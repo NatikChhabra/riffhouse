@@ -153,7 +153,7 @@ button.btn { border: 0; cursor: pointer; }
 .cats { display: flex; flex-wrap: wrap; gap: 8px; }
 .cats button { min-height: 44px; padding: 0 16px; border-radius: var(--r-s); border: 1px solid var(--panel-2); background: transparent; font-size: var(--t-small); font-weight: 500; cursor: pointer; transition: background-color var(--fast) var(--ease); }
 .cats button[aria-pressed="true"] { background: var(--bone); color: var(--coal); border-color: var(--bone); }
-.tone-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px var(--gap); align-content: start; padding-right: 4px; }
+.tone-list { margin-inline: -16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px var(--gap); align-content: start; padding-right: 4px; }
 .tone { display: grid; gap: 2px; width: 100%; height: 100%; align-content: start; text-align: left; padding: 12px 16px; border: 0; border-radius: var(--r-s); background: transparent; cursor: pointer; transition: background-color var(--fast) var(--ease); }
 .tone.is-on { background: var(--panel-2); }
 .tone-n { font-weight: 600; }
@@ -287,8 +287,7 @@ details:not([open]) > p { display: none; }
   .found { grid-column: 1 / -1; display: grid; gap: 12px; padding: 24px; border-radius: var(--r-m); background: var(--well); font-weight: 500; }
   .found li { display: grid; grid-template-columns: 12px 1fr; gap: 12px; align-items: center; }
   .found li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
-  .rail-row .rail-own { padding: 12px; }
-  .rail-row .rail-own p { display: none; }
+  .rail-row .rail-own { grid-column: 1 / -1; }
   .amp-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 16px; }
   .rail-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 16px; }
   .upi { grid-template-columns: minmax(0, 1fr); padding: 20px; }
