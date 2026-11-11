@@ -121,7 +121,9 @@ button.btn { border: 0; cursor: pointer; }
 .hero-pedal img { width: 100%; height: auto; transition: transform 140ms var(--ease); transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
 .hero-pedal:active img, .hero-pedal.is-down img { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(1.2%) scale(.97); }
 .stomp-say { font-size: var(--t-small); font-weight: 500; }
-.hero.is-fuzz h1 { filter: url(#fuzz); }
+.is-fuzz .hero h1, .is-fuzz .monument { filter: url(#fuzz); }
+.is-fuzz h2, .is-fuzz .num { filter: url(#fuzz-s); }
+.is-fuzz .close h2 { filter: none; }
 .hero-pedal { position: absolute; z-index: 0; width: min(calc((100% - 2 * var(--g)) * .4), 62svh, 640px); right: calc(var(--g) + 40px); top: calc(var(--top) + var(--h1) * .92 + 24px); rotate: -6deg; transform-origin: 50% 60%; }
 
 /* The mic jack */
@@ -253,6 +255,7 @@ details:not([open]) > p { display: none; }
 .close { padding-bottom: 48px; overflow: clip; }
 .monument { font-size: calc((100vw - 2 * var(--g)) / 3.76); line-height: .8; padding: .1em var(--g) 0; white-space: nowrap; text-align: center; }
 .monument span { display: inline-block; }
+.monument b { display: inline-block; font-weight: inherit; transform: translateY(var(--lift, 0%)); transition: transform 260ms var(--ease); }
 .close-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: 48px; margin-top: clamp(40px, 5vw, 72px); }
 .close-say { grid-column: 1 / 7; display: grid; gap: 24px; align-content: start; }
 .close-say h2 { font: 600 clamp(28px, 3vw, 40px)/1.1 var(--font-text); text-transform: none; letter-spacing: -.02em; max-width: none; }
@@ -307,6 +310,7 @@ details:not([open]) > p { display: none; }
 @keyframes push { from { transform: translateX(5%); } }
 @keyframes drift { to { translate: 0 22vh; rotate: -15deg; } }
 @keyframes pan-in { from { opacity: 0; transform: translateY(12px); } }
+@keyframes hit { 30% { transform: translateY(3px) scale(.95); } }
 @keyframes chain-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -322,6 +326,12 @@ details:not([open]) > p { display: none; }
   html.js [data-reveal="pop"]:not(.is-in) > li { transform: translateY(36px) scale(.93); }
   .rail-row img, .amp-row img { transition: transform 220ms var(--ease); }
   .pan:not([hidden]) { animation: pan-in 380ms var(--ease) both; }
+  .rail-row li.is-hit img, .amp-row li.is-hit img { animation: hit 260ms var(--ease); }
+  .rail-row li:not(.rail-own), .amp-row li:not(.rail-own) { cursor: pointer; }
+  .hero .btn, .get .btn { translate: var(--mx, 0px) var(--my, 0px); transition: background-color var(--fast) var(--ease), transform var(--fast) var(--ease), translate 180ms var(--ease); }
+  .faq-list details { interpolate-size: allow-keywords; }
+  .faq-list details::details-content { block-size: 0; overflow: clip; transition: block-size 320ms var(--ease), content-visibility 320ms allow-discrete; }
+  .faq-list details[open]::details-content { block-size: auto; }
   html.js [data-reveal="open"] img { clip-path: inset(0); transition: clip-path 900ms var(--ease); }
   html.js [data-reveal="open"]:not(.is-in) img { clip-path: inset(0 0 100% 0); }
   .steps li:nth-child(2), .facts > li:nth-child(2) { transition-delay: 70ms; }

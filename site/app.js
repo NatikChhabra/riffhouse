@@ -66,6 +66,8 @@
     };
 
     const more = $('[data-more]', root);
+    const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    let peek = 0;
     const few = () => (matchMedia('(max-width: 699px)').matches ? 6 : 12);
     let all = false;
     const draw = () => {
@@ -79,6 +81,7 @@
         b.setAttribute('aria-pressed', t.n === current.n);
         b.classList.toggle('is-on', t.n === current.n);
         b.addEventListener('click', () => show(t, true));
+        if (fine) b.addEventListener('pointerenter', () => { clearTimeout(peek); peek = setTimeout(() => { if (current !== t) show(t, true); }, 90); });
         return el('li', {}, [b]);
       }));
       line.textContent = hits.length === 0 ? 'No tone matches that. Try a genre, like blues or metal.'
@@ -185,17 +188,20 @@
   function stomp() {
     const pedal = $('[data-stomp]'), hero = pedal && pedal.closest('.hero');
     if (!pedal) return;
-    const say = $('[data-stomp-say]'), map = $('#fuzz feDisplacementMap');
+    const say = $('[data-stomp-say]'), map = $('#fuzz feDisplacementMap'), small = $('#fuzz-s feDisplacementMap');
+    const page = document.documentElement;
     const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let on = false, raf = 0;
     const settle = (to) => {
       cancelAnimationFrame(raf);
-      if (calm) { map.setAttribute('scale', to); return; }
+      if (calm) { map.setAttribute('scale', to); small.setAttribute('scale', to * 0.4); return; }
       const t0 = performance.now(), peak = on ? to * 3.6 : 0, from = Number(map.getAttribute('scale'));
       const step = (now) => {
         const k = Math.min(1, (now - t0) / 520);
         const kick = on ? Math.sin(k * Math.PI) * peak * (1 - k) : 0;
-        map.setAttribute('scale', (from + (to - from) * k + kick).toFixed(1));
+        const v = from + (to - from) * k + kick;
+        map.setAttribute('scale', v.toFixed(1));
+        small.setAttribute('scale', (v * 0.4).toFixed(1));
         if (k < 1) raf = requestAnimationFrame(step);
       };
       raf = requestAnimationFrame(step);
@@ -203,12 +209,12 @@
     pedal.addEventListener('click', () => {
       on = !on;
       pedal.setAttribute('aria-pressed', on);
-      hero.classList.add('is-fuzz');
+      page.classList.add('is-fuzz');
       if (say) say.textContent = on ? 'Fuzz on. Press again for clean.' : 'Press the pedal for fuzz.';
       pedal.classList.add('is-down');
       setTimeout(() => pedal.classList.remove('is-down'), 150);
       settle(on ? Math.max(3, parseFloat(getComputedStyle($('h1', hero)).fontSize) * 0.045) : 0);
-      if (!on) setTimeout(() => { if (!on) hero.classList.remove('is-fuzz'); }, calm ? 0 : 560);
+      if (!on) setTimeout(() => { if (!on) page.classList.remove('is-fuzz'); }, calm ? 0 : 560);
     });
     if (calm || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     let queued = false;
@@ -250,9 +256,52 @@
     });
   }
 
+  /* Small pleasures for a mouse: the main button leans toward the pointer, the big name ripples under it, pedals press */
+  function play() {
+    $$('.rail-row li:not(.rail-own), .amp-row li:not(.rail-own)').forEach((li) => {
+      li.addEventListener('click', () => {
+        li.classList.remove('is-hit');
+        void li.offsetWidth;
+        li.classList.add('is-hit');
+      });
+    });
+    const word = $('[data-push]');
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    if (word) {
+      /* the word stays one piece of text until a pointer first reaches it */
+      let letters = [], queued = false;
+      word.addEventListener('pointerenter', () => {
+        if (letters.length) return;
+        word.replaceChildren(...[...word.textContent].map((ch) => el('b', { textContent: ch })));
+        letters = [...word.children];
+      });
+      word.addEventListener('pointermove', (e) => {
+        if (queued || !letters.length) return;
+        queued = true;
+        requestAnimationFrame(() => {
+          queued = false;
+          letters.forEach((l) => {
+            const r = l.getBoundingClientRect();
+            const d = Math.abs(e.clientX - (r.left + r.width / 2)) / (r.width * 2.2);
+            l.style.setProperty('--lift', `${(-9 * Math.max(0, 1 - d) ** 2).toFixed(2)}%`);
+          });
+        });
+      });
+      word.addEventListener('pointerleave', () => letters.forEach((l) => l.style.setProperty('--lift', '0%')));
+    }
+    $$('.hero .btn, .get .btn').forEach((btn) => {
+      btn.addEventListener('pointermove', (e) => {
+        const r = btn.getBoundingClientRect();
+        btn.style.setProperty('--mx', `${(((e.clientX - r.left) / r.width - 0.5) * 10).toFixed(1)}px`);
+        btn.style.setProperty('--my', `${(((e.clientY - r.top) / r.height - 0.5) * 8).toFixed(1)}px`);
+      });
+      btn.addEventListener('pointerleave', () => { btn.style.setProperty('--mx', '0px'); btn.style.setProperty('--my', '0px'); });
+    });
+  }
+
   const SPONSOR_URL = '';
   const sponsor = $('[data-sponsor]');
   if (sponsor && SPONSOR_URL) { sponsor.href = SPONSOR_URL; sponsor.hidden = false; }
 
-  tabs(); reveals(); download(); finder(); demos(); copyId(); stomp(); counts();
+  tabs(); reveals(); download(); finder(); demos(); copyId(); stomp(); counts(); play();
 })();
