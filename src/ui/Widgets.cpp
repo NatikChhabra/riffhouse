@@ -162,11 +162,11 @@ void PowerSwitch::paint (juce::Graphics& g)
         const auto dot = r.removeFromLeft (10.0f).withSizeKeepingCentre (8.0f, 8.0f);
         if (on)
         {
-            g.setGradientFill (juce::ColourGradient (colours::record.withAlpha (0.5f), dot.getCentreX(), dot.getCentreY(),
-                                                     colours::record.withAlpha (0.0f), dot.getCentreX() + 9.0f, dot.getCentreY(), true));
+            g.setGradientFill (juce::ColourGradient (colours::lamp.withAlpha (0.5f), dot.getCentreX(), dot.getCentreY(),
+                                                     colours::lamp.withAlpha (0.0f), dot.getCentreX() + 9.0f, dot.getCentreY(), true));
             g.fillEllipse (dot.expanded (9.0f));
             g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffff3d6), dot.getX() + 2.0f, dot.getY() + 2.0f,
-                                                     colours::record, dot.getRight(), dot.getBottom(), true));
+                                                     colours::lamp, dot.getRight(), dot.getBottom(), true));
         }
         else
             g.setColour (juce::Colour (0xff2a2826));
@@ -358,7 +358,7 @@ void Meter::paint (juce::Graphics& g)
 {
     const auto r = getLocalBounds().toFloat();
     const float radius = 0.0f;
-    g.setColour (juce::Colour (0xff262524));
+    g.setColour (juce::Colour (0xff2b2a28));
     g.fillRoundedRectangle (r, radius);
     auto norm = [] (float db) { return juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 60.0f); };
     const float v = norm (levelDb);
@@ -369,10 +369,16 @@ void Meter::paint (juce::Graphics& g)
     else
         g.fillRoundedRectangle (r.withWidth (r.getWidth() * v), radius);
     // cut into segments, like an LED ladder
-    g.setColour (colours::bg);
+    g.setColour (juce::Colour (0xff0b0b0b));
     if (! vertical)
-        for (float x = r.getX() + 3.0f; x < r.getRight(); x += 4.0f)
+    {
+        for (float x = r.getX() + 4.0f; x < r.getRight(); x += 5.0f)
             g.fillRect (x, r.getY(), 1.0f, r.getHeight());
+        // where the level turns from fine to loud to too loud
+        g.setColour (colours::textFaint);
+        for (float db : { -9.0f, -1.0f })
+            g.fillRect (r.getX() + r.getWidth() * norm (db), r.getBottom() - 2.0f, 1.0f, 2.0f);
+    }
     if (holdDb > -59.0f)
     {
         const float hv = norm (holdDb);

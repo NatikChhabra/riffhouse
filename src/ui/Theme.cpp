@@ -79,10 +79,10 @@ void setLook (Look l)
             // neutral warm charcoal, like a dark studio: the gear brings the colour
             bg = juce::Colour (0xff121212); bgTop = juce::Colour (0xff171717); panel = juce::Colour (0xff1a1a1a);
             raised = juce::Colour (0xff232323); raisedHi = juce::Colour (0xff2d2d2d); line = juce::Colour (0xff2e2e2e);
-            well = juce::Colour (0xff0a0a0a); text = juce::Colour (0xffece9e3); textDim = juce::Colour (0xff97938c);
-            textFaint = juce::Colour (0xff625f5a); accent = juce::Colour (0xffe6dfd2); accentHi = juce::Colour (0xffffffff);
+            well = juce::Colour (0xff0a0a0a); text = juce::Colour (0xffece9e3); textDim = juce::Colour (0xffa5a199);
+            textFaint = juce::Colour (0xff7f7b74); accent = juce::Colour (0xffe6dfd2); accentHi = juce::Colour (0xffffffff);
             accentInk = juce::Colour (0xff121212); good = juce::Colour (0xff8fd694); warn = juce::Colour (0xffe8c25a); hot = juce::Colour (0xffffb020);
-            record = juce::Colour (0xffffa31a);
+            record = juce::Colour (0xffe5483a);
             break;
         case Look::signal:
             bg = juce::Colour (0xff141518); bgTop = juce::Colour (0xff17181c); panel = juce::Colour (0xff1c1e22);
@@ -90,7 +90,7 @@ void setLook (Look l)
             well = juce::Colour (0xff050607); text = juce::Colour (0xffe9e7e2); textDim = juce::Colour (0xff8d9096);
             textFaint = juce::Colour (0xff5d6066); accent = juce::Colour (0xffff9f1c); accentHi = juce::Colour (0xffffc266);
             accentInk = juce::Colour (0xff141518); good = stringColour (4); warn = stringColour (1); hot = stringColour (1);
-            record = accent;
+            record = juce::Colour (0xffe5483a);
             break;
         case Look::pedalboard:
             bg = juce::Colour (0xff1b1d1b); bgTop = juce::Colour (0xff1f211f); panel = juce::Colour (0xff2c2f2d);
@@ -98,7 +98,7 @@ void setLook (Look l)
             well = juce::Colour (0xff0b0d0c); text = juce::Colour (0xffeeeae0); textDim = juce::Colour (0xffaaa597);
             textFaint = juce::Colour (0xff76736a); accent = juce::Colour (0xfff4a524); accentHi = juce::Colour (0xffffc457);
             accentInk = juce::Colour (0xff1b1d1b); good = juce::Colour (0xff7bd88f); warn = juce::Colour (0xfff4d03f);
-            hot = juce::Colour (0xfff4d03f); record = accent;
+            hot = juce::Colour (0xfff4d03f); record = juce::Colour (0xffe5483a);
             loud = juce::Colour (0xff0f6b66); silk = juce::Colour (0xffece4cf);
             break;
     }

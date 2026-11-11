@@ -31,6 +31,11 @@ struct PedalDesign
     // 0 light under the name; 1 light at the top edge, three knobs in a triangle;
     // 2 light up and left of the switch; 3 switch left of centre with the light on the right.
     int layout = 0;
+    // The enclosure itself, so a pedalboard is not one box in different paint:
+    // 0 cast box with a round stomp switch; 1 box with a recessed control deck and a hinged foot plate;
+    // 2 folded sheet steel wedge on a base plate; 3 machined slab with a chamfered edge and a soft-touch switch;
+    // 4 console with wooden end cheeks; 5 treadle pedal that rocks
+    int form = 0;
 };
 
 enum class Tolex { levant, tweed, smooth, cream };
@@ -76,7 +81,9 @@ void drawGearKnob (juce::Graphics&, juce::Rectangle<float> area, float angle, fl
 struct PedalLayout
 {
     juce::Rectangle<float> box, knobs, name, led, footswitch;
+    juce::Rectangle<float> treadle; // the rocking plate of a treadle pedal (empty on every other box)
     int variant = 0;
+    int form = 0;
 };
 PedalLayout pedalLayout (juce::Rectangle<float> area, const PedalDesign&, int numKnobs, bool faders = false);
 // Where knob i of n sits on the pedal (one row up to four knobs, two rows above that).
@@ -107,8 +114,20 @@ struct CabLayout
 };
 CabLayout cabLayout (juce::Rectangle<float> area, int cabModel);
 juce::Image renderCab (int cabModel, const CabLayout&, juce::Rectangle<float> area, float scale, const juce::String& irName);
-// micPos 0..10 (centre of the cone to its edge), distance 0..10 (touching to a foot away)
-void drawCabMic (juce::Graphics&, const CabLayout&, float micPos, float distance);
+// The microphone's channel strip: the box its cable runs to, with the four controls that place
+// the mic and trim its lows and highs.
+struct MicPreLayout
+{
+    juce::Rectangle<float> box;
+    std::vector<juce::Rectangle<float>> cells; // position, distance, low cut, high cut
+    juce::Point<float> socket;                 // where the mic cable plugs in
+    float knobSize = 0.0f;
+};
+MicPreLayout micPreLayout (juce::Rectangle<float> box);
+juce::Image renderMicPre (const MicPreLayout&, juce::Rectangle<float> area, float scale);
+// micPos 0..10 (centre of the cone to its edge), distance 0..10 (touching to a foot away).
+// With a socket given, the cable runs along the floor and plugs into it.
+void drawCabMic (juce::Graphics&, const CabLayout&, float micPos, float distance, juce::Point<float> socket = {});
 
 // Small finished pictures of the gear (knobs and switch included) for the chain strip.
 // Everything is in nominal units: draw `image` over `area`, and place it by `box`.
@@ -124,7 +143,11 @@ GearThumb ampThumb (const AmpDesign&, const juce::String& displayText, float sca
 GearThumb cabThumb (int cabModel, float scale);
 
 // The switch itself, for thumbnails as well as the live control.
-void drawFootswitch (juce::Graphics&, juce::Rectangle<float> bounds, bool pressed, bool hover);
+// style 0 round stomp switch, 1 hinged foot plate in the box's own paint, 2 low soft-touch switch
+void drawFootswitch (juce::Graphics&, juce::Rectangle<float> bounds, bool pressed, bool hover, int style = 0, juce::Colour body = {});
+int footswitchStyle (const PedalLayout&);
+// The rocking plate of a treadle pedal. position 0 is heel down, 1 is toe down.
+void drawTreadle (juce::Graphics&, juce::Rectangle<float> well, float position, bool pressed, bool hover);
 
 // A metal stomp switch bound to a module's on/off parameter.
 class Footswitch : public juce::Component, public juce::SettableTooltipClient
@@ -135,10 +158,35 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     bool isOn() const noexcept { return on; }
+    void setStyle (int s, juce::Colour bodyColour) { style = s; body = bodyColour; repaint(); }
     std::function<void (bool)> onChange;
 
 private:
     juce::ParameterAttachment attachment;
     bool on = false, pressed = false;
+    int style = 0;
+    juce::Colour body;
+};
+
+// The treadle of a wah: drag it to rock the pedal, click it to switch the pedal on or off.
+class Treadle : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    Treadle (juce::RangedAudioParameter& position, juce::RangedAudioParameter& onOff);
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    // When the pedal follows the picking by itself there is nothing to rock: it sits level.
+    void setRocking (bool canRock) { rocking = canRock; repaint(); }
+    std::function<void (bool)> onChange;
+
+private:
+    juce::RangedAudioParameter& param;
+    juce::ParameterAttachment pos, power;
+    float value = 0.5f, startValue = 0.5f;
+    bool on = false, pressed = false, dragging = false, rocking = true;
 };
 } // namespace rh::ui

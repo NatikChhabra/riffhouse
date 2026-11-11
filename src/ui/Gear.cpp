@@ -47,13 +47,16 @@ namespace
             case Finish::enamel:
                 break; // smooth baked paint: its gloss is added with the lighting
             case Finish::hammertone:
-                for (int i = 0; i < (int) (area / 70.0f); ++i)
+                // hammered paint pools into shallow dishes a few millimetres across: each one
+                // is lit on the side facing the light and shaded on the other
+                for (int i = 0; i < (int) (area / 120.0f); ++i)
                 {
-                    const float d = 2.0f + rnd.nextFloat() * 5.0f;
+                    const float d = 9.0f + rnd.nextFloat() * 13.0f;
                     const float x = r.getX() + rnd.nextFloat() * r.getWidth(), y = r.getY() + rnd.nextFloat() * r.getHeight();
-                    const bool light = rnd.nextBool();
-                    g.setColour ((light ? juce::Colours::white : juce::Colours::black).withAlpha (0.05f + rnd.nextFloat() * 0.06f));
-                    g.fillEllipse (x, y, d, d * (0.7f + rnd.nextFloat() * 0.5f));
+                    const R cell (x - d * 0.5f, y - d * 0.5f, d, d * (0.75f + rnd.nextFloat() * 0.4f));
+                    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.075f), cell.getX() + d * 0.3f, cell.getY() + d * 0.3f,
+                                                             juce::Colours::black.withAlpha (0.10f), cell.getRight(), cell.getBottom(), true));
+                    g.fillEllipse (cell);
                 }
                 break;
             case Finish::sparkle:
@@ -203,56 +206,71 @@ namespace
         }
     }
 
-    // Paint chipped to bare metal at one corner and scuffed by a boot near the switch. How worn a
-    // box is, and which corner took the knocks, comes from its own seed, so it never changes.
-    void pedalWear (juce::Graphics& g, R b, const PedalLayout& l, C body, juce::int64 seed)
+    // A quarter-inch socket seen from above, coming out of the box's side wall: washer, nut,
+    // threaded bush. Round bar lit from above: a line of light near the top, dark underneath.
+    void sideJack (juce::Graphics& g, float edgeX, float y, bool right, float u)
     {
-        auto rnd = seeded (seed);
-        const int level = rnd.nextInt (3); // 0 looked after, 1 gigged, 2 road worn
-        const bool lightBody = body.getPerceivedBrightness() > 0.55f;
-        const C bare = lightBody ? C (0xff84888b) : C (0xffa4a8ab);
-        auto chip = [&] (juce::Point<float> c, float size)
+        auto piece = [&] (float from, float len, float height, C base, bool threads)
         {
-            juce::Path p;
-            const int n = 5 + rnd.nextInt (4);
-            for (int i = 0; i < n; ++i)
+            const R r (right ? edgeX + from * u : edgeX - (from + len) * u, y - height * u * 0.5f, len * u, height * u);
+            juce::ColourGradient grad (base.brighter (0.5f), 0.0f, r.getY(), base.darker (0.9f), 0.0f, r.getBottom(), false);
+            grad.addColour (0.2, base.brighter (1.3f));
+            grad.addColour (0.5, base);
+            g.setGradientFill (grad);
+            g.fillRoundedRectangle (r, 1.0f * u);
+            if (threads)
             {
-                const float a = juce::MathConstants<float>::twoPi * (float) i / (float) n;
-                const auto v = c.getPointOnCircumference (size * (0.45f + rnd.nextFloat() * 0.75f), a);
-                if (i == 0) p.startNewSubPath (v); else p.lineTo (v);
+                g.setColour (juce::Colours::black.withAlpha (0.35f));
+                for (float x = r.getX() + 1.0f * u; x < r.getRight() - 0.5f * u; x += 2.0f * u)
+                    g.fillRect (x, r.getY(), 0.8f * u, r.getHeight());
             }
-            p.closeSubPath();
-            g.setColour (juce::Colours::black.withAlpha (0.35f)); // the paint's thickness, in shadow
-            g.fillPath (p, juce::AffineTransform::translation (-0.5f, -0.6f));
-            g.setColour (bare.withAlpha (0.9f));
-            g.fillPath (p);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.drawRoundedRectangle (r, 1.0f * u, 0.6f);
+            return r;
         };
-        // the corner that took the knocks, plus a few strays along the bottom edge
-        const bool right = rnd.nextBool(), bottom = rnd.nextInt (4) != 0;
-        const juce::Point<float> corner (right ? b.getRight() : b.getX(), bottom ? b.getBottom() : b.getY());
-        const int chips = 2 + level * 5;
-        for (int i = 0; i < chips; ++i)
+        piece (11.0f, 7.0f, 19.0f, C (0xff8d9195), true);
+        const auto nut = piece (3.0f, 8.0f, 31.0f, C (0xffa0a4a8), false);
+        // the nut's flats: the one facing up is bright, the edges between them are dark lines
+        g.setColour (juce::Colours::black.withAlpha (0.3f));
+        g.fillRect (nut.getX(), nut.getY() + nut.getHeight() * 0.27f, nut.getWidth(), 0.8f);
+        g.fillRect (nut.getX(), nut.getY() + nut.getHeight() * 0.73f, nut.getWidth(), 0.8f);
+        piece (0.0f, 3.0f, 36.0f, C (0xffb4b8bb), false);
+    }
+
+    // A varnished hardwood end cheek: long grain running the length of the box.
+    void woodCheek (juce::Graphics& g, const juce::Path& shape, R r, juce::int64 seed)
+    {
+        juce::Graphics::ScopedSaveState ss (g);
+        g.reduceClipRegion (shape);
+        juce::ColourGradient base (C (0xff6b4326), r.getX(), 0.0f, C (0xff3c2313), r.getRight(), 0.0f, false);
+        base.addColour (0.35, C (0xff5a3720));
+        g.setGradientFill (base);
+        g.fillRect (r);
+        auto rnd = seeded (seed);
+        for (int i = 0; i < (int) (r.getWidth() * 1.6f); ++i)
         {
-            const float along = rnd.nextFloat() * rnd.nextFloat() * 46.0f + 3.0f;
-            const bool onSide = rnd.nextBool();
-            const float inset = 1.5f + rnd.nextFloat() * 3.0f;
-            const juce::Point<float> p (corner.x + (right ? -1.0f : 1.0f) * (onSide ? inset : along),
-                                        corner.y + (bottom ? -1.0f : 1.0f) * (onSide ? along : inset));
-            chip (p, 1.0f + rnd.nextFloat() * (1.2f + (float) level));
+            const float x0 = r.getX() + rnd.nextFloat() * r.getWidth();
+            const float phase = rnd.nextFloat() * 6.0f, sway = 0.6f + rnd.nextFloat() * 2.2f, freq = 0.008f + rnd.nextFloat() * 0.012f;
+            juce::Path grain;
+            bool started = false;
+            for (float y = r.getY() - 4.0f; y <= r.getBottom() + 12.0f; y += 12.0f)
+            {
+                const float x = x0 + std::sin (y * freq + phase) * sway;
+                if (started) grain.lineTo (x, y); else grain.startNewSubPath (x, y);
+                started = true;
+            }
+            const bool light = rnd.nextInt (5) == 0;
+            g.setColour ((light ? C (0xffb9834f) : C (0xff24130a)).withAlpha (0.10f + rnd.nextFloat() * (light ? 0.12f : 0.22f)));
+            g.strokePath (grain.createPathWithRoundedCorners (8.0f), juce::PathStrokeType (0.5f + rnd.nextFloat() * 1.1f));
         }
-        for (int i = 0; i < level * 2; ++i)
-            chip ({ b.getX() + rnd.nextFloat() * b.getWidth(), b.getBottom() - 1.5f - rnd.nextFloat() * 2.5f }, 0.8f + rnd.nextFloat() * 1.4f);
-        // boot scuffs: fine scratches fanning out around the switch
-        const auto sc = l.footswitch.getCentre();
-        const float sr = l.footswitch.getWidth();
-        for (int i = 0; i < 6 + level * 14; ++i)
-        {
-            const float a = rnd.nextFloat() * juce::MathConstants<float>::twoPi;
-            const auto p0 = sc.getPointOnCircumference (sr * (0.75f + rnd.nextFloat() * 0.9f), a);
-            const float len = 4.0f + rnd.nextFloat() * 14.0f, dir = a + 1.2f + rnd.nextFloat() * 0.8f;
-            g.setColour ((lightBody ? juce::Colours::black : juce::Colours::white).withAlpha (0.03f + rnd.nextFloat() * 0.06f));
-            g.drawLine (juce::Line<float> (p0, p0.getPointOnCircumference (len, dir)), 0.6f);
-        }
+        // varnish: one soft line of light down the rounded top of the cheek
+        const float hx = r.getX() + r.getWidth() * 0.32f;
+        juce::ColourGradient shine (juce::Colours::white.withAlpha (0.0f), hx - r.getWidth() * 0.3f, 0.0f, juce::Colours::white.withAlpha (0.0f), hx + r.getWidth() * 0.3f, 0.0f, false);
+        shine.addColour (0.5, juce::Colours::white.withAlpha (0.16f));
+        g.setGradientFill (shine);
+        g.fillRect (r);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.35f), r.getX(), r.getY(), juce::Colours::black.withAlpha (0.55f), r.getRight(), r.getBottom(), false));
+        g.strokePath (shape, juce::PathStrokeType (2.0f));
     }
 
     // the lettering fitted to a width
@@ -274,49 +292,49 @@ namespace
 //==============================================================================
 const PedalDesign& drivePedalDesign (int t)
 {
-    // body, ink, led, finish, knob, knob cap, face, upper, width, stripe
+    // name, kind, body, ink, led, finish, knob, knob cap, face, upper, width, stripe, layout, form
     static const PedalDesign d[] = {
-        { "clean boost", "plus 20 dB of clean", 0xffaeb3b5, 0xff16191b, 0xffd9f1ff, Finish::brushed,    KnobStyle::dome,    0xff16191b, Face::instrumentSemi, false, 0.86f, 0, 1 },
-        { "TREBLE BOOSTER", "range 1", 0xff5f6f78, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xffece4cf, Face::shoulders,      true,  0.92f, 0, 2 },
-        { "GREEN DRIVE", "mid overdrive", 0xff2e6a42, 0xfff0e8cc, 0xff7dffa0, Finish::enamel,     KnobStyle::pedal,   0xfff0e8cc, Face::shoulders,      true,  1.0f,  1 },
-        { "blues drive", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::instrumentSemi, false, 1.0f,  0, 1 },
-        { "RODENT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2 },
-        { "big fuzz", "sustainer", 0xffe6dbc0, 0xff3b2a1a, 0xffffb547, Finish::enamel,     KnobStyle::skirted, 0xff1e1a16, Face::shoulders,      false, 1.28f, 3, 3 },
-        { "METAL BOX", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2 },
+        { "clean boost", "plus 20 dB of clean", 0xffaeb3b5, 0xff16191b, 0xffd9f1ff, Finish::brushed,    KnobStyle::dome,    0xff16191b, Face::instrumentSemi, false, 0.86f, 0, 1, 3 },
+        { "TREBLE BOOSTER", "range 1", 0xff5f6f78, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xffece4cf, Face::shoulders,      true,  0.92f, 0, 2, 0 },
+        { "GREEN DRIVE", "mid overdrive", 0xff2e6a42, 0xfff0e8cc, 0xff7dffa0, Finish::enamel,     KnobStyle::pedal,   0xfff0e8cc, Face::shoulders,      true,  1.0f,  1, 0, 0 },
+        { "blues drive", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::instrumentSemi, false, 1.0f,  0, 1, 0 },
+        { "RODENT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
+        { "big fuzz", "sustainer", 0xffe6dbc0, 0xff3b2a1a, 0xffffb547, Finish::enamel,     KnobStyle::skirted, 0xff1e1a16, Face::shoulders,      false, 1.28f, 3, 3, 2 },
+        { "METAL BOX", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
     };
     return d[juce::jlimit (0, (int) std::size (d) - 1, t)];
 }
 
 const PedalDesign* pedalDesignFor (int module, int type)
 {
-    // name, kind, body, ink, led, finish, knob, knob cap, face, upper, width, stripe
-    static const PedalDesign gate   { "SILENCER", "noise gate", 0xff3e4537, 0xfff0e8cc, 0xff7dffa0, Finish::hammertone, KnobStyle::pedal, 0xfff0e8cc, Face::shoulders, true, 0.95f, 0, 2 };
-    static const PedalDesign comp   { "squeeze", "compressor", 0xff3f8fc4, 0xfff7f7f2, 0xffd9f1ff, Finish::enamel, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.22f, 0, 3 };
-    static const PedalDesign wah    { "FUNK FILTER", "wah and envelope", 0xffd9a521, 0xff2a1d10, 0xff7dffa0, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 1.0f, 1 };
-    static const PedalDesign pitch  { "deep octave", "pitch shifter", 0xff5b3c8f, 0xffeae6f4, 0xffd9c4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 0.95f, 0, 1 };
-    static const PedalDesign eq     { "GRAPHIC EQ", "seven band", 0xff18191b, 0xffeceae4, 0xff7dffa0, Finish::crinkle, KnobStyle::pedal, 0xffeceae4, Face::shoulders, true, 1.5f, 0 };
-    static const PedalDesign lofi   { "dusty tape", "lo-fi machine", 0xff6b5a44, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, false, 1.18f, 0 };
+    // name, kind, body, ink, led, finish, knob, knob cap, face, upper, width, stripe, layout, form
+    static const PedalDesign gate   { "SILENCER", "noise gate", 0xff3e4537, 0xfff0e8cc, 0xff7dffa0, Finish::hammertone, KnobStyle::pedal, 0xfff0e8cc, Face::shoulders, true, 0.95f, 0, 0, 1 };
+    static const PedalDesign comp   { "squeeze", "compressor", 0xff3f8fc4, 0xfff7f7f2, 0xffd9f1ff, Finish::anodised, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.22f, 0, 3, 3 };
+    static const PedalDesign wah    { "FUNK FILTER", "wah and envelope", 0xffd9a521, 0xff2a1d10, 0xff7dffa0, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 0.9f, 0, 0, 5 };
+    static const PedalDesign pitch  { "deep octave", "pitch shifter", 0xff5b3c8f, 0xffeae6f4, 0xffd9c4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 0.95f, 0, 1, 0 };
+    static const PedalDesign eq     { "GRAPHIC EQ", "seven band", 0xff18191b, 0xffeceae4, 0xff7dffa0, Finish::crinkle, KnobStyle::pedal, 0xffeceae4, Face::shoulders, true, 1.5f, 0, 0, 2 };
+    static const PedalDesign lofi   { "dusty tape", "lo-fi machine", 0xff6b5a44, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, false, 1.34f, 0, 0, 4 };
     static const PedalDesign mods[] = {
-        { "liquid chorus", "chorus", 0xff6fc3b2, 0xff10302a, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.0f, 0, 1 },
-        { "JET FLANGER", "flanger", 0xffaeb3b5, 0xff2e2350, 0xffd9c4ff, Finish::brushed, KnobStyle::pedal, 0xfff7f7f2, Face::shoulders, true, 1.0f, 0, 2 },
-        { "PHASE FOUR", "phaser", 0xffb07a2a, 0xff1d140a, 0xffffb547, Finish::hammertone, KnobStyle::pedal, 0xfff1ead8, Face::shoulders, true, 0.9f, 0 },
-        { "tremble", "tremolo", 0xffe6dbc0, 0xff1d1a16, 0xffffb547, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, false, 1.0f, 0, 2 },
-        { "warble", "vibrato", 0xff1f4e5f, 0xffe6edf0, 0xff7fc4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.0f, 0, 1 },
-        { "ROTARY VIBE", "vibe", 0xff4a3426, 0xfff1ead8, 0xffffb547, Finish::crinkle, KnobStyle::skirted, 0xff141516, Face::shoulders, true, 1.25f, 3, 3 },
+        { "liquid chorus", "chorus", 0xff6fc3b2, 0xff10302a, 0xffd9f1ff, Finish::anodised, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.0f, 0, 1, 3 },
+        { "JET FLANGER", "flanger", 0xffaeb3b5, 0xff2e2350, 0xffd9c4ff, Finish::brushed, KnobStyle::pedal, 0xfff7f7f2, Face::shoulders, true, 1.0f, 0, 2, 3 },
+        { "PHASE FOUR", "phaser", 0xffb07a2a, 0xff1d140a, 0xffffb547, Finish::hammertone, KnobStyle::pedal, 0xfff1ead8, Face::shoulders, true, 0.9f, 0, 0, 0 },
+        { "tremble", "tremolo", 0xffe6dbc0, 0xff1d1a16, 0xffffb547, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, false, 1.0f, 0, 0, 1 },
+        { "warble", "vibrato", 0xff1f4e5f, 0xffe6edf0, 0xff7fc4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.0f, 0, 1, 0 },
+        { "ROTARY VIBE", "vibe", 0xff4a3426, 0xfff1ead8, 0xffffb547, Finish::crinkle, KnobStyle::skirted, 0xff141516, Face::shoulders, true, 1.25f, 3, 3, 2 },
     };
     static const PedalDesign delays[] = {
-        { "digital echo", "delay", 0xffeceae4, 0xff16181a, 0xff7fc4ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0 },
-        { "BUCKET DELAY", "analog delay", 0xff4c5a4f, 0xfff0e8cc, 0xffffb547, Finish::hammertone, KnobStyle::pedal, 0xfff0e8cc, Face::shoulders, true, 1.18f, 0, 3 },
-        { "TAPE ECHO", "tape delay", 0xff8a6a48, 0xfff1ead8, 0xffffb547, Finish::crinkle, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 1.3f, 3 },
-        { "ping pong", "stereo delay", 0xff2d3e5c, 0xfff1f3f6, 0xff7fc4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.18f, 0, 2 },
+        { "digital echo", "delay", 0xffeceae4, 0xff16181a, 0xff7fc4ff, Finish::anodised, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0, 0, 3 },
+        { "BUCKET DELAY", "analog delay", 0xff4c5a4f, 0xfff0e8cc, 0xffffb547, Finish::hammertone, KnobStyle::pedal, 0xfff0e8cc, Face::shoulders, true, 1.18f, 0, 0, 1 },
+        { "TAPE ECHO", "tape delay", 0xff8a6a48, 0xfff1ead8, 0xffffb547, Finish::crinkle, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 1.36f, 3, 0, 4 },
+        { "ping pong", "stereo delay", 0xff2d3e5c, 0xfff1f3f6, 0xff7fc4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.18f, 0, 2, 0 },
     };
     static const PedalDesign reverbs[] = {
-        { "small room", "reverb", 0xff5d7f99, 0xfff4f6f8, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0, 2 },
-        { "CONCERT HALL", "reverb", 0xff151517, 0xffd8b04a, 0xffffb547, Finish::sparkle, KnobStyle::hat, 0xffd8b04a, Face::shoulders, true, 1.18f, 0 },
-        { "plate", "reverb", 0xffaeb3b5, 0xff16191b, 0xff7fc4ff, Finish::brushed, KnobStyle::dome, 0xff16191b, Face::instrumentSemi, false, 1.18f, 0, 3 },
-        { "SPRING TANK", "reverb", 0xff2a2a2c, 0xffd0d4d8, 0xffffb547, Finish::crinkle, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 1.3f, 1 },
-        { "shimmer", "octave reverb", 0xffe8e6ef, 0xff4a3c78, 0xffd9c4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.18f, 0, 1 },
-        { "cloud", "ambient reverb", 0xffb8cbe0, 0xff17243a, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0, 3 },
+        { "small room", "reverb", 0xff5d7f99, 0xfff4f6f8, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0, 0, 1 },
+        { "CONCERT HALL", "reverb", 0xff151517, 0xffd8b04a, 0xffffb547, Finish::anodised, KnobStyle::hat, 0xffd8b04a, Face::shoulders, true, 1.36f, 0, 0, 4 },
+        { "plate", "reverb", 0xffaeb3b5, 0xff16191b, 0xff7fc4ff, Finish::brushed, KnobStyle::dome, 0xff16191b, Face::instrumentSemi, false, 1.18f, 0, 3, 3 },
+        { "SPRING TANK", "reverb", 0xff2a2a2c, 0xffd0d4d8, 0xffffb547, Finish::crinkle, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 1.36f, 1, 3, 4 },
+        { "shimmer", "octave reverb", 0xffe8e6ef, 0xff4a3c78, 0xffd9c4ff, Finish::anodised, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.18f, 0, 1, 3 },
+        { "cloud", "ambient reverb", 0xffb8cbe0, 0xff17243a, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0, 3, 0 },
     };
     auto pick = [type] (const PedalDesign* arr, int n) { return &arr[juce::jlimit (0, n - 1, type)]; };
     switch (module)
@@ -566,18 +584,19 @@ PedalLayout pedalLayout (R area, const PedalDesign& d, int numKnobs, bool faders
 {
     PedalLayout l;
     const float h = std::min (area.getHeight(), 420.0f);
+    const bool tall = faders || numKnobs > 4;
+    l.form = (d.form == 1 && tall) ? 0 : d.form;
     const float w = std::min (area.getWidth(), h * 0.64f * d.width);
     l.box = R (w, h).withCentre (area.getCentre());
     const auto b = l.box;
-    const bool tall = faders || numKnobs > 4;
     l.variant = tall ? 0 : d.layout;
     const float fs = std::min (w * 0.27f, h * (tall ? 0.13f : 0.15f));
     auto at = [&] (float fx, float fy) { return juce::Point<float> (b.getX() + w * fx, b.getY() + h * fy); };
     const float knobH = faders ? 0.50f : (tall ? 0.42f : 0.32f);
     l.knobs = R (b.getX() + w * 0.06f, b.getY() + h * 0.045f, w * 0.88f, h * knobH);
     l.name = R (b.getX() + w * 0.08f, b.getY() + h * (tall ? 0.56f : 0.41f), w * 0.84f, h * (tall ? 0.13f : 0.17f));
-    l.led = R (12.0f, 12.0f).withCentre (at (0.5f, tall ? 0.725f : 0.645f));
-    l.footswitch = R (fs, fs).withCentre (at (0.5f, tall ? 0.855f : 0.81f));
+    l.led = R (12.0f, 12.0f).withCentre (at (0.5f, tall ? 0.748f : 0.645f));
+    l.footswitch = R (fs, fs).withCentre (at (0.5f, tall ? 0.868f : 0.81f));
     switch (l.variant)
     {
         case 1: // light at the top edge; a row of three becomes a triangle
@@ -597,6 +616,33 @@ PedalLayout pedalLayout (R area, const PedalDesign& d, int numKnobs, bool faders
             break;
         default: break;
     }
+    // the enclosure families move the parts again
+    switch (l.form)
+    {
+        case 1: // control deck on top, the name on the bar under it, then the foot plate
+            l.variant = 0;
+            l.knobs = R (b.getX() + w * 0.09f, b.getY() + h * 0.05f, w * 0.82f, h * 0.29f);
+            l.name = R (b.getX() + w * 0.10f, b.getY() + h * 0.385f, w * 0.80f, h * 0.125f);
+            l.led = l.led.withCentre (at (0.5f, 0.548f));
+            l.footswitch = R (b.getX() + w * 0.09f, b.getY() + h * 0.59f, w * 0.82f, h * 0.365f);
+            break;
+        case 4: // the wooden cheeks take the outer edges
+        {
+            const float cheek = w * 0.095f;
+            l.knobs = l.knobs.withX (b.getX() + cheek + w * 0.03f).withWidth (w - 2.0f * cheek - w * 0.06f);
+            l.name = l.name.withX (b.getX() + cheek + w * 0.04f).withWidth (w - 2.0f * cheek - w * 0.08f);
+            break;
+        }
+        case 5: // two small controls and the light on the nose, the treadle below
+            l.variant = 0;
+            l.knobs = R (b.getX() + w * 0.08f, b.getY() + h * 0.03f, w * 0.84f, h * 0.205f);
+            l.name = R (b.getX() + w * 0.10f, b.getY() + h * 0.245f, w * 0.80f, h * 0.105f);
+            l.led = l.led.withCentre (at (0.5f, 0.085f));
+            l.treadle = R (b.getX() + w * 0.17f, b.getY() + h * 0.385f, w * 0.66f, h * 0.585f);
+            l.footswitch = l.treadle.withHeight (l.treadle.getHeight() * 0.3f); // the toe: where the switch under it is
+            break;
+        default: break;
+    }
     return l;
 }
 
@@ -608,6 +654,12 @@ R pedalKnobCell (const PedalLayout& l, int i, int n)
         const float cw = l.knobs.getWidth() / 3.0f, ch = l.knobs.getHeight() * 0.7f;
         return { l.knobs.getX() + cw * (float) i, l.knobs.getY() + (i == 1 ? l.knobs.getHeight() - ch : 0.0f), cw, ch };
     }
+    if (l.form == 5)
+    {
+        // one each side of the light
+        const float cw = l.knobs.getWidth() * 0.4f;
+        return { i == 0 ? l.knobs.getX() : l.knobs.getRight() - cw, l.knobs.getY(), cw, l.knobs.getHeight() };
+    }
     const int rows = n > 4 ? 2 : 1;
     const int perRow = (n + rows - 1) / rows;
     const int row = i / perRow, col = i % perRow;
@@ -618,6 +670,8 @@ R pedalKnobCell (const PedalLayout& l, int i, int n)
     return { x0 + cw * (float) col, l.knobs.getY() + ch * (float) row, cw, ch };
 }
 
+int footswitchStyle (const PedalLayout& l) { return l.form == 1 ? 1 : (l.form == 3 ? 2 : 0); }
+
 juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, float scale)
 {
     juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
@@ -625,8 +679,11 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
     juce::Graphics g (img);
     g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
     const auto b = l.box;
-    const float rad = b.getWidth() * 0.045f;
-    const C body (d.body);
+    const int form = l.form;
+    const float w = b.getWidth(), h = b.getHeight();
+    const float u = h / 420.0f; // every fixed size below was drawn for the full-size pedal
+    const float rad = form == 2 ? 4.0f * u : (form == 3 ? w * 0.028f : (form == 4 ? 10.0f * u : w * 0.045f));
+    const C body (d.body), ink (d.ink);
 
     // shadow on the floor: wide and soft away from the light, tight and dark right under the box
     juce::Path face;
@@ -637,32 +694,85 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
         juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 30, { 4, 12 }).drawForPath (g, p);
         juce::DropShadow (juce::Colours::black.withAlpha (0.75f), 7, { 1, 5 }).drawForPath (g, p);
     }
-    // the box's side, seen below the top face
-    g.setGradientFill (juce::ColourGradient (body.darker (0.55f), b.getX(), 0, body.darker (1.1f), b.getRight(), 0, false));
-    g.fillRoundedRectangle (b.translated (0.0f, 6.0f), rad);
+    // the sockets come out of the side walls, so they go down before the top face covers their roots
+    if (form != 4)
+    {
+        const float jy = b.getY() + h * (form == 5 ? 0.13f : (form == 1 ? 0.19f : 0.22f));
+        sideJack (g, b.getX() + 1.0f, jy, false, u);
+        sideJack (g, b.getRight() - 1.0f, jy, true, u);
+    }
+    // the box's side, seen below the top face; a folded top sits on a plain steel base plate
+    if (form == 2)
+    {
+        fillMetal (g, b.translated (0.0f, 7.0f * u).expanded (1.5f * u, 0.0f), C (0xff84888c), rad);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.fillRect (b.getX(), b.getBottom() - 1.0f, w, 1.6f * u);
+    }
+    else
+    {
+        g.setGradientFill (juce::ColourGradient (body.darker (0.55f), b.getX(), 0, body.darker (1.1f), b.getRight(), 0, false));
+        g.fillRoundedRectangle (b.translated (0.0f, (form == 3 ? 4.5f : 6.0f) * u), rad);
+    }
     g.setGradientFill (juce::ColourGradient (body.brighter (0.16f), b.getX(), b.getY(), body.darker (0.24f), b.getRight(), b.getBottom(), false));
     g.fillPath (face);
     {
         juce::Graphics::ScopedSaveState s (g);
         g.reduceClipRegion (face);
         finishTexture (g, b, d.finish, body, (juce::int64) d.body * 31 + 7);
-        // edges: light along the top, a darker band at the sides
-        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.22f), b.getX(), 0, juce::Colours::black.withAlpha (0.0f), b.getX() + 18.0f, 0, false));
-        g.fillRect (b.withWidth (18.0f));
-        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.0f), b.getRight() - 18.0f, 0, juce::Colours::black.withAlpha (0.25f), b.getRight(), 0, false));
-        g.fillRect (b.withLeft (b.getRight() - 18.0f));
+        // the face falls away a little toward the sides
+        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.22f), b.getX(), 0, juce::Colours::black.withAlpha (0.0f), b.getX() + 18.0f * u, 0, false));
+        g.fillRect (b.withWidth (18.0f * u));
+        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.0f), b.getRight() - 18.0f * u, 0, juce::Colours::black.withAlpha (0.25f), b.getRight(), 0, false));
+        g.fillRect (b.withLeft (b.getRight() - 18.0f * u));
 
-        const C ink (d.ink);
+        if (form == 2)
+        {
+            // below the fold the face slopes down toward the player and takes less light
+            const float foldY = l.name.getY() - h * 0.022f;
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.10f), 0.0f, foldY, juce::Colours::black.withAlpha (0.26f), 0.0f, b.getBottom(), false));
+            g.fillRect (b.withTop (foldY));
+            g.setColour (juce::Colours::white.withAlpha (0.32f));
+            g.fillRect (b.getX(), foldY - 1.0f * u, w, 1.0f * u);
+            g.setColour (juce::Colours::black.withAlpha (0.28f));
+            g.fillRect (b.getX(), foldY, w, 1.4f * u);
+        }
+        if (form == 1)
+        {
+            // the control deck is pressed a little below the rim, so heels miss the knobs
+            const auto deck = R (b.getX() + w * 0.055f, b.getY() + h * 0.03f, w * 0.89f, l.name.getY() - b.getY() - h * 0.05f);
+            g.setColour (juce::Colours::black.withAlpha (0.20f));
+            g.fillRoundedRectangle (deck, 7.0f * u);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.38f), 0.0f, deck.getY(), juce::Colours::black.withAlpha (0.0f), 0.0f, deck.getY() + 10.0f * u, false));
+            g.fillRoundedRectangle (deck, 7.0f * u);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.5f), deck.getX(), deck.getY(), juce::Colours::white.withAlpha (0.3f), deck.getRight(), deck.getBottom(), false));
+            g.drawRoundedRectangle (deck, 7.0f * u, 1.2f * u);
+            // the well the foot plate drops into
+            const auto well = l.footswitch.expanded (3.5f * u);
+            g.setColour (C (0xff070707));
+            g.fillRoundedRectangle (well, 6.0f * u);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.6f), well.getX(), well.getY(), juce::Colours::white.withAlpha (0.28f), well.getRight(), well.getBottom(), false));
+            g.drawRoundedRectangle (well, 6.0f * u, 1.2f * u);
+        }
+        if (form == 5)
+        {
+            // the treadle rocks in a trough cut into the casting
+            const auto well = l.treadle.expanded (5.0f * u);
+            g.setColour (C (0xff090909));
+            g.fillRoundedRectangle (well, 8.0f * u);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.6f), well.getX(), well.getY(), juce::Colours::white.withAlpha (0.3f), well.getRight(), well.getBottom(), false));
+            g.drawRoundedRectangle (well, 8.0f * u, 1.3f * u);
+        }
+
         if (d.stripe == 1)
         {
             g.setColour (ink.withAlpha (0.9f));
-            g.fillRect (b.getX(), l.name.getY() - 10.0f, b.getWidth(), 2.0f);
-            g.fillRect (b.getX(), l.name.getBottom() + 26.0f, b.getWidth(), 2.0f);
+            g.fillRect (b.getX(), l.name.getY() - 10.0f * u, w, 2.0f * u);
+            g.fillRect (b.getX(), l.name.getBottom() + 26.0f * u, w, 2.0f * u);
         }
         else if (d.stripe == 2)
         {
             // tread plate along the bottom edge
-            const auto strip = b.withTop (b.getBottom() - b.getHeight() * 0.09f);
+            const auto strip = b.withTop (b.getBottom() - h * 0.09f);
             fillMetal (g, strip, C (0xff8d9196), 0.0f);
             for (float x = strip.getX() - 20.0f; x < strip.getRight(); x += 14.0f)
                 for (float y = strip.getY() + 4.0f; y < strip.getBottom(); y += 10.0f)
@@ -677,54 +787,84 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
         else if (d.stripe == 3)
         {
             g.setColour (ink.withAlpha (0.92f));
-            g.fillRect (b.getX(), l.name.getY() - 6.0f, b.getWidth(), l.name.getHeight() + 12.0f);
+            g.fillRect (b.getX(), l.name.getY() - 6.0f * u, w, l.name.getHeight() + 12.0f * u);
         }
         // gloss paint picks up the room: a soft patch of light on the upper left, no hard edge
         if (d.finish == Finish::enamel || d.finish == Finish::sparkle)
         {
-            const juce::Point<float> gc (b.getX() + b.getWidth() * 0.22f, b.getY() + b.getHeight() * 0.06f);
+            const juce::Point<float> gc (b.getX() + w * 0.22f, b.getY() + h * 0.06f);
             juce::ColourGradient gloss (juce::Colours::white.withAlpha (0.16f), gc.x, gc.y,
-                                        juce::Colours::white.withAlpha (0.0f), gc.x + b.getWidth() * 0.9f, gc.y, true);
+                                        juce::Colours::white.withAlpha (0.0f), gc.x + w * 0.9f, gc.y, true);
             gloss.addColour (0.5, juce::Colours::white.withAlpha (0.05f));
             g.setGradientFill (gloss);
             g.fillRect (b);
         }
-        // a cast box has rolled edges: they catch the light on the top and left, and fall dark on the bottom and right
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.5f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.5f), b.getRight(), b.getBottom(), false));
-        g.drawRoundedRectangle (b.reduced (1.2f), rad, 2.6f);
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.10f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.10f), b.getRight(), b.getBottom(), false));
-        g.drawRoundedRectangle (b.reduced (3.4f), rad * 0.85f, 1.2f);
+        if (form == 4)
+        {
+            // the steel panel sits a little below the hardwood end cheeks: the left one shades it
+            const float cheek = w * 0.095f;
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.5f), b.getX() + cheek, 0.0f, juce::Colours::black.withAlpha (0.0f), b.getX() + cheek + 10.0f * u, 0.0f, false));
+            g.fillRect (b.getX() + cheek, b.getY(), 10.0f * u, h);
+            g.setColour (juce::Colours::white.withAlpha (0.35f));
+            g.fillRect (b.getX() + cheek, b.getY(), w - 2.0f * cheek, 1.2f * u);
+            g.setColour (juce::Colours::black.withAlpha (0.45f));
+            g.fillRect (b.getX() + cheek, b.getBottom() - 1.4f * u, w - 2.0f * cheek, 1.4f * u);
+        }
+        else if (form == 3)
+        {
+            // machined from a block: a flat chamfer all round, bright where it faces the light
+            g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.62f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.5f), b.getRight(), b.getBottom(), false));
+            g.drawRoundedRectangle (b.reduced (2.2f * u), rad, 4.4f * u);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.28f), b.getX(), b.getY(), juce::Colours::white.withAlpha (0.22f), b.getRight(), b.getBottom(), false));
+            g.drawRoundedRectangle (b.reduced (4.8f * u), rad * 0.8f, 0.9f * u);
+        }
+        else if (form == 2)
+        {
+            // bent sheet: a tight bright bend at the top and left, nothing soft about it
+            g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.55f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.45f), b.getRight(), b.getBottom(), false));
+            g.drawRoundedRectangle (b.reduced (0.7f * u), rad, 1.4f * u);
+        }
+        else
+        {
+            // a cast box has rolled edges: they catch the light on the top and left, and fall dark on the bottom and right
+            g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.5f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.5f), b.getRight(), b.getBottom(), false));
+            g.drawRoundedRectangle (b.reduced (1.2f * u), rad, 2.6f * u);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.10f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.10f), b.getRight(), b.getBottom(), false));
+            g.drawRoundedRectangle (b.reduced (3.4f * u), rad * 0.85f, 1.2f * u);
+        }
     }
 
-    // lettering
+    if (form == 4)
     {
-        const C ink (d.ink);
+        // hardwood end cheeks, standing a little proud of the panel at both ends
+        const float cheek = w * 0.095f;
+        for (bool right : { false, true })
+        {
+            const auto ck = (right ? b.withLeft (b.getRight() - cheek) : b.withWidth (cheek)).expanded (0.0f, 4.0f * u);
+            juce::Path cp;
+            cp.addRoundedRectangle (ck, 7.0f * u);
+            juce::DropShadow (juce::Colours::black.withAlpha (0.5f), std::max (2, (int) (5.0f * u)), { (int) (2.0f * u), (int) (3.0f * u) }).drawForPath (g, cp);
+            woodCheek (g, cp, ck, (juce::int64) d.body * 17 + (right ? 5 : 3));
+        }
+    }
+
+    // lettering: printed on paint, cut into bare metal
+    {
         const C letterInk = d.stripe == 3 ? body : ink;
-        juce::String name (d.name);
-        letter (g, name, l.name.withTrimmedBottom (l.name.getHeight() * 0.25f), faceFont (d.face, l.name.getHeight() * 0.62f),
-                letterInk, juce::Justification::centred);
-        letter (g, juce::String (d.kind), l.name.withTrimmedTop (l.name.getHeight() * 0.74f).translated (0.0f, d.stripe == 3 ? 2.0f : 4.0f),
-                faceFont (Face::instrument, 12.5f), letterInk.withAlpha (0.8f), juce::Justification::centred);
+        const auto nameR = l.name.withTrimmedBottom (l.name.getHeight() * 0.25f);
+        const auto kindR = l.name.withTrimmedTop (l.name.getHeight() * 0.74f).translated (0.0f, (d.stripe == 3 ? 2.0f : 4.0f) * u);
+        const auto nameFont = faceFont (d.face, l.name.getHeight() * 0.62f);
+        const auto kindFont = faceFont (Face::instrument, std::max (12.5f * u, l.name.getHeight() * 0.2f));
+        if (form == 3 && d.stripe != 3)
+        {
+            const bool lightMetal = body.getPerceivedBrightness() > 0.5f;
+            const C edge = lightMetal ? juce::Colours::white.withAlpha (0.55f) : juce::Colours::black.withAlpha (0.5f);
+            letter (g, juce::String (d.name), nameR.translated (0.0f, 1.0f * u), nameFont, edge, juce::Justification::centred);
+        }
+        letter (g, juce::String (d.name), nameR, nameFont, letterInk, juce::Justification::centred);
+        letter (g, juce::String (d.kind), kindR, kindFont, letterInk.withAlpha (0.8f), juce::Justification::centred);
     }
 
-    // a little history: every box has been played, and each one shows it in its own place
-    {
-        juce::Graphics::ScopedSaveState ss (g);
-        g.reduceClipRegion (face);
-        pedalWear (g, b, l, body, (juce::int64) d.body * 13 + (juce::int64) d.ink);
-    }
-
-    // jacks on both sides (input on the right, output on the left, like real boxes),
-    // a chrome bezel for the light and a nut under the switch
-    for (bool right : { false, true })
-    {
-        const float jy = b.getY() + b.getHeight() * 0.22f;
-        const auto nut = R (10.0f, 26.0f).withCentre ({ right ? b.getRight() + 4.0f : b.getX() - 4.0f, jy });
-        fillMetal (g, nut, C (0xffb9bdc0), 2.0f, false);
-        g.setColour (juce::Colours::black.withAlpha (0.4f));
-        for (float y = nut.getY() + 4.0f; y < nut.getBottom() - 2.0f; y += 4.0f)
-            g.fillRect (nut.getX(), y, nut.getWidth(), 1.0f);
-    }
     // the light sits in a turned chrome bezel
     {
         const auto lc = l.led.getCentre();
@@ -735,7 +875,23 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
         g.setColour (C (0xff0a0a0a));
         g.fillEllipse (l.led.expanded (1.0f));
     }
-    hexNut (g, l.footswitch.getCentre(), l.footswitch.getWidth() * 0.62f);
+    if (form == 5)
+    {
+        // the bolts the treadle pivots on, one each side of the trough
+        for (float x : { l.treadle.getX() - 15.0f * u, l.treadle.getRight() + 15.0f * u })
+            hexNut (g, { x, l.treadle.getCentreY() }, 6.5f * u);
+    }
+    else if (footswitchStyle (l) == 0)
+        hexNut (g, l.footswitch.getCentre(), l.footswitch.getWidth() * 0.62f);
+    else if (footswitchStyle (l) == 2)
+    {
+        // a soft-touch switch sits in a counterbore, flush with the face
+        const auto bore = l.footswitch.expanded (3.0f * u);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.7f), bore.getX(), bore.getY(), juce::Colours::white.withAlpha (0.35f), bore.getRight(), bore.getBottom(), false));
+        g.fillEllipse (bore);
+        g.setColour (C (0xff0b0b0b));
+        g.fillEllipse (bore.reduced (1.6f * u));
+    }
     return img;
 }
 
@@ -1375,7 +1531,11 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
         auto label = [&] (const char* t, float cx)
         {
             const juce::String text = d.upper ? juce::String (t).toUpperCase() : juce::String (t);
-            letter (g, text, R (80.0f, 16.0f).withCentre ({ cx, labelCy }), f, C (d.ink), juce::Justification::centred);
+            // on the same line as the names under the knobs
+            const bool withKnobs = d.form != 4 && ! l.cells.empty();
+            const auto box = withKnobs ? R (cx - 40.0f, l.cells.front().getBottom() - ampLabelH + 1.0f, 80.0f, ampLabelH)
+                                       : R (80.0f, 16.0f).withCentre ({ cx, labelCy });
+            letter (g, text, box, f, C (d.ink), withKnobs ? juce::Justification::centredTop : juce::Justification::centred);
         };
         jackSocket (g, l.jack, l.knobSize < 62.0f ? 13.0f : 15.0f);
         label ("input", l.jack.x);
@@ -1680,7 +1840,7 @@ CabLayout cabLayout (R area, int model)
     const float scale = spec.speakerInches < 10.0f ? 0.72f : 1.0f;
     float h = area.getHeight() * scale, w = h * spec.aspect;
     if (w > area.getWidth()) { w = area.getWidth(); h = w / spec.aspect; }
-    l.box = R (w, h).withCentre (area.getCentre());
+    l.box = R (w, h).withCentre (area.getCentre()).withBottomY (area.getBottom()); // every cab stands on the floor
     l.baffle = l.box.reduced (std::max (14.0f, w * 0.045f));
     const float cw = l.baffle.getWidth() / (float) spec.cols, ch = l.baffle.getHeight() / (float) spec.rows;
     const float d = std::min (cw, ch) * 0.86f * (spec.speakerInches == 10.0f ? 0.94f : 1.0f);
@@ -1772,7 +1932,110 @@ juce::Image renderCab (int model, const CabLayout& l, R area, float scale, const
     return img;
 }
 
-void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float distance)
+MicPreLayout micPreLayout (R box)
+{
+    MicPreLayout l;
+    l.box = box;
+    const auto face = box.reduced (9.0f);
+    l.socket = { face.getX() + 40.0f, face.getCentreY() + 2.0f };
+    const auto strip = face.withTrimmedLeft (84.0f).withTrimmedRight (12.0f);
+    const float gap = 20.0f, cw = (strip.getWidth() - gap) / 4.0f;
+    l.knobSize = std::min (54.0f, cw - 10.0f);
+    for (int i = 0; i < 4; ++i)
+        l.cells.push_back (R (strip.getX() + cw * (float) i + (i >= 2 ? gap : 0.0f), face.getY() + 34.0f, cw, l.knobSize + 20.0f));
+    return l;
+}
+
+juce::Image renderMicPre (const MicPreLayout& l, R area, float scale)
+{
+    juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
+                     juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
+    juce::Graphics g (img);
+    g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+    const auto b = l.box;
+    {
+        juce::Path p;
+        p.addRoundedRectangle (b.translated (2.0f, 6.0f), 6.0f);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.65f), 22, { 3, 9 }).drawForPath (g, p);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 5, { 1, 4 }).drawForPath (g, p);
+    }
+    // rubber feet
+    for (float x : { b.getX() + 26.0f, b.getRight() - 54.0f })
+    {
+        g.setColour (C (0xff060606));
+        g.fillRoundedRectangle (x, b.getBottom() - 2.0f, 28.0f, 8.0f, 2.5f);
+    }
+    // the case: folded steel in dark grey paint
+    fillMetal (g, b, C (0xff2b2e33), 6.0f);
+    {
+        juce::Path shape;
+        shape.addRoundedRectangle (b, 6.0f);
+        juce::Graphics::ScopedSaveState ss (g);
+        g.reduceClipRegion (shape);
+        finishTexture (g, b, Finish::crinkle, C (0xff2b2e33), 91);
+    }
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.4f), b.getX(), b.getY(), juce::Colours::black.withAlpha (0.5f), b.getRight(), b.getBottom(), false));
+    g.drawRoundedRectangle (b.reduced (0.7f), 6.0f, 1.4f);
+    // the face plate: black anodised aluminium let into the front
+    const auto face = b.reduced (9.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.fillRoundedRectangle (face.expanded (1.2f), 3.5f);
+    g.setGradientFill (juce::ColourGradient (C (0xff222325), 0.0f, face.getY(), C (0xff0f1011), 0.0f, face.getBottom(), false));
+    g.fillRoundedRectangle (face, 3.0f);
+    finishTexture (g, face, Finish::anodised, C (0xff151617), 92);
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.20f), face.getX(), face.getY(), juce::Colours::black.withAlpha (0.3f), face.getRight(), face.getBottom(), false));
+    g.drawRoundedRectangle (face.reduced (0.5f), 3.0f, 1.0f);
+
+    const C ink (0xffc9ccd0);
+    // the socket the microphone plugs into: flange, insert, latch and three contacts
+    {
+        const auto c = l.socket;
+        const float r = 19.0f;
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.fillEllipse (R (r * 2.0f + 3.0f, r * 2.0f + 3.0f).withCentre (c.translated (0.8f, 1.6f)));
+        conic (g, c, r, 0.0f, [] (float a) { return metalAt (C (0xffa9adb0), a); }, 96);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.drawEllipse (R (r * 2.0f, r * 2.0f).withCentre (c), 0.8f);
+        g.setGradientFill (juce::ColourGradient (C (0xff050505), c.x - r, c.y - r, C (0xff232425), c.x + r, c.y + r, false));
+        g.fillEllipse (R (r * 1.46f, r * 1.46f).withCentre (c));
+        fillMetal (g, R (9.0f, 5.0f).withCentre ({ c.x, c.y - r * 0.86f }), C (0xff9a9ea2), 1.2f);
+        for (int i = 0; i < 3; ++i)
+        {
+            const auto pin = c.getPointOnCircumference (r * 0.36f, juce::MathConstants<float>::twoPi * (float) i / 3.0f + juce::MathConstants<float>::pi);
+            g.setColour (C (0xff3a3c3e));
+            g.fillEllipse (R (5.0f, 5.0f).withCentre (pin));
+            g.setColour (C (0xff000000));
+            g.fillEllipse (R (3.0f, 3.0f).withCentre (pin));
+        }
+        auto f = faceFont (Face::instrumentSemi, 9.2f);
+        f.setExtraKerningFactor (0.12f);
+        g.setFont (f);
+        g.setColour (ink.withAlpha (0.8f));
+        g.drawText ("MIC IN", R (80.0f, 12.0f).withCentre ({ c.x, c.y + r + 15.0f }), juce::Justification::centred, false);
+    }
+    // what each pair of controls is for
+    {
+        auto f = faceFont (Face::instrumentSemi, 9.2f);
+        f.setExtraKerningFactor (0.12f);
+        g.setFont (f);
+        const float y = face.getY() + 17.0f;
+        for (int pair = 0; pair < 2; ++pair)
+        {
+            const float x0 = l.cells[(size_t) (pair * 2)].getX() + 4.0f, x1 = l.cells[(size_t) (pair * 2 + 1)].getRight() - 4.0f;
+            const juce::String name (pair == 0 ? "MICROPHONE" : "FILTER");
+            const float tw = juce::GlyphArrangement::getStringWidth (f, name) + 12.0f, mid = (x0 + x1) * 0.5f;
+            g.setColour (ink.withAlpha (0.75f));
+            g.fillRect (x0, y, mid - tw * 0.5f - x0, 1.0f);
+            g.fillRect (mid + tw * 0.5f, y, x1 - (mid + tw * 0.5f), 1.0f);
+            g.fillRect (x0, y, 1.0f, 5.0f);
+            g.fillRect (x1 - 1.0f, y, 1.0f, 5.0f);
+            g.drawText (name, R (tw + 30.0f, 12.0f).withCentre ({ mid, y + 0.5f }), juce::Justification::centred, false);
+        }
+    }
+    return img;
+}
+
+void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float distance, juce::Point<float> socket)
 {
     if (l.speakers.empty()) return;
     const auto sp = l.speakers.front();
@@ -1801,25 +2064,69 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
         const float off = r * (0.03f + 0.16f * away);
         juce::DropShadow (juce::Colours::black.withAlpha (0.75f - 0.35f * away), (int) (r * (0.03f + 0.12f * away)), { (int) off, (int) off }).drawForPath (g, shade);
     }
-    // stand: a rod up from the floor to a clip on the body
+    // The stand is in front of the cab, so its foot sits lower in the picture than the cab's own
+    // bottom edge, and lower still as the mic is pulled back toward us.
     const auto clip = c + axis * (hr * 2.0f);
+    const float footY = l.box.getBottom() + 4.0f + 7.0f * away;
     {
+        const float bw = hr * 4.4f, bh = bw * 0.24f;
+        const R foot (clip.x - bw * 0.5f, footY - bh * 0.5f, bw, bh);
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.fillEllipse (foot.translated (bw * 0.07f, bh * 0.45f).expanded (bw * 0.05f, bh * 0.15f));
+        g.setColour (C (0xff050505));
+        g.fillEllipse (foot.translated (0.0f, bh * 0.28f)); // the thickness of the cast iron
+        g.setGradientFill (juce::ColourGradient (C (0xff4a4d51), foot.getX() + bw * 0.2f, foot.getY(), C (0xff101112), foot.getRight(), foot.getBottom(), false));
+        g.fillEllipse (foot);
+        juce::Path rim;
+        rim.addCentredArc (foot.getCentreX(), foot.getCentreY(), bw * 0.5f - 0.8f, bh * 0.5f - 0.8f, 0.0f, -2.2f, -0.2f, true);
+        g.setColour (juce::Colours::white.withAlpha (0.28f));
+        g.strokePath (rim, juce::PathStrokeType (1.0f));
+        // the rod, with the collar where its two sections clamp
         const float w = std::max (3.0f, hr * 0.26f);
-        const R rod (clip.x - w * 0.5f, clip.y, w, l.box.getBottom() - 2.0f - clip.y);
+        const R rod (clip.x - w * 0.5f, clip.y, w, footY - clip.y);
         juce::ColourGradient m (C (0xff111213), rod.getX(), 0, C (0xff0a0a0b), rod.getRight(), 0, false);
-        m.addColour (0.35, C (0xff54585c));
+        m.addColour (0.35, C (0xff6a6e72));
         g.setGradientFill (m);
         g.fillRect (rod);
+        const R collar (clip.x - w, clip.y + (footY - clip.y) * 0.45f, w * 2.0f, w * 2.4f);
+        juce::ColourGradient cg (C (0xff17181a), collar.getX(), 0, C (0xff0a0a0b), collar.getRight(), 0, false);
+        cg.addColour (0.35, C (0xff7b7f83));
+        g.setGradientFill (cg);
+        g.fillRoundedRectangle (collar, 1.2f);
     }
-    // cable out of the tail, hanging to the floor
+    // cable out of the tail, down to the floor, and along it to the channel strip
     {
+        const float floorY = l.box.getBottom() + 2.0f;
+        const juce::Point<float> land (tail.x + hr * 1.7f, floorY);
         juce::Path cable;
         cable.startNewSubPath (tail);
-        cable.cubicTo (tail + axis * (hr * 1.6f), { tail.x + hr * 1.9f, tail.y + hr * 2.2f }, { tail.x + hr * 1.7f, l.box.getBottom() - 2.0f });
+        cable.cubicTo (tail + axis * (hr * 1.6f), { tail.x + hr * 1.9f, tail.y + hr * 2.2f }, land);
+        const bool plugged = socket.x > land.x + 60.0f;
+        if (plugged)
+        {
+            // a little slack on the floor, then up the front of the box to the socket
+            const float run = socket.x - land.x;
+            cable.cubicTo ({ land.x + run * 0.25f, floorY + 5.0f }, { land.x + run * 0.5f, floorY - 1.0f }, { socket.x - 34.0f, floorY + 2.0f });
+            cable.cubicTo ({ socket.x - 6.0f, floorY + 3.0f }, { socket.x, floorY - 6.0f }, { socket.x, socket.y + 14.0f });
+        }
+        const float cw = std::max (2.0f, hr * 0.2f);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (cable, juce::PathStrokeType (cw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), juce::AffineTransform::translation (1.5f, 2.5f));
         g.setColour (C (0xff070707));
-        g.strokePath (cable, juce::PathStrokeType (std::max (2.0f, hr * 0.2f), juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
-        g.setColour (juce::Colours::white.withAlpha (0.10f));
-        g.strokePath (cable, juce::PathStrokeType (0.8f), juce::AffineTransform::translation (-0.8f, -0.4f));
+        g.strokePath (cable, juce::PathStrokeType (cw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.strokePath (cable, juce::PathStrokeType (0.8f), juce::AffineTransform::translation (-0.7f, -0.5f));
+        if (plugged)
+        {
+            // the plug, seen end on: a strain relief below, a knurled shell in the socket
+            g.setColour (C (0xff0b0b0c));
+            g.fillRoundedRectangle (R (cw + 3.0f, 14.0f).withCentre ({ socket.x, socket.y + 15.0f }), 2.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.55f));
+            g.fillEllipse (R (30.0f, 30.0f).withCentre (socket.translated (0.8f, 1.6f)));
+            conic (g, socket, 13.5f, 0.0f, [] (float a) { return metalAt (C (0xff2c2e31), a).withMultipliedBrightness (0.5f + 0.5f * std::abs (std::sin (a * 14.0f))); }, 168);
+            g.setGradientFill (juce::ColourGradient (C (0xff3a3d40), socket.x - 5.0f, socket.y - 6.0f, C (0xff0c0d0e), socket.x + 8.0f, socket.y + 8.0f, true));
+            g.fillEllipse (R (17.0f, 17.0f).withCentre (socket));
+        }
     }
     // the grille ball, facing the cone
     {
@@ -1886,8 +2193,83 @@ void Footswitch::mouseUp (const juce::MouseEvent& e)
         attachment.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
 }
 
-void drawFootswitch (juce::Graphics& g, R b, bool pressed, bool hover)
+void drawFootswitch (juce::Graphics& g, R b, bool pressed, bool hover, int style, juce::Colour body)
 {
+    if (style == 1)
+    {
+        // a hinged plate in the box's own paint with a ribbed rubber mat: the whole thing is the switch
+        const float u = b.getHeight() / 153.0f;
+        const auto p = b.translated (0.0f, pressed ? 1.6f * u : 0.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.6f));
+        g.fillRoundedRectangle (p.translated (1.0f * u, (pressed ? 1.0f : 3.0f) * u), 4.0f * u);
+        g.setGradientFill (juce::ColourGradient (body.brighter (0.2f), p.getX(), p.getY(), body.darker (0.3f), p.getRight(), p.getBottom(), false));
+        g.fillRoundedRectangle (p, 4.0f * u);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.5f), p.getX(), p.getY(), juce::Colours::black.withAlpha (0.5f), p.getRight(), p.getBottom(), false));
+        g.drawRoundedRectangle (p.reduced (0.7f * u), 4.0f * u, 1.4f * u);
+        // the hinge pin along the top edge
+        const auto pin = R (p.getX() + 8.0f * u, p.getY() + 4.0f * u, p.getWidth() - 16.0f * u, 4.5f * u);
+        fillMetal (g, pin, C (0xffa9adb0), 2.2f * u);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.drawRoundedRectangle (pin, 2.2f * u, 0.6f);
+        // rubber mat
+        const auto mat = R (p.getX() + 9.0f * u, p.getY() + 15.0f * u, p.getWidth() - 18.0f * u, p.getHeight() - 25.0f * u);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.fillRoundedRectangle (mat.expanded (1.2f * u), 6.0f * u);
+        g.setGradientFill (juce::ColourGradient (C (0xff1d1e1f), mat.getX(), mat.getY(), C (0xff0d0d0e), mat.getRight(), mat.getBottom(), false));
+        g.fillRoundedRectangle (mat, 5.0f * u);
+        const float pitch = 9.5f * u;
+        const int ribs = std::max (3, (int) ((mat.getHeight() - 10.0f * u) / pitch));
+        const float y0 = mat.getCentreY() - (float) ribs * pitch * 0.5f + pitch * 0.25f;
+        for (int i = 0; i < ribs; ++i)
+        {
+            const auto rib = R (mat.getX() + 8.0f * u, y0 + (float) i * pitch, mat.getWidth() - 16.0f * u, pitch * 0.5f);
+            g.setColour (juce::Colours::black.withAlpha (0.7f));
+            g.fillRoundedRectangle (rib.translated (0.6f * u, 1.3f * u), rib.getHeight() * 0.5f);
+            g.setGradientFill (juce::ColourGradient (C (0xff3a3b3d), 0.0f, rib.getY(), C (0xff1a1a1b), 0.0f, rib.getBottom(), false));
+            g.fillRoundedRectangle (rib, rib.getHeight() * 0.5f);
+            g.setColour (juce::Colours::white.withAlpha (0.16f));
+            g.fillRect (rib.getX() + rib.getHeight() * 0.5f, rib.getY() + 0.5f * u, rib.getWidth() - rib.getHeight(), 0.9f * u);
+        }
+        if (pressed)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.14f));
+            g.fillRoundedRectangle (p, 4.0f * u);
+        }
+        else if (hover)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.05f));
+            g.fillRoundedRectangle (p, 4.0f * u);
+        }
+        return;
+    }
+    if (style == 2)
+    {
+        // a low soft-touch switch: a chrome ring round a satin button that barely moves
+        b = b.reduced (2.0f);
+        const float r = std::min (b.getWidth(), b.getHeight()) * 0.5f;
+        const auto c = b.getCentre();
+        conic (g, c, r, r * 0.78f, [] (float a) { return metalAt (C (0xffb6babd), a); }, 120);
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.drawEllipse (R (r * 2.0f, r * 2.0f).withCentre (c).reduced (0.4f), 0.9f);
+        const float cr = r * 0.78f;
+        const auto cap = R (cr * 2.0f, cr * 2.0f).withCentre (c.translated (0.0f, pressed ? 0.8f : 0.0f));
+        g.setColour (juce::Colours::black.withAlpha (0.7f));
+        g.fillEllipse (cap.expanded (0.8f));
+        g.setGradientFill (juce::ColourGradient (C (pressed ? 0xff303235 : 0xff4a4d51), c.x - cr * 0.4f, c.y - cr * 0.45f, C (0xff121314), c.x + cr * 0.8f, c.y + cr * 0.8f, true));
+        g.fillEllipse (cap);
+        // the button is dished: light catches the far lip, not the middle
+        juce::Path lip;
+        lip.addCentredArc (cap.getCentreX(), cap.getCentreY(), cr * 0.9f, cr * 0.9f, 0.0f, 1.2f, 2.9f, true);
+        g.setColour (juce::Colours::white.withAlpha (pressed ? 0.12f : 0.26f));
+        g.strokePath (lip, juce::PathStrokeType (1.1f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        if (hover && ! pressed)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.06f));
+            g.fillEllipse (cap);
+        }
+        return;
+    }
+
     b = b.reduced (2.0f);
     const float r = std::min (b.getWidth(), b.getHeight()) * 0.5f * (pressed ? 0.95f : 1.0f);
     const auto c = b.getCentre().translated (0.0f, pressed ? 1.2f : 0.0f);
@@ -1925,7 +2307,139 @@ void drawFootswitch (juce::Graphics& g, R b, bool pressed, bool hover)
 }
 void Footswitch::paint (juce::Graphics& g)
 {
-    drawFootswitch (g, getLocalBounds().toFloat(), pressed, isMouseOver());
+    drawFootswitch (g, getLocalBounds().toFloat(), pressed, isMouseOver(), style, body);
+}
+
+//==============================================================================
+void drawTreadle (juce::Graphics& g, R well, float position, bool pressed, bool hover)
+{
+    const float u = well.getHeight() / 245.0f;
+    const float t = juce::jlimit (-1.0f, 1.0f, position * 2.0f - 1.0f); // +1 toe down, -1 heel down
+    const float heelLift = std::max (0.0f, t), toeLift = std::max (0.0f, -t);
+    const auto area = well.reduced (5.0f * u, 6.0f * u).translated (0.0f, pressed ? 1.0f * u : 0.0f);
+    const float cx = area.getCentreX();
+    // the end that is up in the air is nearer the eye, so it looks a touch wider, and its end face shows
+    const float endFace = 11.0f * u * heelLift;
+    const float yT = area.getY() + 5.0f * u * toeLift, yB = area.getBottom() - endFace;
+    const float wT = area.getWidth() * (0.93f + 0.05f * toeLift), wB = area.getWidth() * (0.97f + 0.03f * heelLift);
+    auto plateShape = [&] (float inset, float insetEnds)
+    {
+        juce::Path p;
+        p.startNewSubPath (cx - wT * 0.5f + inset, yT + insetEnds);
+        p.lineTo (cx + wT * 0.5f - inset, yT + insetEnds);
+        p.lineTo (cx + wB * 0.5f - inset, yB - insetEnds);
+        p.lineTo (cx - wB * 0.5f + inset, yB - insetEnds);
+        p.closeSubPath();
+        return p.createPathWithRoundedCorners (7.0f * u);
+    };
+    const auto plate = plateShape (0.0f, 0.0f);
+    // the raised end throws a longer shadow into the trough
+    {
+        juce::Graphics::ScopedSaveState ss (g);
+        g.reduceClipRegion (well.expanded (5.0f * u).toNearestInt());
+        juce::DropShadow (juce::Colours::black.withAlpha (0.7f), std::max (2, (int) (5.0f * u)), { (int) (1.0f * u), (int) (2.0f * u) }).drawForPath (g, plate);
+        const float lift = std::max (heelLift, toeLift);
+        if (lift > 0.02f)
+        {
+            juce::Path end;
+            const float eh = area.getHeight() * 0.42f;
+            end.addRoundedRectangle (R (area.getX(), heelLift > 0.0f ? yB - eh : yT, area.getWidth(), eh), 7.0f * u);
+            juce::DropShadow (juce::Colours::black.withAlpha (0.75f * lift), std::max (2, (int) (12.0f * u)), { (int) (5.0f * u * lift), (int) (9.0f * u * lift) }).drawForPath (g, end);
+        }
+    }
+    if (endFace > 0.5f)
+    {
+        // the thickness of the casting at the heel
+        const R ef (cx - wB * 0.5f + 2.0f * u, yB - 6.0f * u, wB - 4.0f * u, endFace + 6.0f * u);
+        g.setGradientFill (juce::ColourGradient (C (0xff34363a), 0.0f, yB, C (0xff0b0b0c), 0.0f, ef.getBottom(), false));
+        g.fillRoundedRectangle (ef, 5.0f * u);
+    }
+    // the casting: black wrinkle paint, brighter toward whichever end tips up to the light
+    const C iron (0xff1a1b1d);
+    g.setGradientFill (juce::ColourGradient (iron.brighter (0.25f + 0.55f * toeLift), 0.0f, yT, iron.brighter (0.25f + 0.55f * heelLift), 0.0f, yB, false));
+    g.fillPath (plate);
+    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.45f), area.getX(), yT, juce::Colours::black.withAlpha (0.55f), area.getRight(), yB, false));
+    g.strokePath (plate, juce::PathStrokeType (1.5f * u));
+
+    // the rubber tread
+    const auto mat = plateShape (9.0f * u, 11.0f * u);
+    g.setColour (juce::Colours::black.withAlpha (0.55f));
+    g.strokePath (mat, juce::PathStrokeType (2.4f * u));
+    g.setColour (C (0xff0e0e0f));
+    g.fillPath (mat);
+    {
+        juce::Graphics::ScopedSaveState ss (g);
+        g.reduceClipRegion (mat);
+        const float top = yT + 11.0f * u, bottom = yB - 11.0f * u;
+        const int ribs = 13;
+        const float pitch = (bottom - top) / (float) ribs;
+        for (int i = 0; i < ribs; ++i)
+        {
+            const float y = top + pitch * ((float) i + 0.25f);
+            const float f = ((float) i + 0.5f) / (float) ribs;
+            const float tip = toeLift * (1.0f - f) + heelLift * f; // how far this rib is tipped up to the light
+            const R rib (area.getX(), y, area.getWidth(), pitch * 0.55f);
+            g.setColour (juce::Colours::black.withAlpha (0.8f));
+            g.fillRect (rib.translated (0.0f, 1.4f * u));
+            g.setGradientFill (juce::ColourGradient (C (0xff2f3032).brighter (0.5f * tip), 0.0f, rib.getY(), C (0xff161617), 0.0f, rib.getBottom(), false));
+            g.fillRect (rib);
+            g.setColour (juce::Colours::white.withAlpha (0.10f + 0.16f * tip));
+            g.fillRect (rib.withHeight (1.0f * u));
+        }
+        // two grooves cut the ribs into blocks
+        for (float fx : { 0.36f, 0.64f })
+        {
+            g.setColour (C (0xff070707));
+            g.fillRect (area.getX() + area.getWidth() * fx - 1.6f * u, yT, 3.2f * u, yB - yT);
+        }
+    }
+    if (hover && ! pressed)
+    {
+        g.setColour (juce::Colours::white.withAlpha (0.045f));
+        g.fillPath (plate);
+    }
+}
+
+Treadle::Treadle (juce::RangedAudioParameter& position, juce::RangedAudioParameter& onOff)
+    : param (position),
+      pos (position, [this] (float v) { value = param.convertTo0to1 (v); repaint(); }),
+      power (onOff, [this] (float v) { on = v >= 0.5f; repaint(); if (onChange) onChange (on); })
+{
+    pos.sendInitialUpdate();
+    power.sendInitialUpdate();
+    setTooltip ("Drag up and down to rock the pedal. Click to switch it on or off.");
+}
+
+void Treadle::paint (juce::Graphics& g)
+{
+    drawTreadle (g, getLocalBounds().toFloat(), rocking ? value : 0.5f, pressed && ! dragging, isMouseOver());
+}
+
+void Treadle::mouseDown (const juce::MouseEvent&)
+{
+    pressed = true;
+    startValue = value;
+    repaint();
+}
+
+void Treadle::mouseDrag (const juce::MouseEvent& e)
+{
+    if (! rocking) return;
+    if (! dragging && e.getDistanceFromDragStart() < 4) return;
+    if (! dragging) { dragging = true; pos.beginGesture(); }
+    // pushing the toe (up the screen) opens the filter
+    const float n = juce::jlimit (0.0f, 1.0f, startValue - (float) e.getDistanceFromDragStartY() / ((float) getHeight() * 0.8f));
+    pos.setValueAsPartOfGesture (param.convertFrom0to1 (n));
+}
+
+void Treadle::mouseUp (const juce::MouseEvent& e)
+{
+    const bool wasDragging = dragging;
+    if (dragging) pos.endGesture();
+    dragging = pressed = false;
+    repaint();
+    if (! wasDragging && e.mouseWasClicked() && getLocalBounds().contains (e.getPosition()))
+        power.setValueAsCompleteGesture (on ? 0.0f : 1.0f);
 }
 
 
@@ -1940,6 +2454,7 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale)
 {
     GearThumb t;
     const R nominal (0.0f, 0.0f, 300.0f, 250.0f);
+    if (d.form == 5) n = 2; // the third control is the treadle itself
     t.pedal = pedalLayout (nominal, d, n, faders);
     t.box = t.pedal.box;
     t.area = nominal.withTrimmedTop (-12.0f).withTrimmedBottom (-30.0f);
@@ -1973,7 +2488,10 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale)
             drawGearKnob (g, k, thumbAngle (i), thumbStart, thumbEnd, d.knob, C (d.knobCap), C (d.ink), true, false);
         }
     }
-    drawFootswitch (g, t.pedal.footswitch, false, false);
+    if (t.pedal.form == 5)
+        drawTreadle (g, t.pedal.treadle, 0.62f, false, false);
+    else
+        drawFootswitch (g, t.pedal.footswitch, false, false, footswitchStyle (t.pedal), C (d.body));
     return t;
 }
 

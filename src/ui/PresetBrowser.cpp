@@ -85,7 +85,7 @@ PresetBrowser::PresetBrowser (RiffhouseProcessor& p) : proc (p)
     categories = std::make_unique<Categories> (*this);
     addAndMakeVisible (*categories);
 
-    search.setTextToShowWhenEmpty ("Search tones, artists, genres...  (try \"metal\", \"Hendrix\", \"lofi\")", colours::textFaint);
+    search.setTextToShowWhenEmpty ("Search tones, artists, genres  (try \"metal\", \"Hendrix\", \"lofi\")", colours::textFaint);
     search.setFont (font (16.0f));
     search.setIndents (40, 10);
     search.addListener (this);
@@ -217,10 +217,11 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, 
         g.setColour (colours::accent.withAlpha (0.6f));
         g.drawRoundedRectangle (r.toFloat().reduced (0.5f), 10.0f, 1.0f);
     }
-    else if (row % 2 == 0)
+    else
     {
-        g.setColour (colours::panel);
-        g.fillRoundedRectangle (r.toFloat(), 10.0f);
+        // one quiet rule between tones: the names carry the list, not the boxes
+        g.setColour (juce::Colours::white.withAlpha (0.055f));
+        g.fillRect (18.0f, (float) h - 1.0f, (float) w - 36.0f, 1.0f);
     }
 
     auto content = r.reduced (16, 8);
@@ -231,8 +232,8 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, 
     content.removeFromRight (10);
 
     // category tag
-    const int tw = (int) capsWidth (p.category, 10.0f, 0.12f) + 8;
-    drawCaps (g, p.category, content.removeFromRight (tw).toFloat(), 10.0f, colours::textFaint, juce::Justification::centredRight, 0.12f);
+    const int tw = (int) capsWidth (p.category, 11.0f, 0.12f) + 8;
+    drawCaps (g, p.category, content.removeFromRight (tw).toFloat(), 11.0f, colours::textDim, juce::Justification::centredRight, 0.12f);
     content.removeFromRight (14);
 
     g.setFont (font (16.0f, Weight::semibold));

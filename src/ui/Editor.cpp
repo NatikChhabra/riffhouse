@@ -18,12 +18,13 @@ namespace
     void drawLogo (juce::Graphics& g, juce::Rectangle<float> r)
     {
         // a pilot jewel, then the name in condensed capitals, like the badge on a head
+        const auto amber = colours::lamp;
         const auto jewel = r.removeFromLeft (12.0f).withSizeKeepingCentre (9.0f, 9.0f);
-        g.setGradientFill (juce::ColourGradient (colours::record.withAlpha (0.45f), jewel.getCentreX(), jewel.getCentreY(),
-                                                 colours::record.withAlpha (0.0f), jewel.getCentreX() + 11.0f, jewel.getCentreY(), true));
+        g.setGradientFill (juce::ColourGradient (amber.withAlpha (0.45f), jewel.getCentreX(), jewel.getCentreY(),
+                                                 amber.withAlpha (0.0f), jewel.getCentreX() + 11.0f, jewel.getCentreY(), true));
         g.fillEllipse (jewel.expanded (11.0f));
         g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffff1d0), jewel.getX() + 2.0f, jewel.getY() + 2.0f,
-                                                 colours::record, jewel.getRight(), jewel.getBottom(), true));
+                                                 amber, jewel.getRight(), jewel.getBottom(), true));
         g.fillEllipse (jewel);
         r.removeFromLeft (12.0f);
         g.setColour (colours::text);
@@ -129,7 +130,7 @@ public:
         strokeIcon (g, icons::chevronDown(), line.removeFromLeft (14.0f).withTrimmedTop (line.getHeight() - 15.0f).withSizeKeepingCentre (11.0f, 11.0f),
                     hover ? colours::text : colours::textFaint, 1.6f);
         if (modified)
-            drawCaps (g, "Edited", line.withTrimmedLeft (8.0f).withTrimmedTop (4.0f), 9.5f, colours::record.withAlpha (0.9f), juce::Justification::bottomLeft);
+            drawCaps (g, "Edited", line.withTrimmedLeft (8.0f).withTrimmedTop (4.0f), 10.0f, colours::lamp, juce::Justification::bottomLeft);
         g.setFont (font (12.0f));
         g.setColour (colours::textFaint);
         g.drawText (sub, t.withTrimmedTop (2.0f), juce::Justification::centredTop, true);
@@ -207,8 +208,8 @@ public:
     }
     float wantedWidth() const
     {
-        float w = 52.0f + juce::GlyphArrangement::getStringWidth (font (14.0f, Weight::medium), notice.text);
-        if (notice.action.isNotEmpty()) w += 34.0f + juce::GlyphArrangement::getStringWidth (font (14.0f, Weight::semibold), notice.action);
+        float w = 52.0f + juce::GlyphArrangement::getStringWidth (font (13.5f, Weight::medium), notice.text);
+        if (notice.action.isNotEmpty()) w += 34.0f + juce::GlyphArrangement::getStringWidth (font (13.5f, Weight::semibold), notice.action);
         return w;
     }
     void paint (juce::Graphics& g) override
@@ -224,18 +225,18 @@ public:
         row.removeFromLeft (12.0f);
         if (notice.action.isNotEmpty())
         {
-            g.setFont (font (14.0f, Weight::semibold));
+            g.setFont (font (13.5f, Weight::semibold));
             const float aw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), notice.action);
             actionArea = row.removeFromRight (aw + 4.0f);
             g.setColour (over ? colours::text : colours::accent);
             g.drawText (notice.action, actionArea, juce::Justification::centredRight);
-            g.fillRect (actionArea.getRight() - aw, actionArea.getCentreY() + 9.0f, aw, 1.0f);
+            g.fillRect (actionArea.getRight() - aw, actionArea.getCentreY() + 8.5f, aw, 1.0f);
             row.removeFromRight (18.0f);
         }
         else
             actionArea = {};
         g.setColour (colours::text);
-        g.setFont (font (14.0f, Weight::medium));
+        g.setFont (font (13.5f, Weight::medium));
         g.drawText (notice.text, row, juce::Justification::centredLeft);
     }
     void mouseMove (const juce::MouseEvent& e) override
@@ -472,7 +473,7 @@ public:
                 if (noticeBar.isVisible())
                 {
                     const int w = juce::jmin (getWidth() - 48, juce::roundToInt (noticeBar.wantedWidth()));
-                    noticeBar.setBounds ((getWidth() - w) / 2, bottomY - 52, w, 40);
+                    noticeBar.setBounds ((getWidth() - w) / 2, bottomY - 40, w, 32);
                 }
             }
         }
@@ -532,10 +533,11 @@ public:
         metroButton.setBounds (top.removeFromRight (70));
         tunerButton.setBounds (top.removeFromRight (36));
 
-        auto centre = juce::Rectangle<int> (0, 0, 420, topH).withCentre ({ getWidth() / 2, topH / 2 }).reduced (0, 8);
+        // the tone's name sits dead centre between its two arrows; star and save follow on the right
+        auto centre = juce::Rectangle<int> (0, 0, 352, topH).withCentre ({ getWidth() / 2, topH / 2 }).reduced (0, 8);
         prevPreset.setBounds (centre.removeFromLeft (28));
-        auto right = centre.removeFromRight (28 + 6 + 30 + 2 + 30);
-        nextPreset.setBounds (right.removeFromLeft (28));
+        nextPreset.setBounds (centre.removeFromRight (28));
+        auto right = juce::Rectangle<int> (centre.getRight() + 28, centre.getY(), 6 + 30 + 2 + 30, centre.getHeight());
         right.removeFromLeft (6);
         favourite.setBounds (right.removeFromLeft (30));
         right.removeFromLeft (2);
@@ -550,9 +552,9 @@ public:
         // bottom bar: input on the left, the three big-picture knobs in the middle, output on the right
         auto bottom = juce::Rectangle<int> (24, bottomY, getWidth() - 48, getHeight() - bottomY);
         inMeterArea = bottom.removeFromLeft (380);
-        inMeter.setBounds (inMeterArea.getX() + 58, inMeterArea.getY() + 23, 220, 4);
+        inMeter.setBounds (inMeterArea.getX() + 62, inMeterArea.getY() + 21, 224, 8);
         outMeterArea = bottom.removeFromRight (380);
-        outMeter.setBounds (outMeterArea.getRight() - 220, outMeterArea.getY() + 23, 220, 4);
+        outMeter.setBounds (outMeterArea.getRight() - 224, outMeterArea.getY() + 21, 224, 8);
         auto macros = bottom.withSizeKeepingCentre (3 * 92, getHeight() - bottomY);
         for (auto* k : { &space, &doubler, &volume })
             k->setBounds (macros.removeFromLeft (92).withSizeKeepingCentre (64, 58));
@@ -583,15 +585,15 @@ public:
         drawLogo (g, logoArea.toFloat());
 
         // bottom bar
-        drawCaps (g, "Input", { (float) inMeterArea.getX(), (float) inMeterArea.getY() + 16.0f, 56.0f, 18.0f }, 10.5f, colours::textFaint, juce::Justification::centredLeft, 0.14f);
-        drawCaps (g, "Output", { (float) outMeterArea.getRight() - 290.0f, (float) outMeterArea.getY() + 16.0f, 64.0f, 18.0f }, 10.5f, colours::textFaint, juce::Justification::centredLeft, 0.14f);
-        drawCaps (g, lastStatus, { (float) inMeterArea.getX(), (float) inMeterArea.getY() + 38.0f, 380.0f, 16.0f }, 10.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
+        drawCaps (g, "Input", { (float) inMeterArea.getX(), (float) inMeterArea.getY() + 16.0f, 56.0f, 18.0f }, 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
+        drawCaps (g, "Output", { (float) outMeterArea.getRight() - 300.0f, (float) outMeterArea.getY() + 16.0f, 70.0f, 18.0f }, 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
+        drawCaps (g, lastStatus, { (float) inMeterArea.getX(), (float) inMeterArea.getY() + 38.0f, 380.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
         const int clips = proc.meters().clipEvents.load();
         const auto rightLine = juce::Rectangle<float> ((float) outMeterArea.getX(), (float) outMeterArea.getY() + 38.0f, 380.0f, 16.0f);
         if (clips > 0)
-            drawCaps (g, "Hitting the limiter: lower volume a little", rightLine, 10.0f, colours::warn, juce::Justification::centredRight, 0.1f);
+            drawCaps (g, "Hitting the limiter: lower volume a little", rightLine, 11.0f, colours::warn, juce::Justification::centredRight, 0.1f);
         else
-            drawCaps (g, latencyText(), rightLine, 10.0f, colours::textDim, juce::Justification::centredRight, 0.1f);
+            drawCaps (g, latencyText(), rightLine, 11.0f, colours::textDim, juce::Justification::centredRight, 0.1f);
     }
 
     void mouseUp (const juce::MouseEvent& e) override
@@ -731,7 +733,7 @@ void RiffhouseEditor::showSetupWizard()
 
 void RiffhouseEditor::showToast (const juce::String& m)
 {
-    root->toast.setTopLeftPosition (root->toast.getX(), Root::bottomY - (root->noticeBar.isVisible() ? 104 : 60));
+    root->toast.setTopLeftPosition (root->toast.getX(), Root::bottomY - (root->noticeBar.isVisible() ? 92 : 60));
     root->toast.toFront (false);
     root->toast.show (m);
 }

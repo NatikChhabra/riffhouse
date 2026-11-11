@@ -235,7 +235,12 @@ void RecordPanel::paint (juce::Graphics& g)
     r.removeFromTop (34 + 30 + 4 + 30);
     g.setFont (font (12.5f));
     g.setColour (colours::textFaint);
-    g.drawFittedText ("Saves to " + proc.recordingFolder.getFullPathName(), r.removeFromTop (34), juce::Justification::centredLeft, 2);
+    // inside the home folder the long machine path says nothing: show the part the player chose
+    const auto home = juce::File::getSpecialLocation (juce::File::userHomeDirectory);
+    const juce::String where = proc.recordingFolder.isAChildOf (home)
+                                   ? proc.recordingFolder.getRelativePathFrom (home).replaceCharacter ('\\', '/').replace ("/", " / ")
+                                   : proc.recordingFolder.getFullPathName();
+    g.drawFittedText ("Saves to " + where, r.removeFromTop (34), juce::Justification::centredLeft, 2);
     r.removeFromTop (34);
     g.setColour (colours::line);
     g.fillRect (r.getX(), r.getY() + 6, r.getWidth(), 1);

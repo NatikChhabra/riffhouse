@@ -26,7 +26,8 @@ namespace colours
     inline juce::Colour good      { 0xff4ade80 };
     inline juce::Colour warn      { 0xfffacc15 };
     inline juce::Colour hot       { 0xffffb020 }; // clipping and limiter warnings: amber, never red
-    inline juce::Colour record    { 0xffff9f43 };
+    inline juce::Colour record    { 0xffe5483a }; // the record light only: the one red thing in the app
+    inline juce::Colour lamp      { 0xffffa31a }; // pilot lights: the logo's jewel, on lights, the unsaved mark
     inline juce::Colour loud      { 0xff0f6b66 }; // pedalboard look: the one loud pedal
     inline juce::Colour silk      { 0xffece4cf }; // pedalboard look: silk-screen lettering
 } // namespace colours

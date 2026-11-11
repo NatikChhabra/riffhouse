@@ -39,8 +39,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout RiffhouseProcessor::createLa
                     {
                         if (unit == "Hz") return v >= 1000.0f ? juce::String (v / 1000.0f, 1) + " kHz" : juce::String (juce::roundToInt (v)) + " Hz";
                         if (unit == "ms") return juce::String (juce::roundToInt (v)) + " ms";
-                        if (unit == "dB") return (v > 0 ? "+" : "") + juce::String (v, 1) + " dB";
-                        if (unit == "st") return (v > 0 ? "+" : "") + juce::String (juce::roundToInt (v));
+                        // a real minus sign, as wide as the plus, so values do not jump sideways
+                        const auto signedText = [] (const juce::String& magnitude, float value)
+                        {
+                            const juce::String minus (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
+                            return (value > 0 ? juce::String ("+") : (value < 0 ? minus : juce::String())) + magnitude;
+                        };
+                        if (unit == "dB") return signedText (juce::String (std::abs (v), 1), std::abs (v) < 0.05f ? 0.0f : v) + " dB";
+                        if (unit == "st") return signedText (juce::String (std::abs (juce::roundToInt (v))), (float) juce::roundToInt (v));
                         if (unit == "x") return juce::String (juce::roundToInt (v * 100.0f)) + "%";
                         return juce::String (v, 1);
                     });

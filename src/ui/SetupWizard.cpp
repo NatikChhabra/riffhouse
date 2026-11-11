@@ -214,9 +214,11 @@ void SetupWizard::paint (juce::Graphics& g)
                   "computer can handle without crackles, and sets the input level and noise gate for you.", 80);
             r.removeFromTop (12);
             auto box = r.removeFromTop (110).toFloat();
-            g.setColour (colours::accent.withAlpha (0.10f));
-            g.fillRoundedRectangle (box, 12.0f);
-            strokeIcon (g, icons::headphones(), box.removeFromLeft (70).withSizeKeepingCentre (34, 34), colours::accent, 2.0f);
+            // one thing to do before starting, set off by a rule above and below instead of a box in a box
+            g.setColour (juce::Colours::white.withAlpha (0.10f));
+            g.fillRect (box.getX(), box.getY(), box.getWidth(), 1.0f);
+            g.fillRect (box.getX(), box.getBottom() - 1.0f, box.getWidth(), 1.0f);
+            strokeIcon (g, icons::headphones(), box.removeFromLeft (58).withTrimmedRight (20.0f).withSizeKeepingCentre (34, 34), colours::accent, 2.0f);
             g.setColour (colours::text);
             g.setFont (font (16.0f, Weight::semibold));
             g.drawText ("Put on headphones first", box.removeFromTop (44).withTrimmedTop (14), juce::Justification::centredLeft);
@@ -276,7 +278,7 @@ void SetupWizard::paint (juce::Graphics& g)
             {
                 g.setColour (colours::accentHi);
                 g.setFont (font (15.0f, Weight::semibold));
-                g.drawText ("Measuring in a moment...", r.removeFromTop (34), juce::Justification::centredLeft);
+                g.drawText (utf8 ("Measuring in a moment\xe2\x80\xa6"), r.removeFromTop (34), juce::Justification::centredLeft);
             }
             break;
         }

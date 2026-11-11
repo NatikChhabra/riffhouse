@@ -127,7 +127,7 @@ juce::String describeChoice (P param, int i)
             return juce::isPositiveAndBelow (i, (int) std::size (d)) ? d[i] : "";
         }
         case P::wahMode:
-            return i == 0 ? "Set the position with the Pedal knob, or automate it while recording."
+            return i == 0 ? "Drag the pedal to set the sweep, or automate it while recording."
                           : "Follows how hard you pick. Funk heaven.";
         default: break;
     }
@@ -246,7 +246,7 @@ public:
             {
                 const auto c = px.getPixelColour (x, y);
                 const auto o = thumb.image.getPixelAt (x, y);
-                px.setPixelColour (x, y, o.interpolatedWith (c, 0.6f).withMultipliedBrightness (0.42f).withAlpha (o.getAlpha()));
+                px.setPixelColour (x, y, o.interpolatedWith (c, 0.45f).withMultipliedBrightness (0.6f).withAlpha (o.getAlpha()));
             }
     }
 
@@ -263,6 +263,16 @@ public:
         return juce::AffineTransform::translation (-thumb.box.getCentreX(), -thumb.box.getBottom())
             .scaled (s)
             .translated (target.getCentreX(), target.getBottom());
+    }
+
+    // Where the patch cables meet this piece of gear, in the strip's own coordinates:
+    // the left and right ends of its box at socket height.
+    std::pair<juce::Point<float>, juce::Point<float>> sockets()
+    {
+        updateThumb();
+        const auto b = thumb.box.transformedBy (thumbTransform()).translated ((float) getX(), (float) getY());
+        const float y = b.getY() + b.getHeight() * (index == mAmp || index == mCab ? 0.62f : (thumb.pedal.form == 4 ? 0.3f : 0.22f));
+        return { { b.getX(), y }, { b.getRight(), y } };
     }
 
     juce::Rectangle<float> switchArea() const
@@ -286,11 +296,11 @@ public:
         }
 
         auto lab = getLocalBounds().toFloat().removeFromBottom (20.0f);
-        const auto col = selected ? colours::text : (hover ? colours::text.withAlpha (0.8f) : (on ? colours::textDim : colours::textFaint));
-        drawCaps (g, info.title, lab, 10.5f, col, juce::Justification::centred, 0.14f);
+        const auto col = selected ? colours::text : (hover ? colours::text.withAlpha (0.85f) : (on ? colours::textDim : colours::textFaint));
+        drawCaps (g, info.title, lab, 11.5f, col, juce::Justification::centred, 0.12f);
         if (selected)
         {
-            const float tw = capsWidth (info.title, 10.5f, 0.14f);
+            const float tw = capsWidth (info.title, 11.5f, 0.12f);
             g.setColour (colours::accent);
             g.fillRect (juce::Rectangle<float> (tw, 1.5f).withCentre ({ lab.getCentreX(), lab.getBottom() - 1.0f }));
         }
@@ -314,7 +324,11 @@ public:
     void refresh()
     {
         const auto k = thumbKey();
-        if (k != lastKey) repaint();
+        if (k != lastKey)
+        {
+            repaint();
+            if (auto* strip = getParentComponent()) strip->repaint(); // the cables end on this box
+        }
     }
 
     RiffhouseProcessor& proc;
@@ -376,13 +390,39 @@ void ChainStrip::resized()
 
 void ChainStrip::paint (juce::Graphics& g)
 {
-    // one patch cable running through the whole rig, from the guitar in to the speakers out
+    // patch cables from the guitar in, through every piece of gear, to the speakers out:
+    // short leads that sag between one socket and the next
     const float y = cableY;
     const float x0 = 22.0f, x1 = (float) getWidth() - 22.0f;
-    g.setColour (juce::Colour (0xff0a0a0a));
-    g.fillRect (x0, y - 2.0f, x1 - x0, 4.0f);
-    g.setColour (juce::Colour (0xff2a2928));
-    g.fillRect (x0, y - 1.5f, x1 - x0, 1.0f);
+    auto lead = [&g] (juce::Point<float> from, juce::Point<float> to)
+    {
+        const float span = std::abs (to.x - from.x);
+        const float sag = juce::jlimit (5.0f, 13.0f, span * 0.42f);
+        juce::Path p;
+        p.startNewSubPath (from);
+        p.cubicTo ({ from.x + span * 0.3f, from.y + sag }, { to.x - span * 0.3f, to.y + sag }, to);
+        const juce::PathStrokeType stroke (3.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.strokePath (p, stroke, juce::AffineTransform::translation (0.8f, 2.2f));
+        g.setColour (juce::Colour (0xff050505));
+        g.strokePath (p, stroke);
+        g.setColour (juce::Colours::white.withAlpha (0.16f));
+        g.strokePath (p, juce::PathStrokeType (0.8f), juce::AffineTransform::translation (-0.3f, -0.9f));
+        // the plugs' metal sleeves, where each lead goes into a box
+        for (auto end : { from, to })
+        {
+            g.setColour (juce::Colour (0xff9da1a5));
+            g.fillRoundedRectangle (juce::Rectangle<float> (4.0f, 5.0f).withCentre (end), 1.0f);
+        }
+    };
+    juce::Point<float> from (x0 + 7.0f, y);
+    for (auto* t : tiles)
+    {
+        const auto [left, right] = t->sockets();
+        lead (from, left);
+        from = right;
+    }
+    lead (from, { x1 - 7.0f, y });
     for (auto [x, label] : { std::pair<float, const char*> { x0, "In" }, { x1, "Out" } })
     {
         // a quarter-inch jack plate
@@ -391,7 +431,7 @@ void ChainStrip::paint (juce::Graphics& g)
         g.fillEllipse (plate);
         g.setColour (juce::Colour (0xff0b0b0b));
         g.fillEllipse (plate.reduced (5.0f));
-        drawCaps (g, label, juce::Rectangle<float> (x - 20.0f, y + 12.0f, 40.0f, 14.0f), 9.5f, colours::textFaint, juce::Justification::centred, 0.14f);
+        drawCaps (g, label, juce::Rectangle<float> (x - 20.0f, y + 12.0f, 40.0f, 14.0f), 10.5f, colours::textDim, juce::Justification::centred, 0.14f);
     }
 }
 
@@ -401,6 +441,8 @@ namespace
     // Every page has the same top: the module's name and on light on the left, the
     // type picker in the middle, one line of description under it.
     constexpr int headerH = 36, descTop = 40, descH = 20, gearTop = 70;
+    // kept clear under the gear, so a message about the audio connection never covers a switch
+    constexpr int gearFloor = 40;
 }
 
 ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
@@ -418,6 +460,13 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
         foot->onChange = [this] (bool) { repaint(); };
         addAndMakeVisible (*foot);
     }
+    if (index == mWah)
+    {
+        // the wah has no stomp switch: its treadle is the control and the switch
+        foot->setVisible (false);
+        treadle = std::make_unique<Treadle> (*proc.param (P::wahPos), *proc.param (info.onParam));
+        addAndMakeVisible (*treadle);
+    }
     if (info.typeParam >= 0)
     {
         types = std::make_unique<ChoiceSelector> (proc, (P) info.typeParam);
@@ -433,7 +482,7 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
         addAndMakeVisible (*types);
     }
     for (auto id : info.knobs)
-        addAndMakeVisible (knobs.add (new Knob (proc, id, moduleColour (index))));
+        addAndMakeVisible (knobs.add (new Knob (proc, id, moduleColour (index), id == P::cabMic ? juce::String ("Position") : juce::String())));
 
     if (index == mEq)
     {
@@ -495,21 +544,17 @@ void ModulePage::updateEnablement()
     {
         lastSync = juce::roundToInt (proc.value (P::dlySync));
         knobs[0]->setEnabled (lastSync == choices::syncOff);
-        knobs[0]->setAlpha (lastSync == choices::syncOff ? 1.0f : 0.4f);
     }
     if (index == mPitch && knobs.size() > 0)
     {
         const bool shift = juce::roundToInt (proc.value (P::pitchMode)) == choices::pitchShift;
         knobs[0]->setEnabled (shift);
-        knobs[0]->setAlpha (shift ? 1.0f : 0.4f);
     }
     if (index == mWah && knobs.size() > 1)
     {
         const bool manual = juce::roundToInt (proc.value (P::wahMode)) == choices::wahManual;
-        knobs[0]->setEnabled (manual);
-        knobs[0]->setAlpha (manual ? 1.0f : 0.4f);
+        if (treadle != nullptr) treadle->setRocking (manual);
         knobs[1]->setEnabled (! manual);
-        knobs[1]->setAlpha (manual ? 0.4f : 1.0f);
     }
 }
 
@@ -525,7 +570,7 @@ void ModulePage::refresh()
     if (cabMode)
     {
         const float m = proc.value (P::cabMic), d = proc.value (P::cabDistance);
-        if (m != lastMic || d != lastDist) { lastMic = m; lastDist = d; repaint (cabArea.toNearestInt().expanded (40)); }
+        if (m != lastMic || d != lastDist) { lastMic = m; lastDist = d; repaint(); }
     }
     if (sync != nullptr && juce::roundToInt (proc.value (P::dlySync)) != lastSync)
     {
@@ -567,33 +612,41 @@ void ModulePage::resized()
         loadIr->setBounds (right.removeFromRight (120));
     descArea = juce::Rectangle<int> (0, descTop, getWidth(), descH);
 
-    const auto gear = getLocalBounds().withTrimmedTop (gearTop);
+    const auto gear = getLocalBounds().withTrimmedTop (gearTop).withTrimmedBottom (gearFloor);
     if (cabMode)
     {
-        auto g = gear;
-        auto knobRow = g.removeFromBottom (104);
-        cabArea = g.toFloat().reduced (0.0f, 4.0f);
+        // the cab stands on the floor with its mic in front; the mic's cable runs to the channel
+        // strip beside it, and the four controls live on that box
+        const auto room = gear.toFloat();
+        const float floorY = room.getBottom() - 26.0f;
+        const float preW = 392.0f, preH = 150.0f, gap = 66.0f;
         const int model = juce::roundToInt (proc.value (P::cabModel));
-        cab = cabLayout (cabArea, model);
+        const auto probe = cabLayout ({ 0.0f, 0.0f, room.getWidth() - preW - gap, floorY - room.getY() }, model);
+        const float cabW = probe.box.getWidth();
+        const float x0 = room.getCentreX() - (cabW + gap + preW) * 0.5f;
+        cab = cabLayout ({ x0, room.getY(), cabW, floorY - room.getY() }, model);
+        cabArea = { x0 - 50.0f, room.getY() - 6.0f, cabW + 100.0f, floorY - room.getY() + 46.0f };
         pedalImage = renderCab (model, cab, cabArea, 2.0f, proc.userIrName());
-        const int n = knobs.size();
-        const int cell = 120, size = 62;
-        auto row = knobRow.withSizeKeepingCentre (cell * n, size + 24).translated (0, 6);
-        for (int i = 0; i < n; ++i)
+        pre = micPreLayout ({ x0 + cabW + gap, floorY - preH - 6.0f, preW, preH });
+        preArea = pre.box.expanded (44.0f);
+        preImage = renderMicPre (pre, preArea, 2.0f);
+        for (int i = 0; i < knobs.size() && i < (int) pre.cells.size(); ++i)
         {
-            knobs[i]->setGear (KnobStyle::modern, colours::text, colours::textDim, Face::instrumentSemi, true);
-            knobs[i]->setLabelHeight (24);
-            knobs[i]->setBounds (row.removeFromLeft (cell).withSizeKeepingCentre (size, size + 24));
+            knobs[i]->setGear (KnobStyle::dome, juce::Colour (0xff16191b), juce::Colour (0xffc9ccd0), Face::instrument, true);
+            knobs[i]->setLabelHeight (20);
+            knobs[i]->setBounds (pre.cells[(size_t) i].withSizeKeepingCentre (pre.knobSize, pre.knobSize + 20.0f).toNearestInt());
         }
         return;
     }
 
     const auto& d = design();
     const bool fad = ! faders.isEmpty();
-    pedalArea = gear.toFloat().withTrimmedBottom (-6.0f);
-    pedal = pedalLayout (pedalArea, d, fad ? faders.size() : knobs.size(), fad);
+    pedalArea = gear.toFloat().withTrimmedBottom (10.0f);
+    pedal = pedalLayout (pedalArea, d, fad ? faders.size() : (d.form == 5 ? knobs.size() - 1 : knobs.size()), fad);
     pedalImage = renderPedal (d, pedal, pedalArea, 2.0f);
+    foot->setStyle (footswitchStyle (pedal), juce::Colour (d.body));
     foot->setBounds (pedal.footswitch.toNearestInt());
+    if (treadle != nullptr) treadle->setBounds (pedal.treadle.toNearestInt());
     if (fad)
     {
         const int n = faders.size();
@@ -606,11 +659,15 @@ void ModulePage::resized()
         }
         return;
     }
-    const int n = knobs.size();
+    // on the treadle pedal the first control is the treadle itself
+    const int first = pedal.form == 5 ? 1 : 0;
+    if (first > 0) knobs[0]->setVisible (false);
+    const int n = knobs.size() - first;
     const int labelH = 20;
-    for (int i = 0; i < n; ++i)
+    for (int k = 0; k < n; ++k)
     {
-        const auto cell = pedalKnobCell (pedal, i, n);
+        const int i = k + first;
+        const auto cell = pedalKnobCell (pedal, k, n);
         const int size = (int) std::min (cell.getWidth() - 6.0f, std::min (cell.getHeight() - (float) labelH, 96.0f));
         knobs[i]->setGear (d.knob, juce::Colour (d.knobCap), juce::Colour (d.ink), d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.upper);
         knobs[i]->setLabelHeight (labelH);
@@ -626,7 +683,7 @@ void ModulePage::paint (juce::Graphics& g)
         drawCaps (g, spec (info.onParam).name, getLocalBounds().removeFromTop (headerH).toFloat(), 22.0f, colours::text,
                   juce::Justification::centred, 0.06f);
     if (sync != nullptr || index == mWah)
-        drawCaps (g, index == mWah ? "Mode" : "Sync", syncLabel.toFloat(), 11.0f, colours::textFaint, juce::Justification::centredRight);
+        drawCaps (g, index == mWah ? "Mode" : "Sync", syncLabel.toFloat(), 11.5f, colours::textDim, juce::Justification::centredRight);
     g.setColour (colours::textDim);
     g.setFont (font (13.5f));
     g.drawText (typeText, descArea, juce::Justification::centred, true);
@@ -635,11 +692,12 @@ void ModulePage::paint (juce::Graphics& g)
     {
         if (pedalImage.isValid())
         {
-            g.setOpacity (on ? 1.0f : 0.5f);
+            g.setOpacity (on ? 1.0f : 0.55f);
             g.drawImage (pedalImage, cabArea);
+            g.drawImage (preImage, preArea);
             g.setOpacity (1.0f);
         }
-        drawCabMic (g, cab, proc.value (P::cabMic), proc.value (P::cabDistance));
+        drawCabMic (g, cab, proc.value (P::cabMic), proc.value (P::cabDistance), pre.socket);
         return;
     }
     if (pedalImage.isValid())
@@ -685,7 +743,7 @@ AmpPage::AmpPage (RiffhouseProcessor& p)
         m.addSectionHeader ("Neural capture");
         if (proc.captureName().isNotEmpty())
             m.addItem (choices::neuralCapture + 1, proc.captureName(), true, current == choices::neuralCapture);
-        m.addItem (1000, "Load a capture file (.nam)...");
+        m.addItem (1000, utf8 ("Load a capture file (.nam)\xe2\x80\xa6"));
     };
     selector.onMenuItem = [this] (int id) { if (id == 1000) loadCapture(); };
     selector.onChange = [this] (int m) { current = m; refresh(); resized(); repaint(); };
@@ -717,7 +775,7 @@ void AmpPage::loadCapture()
                           {
                               const auto f = fc.getResult();
                               if (! f.existsAsFile()) return;
-                              status = "Loading " + f.getFileName() + "...";
+                              status = "Loading " + f.getFileName() + utf8 ("\xe2\x80\xa6");
                               repaint();
                               juce::Component::SafePointer<AmpPage> safe (this);
                               proc.loadCaptureAsync (f, [safe, f] (juce::String err)
@@ -747,16 +805,16 @@ void AmpPage::resized()
 {
     auto r = getLocalBounds();
     auto head = r.removeFromTop (headerH);
-    titleArea = head.removeFromLeft (260);
+    titleArea = head.removeFromLeft (330);
     power.setBounds (titleArea.getX() + (int) capsWidth ("Amp", 12.0f) + 14, titleArea.getY(), 56, headerH);
-    tagArea = head.removeFromRight (260);
+    tagArea = head.removeFromRight (330);
     loadNam.setBounds (tagArea.withTrimmedLeft (110));
-    selector.setBounds (head.withSizeKeepingCentre (std::min (head.getWidth(), 560), headerH));
+    selector.setBounds (head.withSizeKeepingCentre (std::min (head.getWidth(), 480), headerH));
     descArea = juce::Rectangle<int> (0, descTop, getWidth(), descH);
 
     // the amp itself fills the rest of the page
-    const auto gear = getLocalBounds().withTrimmedTop (gearTop).toFloat();
-    ampArea = gear.withSizeKeepingCentre (std::min (gear.getWidth(), 1080.0f), std::min (gear.getHeight() - 8.0f, 420.0f));
+    const auto gear = getLocalBounds().withTrimmedTop (gearTop).withTrimmedBottom (gearFloor).toFloat();
+    ampArea = gear.withSizeKeepingCentre (std::min (gear.getWidth(), 1080.0f), std::min (gear.getHeight(), 420.0f));
     const auto& d = ampDesign (current);
     layout = ampLayout (ampArea, d);
     const juce::String display = current == choices::neuralCapture ? (proc.captureName().isNotEmpty() ? proc.captureName() : juce::String ("no capture"))
@@ -781,7 +839,7 @@ void AmpPage::paint (juce::Graphics& g)
     const bool on = power.isOn();
     drawCaps (g, "Amp", titleArea.toFloat(), 12.0f, colours::textDim);
     if (current != choices::neuralCapture)
-        drawCaps (g, ampTags (current), tagArea.toFloat(), 10.5f, colours::textFaint, juce::Justification::centredRight, 0.1f);
+        drawCaps (g, ampTags (current), tagArea.toFloat(), 11.5f, colours::textDim, juce::Justification::centredRight, 0.08f);
     g.setColour (colours::textDim);
     g.setFont (font (13.5f));
     g.drawText (status.isNotEmpty() ? status : describeChoice (P::ampModel, current), descArea, juce::Justification::centred, true);

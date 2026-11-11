@@ -77,9 +77,12 @@ private:
 
     bool cabMode = false;
     CabLayout cab;
-    juce::Rectangle<float> cabArea;
+    juce::Rectangle<float> cabArea, preArea;
+    MicPreLayout pre;
+    juce::Image preImage;
     float lastMic = -1.0f, lastDist = -1.0f;
     std::unique_ptr<Footswitch> foot;
+    std::unique_ptr<Treadle> treadle;
     PedalLayout pedal;
     juce::Rectangle<float> pedalArea;
     juce::Image pedalImage;
