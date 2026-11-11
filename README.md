@@ -1,3 +1,5 @@
+![Riffhouse, a free guitar amp and pedalboard](docs/banner.png)
+
 # Riffhouse
 
 A free guitar amp and pedalboard for your computer.
@@ -8,7 +10,7 @@ Plug your guitar into whatever you have, even the mic jack on a laptop. Press on
 
 ## Get it
 
-**Windows:** download `Riffhouse-windows-setup.exe` from the [latest release](https://github.com/NatikChhabra/riffhouse/releases/latest) and run it.
+**Windows:** download the file ending in `windows-setup.exe` from the [latest release](https://github.com/NatikChhabra/riffhouse/releases/latest) and run it.
 
 Windows may show a blue "Windows protected your PC" box the first time. That happens because the installer is not signed with a paid certificate. Press **More info**, then **Run anyway**.
 
@@ -26,6 +28,13 @@ After that Riffhouse keeps itself up to date. A new version downloads in the bac
 - **Tuner** for any tuning, **metronome**, and a **recorder** that also keeps the clean guitar so you can change the tone later.
 - **Play along:** load a song, it plays in your headphones and stays out of your recording.
 - A **VST3 plugin** of the same rig for recording software.
+
+Every amp, pedal and cabinet is its own piece of gear, drawn by the app itself.
+
+| | |
+|---|---|
+| ![A drive pedal](docs/screenshots/pedal.png) | ![The wah, which you rock with the mouse](docs/screenshots/wah.png) |
+| ![A cabinet with its microphone](docs/screenshots/cab.png) | ![The tone browser](docs/screenshots/browser.png) |
 
 ## It sets itself up
 

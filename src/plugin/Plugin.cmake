@@ -12,6 +12,11 @@ set(RIFFHOUSE_ICON "")
 if (EXISTS "${CMAKE_SOURCE_DIR}/resources/icon.png")
     set(RIFFHOUSE_ICON "${CMAKE_SOURCE_DIR}/resources/icon.png")
 endif()
+# small sizes get a plainer drawing of the same mark
+set(RIFFHOUSE_ICON_SMALL "${RIFFHOUSE_ICON}")
+if (EXISTS "${CMAKE_SOURCE_DIR}/resources/icon-small.png")
+    set(RIFFHOUSE_ICON_SMALL "${CMAKE_SOURCE_DIR}/resources/icon-small.png")
+endif()
 
 juce_add_plugin(Riffhouse
     PRODUCT_NAME "Riffhouse"
@@ -33,7 +38,7 @@ juce_add_plugin(Riffhouse
     AU_MAIN_TYPE kAudioUnitType_Effect
     COPY_PLUGIN_AFTER_BUILD FALSE
     ICON_BIG "${RIFFHOUSE_ICON}"
-    ICON_SMALL "${RIFFHOUSE_ICON}")
+    ICON_SMALL "${RIFFHOUSE_ICON_SMALL}")
 
 target_sources(Riffhouse PRIVATE
     ${RIFFHOUSE_CORE_SOURCES}

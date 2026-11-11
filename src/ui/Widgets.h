@@ -137,10 +137,11 @@ public:
     void mouseMove (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
     int getSelected() const noexcept { return selected; }
-    void select (int i) { attachment.setValueAsCompleteGesture ((float) i); }
+    void select (int i) { attachment.setValueAsCompleteGesture ((float) i); if (onPick) onPick (i); }
     void showMenu();
     float textHeight = 22.0f;
-    std::function<void (int)> onChange;
+    std::function<void (int)> onChange;                     // whenever the value changes, also from a preset or automation
+    std::function<void (int)> onPick;                       // only when the player chose it here
     std::function<juce::String (int)> displayName;          // defaults to the choice's own name
     std::function<int (int current, int delta)> stepper;    // where the arrows go; defaults to wrapping
     std::function<void (juce::PopupMenu&)> buildMenu;       // defaults to every choice; ids are index + 1

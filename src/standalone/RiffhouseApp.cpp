@@ -166,7 +166,7 @@ public:
             {
                 if (auto* ed = dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()))
                     ed->saveSnapshots (folder, scale > 0.0f ? scale : 1.0f);
-                quit();
+                systemRequestedQuit();
             });
         }
     }
@@ -230,7 +230,7 @@ public:
         if (updates->launchInstaller (true))
         {
             installerStarted = true;
-            quit();
+            systemRequestedQuit(); // closes any open file window or menu first, then quits
         }
     }
     juce::PropertiesFile& settings() override { return *properties.getUserSettings(); }

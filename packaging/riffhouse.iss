@@ -31,6 +31,10 @@ OutputBaseFilename=Riffhouse-{#AppVersion}-windows-setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; the pictures come from tools/brand/make_assets.py
+SetupIconFile=riffhouse.ico
+WizardImageFile=wizard.bmp
+WizardSmallImageFile=wizard-small.bmp
 UninstallDisplayIcon={app}\Riffhouse.exe
 UninstallDisplayName=Riffhouse
 ; Never let the installer close other programs: a DAW with the plugin open stays open.

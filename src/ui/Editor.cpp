@@ -17,16 +17,9 @@ namespace
 
     void drawLogo (juce::Graphics& g, juce::Rectangle<float> r)
     {
-        // a pilot jewel, then the name in condensed capitals, like the badge on a head
-        const auto amber = colours::lamp;
-        const auto jewel = r.removeFromLeft (12.0f).withSizeKeepingCentre (9.0f, 9.0f);
-        g.setGradientFill (juce::ColourGradient (amber.withAlpha (0.45f), jewel.getCentreX(), jewel.getCentreY(),
-                                                 amber.withAlpha (0.0f), jewel.getCentreX() + 11.0f, jewel.getCentreY(), true));
-        g.fillEllipse (jewel.expanded (11.0f));
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xfffff1d0), jewel.getX() + 2.0f, jewel.getY() + 2.0f,
-                                                 amber, jewel.getRight(), jewel.getBottom(), true));
-        g.fillEllipse (jewel);
-        r.removeFromLeft (12.0f);
+        // the mark, then the name in condensed capitals, like the badge on a head
+        drawBrandMark (g, r.removeFromLeft (30.0f).withSizeKeepingCentre (30.0f, 30.0f).translated (0.0f, -1.5f), colours::text);
+        r.removeFromLeft (9.0f);
         g.setColour (colours::text);
         g.setFont (faceFont (Face::shoulders, 21.0f).withExtraKerningFactor (0.16f));
         g.drawText ("RIFFHOUSE", r, juce::Justification::centredLeft);
@@ -464,7 +457,7 @@ public:
         inMeter.setLevel (proc.meters().gateInPeak.load());
         outMeter.setLevel (proc.meters().outPeak.load());
         chain.refresh();
-        if (++noticeTicks >= 10)
+        if (! quietNotices && ++noticeTicks >= 10)
         {
             noticeTicks = 0;
             if (auto* host = StandaloneHost::get())
@@ -631,6 +624,7 @@ public:
     Toast toast;
     NoticeBar noticeBar;
     int noticeTicks = 0;
+    bool quietNotices = false; // pictures of the app are taken without a message about the missing guitar
     std::unique_ptr<SetupWizard> wizard;
 
     juce::String lastStatus;
@@ -743,6 +737,8 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     folder.createDirectory();
     auto& r = *root;
     r.wizard.reset();
+    r.quietNotices = true;
+    r.noticeBar.set ({});
     auto shoot = [&] (const juce::String& name)
     {
         r.tick();
@@ -753,20 +749,14 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         if (auto out = f.createOutputStream()) png.writeImageToStream (img, *out);
     };
     {
-        // the app icon: one amp knob, lit like the rest of the gear
-        juce::Image icon (juce::Image::ARGB, 512, 512, true);
-        juce::Graphics g (icon);
-        const auto tile = juce::Rectangle<float> (16.0f, 16.0f, 480.0f, 480.0f);
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff2a2826), 0.0f, 16.0f, juce::Colour (0xff0d0d0d), 0.0f, 496.0f, false));
-        g.fillRoundedRectangle (tile, 108.0f);
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.22f), 0.0f, 16.0f, juce::Colours::white.withAlpha (0.02f), 0.0f, 496.0f, false));
-        g.drawRoundedRectangle (tile.reduced (1.5f), 106.5f, 3.0f);
-        const float pi = juce::MathConstants<float>::pi;
-        drawGearKnob (g, tile.reduced (92.0f), pi * 2.38f, pi * 1.2f, pi * 2.8f, KnobStyle::hat, juce::Colour (0xffd8b04a), juce::Colour (0xffe9e4d6), true, false, false);
+        // the app icon, full size and the plainer one for small sizes
         juce::PNGImageFormat png;
-        auto f = folder.getChildFile ("icon.png");
-        f.deleteFile();
-        if (auto out = f.createOutputStream()) png.writeImageToStream (icon, *out);
+        for (auto [name, size, simple] : { std::tuple<const char*, int, bool> { "icon.png", 1024, false }, { "icon-small.png", 128, true } })
+        {
+            auto f = folder.getChildFile (name);
+            f.deleteFile();
+            if (auto out = f.createOutputStream()) png.writeImageToStream (renderAppIcon (size, simple), *out);
+        }
     }
     r.closeOverlays();
     for (int i = 0; i < numModules; ++i)
@@ -776,6 +766,14 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     }
     r.showPage (mAmp);
     shoot ("main");
+    {
+        // one picture with the message that shows when no guitar is connected
+        r.noticeBar.set ({ "No guitar input yet. Plug in and Riffhouse will find it.", "Run setup", false });
+        const int w = juce::roundToInt (r.noticeBar.wantedWidth());
+        r.noticeBar.setBounds ((r.getWidth() - w) / 2, Root::bottomY - 40, w, 32);
+        shoot ("notice");
+        r.noticeBar.set ({});
+    }
     r.toggleOverlay (r.browser);
     shoot ("browser");
     r.closeOverlays();
@@ -859,6 +857,44 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         }
     }
 
+    // each piece of gear on its own with a clear background, for the website and the README
+    {
+        const auto cut = folder.getChildFile ("cutouts");
+        cut.createDirectory();
+        juce::PNGImageFormat png;
+        auto write = [&] (const juce::String& name, const juce::Image& img)
+        {
+            auto f = cut.getChildFile (name + ".png");
+            f.deleteFile();
+            if (auto out = f.createOutputStream()) png.writeImageToStream (img, *out);
+        };
+        const float big = 3.0f;
+        struct Family { int module; int types; const char* name; };
+        for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 1, "wah" }, Family { mPitch, 1, "pitch" },
+                          Family { mDrive, 7, "drive" }, Family { mEq, 1, "eq" }, Family { mMod, 6, "mod" }, Family { mDelay, 4, "delay" },
+                          Family { mReverb, 6, "reverb" }, Family { mLofi, 1, "lofi" } })
+            for (int t = 0; t < fam.types; ++t)
+            {
+                const auto& d = *pedalDesignFor (fam.module, t);
+                const bool faders = fam.module == mEq;
+                auto thumb = pedalThumb (d, faders ? 8 : (int) modules()[(size_t) fam.module].knobs.size(), faders, big);
+                juce::Graphics tg (thumb.image);
+                tg.addTransform (juce::AffineTransform::translation (-thumb.area.getX(), -thumb.area.getY()).scaled (big));
+                drawPedalLed (tg, thumb.pedal, d, true);
+                write (juce::String (fam.name) + "-" + juce::String (t), thumb.image);
+            }
+        for (int m = 0; m < choices::numAmpModels; ++m)
+        {
+            const auto& d = ampDesign (m);
+            auto thumb = ampThumb (d, m == choices::neuralCapture ? juce::String ("your capture") : juce::String (spec (P::ampModel).choices[(size_t) m]).toLowerCase(), 1.6f);
+            juce::Graphics tg (thumb.image);
+            tg.addTransform (juce::AffineTransform::scale (1.6f));
+            drawAmpJewel (tg, thumb.amp, d, true);
+            write ("amp-" + juce::String (m).paddedLeft ('0', 2), thumb.image);
+        }
+        for (int m = 0; m < 8; ++m)
+            write ("cab-" + juce::String (m), cabThumb (m, 2.0f).image);
+    }
 }
 
 bool RiffhouseEditor::keyPressed (const juce::KeyPress& k)

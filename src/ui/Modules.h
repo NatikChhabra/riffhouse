@@ -71,6 +71,7 @@ private:
     juce::OwnedArray<Knob> knobs;
     juce::OwnedArray<Fader> faders;
     std::unique_ptr<IconButton> loadIr;
+    std::unique_ptr<juce::FileChooser> chooser;
     juce::String typeText, extraText;
     int lastType = -1, lastSync = -1;
     juce::Rectangle<int> titleArea, descArea, syncLabel;

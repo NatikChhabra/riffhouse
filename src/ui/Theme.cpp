@@ -817,4 +817,55 @@ void strokeIcon (juce::Graphics& g, const juce::Path& p, juce::Rectangle<float> 
     t.applyTransform (iconTransform (area));
     g.strokePath (t, juce::PathStrokeType (thickness, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
+void drawBrandMark (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour ink, bool glow)
+{
+    // drawn on a 100 unit square; the same numbers are in resources/brand/mark.svg
+    const float side = std::min (area.getWidth(), area.getHeight());
+    const auto sq = juce::Rectangle<float> (side, side).withCentre (area.getCentre());
+    const float u = side / 100.0f;
+    auto pt = [&] (float x, float y) { return juce::Point<float> (sq.getX() + x * u, sq.getY() + y * u); };
+    juce::Path roof;
+    roof.startNewSubPath (pt (50.0f, 10.0f));
+    for (auto p : { pt (91.2f, 45.0f), pt (74.9f, 45.0f), pt (50.0f, 23.8f), pt (25.1f, 45.0f), pt (8.8f, 45.0f) }) roof.lineTo (p);
+    roof.closeSubPath();
+    juce::Path h;
+    h.startNewSubPath (pt (25.0f, 52.0f));
+    for (auto p : { pt (35.5f, 52.0f), pt (35.5f, 66.0f), pt (64.5f, 66.0f), pt (64.5f, 52.0f), pt (75.0f, 52.0f), pt (75.0f, 92.0f),
+                    pt (64.5f, 92.0f), pt (64.5f, 76.0f), pt (35.5f, 76.0f), pt (35.5f, 92.0f), pt (25.0f, 92.0f) }) h.lineTo (p);
+    h.closeSubPath();
+    g.setColour (ink);
+    g.fillPath (roof);
+    g.fillPath (h);
+    const auto c = pt (50.0f, 43.0f);
+    const float r = 6.0f * u;
+    if (glow)
+    {
+        g.setGradientFill (juce::ColourGradient (colours::lamp.withAlpha (0.5f), c.x, c.y, colours::lamp.withAlpha (0.0f), c.x + r * 2.9f, c.y, true));
+        g.fillEllipse (juce::Rectangle<float> (r * 5.8f, r * 5.8f).withCentre (c));
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffffe3a6), c.x - r * 0.35f, c.y - r * 0.4f, colours::lamp, c.x + r * 0.55f, c.y + r * 0.55f, true));
+    }
+    else
+        g.setColour (colours::lamp);
+    g.fillEllipse (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
+}
+
+juce::Image renderAppIcon (int size, bool simple)
+{
+    juce::Image icon (juce::Image::ARGB, size, size, true);
+    juce::Graphics g (icon);
+    const float s = (float) size;
+    const auto tile = juce::Rectangle<float> (s, s).reduced (s * (simple ? 0.0f : 0.03f));
+    const float radius = tile.getWidth() * 0.225f;
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff211f1d), 0.0f, tile.getY(), juce::Colour (0xff0f0e0d), 0.0f, tile.getBottom(), false));
+    g.fillRoundedRectangle (tile, radius);
+    if (! simple)
+    {
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.16f), 0.0f, tile.getY(), juce::Colours::white.withAlpha (0.02f), 0.0f, tile.getBottom(), false));
+        g.drawRoundedRectangle (tile.reduced (s * 0.003f), radius, s * 0.006f);
+    }
+    // the mark's own box has air above the roof and none under the H: lift it so it sits centred by eye
+    const float m = tile.getWidth() * (simple ? 0.84f : 0.68f);
+    drawBrandMark (g, juce::Rectangle<float> (m, m).withCentre (tile.getCentre().translated (0.0f, -m * 0.01f)), juce::Colour (0xffece9e3), ! simple);
+    return icon;
+}
 } // namespace rh::ui

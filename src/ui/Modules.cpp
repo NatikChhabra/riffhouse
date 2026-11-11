@@ -470,14 +470,19 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
     if (info.typeParam >= 0)
     {
         types = std::make_unique<ChoiceSelector> (proc, (P) info.typeParam);
-        types->onChange = [this] (int sel)
+        types->onChange = [this] (int)
         {
             resized();
-            if (index == mCab && sel == choices::cabUserIr && proc.userIrName().isEmpty() && loadIr != nullptr)
-                loadIr->triggerClick();
             updateTypeText();
             updateEnablement();
             repaint();
+        };
+        // Asking for a file only when the player picked "your IR" here. A preset or
+        // automation that lands on it must never throw a file window at them.
+        types->onPick = [this] (int sel)
+        {
+            if (index == mCab && sel == choices::cabUserIr && proc.userIrName().isEmpty() && loadIr != nullptr)
+                loadIr->triggerClick();
         };
         addAndMakeVisible (*types);
     }
@@ -505,9 +510,10 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
         loadIr->setTooltip ("Use any cabinet impulse response (.wav)");
         loadIr->onClick = [this]
         {
-            auto chooser = std::make_shared<juce::FileChooser> ("Choose a cabinet IR", juce::File(), "*.wav;*.aif;*.aiff;*.flac");
+            // owned by the page, so the file window closes with it
+            chooser = std::make_unique<juce::FileChooser> ("Choose a cabinet IR", juce::File(), "*.wav;*.aif;*.aiff;*.flac");
             chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                                  [this, chooser] (const juce::FileChooser& fc)
+                                  [this] (const juce::FileChooser& fc)
                                   {
                                       const auto f = fc.getResult();
                                       if (f.existsAsFile())

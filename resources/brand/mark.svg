@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Riffhouse">
+  <!-- A roof over the letter H, with the amp's pilot light in the gable. Set `color` to tint the mark. -->
+  <path fill="currentColor" d="M50 10 91.2 45H74.9L50 23.8 25.1 45H8.8Z"/>
+  <path fill="currentColor" d="M25 52h10.5v14h29V52H75v40H64.5V76h-29v16H25Z"/>
+  <circle cx="50" cy="43" r="6" fill="#ffa31a"/>
+</svg>
