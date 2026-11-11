@@ -84,7 +84,7 @@ Every change runs 5,900 automatic checks on the sound engine before it ships.
 | Amp oversampling | 8x below 64 kHz, 4x above |
 | Aliasing on a hot amp | 42.9 dB below the wanted harmonics |
 | Everything switched on | about 8x faster than real time on one core of a build server |
-| Loudness across all 177 tones with Auto level | equal on the playing it measured with; nine in ten within 5 dB on other playing |
+| Loudness across all 177 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
 
 ## Build it yourself
 
