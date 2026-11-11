@@ -1,0 +1,123 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # The ASIO SDK is GPLv3 since October 2025. MSYS2 packages its headers.
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: UCRT64
+          update: false
+          install: mingw-w64-ucrt-x86_64-asiosdk
+
+      - name: Locate the ASIO SDK
+        shell: pwsh
+        run: |
+          $sdk = Join-Path "${{ steps.msys2.outputs.msys2-location }}" "ucrt64\include\asiosdk"
+          if (-not (Test-Path (Join-Path $sdk "common\asio.h"))) { throw "ASIO SDK headers not found at $sdk" }
+          "ASIO_SDK=$($sdk -replace '\\','/')" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Configure
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DRIFFHOUSE_ASIO_SDK_DIR="${{ env.ASIO_SDK }}"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel --target Riffhouse_Standalone Riffhouse_VST3 riffhouse_tests
+
+      - name: Test the sound engine
+        run: build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe
+
+      - name: Read the version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path CMakeLists.txt -Pattern 'project\(Riffhouse VERSION ([0-9.]+)').Matches[0].Groups[1].Value
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$env:VERSION" "/DBuildDir=$PWD\build\src\Riffhouse_artefacts\Release" packaging\riffhouse.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+          $file = "dist\Riffhouse-$env:VERSION-windows-setup.exe"
+          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+          "SHA-256 Riffhouse-$env:VERSION-windows-setup.exe $hash" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
+          Get-Content dist\SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riffhouse-windows
+          path: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  linux:
+    name: Linux build and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libasound2-dev libjack-jackd2-dev libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libgl1-mesa-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --target Riffhouse_Standalone riffhouse_tests
+      - name: Test the sound engine
+        run: build/tests/riffhouse_tests_artefacts/Release/riffhouse_tests
+
+  release:
+    name: Publish the release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: riffhouse-windows
+          path: dist
+      - name: Write the release notes
+        run: |
+          {
+            echo "Download **$(basename dist/*.exe)** below and run it. Riffhouse updates itself after that."
+            echo
+            echo "Windows may show a blue \"Windows protected your PC\" box the first time, because the installer is not signed with a paid certificate. Press **More info**, then **Run anyway**."
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } > notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+          body_path: notes.md
+          generate_release_notes: true

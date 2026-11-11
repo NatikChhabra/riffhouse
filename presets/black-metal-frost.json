@@ -1,0 +1,37 @@
+{
+  "name": "Black Metal Frost",
+  "category": "Metal",
+  "genres": [
+    "Black Metal"
+  ],
+  "inspiredBy": "",
+  "description": "Thin, cold and trebly with a dark hall.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit 800",
+    "amp_gain": 8.5,
+    "amp_bass": 3.5,
+    "amp_mid": 4.5,
+    "amp_treble": 7.5,
+    "amp_presence": 7,
+    "amp_depth": 3,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 2,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -54,
+    "gate_release": 80,
+    "rev_on": true,
+    "rev_type": "Hall",
+    "rev_decay": 6,
+    "rev_predelay": 30,
+    "rev_tone": 3.5,
+    "rev_mix": 2.5,
+    "out_level": -3.9
+  }
+}

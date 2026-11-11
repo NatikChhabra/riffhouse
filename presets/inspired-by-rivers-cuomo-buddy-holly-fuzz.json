@@ -1,0 +1,39 @@
+{
+  "name": "Inspired by Rivers Cuomo: Buddy Holly Fuzz",
+  "category": "Inspired By",
+  "genres": [
+    "Alternative",
+    "Power Pop"
+  ],
+  "inspiredBy": "Rivers Cuomo",
+  "description": "Thick, saturated power-pop fuzz.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit 800",
+    "amp_gain": 5.5,
+    "amp_bass": 5.5,
+    "amp_mid": 6,
+    "amp_treble": 5.5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Big Fuzz",
+    "drv_gain": 6,
+    "drv_tone": 5,
+    "drv_level": 5,
+    "gate_on": true,
+    "gate_thresh": -58,
+    "gate_release": 80,
+    "rev_on": false,
+    "doubler": 6,
+    "out_level": -0.5
+  }
+}

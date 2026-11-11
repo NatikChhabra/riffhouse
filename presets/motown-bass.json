@@ -1,0 +1,39 @@
+{
+  "name": "Motown Bass",
+  "category": "Bass",
+  "genres": [
+    "Bass",
+    "Soul",
+    "Motown"
+  ],
+  "inspiredBy": "",
+  "description": "Deep, thumpy, old-school.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Bass Station",
+    "amp_gain": 3.5,
+    "amp_bass": 6.5,
+    "amp_mid": 5,
+    "amp_treble": 3,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x15 Bass",
+    "cab_mic": 4,
+    "cab_distance": 2.5,
+    "cab_lowcut": 30,
+    "cab_highcut": 5000,
+    "comp_on": true,
+    "comp_sustain": 4,
+    "comp_attack": 5,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "rev_on": false,
+    "gate_on": true,
+    "gate_thresh": -72,
+    "gate_release": 80,
+    "out_level": 1.4
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "Metal Bass",
+  "category": "Bass",
+  "genres": [
+    "Bass",
+    "Metal"
+  ],
+  "inspiredBy": "",
+  "description": "Clanky, driven bass that cuts through guitars.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Bass Station",
+    "amp_gain": 7,
+    "amp_bass": 6,
+    "amp_mid": 6.5,
+    "amp_treble": 6.5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x10 Bass",
+    "cab_mic": 2.5,
+    "cab_distance": 1.5,
+    "cab_lowcut": 35,
+    "cab_highcut": 10000,
+    "drv_on": true,
+    "drv_type": "Metal Box",
+    "drv_gain": 3,
+    "drv_tone": 6,
+    "drv_level": 5,
+    "comp_on": true,
+    "comp_sustain": 5,
+    "comp_attack": 4,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "gate_on": true,
+    "gate_thresh": -60,
+    "gate_release": 80,
+    "rev_on": false,
+    "out_level": -8.7
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "Inspired by Mark Tremonti: Rock Anthem Rhythm",
+  "category": "Inspired By",
+  "genres": [
+    "Hard Rock",
+    "Post-Grunge"
+  ],
+  "inspiredBy": "Mark Tremonti",
+  "description": "Thick, saturated modern rock rhythm.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Modern High Gain",
+    "amp_gain": 6,
+    "amp_bass": 6,
+    "amp_mid": 5.5,
+    "amp_treble": 5.5,
+    "amp_presence": 5.5,
+    "amp_depth": 6,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -56,
+    "gate_release": 80,
+    "rev_on": false,
+    "doubler": 6,
+    "out_level": 0.7
+  }
+}

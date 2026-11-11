@@ -1,0 +1,43 @@
+{
+  "name": "Inspired by Keith Urban: Country Rock Drive",
+  "category": "Inspired By",
+  "genres": [
+    "Country Rock"
+  ],
+  "inspiredBy": "Keith Urban",
+  "description": "Bright overdrive for modern country.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Chime Top",
+    "amp_gain": 6,
+    "amp_bass": 4.5,
+    "amp_mid": 5,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "2x12 Blue",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Blues Drive",
+    "drv_gain": 3,
+    "drv_tone": 5.5,
+    "drv_level": 6,
+    "dly_on": true,
+    "dly_type": "Digital",
+    "dly_time": 380,
+    "dly_sync": "Off",
+    "dly_feedback": 2.5,
+    "dly_tone": 6,
+    "dly_mix": 2,
+    "gate_on": true,
+    "gate_thresh": -64,
+    "gate_release": 80,
+    "out_level": -5.2
+  }
+}

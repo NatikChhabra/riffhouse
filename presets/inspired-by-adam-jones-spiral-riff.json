@@ -1,0 +1,38 @@
+{
+  "name": "Inspired by Adam Jones: Spiral Riff",
+  "category": "Inspired By",
+  "genres": [
+    "Progressive Metal",
+    "Alternative Metal"
+  ],
+  "inspiredBy": "Adam Jones",
+  "description": "Thick, mid-heavy high gain with a phaser option.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Modern High Gain",
+    "amp_gain": 6,
+    "amp_bass": 6,
+    "amp_mid": 6.5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 6.5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -54,
+    "gate_release": 50,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 2.5,
+    "rev_predelay": 5,
+    "rev_tone": 4.5,
+    "rev_mix": 0.8,
+    "out_level": -1.4
+  }
+}

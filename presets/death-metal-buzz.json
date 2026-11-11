@@ -1,0 +1,37 @@
+{
+  "name": "Death Metal Buzz",
+  "category": "Metal",
+  "genres": [
+    "Death Metal"
+  ],
+  "inspiredBy": "",
+  "description": "Saw-toothed and brutal.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Modern High Gain",
+    "amp_gain": 7,
+    "amp_bass": 6,
+    "amp_mid": 4,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 2.5,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Metal Box",
+    "drv_gain": 6,
+    "drv_tone": 6,
+    "drv_level": 5,
+    "gate_on": true,
+    "gate_thresh": -50,
+    "gate_release": 40,
+    "rev_on": false,
+    "out_level": -1.7
+  }
+}

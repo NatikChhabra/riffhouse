@@ -1,0 +1,42 @@
+{
+  "name": "Inspired by Josh Homme: Desert Riff",
+  "category": "Inspired By",
+  "genres": [
+    "Stoner Rock",
+    "Desert Rock"
+  ],
+  "inspiredBy": "Josh Homme",
+  "description": "Midrangey, fuzzy, dry desert rock.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tweed Edge",
+    "amp_gain": 6.5,
+    "amp_bass": 5,
+    "amp_mid": 7,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "2x12 Blue",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Big Fuzz",
+    "drv_gain": 5,
+    "drv_tone": 6.5,
+    "drv_level": 5,
+    "pitch_on": true,
+    "pitch_mode": "Octave Up",
+    "pitch_semis": 12,
+    "pitch_mix": 2,
+    "gate_on": true,
+    "gate_thresh": -58,
+    "gate_release": 80,
+    "rev_on": false,
+    "out_level": -5.3
+  }
+}

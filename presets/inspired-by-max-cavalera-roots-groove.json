@@ -1,0 +1,38 @@
+{
+  "name": "Inspired by Max Cavalera: Roots Groove",
+  "category": "Inspired By",
+  "genres": [
+    "Groove Metal",
+    "Thrash"
+  ],
+  "inspiredBy": "Max Cavalera",
+  "description": "Downtuned, fat, grinding rhythm.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Modern High Gain",
+    "amp_gain": 6.5,
+    "amp_bass": 7,
+    "amp_mid": 4,
+    "amp_treble": 5.5,
+    "amp_presence": 5.5,
+    "amp_depth": 7,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 3,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Metal Box",
+    "drv_gain": 3,
+    "drv_tone": 5,
+    "drv_level": 6,
+    "gate_on": true,
+    "gate_thresh": -52,
+    "gate_release": 40,
+    "rev_on": false,
+    "out_level": -0.8
+  }
+}

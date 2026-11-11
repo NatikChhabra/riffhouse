@@ -1,0 +1,39 @@
+{
+  "name": "Folk Metal Fire",
+  "category": "Metal",
+  "genres": [
+    "Folk Metal",
+    "Metal"
+  ],
+  "inspiredBy": "",
+  "description": "Big, mid-forward heavy rhythm that leaves room for folk instruments.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tight Metal",
+    "amp_gain": 6,
+    "amp_bass": 5.5,
+    "amp_mid": 6.5,
+    "amp_treble": 6,
+    "amp_presence": 6,
+    "amp_depth": 6,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 3,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -52,
+    "gate_release": 45,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 2.5,
+    "rev_predelay": 5,
+    "rev_tone": 5,
+    "rev_mix": 0.8,
+    "doubler": 6,
+    "out_level": -0.4
+  }
+}

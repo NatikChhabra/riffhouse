@@ -1,0 +1,41 @@
+{
+  "name": "Sub Octave Synth",
+  "category": "Ambient",
+  "genres": [
+    "Experimental",
+    "Electronic"
+  ],
+  "inspiredBy": "",
+  "description": "Octave-down fuzz that sounds like a synth bass.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Studio Direct",
+    "amp_gain": 5,
+    "amp_bass": 5,
+    "amp_mid": 5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x12 Open Back",
+    "cab_mic": 4,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "pitch_on": true,
+    "pitch_mode": "Sub Octave",
+    "pitch_semis": -12,
+    "pitch_mix": 8,
+    "drv_on": true,
+    "drv_type": "Big Fuzz",
+    "drv_gain": 6,
+    "drv_tone": 4,
+    "drv_level": 4,
+    "gate_on": true,
+    "gate_thresh": -60,
+    "gate_release": 80,
+    "out_level": -15.1
+  }
+}

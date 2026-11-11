@@ -1,0 +1,43 @@
+{
+  "name": "Inspired by Brad Paisley: Chicken Pickin'",
+  "category": "Inspired By",
+  "genres": [
+    "Country"
+  ],
+  "inspiredBy": "Brad Paisley",
+  "description": "Snappy, compressed, a little hot.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Chime Top",
+    "amp_gain": 5,
+    "amp_bass": 4.5,
+    "amp_mid": 5,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "2x12 Blue",
+    "cab_mic": 2.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "comp_on": true,
+    "comp_sustain": 6,
+    "comp_attack": 3,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "dly_on": true,
+    "dly_type": "Analog",
+    "dly_time": 300,
+    "dly_sync": "Off",
+    "dly_feedback": 2,
+    "dly_tone": 5,
+    "dly_mix": 1.8,
+    "gate_on": true,
+    "gate_thresh": -66,
+    "gate_release": 80,
+    "out_level": -3.6
+  }
+}

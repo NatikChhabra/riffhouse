@@ -1,0 +1,34 @@
+{
+  "name": "Inspired by Joe Duplantier: Gojira Heavy",
+  "category": "Inspired By",
+  "genres": [
+    "Progressive Metal",
+    "Death Metal"
+  ],
+  "inspiredBy": "Joe Duplantier",
+  "description": "Huge, tight, mid-forward heavy rhythm.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tight Metal",
+    "amp_gain": 7,
+    "amp_bass": 6.5,
+    "amp_mid": 6,
+    "amp_treble": 5.5,
+    "amp_presence": 6,
+    "amp_depth": 7,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 3,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -50,
+    "gate_release": 40,
+    "rev_on": false,
+    "doubler": 7,
+    "out_level": 0.3
+  }
+}

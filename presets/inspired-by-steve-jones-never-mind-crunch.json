@@ -1,0 +1,33 @@
+{
+  "name": "Inspired by Steve Jones: Never Mind Crunch",
+  "category": "Inspired By",
+  "genres": [
+    "Punk"
+  ],
+  "inspiredBy": "Steve Jones",
+  "description": "Thick, cranked British punk rhythm.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit Plexi",
+    "amp_gain": 8,
+    "amp_bass": 5.5,
+    "amp_mid": 6.5,
+    "amp_treble": 6,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -58,
+    "gate_release": 80,
+    "rev_on": false,
+    "doubler": 6,
+    "out_level": -2.2
+  }
+}

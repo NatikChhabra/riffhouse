@@ -1,0 +1,43 @@
+{
+  "name": "Inspired by Jerry Cantrell: Rooster Grind",
+  "category": "Inspired By",
+  "genres": [
+    "Grunge",
+    "Alternative Metal"
+  ],
+  "inspiredBy": "Jerry Cantrell",
+  "description": "Thick, sludgy, mid-heavy grunge.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit 800",
+    "amp_gain": 7,
+    "amp_bass": 6,
+    "amp_mid": 6.5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 6,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "mod_on": true,
+    "mod_type": "Chorus",
+    "mod_rate": 1.5,
+    "mod_depth": 2,
+    "mod_mix": 2,
+    "gate_on": true,
+    "gate_thresh": -58,
+    "gate_release": 80,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 2.5,
+    "rev_predelay": 5,
+    "rev_tone": 4.5,
+    "rev_mix": 1,
+    "out_level": -2.0
+  }
+}

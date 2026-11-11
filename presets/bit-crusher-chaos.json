@@ -1,0 +1,40 @@
+{
+  "name": "Bit Crusher Chaos",
+  "category": "Ambient",
+  "genres": [
+    "Experimental",
+    "Electronic"
+  ],
+  "inspiredBy": "",
+  "description": "8-bit video game crunch.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit Plexi",
+    "amp_gain": 5,
+    "amp_bass": 5,
+    "amp_mid": 5,
+    "amp_treble": 6,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x8 Tiny Combo",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "lofi_on": true,
+    "lofi_bits": 7,
+    "lofi_rate": 7,
+    "lofi_wobble": 0,
+    "lofi_noise": 0,
+    "lofi_filter": 2,
+    "lofi_mix": 10,
+    "gate_on": true,
+    "gate_thresh": -62,
+    "gate_release": 80,
+    "rev_on": false,
+    "out_level": 2.7
+  }
+}

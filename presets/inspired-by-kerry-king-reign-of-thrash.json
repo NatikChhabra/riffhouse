@@ -1,0 +1,32 @@
+{
+  "name": "Inspired by Kerry King: Reign of Thrash",
+  "category": "Inspired By",
+  "genres": [
+    "Thrash"
+  ],
+  "inspiredBy": "Kerry King",
+  "description": "Fast, buzzy, aggressive thrash.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Modern High Gain",
+    "amp_gain": 8,
+    "amp_bass": 6,
+    "amp_mid": 4.5,
+    "amp_treble": 7,
+    "amp_presence": 7,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 2.5,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -52,
+    "gate_release": 40,
+    "rev_on": false,
+    "out_level": -2.2
+  }
+}

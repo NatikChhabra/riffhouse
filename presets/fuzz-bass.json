@@ -1,0 +1,38 @@
+{
+  "name": "Fuzz Bass",
+  "category": "Bass",
+  "genres": [
+    "Bass",
+    "Stoner Rock"
+  ],
+  "inspiredBy": "",
+  "description": "Fuzzed-out bass with clean lows underneath.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Bass Station",
+    "amp_gain": 5,
+    "amp_bass": 6,
+    "amp_mid": 5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x10 Bass",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 30,
+    "cab_highcut": 9000,
+    "drv_on": true,
+    "drv_type": "Big Fuzz",
+    "drv_gain": 6,
+    "drv_tone": 5,
+    "drv_level": 4,
+    "gate_on": true,
+    "gate_thresh": -62,
+    "gate_release": 80,
+    "rev_on": false,
+    "out_level": -7.5
+  }
+}

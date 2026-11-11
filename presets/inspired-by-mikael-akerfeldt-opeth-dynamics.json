@@ -1,0 +1,37 @@
+{
+  "name": "Inspired by Mikael Akerfeldt: Opeth Dynamics",
+  "category": "Inspired By",
+  "genres": [
+    "Progressive Metal"
+  ],
+  "inspiredBy": "Mikael Akerfeldt",
+  "description": "Dark, warm high gain that still has detail.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Hot Rod Lead",
+    "amp_gain": 6.5,
+    "amp_bass": 6,
+    "amp_mid": 6,
+    "amp_treble": 4.5,
+    "amp_presence": 4.5,
+    "amp_depth": 6,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 4,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -56,
+    "gate_release": 80,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 3,
+    "rev_predelay": 8,
+    "rev_tone": 4.5,
+    "rev_mix": 1.2,
+    "out_level": -0.6
+  }
+}

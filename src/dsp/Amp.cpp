@@ -1,0 +1,244 @@
+// Riffhouse - free, open-source guitar rig
+// Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
+#include "Amp.h"
+
+namespace rh
+{
+namespace
+{
+    using namespace tonestacks;
+
+    // name, inHP, bright, gainMin, gainMax, stages, stageGain[5], stageBias[5], stageHp[5], stageLp[5],
+    // baxandall, stack, midHz, powerDrive, powerBias, sag, presenceHz, depthHz, outHp, outLp, trim
+    const AmpVoicing voicings[] = {
+        { "Glass Clean", 20.0f, 5.0f, -14.0f, 14.0f, 2,
+          { 1, 6, 1, 1, 1 }, { 0.10f, 0.08f, 0, 0, 0 }, { 20, 30, 0, 0, 0 }, { 14000, 13750, 0, 0, 0 },
+          false, american, 600.0f, 0.9f, 0.00f, 0.10f, 4500.0f, 95.0f, 45.0f, 11000.0f, 3.3f },
+        { "Tweed Edge", 20.0f, 2.0f, -12.0f, 20.0f, 2,
+          { 1, 14, 1, 1, 1 }, { 0.20f, 0.15f, 0, 0, 0 }, { 20, 40, 0, 0, 0 }, { 11250, 8750, 0, 0, 0 },
+          false, tweed, 800.0f, 2.2f, 0.05f, 0.45f, 3000.0f, 85.0f, 50.0f, 8000.0f, -5.5f },
+        { "Chime Top", 25.0f, 3.0f, -14.0f, 20.0f, 3,
+          { 1, 10, 1.5f, 1, 1 }, { 0.15f, 0.10f, 0.05f, 0, 0 }, { 25, 60, 30, 0, 0 }, { 14000, 12000, 15000, 0, 0 },
+          false, chime, 900.0f, 1.8f, 0.18f, 0.30f, 3500.0f, 110.0f, 70.0f, 10000.0f, -4.3f },
+        { "Brit Plexi", 30.0f, 6.0f, -14.0f, 22.0f, 3,
+          { 1, 16, 1.2f, 1, 1 }, { 0.20f, 0.18f, 0.05f, 0, 0 }, { 30, 90, 40, 0, 0 }, { 12000, 11250, 14000, 0, 0 },
+          false, british, 750.0f, 1.6f, 0.02f, 0.25f, 3500.0f, 100.0f, 60.0f, 10500.0f, -3.2f },
+        { "Brit 800", 40.0f, 4.0f, -40.0f, 20.0f, 4,
+          { 1, 22, 12, 1.2f, 1 }, { 0.25f, 0.35f, 0.15f, 0.05f, 0 }, { 40, 120, 90, 40, 0 }, { 13750, 10000, 8750, 12000, 0 },
+          false, british, 700.0f, 1.3f, 0.02f, 0.20f, 3200.0f, 100.0f, 70.0f, 10000.0f, -3.1f },
+        { "Hot Rod Lead", 40.0f, 2.0f, -46.0f, 16.0f, 5,
+          { 1, 20, 14, 8, 1.2f }, { 0.25f, 0.30f, 0.20f, 0.10f, 0.05f }, { 40, 150, 120, 80, 40 }, { 12500, 8750, 8125, 8125, 12000 },
+          false, britishHot, 650.0f, 1.2f, 0.02f, 0.20f, 3000.0f, 95.0f, 70.0f, 10000.0f, -3.7f },
+        { "Modern High Gain", 30.0f, 1.0f, -48.0f, 16.0f, 5,
+          { 1, 22, 16, 10, 1.2f }, { 0.20f, 0.30f, 0.25f, 0.10f, 0.05f }, { 30, 100, 80, 60, 30 }, { 11250, 8750, 7500, 7500, 12000 },
+          false, modern, 550.0f, 1.6f, 0.0f, 0.40f, 3500.0f, 80.0f, 45.0f, 10000.0f, -6.7f },
+        { "Tight Metal", 110.0f, 2.0f, -46.0f, 18.0f, 5,
+          { 1, 25, 18, 10, 1.2f }, { 0.20f, 0.30f, 0.20f, 0.10f, 0.05f }, { 110, 220, 160, 90, 40 }, { 11875, 9375, 8125, 8125, 12000 },
+          false, modern, 650.0f, 1.3f, 0.0f, 0.15f, 3800.0f, 90.0f, 60.0f, 10500.0f, -5.1f },
+        { "Bass Station", 15.0f, 0.0f, -10.0f, 18.0f, 2,
+          { 1, 8, 1, 1, 1 }, { 0.15f, 0.10f, 0, 0, 0 }, { 15, 20, 0, 0, 0 }, { 12000, 11250, 0, 0, 0 },
+          true, american, 500.0f, 1.2f, 0.0f, 0.30f, 5000.0f, 60.0f, 28.0f, 9000.0f, 1.8f },
+        { "Studio Direct", 15.0f, 0.0f, -12.0f, 12.0f, 1,
+          { 1, 1, 1, 1, 1 }, { 0.05f, 0, 0, 0, 0 }, { 15, 0, 0, 0, 0 }, { 18000, 0, 0, 0, 0 },
+          true, american, 800.0f, 0.5f, 0.0f, 0.0f, 6000.0f, 90.0f, 25.0f, 16000.0f, 27.1f },
+    };
+} // namespace
+
+const AmpVoicing& ampVoicing (int model)
+{
+    model = std::clamp (model, 0, numAmpVoicings() - 1);
+    return voicings[model];
+}
+
+int numAmpVoicings() { return (int) (sizeof (voicings) / sizeof (voicings[0])); }
+
+void Amp::prepare (double sampleRate, int maxBlock)
+{
+    sr = sampleRate;
+    // 8x oversampling below 64 kHz, 4x above. Five gain stages in a row make harmonics far past
+    // what 4x can hold: at full gain 8x measures 10 dB less aliasing for one extra sample of delay.
+    const int stagesOs = sampleRate < 64000.0 ? 3 : 2;
+    oversampler = std::make_unique<juce::dsp::Oversampling<float>> (1, (size_t) stagesOs,
+                                                                    juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
+                                                                    true, false);
+    oversampler->initProcessing ((size_t) maxBlock);
+    osr = sampleRate * (double) (1 << stagesOs);
+
+    for (auto& s : stages)
+        s.blocking.prepare (osr, 2.0f, 60.0f);
+    supply.prepare (osr, 4.0f, 180.0f);
+    stack.prepare (osr);
+    dcPre.prepare (osr);
+    dcPost.prepare (osr);
+    preGain.prepare (osr, 30.0f);
+    masterGain.prepare (osr, 30.0f);
+    outGain.prepare (sr, 30.0f);
+    dirty = true;
+    updateFilters();
+    preGain.reset (preGain.getTarget());
+    reset();
+}
+
+void Amp::reset()
+{
+    if (oversampler) oversampler->reset();
+    inputHp.reset();
+    bright.reset(); midBoost.reset(); presence.reset(); depth.reset(); outHp.reset(); outLp.reset(); antiFizz.reset();
+    baxLow.reset(); baxMid.reset(); baxHigh.reset();
+    stack.reset();
+    for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.blocking.reset(); }
+    supply.reset();
+    dcPre.reset(); dcPost.reset();
+}
+
+float Amp::latencySamples() const { return oversampler ? oversampler->getLatencyInSamples() : 0.0f; }
+
+void Amp::setSettings (const AmpSettings& s)
+{
+    if (s.model != settings.model || s.gain != settings.gain || s.bass != settings.bass || s.mid != settings.mid
+        || s.treble != settings.treble || s.presence != settings.presence || s.depth != settings.depth
+        || s.master != settings.master || s.levelDb != settings.levelDb || v == nullptr)
+    {
+        const bool modelChanged = (v == nullptr) || s.model != settings.model;
+        settings = s;
+        dirty = true;
+        updateFilters();
+        if (modelChanged)
+        {
+            reset();
+            preGain.reset (preGain.getTarget());
+        }
+    }
+}
+
+void Amp::updateFilters()
+{
+    if (! dirty) return;
+    dirty = false;
+    v = &ampVoicing (settings.model);
+
+    const float g01 = clamp01 (settings.gain / 10.0f);
+    preGain.setTarget (dbToGain (lerp (v->gainMinDb, v->gainMaxDb, g01)));
+    masterGain.setTarget (dbToGain (lerp (-18.0f, 6.0f, clamp01 (settings.master / 10.0f))));
+    outGain.setTarget (dbToGain (v->trimDb + settings.levelDb));
+
+    inputHp.setCutoff (osr, v->inputHpHz);
+    // The bright cap matters most at low gain settings, as on a real amp.
+    bright.set (Biquad::Type::highShelf, osr, 1800.0, 0.6, v->brightDb * (1.0f - g01));
+
+    for (int i = 0; i < 5; ++i)
+    {
+        auto& st = stages[i];
+        st.gain = v->stageGain[i];
+        st.bias = v->stageBias[i];
+        st.hp.setCutoff (osr, std::max (5.0f, v->stageHpHz[i]));
+        st.lp.setCutoff (osr, v->stageLpHz[i] > 0 ? v->stageLpHz[i] : 20000.0f);
+    }
+
+    const float b = settings.bass / 10.0f, m = settings.mid / 10.0f, t = settings.treble / 10.0f;
+    if (v->baxandall)
+    {
+        baxLow.set (Biquad::Type::lowShelf, osr, 110.0, 0.7, (b - 0.5f) * 24.0f);
+        baxMid.set (Biquad::Type::peak, osr, v->midBoostHz, 0.8, (m - 0.5f) * 20.0f);
+        baxHigh.set (Biquad::Type::highShelf, osr, 2800.0, 0.7, (t - 0.5f) * 24.0f);
+        stackMakeup = 1.0f;
+    }
+    else
+    {
+        stack.set (v->stack, t, m, b);
+        // Make up the passive stack's insertion loss, measured with the knobs at noon
+        // so turning knobs still changes the level the way a real amp does.
+        ToneStack probe;
+        probe.prepare (osr);
+        probe.set (v->stack, 0.5, 0.5, 0.5);
+        double sum = 0.0;
+        const double freqs[] = { 150.0, 400.0, 1000.0, 2500.0 };
+        for (double f : freqs) sum += probe.magnitude (f);
+        stackMakeup = (float) (4.0 / sum);
+        midBoost.set (Biquad::Type::peak, osr, v->midBoostHz, 0.7, (m - 0.5f) * 8.0f);
+    }
+
+    presence.set (Biquad::Type::highShelf, osr, v->presenceHz, 0.6, (settings.presence / 10.0f - 0.5f) * 12.0f);
+    depth.set (Biquad::Type::peak, osr, v->depthHz, 0.8, (settings.depth / 10.0f - 0.5f) * 12.0f);
+    outHp.set (Biquad::Type::highpass, osr, v->outputHpHz, 0.6);
+    outLp.set (Biquad::Type::lowpass, osr, v->outputLpHz, 0.6);
+    antiFizz.set (Biquad::Type::lowpass, osr, std::min (16000.0, 0.45 * sr), 0.5);
+}
+
+// Asymmetric triode-style transfer curve: the positive side (grid conduction)
+// clips earlier and harder than the negative side (cutoff), which gives even
+// harmonics. The stage inverts like a common-cathode stage.
+inline float Amp::tube (float x, float bias) noexcept
+{
+    auto f = [] (float u) { return u >= 0.0f ? fastTanh (u) : fastTanh (0.6f * u) * (1.0f / 0.6f); };
+    return -(f (x + bias) - f (bias));
+}
+
+void Amp::process (float* data, int n)
+{
+    if (v == nullptr || oversampler == nullptr) return;
+
+    float* chans[] = { data };
+    juce::dsp::AudioBlock<float> block (chans, 1, (size_t) n);
+    auto os = oversampler->processSamplesUp (block);
+    float* x = os.getChannelPointer (0);
+    const int on = (int) os.getNumSamples();
+
+    const int ns = v->numStages;
+    const bool bax = v->baxandall;
+    const float sag = v->sag;
+    const float pBias = v->powerBias;
+
+    for (int i = 0; i < on; ++i)
+    {
+        float s = x[i];
+        s = inputHp.highpass (s);
+        s = bright.process (s);
+
+        // Stage 1 has a fixed gain; the gain knob sits after it (as the volume
+        // pot does on most amps). Single-stage voicings take the gain first.
+        if (ns == 1)
+            s *= preGain.next();
+
+        for (int k = 0; k < ns; ++k)
+        {
+            auto& st = stages[k];
+            if (k == 1)
+                s *= preGain.next() * st.gain;
+            else if (k > 1)
+                s *= st.gain;
+            else
+                s *= 2.0f;
+
+            // grid blocking: big positive swings shift the bias, which gives the
+            // squashy, dynamic feel when you dig in
+            const float env = st.blocking.process (std::max (0.0f, s));
+            s = tube (s, st.bias - 0.25f * std::min (env, 2.0f));
+            s = st.hp.highpass (s);
+            s = st.lp.lowpass (s);
+        }
+
+        s = dcPre.process (s);
+
+        if (bax)
+            s = baxHigh.process (baxMid.process (baxLow.process (s)));
+        else
+            s = midBoost.process (stack.process (s) * stackMakeup);
+
+        // power amp: presence and depth act through the negative feedback loop
+        s = depth.process (presence.process (s));
+        s *= 0.35f * v->powerDrive * masterGain.next();
+        const float env = supply.process (s);
+        const float head = 1.0f / (1.0f + sag * std::min (env, 4.0f));
+        s = head * (fastTanh ((s + pBias) / head) - fastTanh (pBias / head));
+        s = dcPost.process (s);
+        s = outLp.process (outHp.process (s));
+        x[i] = antiFizz.process (s);
+    }
+
+    oversampler->processSamplesDown (block);
+
+    for (int i = 0; i < n; ++i)
+        data[i] *= outGain.next();
+}
+} // namespace rh

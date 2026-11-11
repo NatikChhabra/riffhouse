@@ -1,0 +1,38 @@
+{
+  "name": "Inspired by Geddy Lee: Prog Bass Growl",
+  "category": "Inspired By",
+  "genres": [
+    "Bass",
+    "Progressive Rock"
+  ],
+  "inspiredBy": "Geddy Lee",
+  "description": "Bright, growly, midrange-y bass.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Bass Station",
+    "amp_gain": 6,
+    "amp_bass": 5.5,
+    "amp_mid": 6.5,
+    "amp_treble": 6.5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x10 Bass",
+    "cab_mic": 2.5,
+    "cab_distance": 2,
+    "cab_lowcut": 30,
+    "cab_highcut": 11000,
+    "comp_on": true,
+    "comp_sustain": 5,
+    "comp_attack": 4,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "rev_on": false,
+    "gate_on": true,
+    "gate_thresh": -66,
+    "gate_release": 80,
+    "out_level": -4.7
+  }
+}

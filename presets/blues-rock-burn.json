@@ -1,0 +1,42 @@
+{
+  "name": "Blues Rock Burn",
+  "category": "Blues",
+  "genres": [
+    "Blues Rock"
+  ],
+  "inspiredBy": "",
+  "description": "Hot blues rock with a fuzz edge.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit Plexi",
+    "amp_gain": 6,
+    "amp_bass": 5,
+    "amp_mid": 6,
+    "amp_treble": 5.5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Blues Drive",
+    "drv_gain": 6,
+    "drv_tone": 5,
+    "drv_level": 6,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 3,
+    "rev_predelay": 8,
+    "rev_tone": 5,
+    "rev_mix": 1.4,
+    "gate_on": true,
+    "gate_thresh": -62,
+    "gate_release": 80,
+    "out_level": -4.3
+  }
+}

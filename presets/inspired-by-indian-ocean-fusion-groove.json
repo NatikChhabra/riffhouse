@@ -1,0 +1,38 @@
+{
+  "name": "Inspired by Indian Ocean: Fusion Groove",
+  "category": "Inspired By",
+  "genres": [
+    "Indian Fusion",
+    "Folk Rock"
+  ],
+  "inspiredBy": "Indian Ocean",
+  "description": "Earthy, slightly driven tone for fusion grooves.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tweed Edge",
+    "amp_gain": 5,
+    "amp_bass": 5.5,
+    "amp_mid": 6,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x12 Open Back",
+    "cab_mic": 3.5,
+    "cab_distance": 2.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 3.5,
+    "rev_predelay": 10,
+    "rev_tone": 4.5,
+    "rev_mix": 1.8,
+    "gate_on": true,
+    "gate_thresh": -66,
+    "gate_release": 80,
+    "out_level": -0.5
+  }
+}

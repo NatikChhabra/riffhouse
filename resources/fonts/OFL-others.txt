@@ -1,0 +1,7 @@
+Instrument Sans (c) The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)
+Doto (c) The Doto Project Authors (https://github.com/oliverlalan/Doto)
+Big Shoulders (c) The Big Shoulders Project Authors (https://github.com/xotypeco/big_shoulders)
+
+All are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+The files here are static instances made from the variable fonts published on Google Fonts.
+The full licence text is the same as in OFL-Inter.txt.

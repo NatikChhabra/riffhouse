@@ -1,0 +1,42 @@
+{
+  "name": "Inspired by Brent Mason: Nashville Session",
+  "category": "Inspired By",
+  "genres": [
+    "Country"
+  ],
+  "inspiredBy": "Brent Mason",
+  "description": "Glassy, compressed, studio clean.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Glass Clean",
+    "amp_gain": 4.5,
+    "amp_bass": 4.5,
+    "amp_mid": 5,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "2x12 American",
+    "cab_mic": 2.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "comp_on": true,
+    "comp_sustain": 6,
+    "comp_attack": 3,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 3,
+    "rev_predelay": 8,
+    "rev_tone": 5.5,
+    "rev_mix": 1.4,
+    "gate_on": true,
+    "gate_thresh": -68,
+    "gate_release": 80,
+    "out_level": -3.5
+  }
+}

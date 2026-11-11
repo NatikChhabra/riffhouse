@@ -1,0 +1,42 @@
+{
+  "name": "Inspired by Zakk Wylde: Pinch Harmonic Beast",
+  "category": "Inspired By",
+  "genres": [
+    "Heavy Metal"
+  ],
+  "inspiredBy": "Zakk Wylde",
+  "description": "Big, mid-boosted squealing rhythm.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit 800",
+    "amp_gain": 7.5,
+    "amp_bass": 6,
+    "amp_mid": 7,
+    "amp_treble": 6,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Metal Box",
+    "drv_gain": 2,
+    "drv_tone": 5,
+    "drv_level": 7,
+    "gate_on": true,
+    "gate_thresh": -56,
+    "gate_release": 80,
+    "rev_on": true,
+    "rev_type": "Room",
+    "rev_decay": 2.5,
+    "rev_predelay": 5,
+    "rev_tone": 5,
+    "rev_mix": 0.8,
+    "out_level": -4.3
+  }
+}

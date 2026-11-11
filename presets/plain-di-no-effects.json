@@ -1,0 +1,18 @@
+{
+  "name": "Plain DI (No Effects)",
+  "category": "Essentials",
+  "genres": [
+    "Utility"
+  ],
+  "inspiredBy": "",
+  "description": "Your guitar with only the noise gate and hum filter. Useful for recording a clean track to re-amp later.",
+  "params": {
+    "amp_on": false,
+    "cab_on": false,
+    "rev_on": false,
+    "gate_on": true,
+    "gate_thresh": -70,
+    "gate_release": 80,
+    "out_level": 7.9
+  }
+}

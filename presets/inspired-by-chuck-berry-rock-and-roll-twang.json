@@ -1,0 +1,39 @@
+{
+  "name": "Inspired by Chuck Berry: Rock and Roll Twang",
+  "category": "Inspired By",
+  "genres": [
+    "Rock and Roll",
+    "50s"
+  ],
+  "inspiredBy": "Chuck Berry",
+  "description": "Small, slightly dirty combo with slapback.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tweed Edge",
+    "amp_gain": 5.5,
+    "amp_bass": 5,
+    "amp_mid": 5.5,
+    "amp_treble": 6,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x12 Open Back",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "dly_on": true,
+    "dly_type": "Tape",
+    "dly_time": 110,
+    "dly_sync": "Off",
+    "dly_feedback": 0.5,
+    "dly_tone": 5,
+    "dly_mix": 2.5,
+    "gate_on": true,
+    "gate_thresh": -66,
+    "gate_release": 80,
+    "out_level": -1.7
+  }
+}

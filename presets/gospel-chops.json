@@ -1,0 +1,43 @@
+{
+  "name": "Gospel Chops",
+  "category": "Funk",
+  "genres": [
+    "Gospel",
+    "Soul"
+  ],
+  "inspiredBy": "",
+  "description": "Round, warm and articulate for church chops.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Glass Clean",
+    "amp_gain": 4,
+    "amp_bass": 5.5,
+    "amp_mid": 5.5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "2x12 American",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "comp_on": true,
+    "comp_sustain": 5,
+    "comp_attack": 5,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "rev_on": true,
+    "rev_type": "Hall",
+    "rev_decay": 4,
+    "rev_predelay": 20,
+    "rev_tone": 5,
+    "rev_mix": 2,
+    "gate_on": true,
+    "gate_thresh": -70,
+    "gate_release": 80,
+    "out_level": -1.1
+  }
+}

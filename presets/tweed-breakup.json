@@ -1,0 +1,39 @@
+{
+  "name": "Tweed Breakup",
+  "category": "Crunch",
+  "genres": [
+    "Blues",
+    "Classic Rock",
+    "Americana"
+  ],
+  "inspiredBy": "",
+  "description": "Loose, hairy, touch-sensitive breakup.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tweed Edge",
+    "amp_gain": 6,
+    "amp_bass": 5,
+    "amp_mid": 5.5,
+    "amp_treble": 5.5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x12 Open Back",
+    "cab_mic": 3.5,
+    "cab_distance": 2.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "rev_on": true,
+    "rev_type": "Spring",
+    "rev_decay": 3,
+    "rev_predelay": 0,
+    "rev_tone": 5,
+    "rev_mix": 1.6,
+    "gate_on": true,
+    "gate_thresh": -64,
+    "gate_release": 80,
+    "out_level": -1.6
+  }
+}

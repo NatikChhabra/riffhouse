@@ -1,0 +1,38 @@
+{
+  "name": "Reggae Skank",
+  "category": "Funk",
+  "genres": [
+    "Reggae",
+    "Ska"
+  ],
+  "inspiredBy": "",
+  "description": "Short, bright upstrokes with a touch of spring.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Glass Clean",
+    "amp_gain": 4,
+    "amp_bass": 3.5,
+    "amp_mid": 5.5,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x12 Open Back",
+    "cab_mic": 2.5,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "rev_on": true,
+    "rev_type": "Spring",
+    "rev_decay": 3.5,
+    "rev_predelay": 0,
+    "rev_tone": 6,
+    "rev_mix": 1.6,
+    "gate_on": true,
+    "gate_thresh": -70,
+    "gate_release": 80,
+    "out_level": -3.0
+  }
+}

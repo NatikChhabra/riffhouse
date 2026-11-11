@@ -1,0 +1,36 @@
+{
+  "name": "Inspired by Slash: Wah Rock",
+  "category": "Inspired By",
+  "genres": [
+    "Hard Rock"
+  ],
+  "inspiredBy": "Slash",
+  "description": "Hot-rod crunch with a cocked wah.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Hot Rod Lead",
+    "amp_gain": 6,
+    "amp_bass": 5.5,
+    "amp_mid": 6.5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "wah_on": true,
+    "wah_mode": "Manual",
+    "wah_pos": 6,
+    "wah_sens": 5,
+    "wah_q": 6,
+    "gate_on": true,
+    "gate_thresh": -60,
+    "gate_release": 80,
+    "out_level": -0.4
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "Inspired by Stevie Ray Vaughan: Texas Flood",
+  "category": "Inspired By",
+  "genres": [
+    "Texas Blues",
+    "Blues"
+  ],
+  "inspiredBy": "Stevie Ray Vaughan",
+  "description": "Big clean amp slammed by a green overdrive.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Glass Clean",
+    "amp_gain": 7,
+    "amp_bass": 5.5,
+    "amp_mid": 6,
+    "amp_treble": 6,
+    "amp_presence": 5.5,
+    "amp_depth": 5,
+    "amp_master": 7.5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 3,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Green Drive",
+    "drv_gain": 2,
+    "drv_tone": 5.5,
+    "drv_level": 7,
+    "rev_on": true,
+    "rev_type": "Spring",
+    "rev_decay": 3,
+    "rev_predelay": 0,
+    "rev_tone": 5,
+    "rev_mix": 1.5,
+    "gate_on": true,
+    "gate_thresh": -64,
+    "gate_release": 80,
+    "out_level": -14.8
+  }
+}

@@ -1,0 +1,49 @@
+cmake_minimum_required(VERSION 3.22)
+project(Riffhouse VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
+
+option(RIFFHOUSE_BUILD_PLUGIN "Build the standalone app and plugins" ON)
+option(RIFFHOUSE_BUILD_TESTS "Build the offline test and render tools" ON)
+set(RIFFHOUSE_ASIO_SDK_DIR "" CACHE PATH "Path to the Steinberg ASIO SDK (Windows only, enables ASIO)")
+
+include(FetchContent)
+set(FETCHCONTENT_QUIET OFF)
+
+# JUCE (AGPLv3)
+FetchContent_Declare(juce
+    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+    GIT_TAG 8.0.10
+    GIT_SHALLOW ON)
+FetchContent_MakeAvailable(juce)
+
+# Neural Amp Modeler core (MIT)
+FetchContent_Declare(namcore
+    GIT_REPOSITORY https://github.com/sdatkinson/NeuralAmpModelerCore.git
+    GIT_TAG v0.6.0
+    GIT_SHALLOW ON
+    GIT_SUBMODULES "Dependencies/eigen"
+    SOURCE_SUBDIR do-not-add)
+FetchContent_MakeAvailable(namcore)
+
+file(GLOB NAM_SOURCES "${namcore_SOURCE_DIR}/NAM/*.cpp" "${namcore_SOURCE_DIR}/NAM/*/*.cpp")
+add_library(nam_core OBJECT ${NAM_SOURCES})
+target_include_directories(nam_core SYSTEM PUBLIC
+    "${namcore_SOURCE_DIR}"
+    "${namcore_SOURCE_DIR}/Dependencies/eigen"
+    "${namcore_SOURCE_DIR}/Dependencies/nlohmann")
+target_compile_definitions(nam_core PUBLIC NAM_SAMPLE_FLOAT NAM_ENABLE_A2_FAST)
+if (MSVC)
+    target_compile_definitions(nam_core PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN _USE_MATH_DEFINES)
+    target_compile_options(nam_core PRIVATE /W0 /bigobj)
+else()
+    target_compile_options(nam_core PRIVATE -w)
+endif()
+
+add_subdirectory(src)
+if (RIFFHOUSE_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

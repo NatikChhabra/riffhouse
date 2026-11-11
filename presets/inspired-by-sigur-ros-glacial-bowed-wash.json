@@ -1,0 +1,43 @@
+{
+  "name": "Inspired by Sigur Ros: Glacial Bowed Wash",
+  "category": "Inspired By",
+  "genres": [
+    "Post-Rock",
+    "Ambient"
+  ],
+  "inspiredBy": "Sigur Ros",
+  "description": "Endless, glacial reverb wash.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tweed Edge",
+    "amp_gain": 5,
+    "amp_bass": 5,
+    "amp_mid": 5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "2x12 Blue",
+    "cab_mic": 4,
+    "cab_distance": 3,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Big Fuzz",
+    "drv_gain": 4,
+    "drv_tone": 4,
+    "drv_level": 4,
+    "rev_on": true,
+    "rev_type": "Cloud",
+    "rev_decay": 8,
+    "rev_predelay": 60,
+    "rev_tone": 4.5,
+    "rev_mix": 6,
+    "gate_on": true,
+    "gate_thresh": -62,
+    "gate_release": 80,
+    "out_level": -4.8
+  }
+}

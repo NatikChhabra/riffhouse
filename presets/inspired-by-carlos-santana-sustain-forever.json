@@ -1,0 +1,38 @@
+{
+  "name": "Inspired by Carlos Santana: Sustain Forever",
+  "category": "Inspired By",
+  "genres": [
+    "Latin Rock",
+    "Classic Rock"
+  ],
+  "inspiredBy": "Carlos Santana",
+  "description": "Smooth, mid-heavy, endless sustain.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Hot Rod Lead",
+    "amp_gain": 7,
+    "amp_bass": 5,
+    "amp_mid": 7.5,
+    "amp_treble": 4.5,
+    "amp_presence": 4.5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 4.5,
+    "cab_distance": 2,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "rev_on": true,
+    "rev_type": "Hall",
+    "rev_decay": 4,
+    "rev_predelay": 20,
+    "rev_tone": 4.5,
+    "rev_mix": 1.8,
+    "gate_on": true,
+    "gate_thresh": -62,
+    "gate_release": 80,
+    "out_level": -2.1
+  }
+}

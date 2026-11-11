@@ -1,0 +1,32 @@
+{
+  "name": "Inspired by Johnny Ramone: Blitzkrieg Buzz",
+  "category": "Inspired By",
+  "genres": [
+    "Punk"
+  ],
+  "inspiredBy": "Johnny Ramone",
+  "description": "Pure downstroke buzzsaw.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Brit 800",
+    "amp_gain": 7.5,
+    "amp_bass": 5,
+    "amp_mid": 6.5,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Vintage",
+    "cab_mic": 2.5,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "gate_on": true,
+    "gate_thresh": -58,
+    "gate_release": 80,
+    "rev_on": false,
+    "out_level": -3.7
+  }
+}

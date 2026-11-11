@@ -1,0 +1,39 @@
+{
+  "name": "Djent Precision",
+  "category": "Metal",
+  "genres": [
+    "Djent",
+    "Progressive Metal"
+  ],
+  "inspiredBy": "",
+  "description": "Ultra tight with a boosted front end. Great for low tunings.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tight Metal",
+    "amp_gain": 6.5,
+    "amp_bass": 5,
+    "amp_mid": 6,
+    "amp_treble": 6.5,
+    "amp_presence": 6.5,
+    "amp_depth": 5.5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 2.5,
+    "cab_distance": 1,
+    "cab_lowcut": 80,
+    "cab_highcut": 10000,
+    "drv_on": true,
+    "drv_type": "Green Drive",
+    "drv_gain": 0.5,
+    "drv_tone": 6,
+    "drv_level": 7,
+    "gate_on": true,
+    "gate_thresh": -50,
+    "gate_release": 40,
+    "rev_on": false,
+    "doubler": 7,
+    "out_level": -0.4
+  }
+}

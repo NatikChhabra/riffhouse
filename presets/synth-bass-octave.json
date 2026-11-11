@@ -1,0 +1,42 @@
+{
+  "name": "Synth Bass Octave",
+  "category": "Bass",
+  "genres": [
+    "Bass",
+    "Electronic"
+  ],
+  "inspiredBy": "",
+  "description": "Sub-octave synth-like bass.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Bass Station",
+    "amp_gain": 4,
+    "amp_bass": 6,
+    "amp_mid": 5,
+    "amp_treble": 5,
+    "amp_presence": 5,
+    "amp_depth": 5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "1x15 Bass",
+    "cab_mic": 3.5,
+    "cab_distance": 2,
+    "cab_lowcut": 30,
+    "cab_highcut": 6000,
+    "pitch_on": true,
+    "pitch_mode": "Sub Octave",
+    "pitch_semis": -12,
+    "pitch_mix": 6,
+    "comp_on": true,
+    "comp_sustain": 6,
+    "comp_attack": 4,
+    "comp_level": 5,
+    "comp_blend": 10,
+    "gate_on": true,
+    "gate_thresh": -64,
+    "gate_release": 80,
+    "rev_on": false,
+    "out_level": -2.3
+  }
+}

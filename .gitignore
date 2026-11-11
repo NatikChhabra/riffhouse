@@ -1,0 +1,8 @@
+build*/
+out/
+.vs/
+.vscode/
+*.user
+__pycache__/
+renders/
+.DS_Store
