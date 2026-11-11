@@ -147,6 +147,25 @@ button.btn { border: 0; cursor: pointer; }
 .unit { color: var(--soft); font-weight: 500; }
 .jack-shot { grid-column: 1 / 7; align-self: start; }
 .jack-shot img { border-radius: 3.4% / 3.9%; }
+/* The figure: two lines from the app's own filter. The svg stretches, so strokes keep their width. */
+.curve { grid-column: 1 / -1; display: grid; gap: 20px; }
+.curve-plot { position: relative; height: clamp(220px, 30vw, 400px); margin-bottom: 28px; }
+.curve svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.curve path { fill: none; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.curve-grid { stroke: var(--panel-2); stroke-width: 1; }
+.curve-jack { stroke: var(--soft); stroke-width: 3; }
+.curve-fixed { stroke: var(--amber); stroke-width: 6; }
+.curve-db, .curve-hz { position: absolute; font-size: var(--t-small); font-weight: 500; color: var(--soft); font-variant-numeric: tabular-nums; }
+.curve-db { right: 0; top: var(--y); translate: 0 -130%; }
+.curve-hz { left: var(--x); top: 100%; translate: -50% 8px; white-space: nowrap; }
+.curve-hz:nth-last-child(3) { translate: 0 8px; }
+.curve-hz:last-child { translate: -100% 8px; }
+.curve figcaption { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center; font-size: var(--t-small); font-weight: 500; }
+.key { display: inline-flex; align-items: center; gap: 12px; }
+.key::before { content: ""; width: 28px; height: 6px; border-radius: 3px; background: var(--amber); }
+.key-jack::before { height: 3px; background: var(--soft); }
+.curve-note { color: var(--soft); font-weight: 400; }
+.shout { font-size: clamp(72px, calc((100vw - 2 * var(--g)) / 4.9), 300px); line-height: .82; max-width: none; white-space: nowrap; }
 .steps { grid-column: 8 / 13; align-self: start; counter-reset: step; display: grid; gap: 36px; }
 .steps li { counter-increment: step; display: grid; grid-template-columns: 2.2em 1fr; column-gap: 8px; row-gap: 8px; }
 .steps li::before { content: counter(step); grid-row: 1 / 3; font: 800 44px/.9 var(--font-display); color: var(--soft); }
@@ -222,9 +241,11 @@ html:not(.js) .pan[hidden] { display: grid !important; margin-top: 56px; }
 
 /* What we measure */
 .measure-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); }
-.measure-grid .sec-head { grid-column: 1 / 6; align-content: start; align-self: start; position: sticky; top: 96px; }
-.facts { grid-column: 7 / 13; display: grid; gap: 12px; }
-.facts > li { display: grid; gap: 8px; padding: 24px 28px; border-radius: var(--r-m); background: var(--well); }
+.measure-grid .sec-head { grid-column: 1 / -1; }
+.facts { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(40px, 5vw, 72px) var(--gap); }
+.facts > li { display: grid; gap: 8px; align-content: start; grid-column: span 2; }
+.facts > li:nth-child(-n+2) { grid-column: span 3; }
+.facts > li:nth-child(-n+2) b { font-size: clamp(72px, 11vw, 176px); line-height: .82; }
 .facts p { color: var(--soft); }
 .facts strong { color: var(--ink); font-weight: 600; }
 .facts b { display: block; font: 800 clamp(40px, 4.4vw, 60px)/.95 var(--font-display); text-transform: uppercase; color: var(--ink); font-variant-numeric: tabular-nums; margin-bottom: 8px; }
@@ -291,7 +312,8 @@ details:not([open]) > p { display: none; }
   .amp-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .faq-head, .faq-list { grid-column: 1 / -1; }
   .demo-list { grid-template-columns: minmax(0, 1fr); }
-  .measure-grid .sec-head { margin-bottom: 40px; position: static; }
+  .measure-grid .sec-head { margin-bottom: 40px; }
+  .facts > li, .facts > li:nth-child(-n+2) { grid-column: 1 / -1; }
 }
 @media (max-width: 699px) {
   :root { --top: 64px; --t-body: 17px; }
@@ -354,6 +376,8 @@ details:not([open]) > p { display: none; }
   .faq-list details { interpolate-size: allow-keywords; }
   .faq-list details::details-content { block-size: 0; overflow: clip; transition: block-size 320ms var(--ease), content-visibility 320ms allow-discrete; }
   .faq-list details[open]::details-content { block-size: auto; }
+  html.js [data-reveal="draw"] svg { clip-path: inset(-10% 0 -10% 0); transition: clip-path 1400ms var(--ease) 200ms; }
+  html.js [data-reveal="draw"]:not(.is-in) svg { clip-path: inset(-10% 100% -10% 0); }
   html.js [data-reveal="open"] img { clip-path: inset(0); transition: clip-path 900ms var(--ease); }
   html.js [data-reveal="open"]:not(.is-in) img { clip-path: inset(0 0 100% 0); }
   .steps li:nth-child(2), .facts > li:nth-child(2) { transition-delay: 70ms; }
