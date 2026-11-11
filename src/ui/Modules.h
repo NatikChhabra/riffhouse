@@ -48,6 +48,25 @@ private:
     int selected = mAmp;
 };
 
+// The speaker and the mic drawn from above, on the cabinet page. It shows what the two
+// mic knobs do, and the mic can be dragged: sideways across the cone, back into the room.
+class MicMap : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    explicit MicMap (RiffhouseProcessor&);
+    void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
+    void mouseDrag (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
+
+private:
+    struct Plan { juce::Rectangle<float> area; float cx, baffleY, coneR, travel, near, far; };
+    Plan plan() const;
+    void moveTo (juce::Point<float>);
+    RiffhouseProcessor& proc;
+    bool dragging = false;
+};
+
 // The page under the chain strip that edits one module: the piece of gear itself,
 // its type picker above it, and nothing else in the way.
 class ModulePage : public juce::Component
@@ -82,6 +101,7 @@ private:
     MicPreLayout pre;
     juce::Image preImage;
     float lastMic = -1.0f, lastDist = -1.0f;
+    std::unique_ptr<MicMap> micMap;
     std::unique_ptr<Footswitch> foot;
     std::unique_ptr<Treadle> treadle;
     PedalLayout pedal;

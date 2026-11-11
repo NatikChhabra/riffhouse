@@ -26,6 +26,7 @@ public:
     // Draw as a hardware knob printed on a piece of gear: its style, pointer or
     // cap colour, the panel's lettering colour and face.
     void setGear (KnobStyle, juce::Colour cap, juce::Colour ink, Face face, bool upper);
+    bool capsLabel = false; // letter it like the app's frame, not like a piece of gear
     void setNumbers (bool on) { slider.getProperties().set ("numbers", on); } // 0 to 10 round the knob, like an amp panel
 
 private:
@@ -162,10 +163,11 @@ class Meter : public juce::Component
 public:
     void setLevel (float linearPeak);
     void paint (juce::Graphics&) override;
+    juce::String peakText() const; // the held peak in dB, empty in silence
     bool vertical = false;
 
 private:
     float levelDb = -100.0f, holdDb = -100.0f;
-    int holdTicks = 0;
+    int holdTicks = 0, clipTicks = 0;
 };
 } // namespace rh::ui

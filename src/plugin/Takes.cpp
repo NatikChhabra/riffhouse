@@ -38,7 +38,13 @@ std::vector<Take> listTakes (const juce::File& folder)
             t.seconds = r->sampleRate > 0.0 ? (double) r->lengthInSamples / r->sampleRate : 0.0;
         if (t.seconds > 0.05) takes.push_back (std::move (t)); // an empty file is a take that never started
     }
-    std::sort (takes.begin(), takes.end(), [] (const Take& a, const Take& b) { return a.when > b.when; });
+    // newest first. Two files written in the same second (a quick re-amp) fall back to their
+    // names, which start with the time of the take and put a re-amp after its original.
+    std::sort (takes.begin(), takes.end(), [] (const Take& a, const Take& b)
+    {
+        if (a.when != b.when) return a.when > b.when;
+        return a.sound.getFileNameWithoutExtension().compare (b.sound.getFileNameWithoutExtension()) > 0;
+    });
     return takes;
 }
 

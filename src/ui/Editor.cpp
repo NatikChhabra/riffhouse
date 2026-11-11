@@ -40,6 +40,12 @@ public:
         const bool rec = proc.recorder().isRecording();
         const bool counting = proc.isCountingIn();
         const bool hover = isMouseOver();
+        // pushed to the right, so the little arrow for its options sits right behind the word
+        const auto timeFont = font (15.0f, Weight::semibold);
+        const juce::String word = counting ? "Ready" : "Rec";
+        const float tw = rec ? juce::GlyphArrangement::getStringWidth (timeFont, formatTime (proc.recorder().secondsRecorded())) + 2.0f
+                             : capsWidth (word, 12.0f, 0.14f);
+        r = r.removeFromRight (std::min (r.getWidth(), 16.0f + 8.0f + tw + 2.0f));
         const auto dot = r.removeFromLeft (16.0f).withSizeKeepingCentre (10.0f, 10.0f);
         if (rec)
         {
@@ -60,11 +66,11 @@ public:
         if (rec)
         {
             g.setColour (colours::record);
-            g.setFont (font (15.0f, Weight::semibold));
+            g.setFont (timeFont);
             g.drawText (formatTime (proc.recorder().secondsRecorded()), r, juce::Justification::centredLeft);
             return;
         }
-        drawCaps (g, counting ? "Ready" : "Rec", r, 12.0f, hover || counting ? colours::text : colours::textDim, juce::Justification::centredLeft, 0.14f);
+        drawCaps (g, word, r, 12.0f, hover || counting ? colours::text : colours::textDim, juce::Justification::centredLeft, 0.14f);
     }
 
     void mouseUp (const juce::MouseEvent& e) override { if (e.mouseWasClicked() && onClick) onClick(); }
@@ -93,13 +99,20 @@ public:
             modified = m;
             index = idx;
             sub = {};
+            // "Inspired by <artist>: <title>" shows the title here and the artist on the line under it
+            title = n;
+            if (n.startsWith ("Inspired by ") && n.contains (": "))
+            {
+                title = n.fromFirstOccurrenceOf (": ", false, false);
+                sub = n.upToFirstOccurrenceOf (": ", false, false);
+            }
             if (idx >= 0)
             {
                 const auto& pr = proc.presets().all()[(size_t) idx];
-                sub = pr.inspiredBy.isNotEmpty() ? "Inspired by " + pr.inspiredBy : pr.category;
+                if (sub.isEmpty()) sub = pr.inspiredBy.isNotEmpty() ? "Inspired by " + pr.inspiredBy : pr.category;
                 if (! pr.genres.isEmpty()) sub << ", " << pr.genres.joinIntoString (", ").toLowerCase();
             }
-            else
+            else if (sub.isEmpty())
                 sub = "Not saved yet";
             repaint();
         }
@@ -112,19 +125,21 @@ public:
         auto t = getLocalBounds().toFloat();
         auto top = t.removeFromTop (t.getHeight() * 0.56f);
         const auto nameFont = font (17.0f, Weight::semibold);
-        const float nw = juce::GlyphArrangement::getStringWidth (nameFont, name);
-        const float editedW = modified ? capsWidth ("Edited", 9.5f) + 10.0f : 0.0f;
-        const float total = std::min (top.getWidth(), nw + 6.0f + 14.0f + editedW);
-        auto line = top.withSizeKeepingCentre (total, top.getHeight());
-        auto nameR = line.removeFromLeft (std::min (nw + 2.0f, line.getWidth() - 20.0f - editedW));
+        // The name stays centred whatever happens around it: "Edited" hangs off its right
+        // end, so touching a knob never makes the title jump.
+        const float editedW = capsWidth ("Edited", 10.0f) + 10.0f;
+        const float room = top.getWidth() - 2.0f * editedW - 18.0f;
+        const float nw = std::min (room, juce::GlyphArrangement::getStringWidth (nameFont, title) + 2.0f);
+        auto line = top.withSizeKeepingCentre (nw + 18.0f, top.getHeight());
         g.setFont (nameFont);
         g.setColour (hover ? colours::accentHi : colours::text);
-        g.drawText (name, nameR, juce::Justification::bottomLeft, true);
+        g.drawText (title, line.removeFromLeft (nw), juce::Justification::bottomLeft, true);
         line.removeFromLeft (4.0f);
-        strokeIcon (g, icons::chevronDown(), line.removeFromLeft (14.0f).withTrimmedTop (line.getHeight() - 15.0f).withSizeKeepingCentre (11.0f, 11.0f),
+        strokeIcon (g, icons::chevronDown(), line.withTrimmedTop (line.getHeight() - 15.0f).withSizeKeepingCentre (11.0f, 11.0f),
                     hover ? colours::text : colours::textFaint, 1.6f);
         if (modified)
-            drawCaps (g, "Edited", line.withTrimmedLeft (8.0f).withTrimmedTop (4.0f), 10.0f, colours::lamp, juce::Justification::bottomLeft);
+            drawCaps (g, "Edited", juce::Rectangle<float> (line.getRight() + 8.0f, top.getY() + 4.0f, editedW, top.getHeight() - 4.0f), 10.0f,
+                      colours::lamp, juce::Justification::bottomLeft);
         g.setFont (font (12.0f));
         g.setColour (colours::textFaint);
         g.drawText (sub, t.withTrimmedTop (2.0f), juce::Justification::centredTop, true);
@@ -136,7 +151,7 @@ public:
 
 private:
     RiffhouseProcessor& proc;
-    juce::String name, sub;
+    juce::String name, title, sub;
     bool modified = false;
     int index = -2;
 };
@@ -354,6 +369,7 @@ public:
         for (auto* k : { &space, &doubler, &volume })
         {
             k->setGear (KnobStyle::modern, colours::text, colours::textDim, Face::instrumentSemi, true);
+            k->capsLabel = true;
             k->setLabelHeight (16);
             addAndMakeVisible (*k);
         }
@@ -526,8 +542,9 @@ public:
     // -------------------------------------------------------------------------
     void tick()
     {
-        inMeter.setLevel (proc.meters().gateInPeak.load());
-        outMeter.setLevel (proc.meters().outPeak.load());
+        // for the pictures in the docs the meters show a guitar being played
+        inMeter.setLevel (demoLevels ? 0.2f : proc.meters().gateInPeak.load());
+        outMeter.setLevel (demoLevels ? 0.42f : proc.meters().outPeak.load());
         chain.refresh();
         if (! quietNotices && ++noticeTicks >= 10)
         {
@@ -556,17 +573,29 @@ public:
         if (++frame % 15 == 0) refreshTop();
     }
 
-    juce::String bottomStatus() const
+    struct StatusItem { juce::String text; bool lit; };
+    std::vector<StatusItem> statusItems() const
     {
-        juce::StringArray s;
+        std::vector<StatusItem> s;
         const int mains = proc.meters().mains.load();
         const int humMode = juce::roundToInt (proc.value (P::humFilter));
-        if (humMode == 0) s.add ("Hum filter off");
-        else if (mains > 0) s.add (juce::String (mains) + " Hz hum removed");
-        else s.add ("No hum");
-        s.add (proc.value (P::inputFix) > 0.5f ? "Input fix on" : "Input fix off");
-        s.add (juce::String ("Gate ") + (proc.value (P::gateOn) < 0.5f ? "off" : (proc.meters().gateOpen.load() ? "open" : "closed")));
-        return s.joinIntoString ("   ");
+        if (humMode == 0) s.push_back ({ "Hum filter off", false });
+        else if (mains > 0) s.push_back ({ juce::String (mains) + " Hz hum removed", true });
+        else s.push_back ({ "No hum found", false });
+        const bool fix = proc.value (P::inputFix) > 0.5f;
+        s.push_back ({ fix ? "Input fix on" : "Input fix off", fix });
+        const bool gate = proc.value (P::gateOn) > 0.5f;
+        const bool open = gate && proc.meters().gateOpen.load();
+        s.push_back ({ juce::String ("Gate ") + (! gate ? "off" : (open ? "open" : "closed")), open });
+        return s;
+    }
+
+    juce::String bottomStatus() const
+    {
+        juce::String all;
+        for (const auto& item : statusItems()) all << item.text << (item.lit ? "*" : "-");
+        all << inMeter.peakText() << outMeter.peakText();
+        return all;
     }
 
     juce::String latencyText() const
@@ -579,7 +608,7 @@ public:
                 lat += proc.getLatencySamples();
                 return juce::String (1000.0 * lat / std::max (1.0, dev->getCurrentSampleRate()), 1) + " ms round trip";
             }
-        return juce::String (1000.0 * proc.getLatencySamples() / std::max (1.0, proc.currentSampleRate()), 2) + " ms added";
+        return "The rig adds " + juce::String (1000.0 * proc.getLatencySamples() / std::max (1.0, proc.currentSampleRate()), 2) + " ms";
     }
 
     // -------------------------------------------------------------------------
@@ -592,14 +621,15 @@ public:
         logoArea = top.removeFromLeft (180);
         settingsButton.setBounds (top.removeFromRight (36));
         top.removeFromRight (10);
-        recordOptions.setBounds (top.removeFromRight (20));
-        record.setBounds (top.removeFromRight (72));
+        recordOptions.setBounds (top.removeFromRight (18));
+        record.setBounds (top.removeFromRight (84));
         top.removeFromRight (14);
         metroButton.setBounds (top.removeFromRight (70));
         tunerButton.setBounds (top.removeFromRight (36));
 
         // the tone's name sits dead centre between its two arrows; star and save follow on the right
-        auto centre = juce::Rectangle<int> (0, 0, 352, topH).withCentre ({ getWidth() / 2, topH / 2 }).reduced (0, 8);
+        auto centre = juce::Rectangle<int> (0, 0, 380, topH).withCentre ({ getWidth() / 2, topH / 2 }).reduced (0, 8);
+        toneWell = centre;
         prevPreset.setBounds (centre.removeFromLeft (28));
         nextPreset.setBounds (centre.removeFromRight (28));
         auto right = juce::Rectangle<int> (centre.getRight() + 28, centre.getY(), 6 + 30 + 2 + 30, centre.getHeight());
@@ -617,9 +647,9 @@ public:
         // bottom bar: input on the left, the three big-picture knobs in the middle, output on the right
         auto bottom = juce::Rectangle<int> (24, bottomY, getWidth() - 48, getHeight() - bottomY);
         inMeterArea = bottom.removeFromLeft (380);
-        inMeter.setBounds (inMeterArea.getX() + 62, inMeterArea.getY() + 21, 224, 8);
+        inMeter.setBounds (inMeterArea.getX() + 62, inMeterArea.getY() + 17, 226, 13);
         outMeterArea = bottom.removeFromRight (380);
-        outMeter.setBounds (outMeterArea.getRight() - 224, outMeterArea.getY() + 21, 224, 8);
+        outMeter.setBounds (outMeterArea.getRight() - 226 - 54, outMeterArea.getY() + 17, 226, 13);
         auto macros = bottom.withSizeKeepingCentre (3 * 92, getHeight() - bottomY);
         for (auto* k : { &space, &doubler, &volume })
             k->setBounds (macros.removeFromLeft (92).withSizeKeepingCentre (64, 58));
@@ -651,13 +681,51 @@ public:
         }
         g.drawImageAt (stage, 0, 0);
         drawLogo (g, logoArea.toFloat());
+        {
+            // the tone's name sits in a shallow window, like the display on a rack unit,
+            // with its two step buttons at the ends
+            const auto well = toneWell.toFloat();
+            g.setColour (juce::Colour (0xff151413));
+            g.fillRoundedRectangle (well, 3.0f);
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.55f), 0.0f, well.getY(),
+                                                     juce::Colours::transparentBlack, 0.0f, well.getY() + 7.0f, false));
+            g.fillRoundedRectangle (well, 3.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.07f));
+            g.fillRect (well.getX() + 3.0f, well.getBottom() - 1.0f, well.getWidth() - 6.0f, 1.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.6f));
+            g.fillRect (well.getX() + 28.0f, well.getY() + 6.0f, 1.0f, well.getHeight() - 12.0f);
+            g.fillRect (well.getRight() - 29.0f, well.getY() + 6.0f, 1.0f, well.getHeight() - 12.0f);
+        }
 
-        // bottom bar
-        drawCaps (g, "Input", { (float) inMeterArea.getX(), (float) inMeterArea.getY() + 16.0f, 56.0f, 18.0f }, 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
-        drawCaps (g, "Output", { (float) outMeterArea.getRight() - 300.0f, (float) outMeterArea.getY() + 16.0f, 70.0f, 18.0f }, 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
-        drawCaps (g, lastStatus, { (float) inMeterArea.getX(), (float) inMeterArea.getY() + 38.0f, 380.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
+        // bottom bar: each meter with its name in front and its peak in numbers behind
+        const float my = (float) inMeterArea.getY() + 14.0f;
+        drawCaps (g, "Input", { (float) inMeterArea.getX(), my, 56.0f, 18.0f }, 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
+        drawCaps (g, "Output", { (float) outMeter.getX() - 70.0f, my, 62.0f, 18.0f }, 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
+        g.setFont (font (12.0f, Weight::numeric));
+        g.setColour (colours::textDim);
+        g.drawText (inMeter.peakText(), juce::Rectangle<float> ((float) inMeter.getRight() + 8.0f, my, 50.0f, 18.0f), juce::Justification::centredLeft);
+        g.drawText (outMeter.peakText(), juce::Rectangle<float> ((float) outMeter.getRight() + 8.0f, my, 50.0f, 18.0f), juce::Justification::centredLeft);
+
+        // what the input stage is doing, one small lamp each
+        float x = (float) inMeterArea.getX();
+        const float sy = (float) inMeterArea.getY() + 38.0f;
+        for (const auto& item : statusItems())
+        {
+            const auto lampR = juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ x + 3.0f, sy + 8.0f });
+            if (item.lit)
+            {
+                g.setGradientFill (juce::ColourGradient (colours::lamp.withAlpha (0.45f), lampR.getCentreX(), lampR.getCentreY(),
+                                                         colours::lamp.withAlpha (0.0f), lampR.getCentreX() + 8.0f, lampR.getCentreY(), true));
+                g.fillEllipse (lampR.expanded (6.0f));
+            }
+            g.setColour (item.lit ? colours::lamp : juce::Colour (0xff3b3936));
+            g.fillEllipse (lampR);
+            const float w = capsWidth (item.text, 11.0f, 0.1f);
+            drawCaps (g, item.text, { x + 13.0f, sy, w + 4.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
+            x += 13.0f + w + 20.0f;
+        }
         const int clips = proc.meters().clipEvents.load();
-        const auto rightLine = juce::Rectangle<float> ((float) outMeterArea.getX(), (float) outMeterArea.getY() + 38.0f, 380.0f, 16.0f);
+        const auto rightLine = juce::Rectangle<float> ((float) outMeterArea.getX(), sy, 380.0f, 16.0f);
         if (clips > 0)
             drawCaps (g, "Hitting the limiter: lower volume a little", rightLine, 11.0f, colours::warn, juce::Justification::centredRight, 0.1f);
         else
@@ -672,7 +740,7 @@ public:
 
     RiffhouseEditor& editor;
     RiffhouseProcessor& proc;
-    juce::Rectangle<int> logoArea, inMeterArea, outMeterArea;
+    juce::Rectangle<int> logoArea, inMeterArea, outMeterArea, toneWell;
     juce::Image stage;
 
     PresetBox presetBox;
@@ -706,6 +774,7 @@ public:
     std::unique_ptr<SetupWizard> wizard;
 
     juce::String lastStatus;
+    bool demoLevels = false;
     int frame = 0;
     bool wasRecording = false;
 };
@@ -944,6 +1013,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     auto& r = *root;
     r.wizard.reset();
     r.quietNotices = true;
+    r.demoLevels = true;
     r.noticeBar.set ({});
     auto shoot = [&] (const juce::String& name)
     {

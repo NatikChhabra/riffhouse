@@ -77,6 +77,14 @@ void Knob::paint (juce::Graphics& g)
     auto r = getLocalBounds().removeFromBottom (labelH);
     const bool active = slider.isMouseOverOrDragging();
     const float h = std::max (12.0f, std::min (15.0f, (float) labelH * 0.44f));
+    if (gear && capsLabel && ! active)
+    {
+        // the app's own knobs are lettered like the rest of its frame: small spaced capitals
+        const float track = capsWidth (label, 11.5f, 0.14f) > (float) r.getWidth() ? 0.07f : 0.14f; // a long word in a narrow place closes up
+        drawCaps (g, label, r.toFloat().withTrimmedTop (1.0f).withHeight (16.0f), 11.5f, gearInk.withMultipliedAlpha (isEnabled() ? 1.0f : 0.4f),
+                  juce::Justification::centred, track);
+        return;
+    }
     if (gear)
     {
         // lettering printed on the panel; the value shows while you turn it
@@ -86,10 +94,16 @@ void Knob::paint (juce::Graphics& g)
         g.drawFittedText (txt, r.withTrimmedTop (1), juce::Justification::centredTop, 1);
         return;
     }
-    g.setFont (font (h, active ? Weight::semibold : Weight::medium));
-    g.setColour (active ? colours::text : (isEnabled() ? colours::textDim : colours::textFaint));
-    const juce::String txt = active ? slider.getTextFromValue (slider.getValue()) : label;
-    g.drawFittedText (txt, r.withTrimmedTop (2), juce::Justification::centredTop, 1);
+    if (! active)
+    {
+        // the same spaced capitals as every other label in the app's frame
+        drawCaps (g, label, r.toFloat().withTrimmedTop (2.0f).withHeight (16.0f), 11.5f, isEnabled() ? colours::textDim : colours::textFaint,
+                  juce::Justification::centred, 0.14f);
+        return;
+    }
+    g.setFont (font (h, Weight::semibold));
+    g.setColour (colours::text);
+    g.drawFittedText (slider.getTextFromValue (slider.getValue()), r.withTrimmedTop (2), juce::Justification::centredTop, 1);
 }
 
 //==============================================================================
@@ -347,45 +361,62 @@ void Meter::setLevel (float lin)
     const float next = db > levelDb ? db : std::max (db, levelDb - 1.6f);
     if (db >= holdDb) { holdDb = db; holdTicks = 40; }
     else if (--holdTicks <= 0) holdDb = std::max (-100.0f, holdDb - 1.2f);
-    if (std::abs (next - levelDb) > 0.05f || holdTicks > 0)
+    if (db > -0.3f) clipTicks = 60; // the lamp at the end stays on for two seconds
+    else if (clipTicks > 0) --clipTicks;
+    if (std::abs (next - levelDb) > 0.05f || holdTicks > 0 || clipTicks > 0)
     {
         levelDb = next;
         repaint();
     }
 }
 
+juce::String Meter::peakText() const
+{
+    if (holdDb < -59.5f) return {};
+    return juce::String (juce::roundToInt (std::min (0.0f, holdDb))) + " dB";
+}
+
 void Meter::paint (juce::Graphics& g)
 {
     const auto r = getLocalBounds().toFloat();
-    const float radius = 0.0f;
-    g.setColour (juce::Colour (0xff2b2a28));
-    g.fillRoundedRectangle (r, radius);
     auto norm = [] (float db) { return juce::jlimit (0.0f, 1.0f, (db + 60.0f) / 60.0f); };
-    const float v = norm (levelDb);
-    const auto barColour = levelDb > -1.0f ? colours::hot : (levelDb > -9.0f ? colours::warn : colours::good);
-    g.setColour (barColour);
     if (vertical)
-        g.fillRoundedRectangle (r.withTrimmedTop (r.getHeight() * (1.0f - v)), radius);
-    else
-        g.fillRoundedRectangle (r.withWidth (r.getWidth() * v), radius);
-    // cut into segments, like an LED ladder
-    g.setColour (juce::Colour (0xff0b0b0b));
-    if (! vertical)
     {
-        for (float x = r.getX() + 4.0f; x < r.getRight(); x += 5.0f)
-            g.fillRect (x, r.getY(), 1.0f, r.getHeight());
-        // where the level turns from fine to loud to too loud
-        g.setColour (colours::textFaint);
-        for (float db : { -9.0f, -1.0f })
-            g.fillRect (r.getX() + r.getWidth() * norm (db), r.getBottom() - 2.0f, 1.0f, 2.0f);
+        g.setColour (juce::Colour (0xff2b2a28));
+        g.fillRect (r);
+        g.setColour (levelDb > -1.0f ? colours::hot : (levelDb > -9.0f ? colours::warn : colours::good));
+        g.fillRect (r.withTrimmedTop (r.getHeight() * (1.0f - norm (levelDb))));
+        if (holdDb > -59.0f)
+        {
+            g.setColour (colours::text.withAlpha (0.8f));
+            g.fillRect (r.getX(), r.getBottom() - r.getHeight() * norm (holdDb), r.getWidth(), 1.0f);
+        }
+        return;
     }
-    if (holdDb > -59.0f)
+
+    // A ladder of small lamps, each with its own colour, as on a mixing desk: green for
+    // fine, amber for loud, red for too loud. Unlit lamps keep a trace of their colour, so
+    // the scale reads even in silence. The last lamp is the clip light.
+    const float pitch = 4.0f, lampW = 3.0f;
+    const float clipW = 7.0f;
+    const auto ladder = r.withTrimmedRight (clipW + 3.0f).withTrimmedBottom (3.0f);
+    const int count = (int) (ladder.getWidth() / pitch);
+    const int holdAt = holdDb > -59.0f ? juce::jlimit (0, count - 1, (int) (norm (holdDb) * (float) count)) : -1;
+    for (int i = 0; i < count; ++i)
     {
-        const float hv = norm (holdDb);
-        g.setColour (colours::text.withAlpha (0.8f));
-        if (vertical) g.fillRect (r.getX(), r.getBottom() - r.getHeight() * hv, r.getWidth(), 1.0f);
-        else g.fillRect (r.getX() + r.getWidth() * hv - 1.0f, r.getY(), 1.0f, r.getHeight());
+        const float db = -60.0f + 60.0f * ((float) i + 0.5f) / (float) count;
+        const auto zone = db > -3.0f ? colours::hot : (db > -12.0f ? colours::warn : colours::good);
+        const bool lit = db <= levelDb || i == holdAt;
+        g.setColour (lit ? zone : juce::Colour (0xff262524).interpolatedWith (zone, 0.14f));
+        g.fillRect (ladder.getX() + (float) i * pitch, ladder.getY(), lampW, ladder.getHeight());
     }
+    const auto clip = juce::Rectangle<float> (r.getRight() - clipW, ladder.getY(), clipW, ladder.getHeight());
+    g.setColour (clipTicks > 0 ? colours::hot : juce::Colour (0xff262524).interpolatedWith (colours::hot, 0.22f));
+    g.fillRect (clip);
+    // the scale under it: -48, -24, -12, -6 and 0 dB
+    g.setColour (colours::textFaint);
+    for (float db : { -48.0f, -24.0f, -12.0f, -6.0f, 0.0f })
+        g.fillRect (ladder.getX() + (ladder.getWidth() - 1.0f) * norm (db), r.getBottom() - 2.0f, 1.0f, 2.0f);
 }
 
 //==============================================================================
@@ -431,8 +462,15 @@ void ChoiceSelector::resized()
     const float tw = capsWidth (nameFor (selected), textHeight, 0.06f) + 30.0f;
     const int w = juce::jmin (getWidth() - 64, (int) tw);
     nameArea = juce::Rectangle<int> (w, getHeight()).withCentre (getLocalBounds().getCentre());
-    prev.setBounds (nameArea.getX() - 32, 0, 28, getHeight());
-    next.setBounds (nameArea.getRight() + 4, 0, 28, getHeight());
+    // The arrows stand where the longest name needs them and stay there, so stepping
+    // through the list never means chasing the button.
+    float widest = tw;
+    for (int i = 0; i < items.size(); ++i)
+        widest = std::max (widest, capsWidth (nameFor (i), textHeight, 0.06f) + 30.0f);
+    const int slot = juce::jmin (getWidth() - 64, (int) widest);
+    const int cx = getWidth() / 2;
+    prev.setBounds (cx - slot / 2 - 32, 0, 28, getHeight());
+    next.setBounds (cx + slot / 2 + 4, 0, 28, getHeight());
 }
 
 void ChoiceSelector::paint (juce::Graphics& g)

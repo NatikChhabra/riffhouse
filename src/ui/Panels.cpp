@@ -371,7 +371,10 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
         }
 
     for (auto* k : { &inGain, &gate }) // the same knob as the bottom bar, not a second kind
+    {
         k->setGear (KnobStyle::modern, colours::text, colours::textDim, Face::instrumentSemi, true);
+        k->capsLabel = true;
+    }
     addAndMakeVisible (inGain);
     addAndMakeVisible (gate);
     addAndMakeVisible (inputFix);

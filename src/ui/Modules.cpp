@@ -246,7 +246,7 @@ public:
             {
                 const auto c = px.getPixelColour (x, y);
                 const auto o = thumb.image.getPixelAt (x, y);
-                px.setPixelColour (x, y, o.interpolatedWith (c, 0.45f).withMultipliedBrightness (0.6f).withAlpha (o.getAlpha()));
+                px.setPixelColour (x, y, o.interpolatedWith (c, 0.4f).withMultipliedBrightness (0.74f).withAlpha (o.getAlpha()));
             }
     }
 
@@ -296,7 +296,8 @@ public:
         }
 
         auto lab = getLocalBounds().toFloat().removeFromBottom (20.0f);
-        const auto col = selected ? colours::text : (hover ? colours::text.withAlpha (0.85f) : (on ? colours::textDim : colours::textFaint));
+        // the label only says which page is open; on and off is the gear's own light
+        const auto col = selected ? colours::text : (hover ? colours::text.withAlpha (0.85f) : colours::textDim);
         drawCaps (g, info.title, lab, 11.5f, col, juce::Justification::centred, 0.12f);
         if (selected)
         {
@@ -445,6 +446,178 @@ namespace
     constexpr int gearFloor = 40;
 }
 
+//==============================================================================
+MicMap::MicMap (RiffhouseProcessor& p) : proc (p)
+{
+    setMouseCursor (juce::MouseCursor::DraggingHandCursor);
+    setTooltip ("Drag the mic. Toward the middle of the speaker is brighter, toward the edge warmer. Further back lets the room in.");
+}
+
+MicMap::Plan MicMap::plan() const
+{
+    Plan p;
+    p.area = getLocalBounds().toFloat().withTrimmedTop (24.0f);
+    p.coneR = std::min (150.0f, p.area.getWidth() * 0.4f);
+    p.cx = p.area.getCentreX() - 20.0f;
+    p.baffleY = p.area.getY() + 74.0f;
+    p.travel = p.coneR * 0.72f;                 // as far as the mic goes toward the edge
+    p.near = p.baffleY + 7.0f;                  // the mic's nose at distance 0
+    p.far = p.area.getBottom() - 66.0f;         // and at distance 10
+    return p;
+}
+
+void MicMap::paint (juce::Graphics& g)
+{
+    const auto p = plan();
+    const juce::Colour ink (0xffc9ccd0);
+    drawCaps (g, "The mic, seen from above", getLocalBounds().toFloat().removeFromTop (16.0f), 11.5f, colours::textDim, juce::Justification::centredLeft, 0.14f);
+
+    const float pos = juce::jlimit (0.0f, 10.0f, proc.value (P::cabMic)) / 10.0f;
+    const float dist = juce::jlimit (0.0f, 10.0f, proc.value (P::cabDistance)) / 10.0f;
+    const float apexY = p.baffleY - 46.0f, capR = p.coneR * 0.25f;
+
+    // the cabinet's front board, cut through, with the hole the speaker sits in
+    for (float side : { -1.0f, 1.0f })
+    {
+        const float x0 = p.cx + side * (p.coneR + 4.0f), x1 = side < 0.0f ? p.area.getX() : p.area.getRight();
+        const juce::Rectangle<float> board (std::min (x0, x1), p.baffleY - 4.0f, std::abs (x1 - x0), 8.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff4a4640), 0.0f, board.getY(), juce::Colour (0xff23211e), 0.0f, board.getBottom(), false));
+        g.fillRect (board);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        for (float x = board.getX() + 5.0f; x < board.getRight(); x += 7.0f) // the cut grain of plywood
+            g.drawLine (x, board.getY() + 1.0f, x - 3.0f, board.getBottom() - 1.0f, 0.8f);
+    }
+    // the speaker in section: paper cone falling back to the dust cap, the magnet behind it
+    {
+        juce::Path cone;
+        cone.startNewSubPath (p.cx - p.coneR, p.baffleY);
+        cone.lineTo (p.cx - capR, apexY);
+        cone.quadraticTo (p.cx, apexY + capR * 0.95f, p.cx + capR, apexY);
+        cone.lineTo (p.cx + p.coneR, p.baffleY);
+        juce::Path fill = cone;
+        fill.closeSubPath();
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff3b352d).withAlpha (0.9f), 0.0f, apexY, juce::Colour (0xff1c1a17).withAlpha (0.25f), 0.0f, p.baffleY, false));
+        g.fillPath (fill);
+        g.setColour (ink.withAlpha (0.8f));
+        g.strokePath (cone, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        // the pressed steel basket that holds it all, and the magnet on its back
+        const juce::Rectangle<float> magnet (p.cx - capR * 0.95f, apexY - 20.0f, capR * 1.9f, 15.0f);
+        juce::Path basket;
+        basket.startNewSubPath (p.cx - p.coneR - 3.0f, p.baffleY - 5.0f);
+        basket.lineTo (magnet.getX() + 3.0f, magnet.getBottom());
+        basket.startNewSubPath (p.cx + p.coneR + 3.0f, p.baffleY - 5.0f);
+        basket.lineTo (magnet.getRight() - 3.0f, magnet.getBottom());
+        g.setColour (ink.withAlpha (0.28f));
+        g.strokePath (basket, juce::PathStrokeType (1.2f));
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff5b5e62), 0.0f, magnet.getY(), juce::Colour (0xff26282a), 0.0f, magnet.getBottom(), false));
+        g.fillRoundedRectangle (magnet, 2.0f);
+        g.setColour (juce::Colour (0xff3a3c3f));
+        g.fillRect (juce::Rectangle<float> (capR * 1.2f, 6.0f).withCentre ({ p.cx, magnet.getBottom() + 2.0f }));
+    }
+
+    // the mic
+    const float mx = p.cx + p.travel * pos;
+    const float nose = p.near + (p.far - p.near) * dist;
+    {
+        // what it points at: a faint line from its nose to the paper
+        const float t = std::abs (mx - p.cx) <= capR ? 1.0f : 1.0f - (std::abs (mx - p.cx) - capR) / (p.coneR - capR);
+        const float hitY = p.baffleY - (p.baffleY - apexY) * juce::jlimit (0.0f, 1.0f, t);
+        juce::Path aim;
+        aim.startNewSubPath (mx, nose - 3.0f);
+        aim.lineTo (mx, hitY + 3.0f);
+        juce::Path dotted;
+        const float dashes[] = { 2.0f, 4.0f };
+        juce::PathStrokeType (1.4f).createDashedStroke (dotted, aim, dashes, 2);
+        g.setColour (colours::lamp.withAlpha (0.85f));
+        g.fillPath (dotted);
+    }
+    {
+        const float headW = 19.0f, headL = 15.0f, bodyW = 13.0f, bodyL = 46.0f;
+        // cable from the tail, off the bottom of the picture
+        juce::Path cable;
+        cable.startNewSubPath (mx, nose + headL + bodyL);
+        cable.cubicTo (mx, nose + headL + bodyL + 26.0f, mx + 26.0f, p.area.getBottom() - 8.0f, mx + 60.0f, p.area.getBottom() + 4.0f);
+        g.setColour (juce::Colour (0xff070707));
+        g.strokePath (cable, juce::PathStrokeType (3.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.setColour (juce::Colours::white.withAlpha (0.12f));
+        g.strokePath (cable, juce::PathStrokeType (0.8f), juce::AffineTransform::translation (-0.8f, -0.4f));
+
+        const juce::Rectangle<float> body (mx - bodyW * 0.5f, nose + headL - 1.0f, bodyW, bodyL);
+        juce::ColourGradient tube (juce::Colour (0xff17181a), body.getX(), 0.0f, juce::Colour (0xff0b0c0d), body.getRight(), 0.0f, false);
+        tube.addColour (0.3, juce::Colour (0xff8b9095));
+        tube.addColour (0.55, juce::Colour (0xff3a3d40));
+        g.setGradientFill (tube);
+        juce::Path bodyPath;
+        bodyPath.startNewSubPath (body.getX(), body.getY());
+        bodyPath.lineTo (body.getRight(), body.getY());
+        bodyPath.lineTo (body.getRight() - 1.8f, body.getBottom());
+        bodyPath.lineTo (body.getX() + 1.8f, body.getBottom());
+        bodyPath.closeSubPath();
+        g.fillPath (bodyPath);
+        g.setColour (juce::Colours::black.withAlpha (0.7f));
+        g.fillRect (body.getX(), body.getY() + bodyL * 0.42f, bodyW, 2.0f);
+
+        const juce::Rectangle<float> head (mx - headW * 0.5f, nose, headW, headL);
+        juce::ColourGradient cap (juce::Colour (0xff2a2c2f), head.getX(), 0.0f, juce::Colour (0xff0e0f10), head.getRight(), 0.0f, false);
+        cap.addColour (0.3, juce::Colour (0xffb4b8bc));
+        cap.addColour (0.55, juce::Colour (0xff53575b));
+        g.setGradientFill (cap);
+        g.fillRoundedRectangle (head, 2.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        for (float y = head.getY() + 3.5f; y < head.getBottom() - 1.0f; y += 3.5f)
+            g.fillRect (head.getX(), y, headW, 1.0f);
+        if (dragging || isMouseOver())
+        {
+            g.setColour (colours::lamp.withAlpha (dragging ? 0.9f : 0.5f));
+            g.drawRoundedRectangle (head.getUnion (body).expanded (5.0f), 5.0f, 1.2f);
+        }
+    }
+
+    // what moving it does, written where you would move it to
+    const float capY = p.area.getBottom() - 34.0f;
+    auto note = [&] (const juce::String& where, const juce::String& what, float x, float y, juce::Justification j)
+    {
+        const juce::Rectangle<float> r (j.testFlags (juce::Justification::right) ? x - 120.0f : (j.testFlags (juce::Justification::left) ? x : x - 60.0f), y, 120.0f, 14.0f);
+        drawCaps (g, where, r, 11.0f, colours::textDim, j, 0.12f);
+        g.setFont (font (12.5f));
+        g.setColour (colours::textFaint.brighter (0.35f));
+        g.drawText (what, r.translated (0.0f, 15.0f), j, false);
+    };
+    note ("Middle", "bright, cutting", p.cx, capY, juce::Justification::centred);
+    note ("Edge", "warm, soft", p.cx + p.travel + 56.0f, capY, juce::Justification::centred);
+    note ("Close", "full, direct", p.area.getX(), p.near + 4.0f, juce::Justification::centredLeft);
+    note ("Far", "airy, roomy", p.area.getX(), p.far + 4.0f, juce::Justification::centredLeft);
+}
+
+void MicMap::moveTo (juce::Point<float> at)
+{
+    const auto p = plan();
+    // the hand holds the mic by its body, a little behind the nose
+    const float pos = juce::jlimit (0.0f, 1.0f, (at.x - p.cx) / p.travel);
+    const float dist = juce::jlimit (0.0f, 1.0f, (at.y - 24.0f - p.near) / (p.far - p.near));
+    proc.param (P::cabMic)->setValueNotifyingHost (proc.param (P::cabMic)->convertTo0to1 (pos * 10.0f));
+    proc.param (P::cabDistance)->setValueNotifyingHost (proc.param (P::cabDistance)->convertTo0to1 (dist * 10.0f));
+    repaint();
+}
+
+void MicMap::mouseDown (const juce::MouseEvent& e)
+{
+    dragging = true;
+    proc.param (P::cabMic)->beginChangeGesture();
+    proc.param (P::cabDistance)->beginChangeGesture();
+    moveTo (e.position);
+}
+
+void MicMap::mouseDrag (const juce::MouseEvent& e) { moveTo (e.position); }
+
+void MicMap::mouseUp (const juce::MouseEvent&)
+{
+    dragging = false;
+    proc.param (P::cabMic)->endChangeGesture();
+    proc.param (P::cabDistance)->endChangeGesture();
+    repaint();
+}
+
 ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
     : proc (p), info (modules()[(size_t) idx]), index (idx), power (p, info.onParam, moduleColour (idx))
 {
@@ -504,6 +677,8 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
     }
     if (index == mCab)
     {
+        micMap = std::make_unique<MicMap> (proc);
+        addAndMakeVisible (*micMap);
         loadIr = std::make_unique<IconButton> (icons::folder(), "Load IR");
         loadIr->drawBackground = false;
         loadIr->iconSize = 16.0f;
@@ -576,7 +751,7 @@ void ModulePage::refresh()
     if (cabMode)
     {
         const float m = proc.value (P::cabMic), d = proc.value (P::cabDistance);
-        if (m != lastMic || d != lastDist) { lastMic = m; lastDist = d; repaint(); }
+        if (m != lastMic || d != lastDist) { lastMic = m; lastDist = d; repaint(); if (micMap != nullptr) micMap->repaint(); }
     }
     if (sync != nullptr && juce::roundToInt (proc.value (P::dlySync)) != lastSync)
     {
@@ -625,22 +800,27 @@ void ModulePage::resized()
         // strip beside it, and the four controls live on that box
         const auto room = gear.toFloat();
         const float floorY = room.getBottom() - 26.0f;
-        const float preW = 392.0f, preH = 150.0f, gap = 66.0f;
+        // The cab has the left of the page and the mic's controls the right, each in a fixed
+        // place, so nothing jumps when you step through the cabinets.
+        const float preW = 392.0f, preH = 150.0f, gap = 60.0f;
         const int model = juce::roundToInt (proc.value (P::cabModel));
-        const auto probe = cabLayout ({ 0.0f, 0.0f, room.getWidth() - preW - gap, floorY - room.getY() }, model);
-        const float cabW = probe.box.getWidth();
-        const float x0 = room.getCentreX() - (cabW + gap + preW) * 0.5f;
-        cab = cabLayout ({ x0, room.getY(), cabW, floorY - room.getY() }, model);
+        const float zoneW = room.getWidth() - preW - gap;
+        cab = cabLayout ({ room.getX(), room.getY(), zoneW, floorY - room.getY() }, model);
+        const float cabW = cab.box.getWidth();
+        const float x0 = cab.box.getX();
         cabArea = { x0 - 50.0f, room.getY() - 6.0f, cabW + 100.0f, floorY - room.getY() + 46.0f };
         pedalImage = renderCab (model, cab, cabArea, 2.0f, proc.userIrName());
-        pre = micPreLayout ({ x0 + cabW + gap, floorY - preH - 6.0f, preW, preH });
+        pre = micPreLayout ({ room.getRight() - preW, floorY - preH - 6.0f, preW, preH });
         preArea = pre.box.expanded (44.0f);
         preImage = renderMicPre (pre, preArea, 2.0f);
+        if (micMap != nullptr)
+            micMap->setBounds (juce::Rectangle<float> (pre.box.getX(), room.getY() + 4.0f, preW, pre.box.getY() - room.getY() - 26.0f).toNearestInt());
         for (int i = 0; i < knobs.size() && i < (int) pre.cells.size(); ++i)
         {
             knobs[i]->setGear (KnobStyle::dome, juce::Colour (0xff16191b), juce::Colour (0xffc9ccd0), Face::instrument, true);
+            knobs[i]->capsLabel = true;
             knobs[i]->setLabelHeight (20);
-            knobs[i]->setBounds (pre.cells[(size_t) i].withSizeKeepingCentre (pre.knobSize, pre.knobSize + 20.0f).toNearestInt());
+            knobs[i]->setBounds (pre.cells[(size_t) i].withSizeKeepingCentre (pre.cells[(size_t) i].getWidth() + 8.0f, pre.knobSize + 20.0f).toNearestInt());
         }
         return;
     }

@@ -770,8 +770,11 @@ void testTakes()
     else
         CHECK (false, "the new take can be read back");
 
+    // written in the same second as the first one, so only their names can order them
+    out.setLastModificationTime (wetFile.getLastModificationTime());
     takes = listTakes (dir);
     CHECK (takes.size() == 2, "both takes are listed (%d)", (int) takes.size());
+    CHECK (takes.size() == 2 && takes[0].sound == out && takes[1].sound == wetFile, "the re-amped take is listed above its original");
     for (const auto& t : takes)
         if (t.sound == out)
         {

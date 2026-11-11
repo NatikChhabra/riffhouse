@@ -1712,7 +1712,7 @@ namespace
             case 1: return { 2, 1, 12.0f, 0xff2f5d9a, 0xff141414, 1.75f };  // 2x12, blue frames
             case 2: return { 2, 2, 12.0f, 0xff6e6a62, 0xff151515, 1.0f };   // 4x12 vintage
             case 3: return { 2, 2, 12.0f, 0xff1c1d1f, 0xff101010, 1.0f };   // 4x12 modern
-            case 4: return { 2, 1, 12.0f, 0xffb9bdc2, 0xff121212, 1.75f };  // 2x12 American
+            case 4: return { 2, 1, 12.0f, 0xff6d7176, 0xff121212, 1.75f };  // 2x12 American
             case 5: return { 1, 1, 8.0f,  0xff8c9196, 0xff2b2118, 1.05f };  // 1x8 tiny combo
             case 6: return { 2, 2, 10.0f, 0xff2a2c2f, 0xff1d2530, 1.0f };   // 4x10 bass
             case 7: return { 1, 1, 15.0f, 0xff2a2c2f, 0xff1d2530, 0.92f };  // 1x15 bass
@@ -1735,8 +1735,8 @@ namespace
             juce::DropShadow (juce::Colours::black.withAlpha (0.75f), std::max (4, (int) (r * 0.07f)), { 2, 3 }).drawForPath (g, hole);
         }
         // rim: the rolled edge catches the light on one side
-        ring (r, r * 0.955f, frame.darker (0.7f), frame.brighter (0.5f), true);
-        ring (r * 0.955f, r * 0.93f, frame.darker (0.75f), frame.brighter (0.1f), false);
+        ring (r, r * 0.955f, frame.darker (0.8f), frame.brighter (0.12f), true);
+        ring (r * 0.955f, r * 0.93f, frame.darker (0.85f), frame.darker (0.2f), false);
         // gasket: grey fibre board in eight pieces
         ring (r * 0.935f, r * 0.845f, C (0xff232323), C (0xff3d3c3a), true);
         {
@@ -1937,7 +1937,7 @@ MicPreLayout micPreLayout (R box)
     MicPreLayout l;
     l.box = box;
     const auto face = box.reduced (9.0f);
-    l.socket = { face.getX() + 40.0f, face.getCentreY() + 2.0f };
+    l.socket = { face.getX() + 40.0f, face.getCentreY() + 12.0f };
     const auto strip = face.withTrimmedLeft (84.0f).withTrimmedRight (12.0f);
     const float gap = 20.0f, cw = (strip.getWidth() - gap) / 4.0f;
     l.knobSize = std::min (54.0f, cw - 10.0f);
@@ -2011,7 +2011,7 @@ juce::Image renderMicPre (const MicPreLayout& l, R area, float scale)
         f.setExtraKerningFactor (0.12f);
         g.setFont (f);
         g.setColour (ink.withAlpha (0.8f));
-        g.drawText ("MIC IN", R (80.0f, 12.0f).withCentre ({ c.x, c.y + r + 15.0f }), juce::Justification::centred, false);
+        g.drawText ("MIC IN", R (80.0f, 12.0f).withCentre ({ c.x, c.y - r - 15.0f }), juce::Justification::centred, false);
     }
     // what each pair of controls is for
     {
@@ -2057,7 +2057,7 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
     body.lineTo (c - across * bodyHead);
     body.closeSubPath();
     juce::Path head;
-    head.addEllipse (R (hr * 2.0f, hr * 2.0f).withCentre (c));
+    head.addEllipse (R (hr * 1.9f, hr * 1.9f).withCentre (c + axis * (hr * 0.5f)));
     {
         juce::Path shade = body;
         shade.addPath (head);
@@ -2069,45 +2069,68 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
     const auto clip = c + axis * (hr * 2.0f);
     const float footY = l.box.getBottom() + 4.0f + 7.0f * away;
     {
-        const float bw = hr * 4.4f, bh = bw * 0.24f;
-        const R foot (clip.x - bw * 0.5f, footY - bh * 0.5f, bw, bh);
-        g.setColour (juce::Colours::black.withAlpha (0.6f));
-        g.fillEllipse (foot.translated (bw * 0.07f, bh * 0.45f).expanded (bw * 0.05f, bh * 0.15f));
+        // A tripod seen from the front, like everything else in the picture: two legs
+        // spread to the sides, the third comes straight at us and shows as a short stub.
+        const float w0 = std::max (5.0f, hr * 0.34f);
+        const float spread = hr * 2.9f, hub = footY - hr * 1.5f;
+        auto tube = [&g] (juce::Point<float> from, juce::Point<float> to, float thick)
+        {
+            juce::Path leg;
+            leg.startNewSubPath (from);
+            leg.lineTo (to);
+            const juce::PathStrokeType st (thick, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.strokePath (leg, st, juce::AffineTransform::translation (1.5f, 2.5f));
+            g.setColour (C (0xff0d0e0f));
+            g.strokePath (leg, st);
+            g.setColour (C (0xff777b80).withAlpha (0.8f));
+            g.strokePath (leg, juce::PathStrokeType (std::max (1.0f, thick * 0.22f)), juce::AffineTransform::translation (-thick * 0.18f, -thick * 0.18f));
+        };
+        for (float side : { -1.0f, 1.0f })
+        {
+            const juce::Point<float> toe (clip.x + side * spread, footY);
+            tube ({ clip.x, hub }, toe, w0 * 0.8f);
+            g.setColour (C (0xff050505)); // rubber tip
+            g.fillRoundedRectangle (R (w0 * 1.5f, w0 * 0.9f).withCentre ({ toe.x, toe.y + w0 * 0.1f }), w0 * 0.3f);
+        }
+        tube ({ clip.x, hub }, { clip.x, footY + 2.0f }, w0 * 0.8f);
         g.setColour (C (0xff050505));
-        g.fillEllipse (foot.translated (0.0f, bh * 0.28f)); // the thickness of the cast iron
-        g.setGradientFill (juce::ColourGradient (C (0xff4a4d51), foot.getX() + bw * 0.2f, foot.getY(), C (0xff101112), foot.getRight(), foot.getBottom(), false));
-        g.fillEllipse (foot);
-        juce::Path rim;
-        rim.addCentredArc (foot.getCentreX(), foot.getCentreY(), bw * 0.5f - 0.8f, bh * 0.5f - 0.8f, 0.0f, -2.2f, -0.2f, true);
-        g.setColour (juce::Colours::white.withAlpha (0.28f));
-        g.strokePath (rim, juce::PathStrokeType (1.0f));
+        g.fillRoundedRectangle (R (w0 * 1.5f, w0 * 0.9f).withCentre ({ clip.x, footY + 2.5f }), w0 * 0.3f);
         // the rod, with the collar where its two sections clamp
-        const float w = std::max (3.0f, hr * 0.26f);
-        const R rod (clip.x - w * 0.5f, clip.y, w, footY - clip.y);
+        const float w = std::max (5.0f, hr * 0.34f);
+        const R rod (clip.x - w * 0.5f, clip.y, w, hub + w - clip.y);
         juce::ColourGradient m (C (0xff111213), rod.getX(), 0, C (0xff0a0a0b), rod.getRight(), 0, false);
         m.addColour (0.35, C (0xff6a6e72));
         g.setGradientFill (m);
         g.fillRect (rod);
-        const R collar (clip.x - w, clip.y + (footY - clip.y) * 0.45f, w * 2.0f, w * 2.4f);
+        const R collar (clip.x - w * 0.85f, clip.y + (footY - clip.y) * 0.45f, w * 1.7f, w * 2.2f);
         juce::ColourGradient cg (C (0xff17181a), collar.getX(), 0, C (0xff0a0a0b), collar.getRight(), 0, false);
         cg.addColour (0.35, C (0xff7b7f83));
         g.setGradientFill (cg);
         g.fillRoundedRectangle (collar, 1.2f);
+        // the casting the three legs fold out of
+        const R boss (clip.x - w * 1.1f, hub - w * 0.2f, w * 2.2f, w * 2.0f);
+        juce::ColourGradient bg (C (0xff17181a), boss.getX(), 0, C (0xff0a0a0b), boss.getRight(), 0, false);
+        bg.addColour (0.35, C (0xff5f6367));
+        g.setGradientFill (bg);
+        g.fillRoundedRectangle (boss, 2.0f);
     }
     // cable out of the tail, down to the floor, and along it to the channel strip
     {
-        const float floorY = l.box.getBottom() + 2.0f;
-        const juce::Point<float> land (tail.x + hr * 1.7f, floorY);
+        const float floorY = l.box.getBottom() + 5.0f;
+        const juce::Point<float> land (tail.x + hr * 3.2f, floorY);
         juce::Path cable;
         cable.startNewSubPath (tail);
-        cable.cubicTo (tail + axis * (hr * 1.6f), { tail.x + hr * 1.9f, tail.y + hr * 2.2f }, land);
+        // it leaves along the mic, hangs, and meets the floor at a shallow angle
+        cable.cubicTo (tail + axis * (hr * 2.4f), { land.x - hr * 2.6f, floorY - hr * 0.2f }, land);
         const bool plugged = socket.x > land.x + 60.0f;
         if (plugged)
         {
-            // a little slack on the floor, then up the front of the box to the socket
+            // slack on the floor, then a wide bend up into the socket
             const float run = socket.x - land.x;
-            cable.cubicTo ({ land.x + run * 0.25f, floorY + 5.0f }, { land.x + run * 0.5f, floorY - 1.0f }, { socket.x - 34.0f, floorY + 2.0f });
-            cable.cubicTo ({ socket.x - 6.0f, floorY + 3.0f }, { socket.x, floorY - 6.0f }, { socket.x, socket.y + 14.0f });
+            const float rise = floorY - socket.y;
+            cable.cubicTo ({ land.x + run * 0.3f, floorY + 4.0f }, { land.x + run * 0.55f, floorY - 2.0f }, { socket.x - rise * 0.9f, floorY + 1.0f });
+            cable.cubicTo ({ socket.x - rise * 0.25f, floorY + 2.0f }, { socket.x, floorY - rise * 0.35f }, { socket.x, socket.y + 14.0f });
         }
         const float cw = std::max (2.0f, hr * 0.2f);
         g.setColour (juce::Colours::black.withAlpha (0.45f));
@@ -2128,24 +2151,6 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
             g.fillEllipse (R (17.0f, 17.0f).withCentre (socket));
         }
     }
-    // the grille ball, facing the cone
-    {
-        juce::ColourGradient ball (C (0xffe4e6e8), c.x - hr * 0.4f, c.y - hr * 0.45f, C (0xff3d4144), c.x + hr * 0.9f, c.y + hr * 0.9f, true);
-        ball.addColour (0.55, C (0xff8a8e92));
-        g.setGradientFill (ball);
-        g.fillPath (head);
-        juce::Graphics::ScopedSaveState s (g);
-        g.reduceClipRegion (head);
-        const float pitch = std::max (2.2f, hr * 0.16f);
-        g.setColour (juce::Colours::black.withAlpha (0.38f));
-        for (float d = -hr * 2.0f; d < hr * 2.0f; d += pitch)
-        {
-            g.drawLine (c.x + d - hr, c.y - hr, c.x + d + hr, c.y + hr, 0.8f);
-            g.drawLine (c.x + d + hr, c.y - hr, c.x + d - hr, c.y + hr, 0.8f);
-        }
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.drawEllipse (R (hr * 2.0f, hr * 2.0f).withCentre (c).reduced (0.5f), 1.0f);
-    }
     // the body: a satin tube, lit along its upper side
     {
         const auto mid = c + axis * (hr * 1.65f);
@@ -2163,6 +2168,43 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
             g.setColour (juce::Colours::black.withAlpha (t < 1.0f ? 0.55f : 0.75f));
             g.drawLine ({ p + across * w, p - across * w }, t < 1.0f ? 1.2f : std::max (1.6f, hr * 0.16f));
         }
+    }
+    // The head of an instrument mic: a short ribbed cap, wider than the body, with its flat
+    // front against the cone. We see its side and the dark rim of that front.
+    {
+        const float capLen = hr * 1.15f, capFar = hr * 0.98f, capNear = hr * 0.84f;
+        const auto near = c + axis * capLen;
+        juce::Path cap;
+        cap.startNewSubPath (c + across * capFar);
+        cap.lineTo (near + across * capNear);
+        cap.lineTo (near - across * capNear);
+        cap.lineTo (c - across * capFar);
+        cap.closeSubPath();
+        // the far end, turned a little away from us
+        juce::Path front;
+        front.addEllipse (R (capFar * 2.0f, capFar * 0.9f).withCentre ({ 0.0f, 0.0f }));
+        front.applyTransform (juce::AffineTransform::rotation (std::atan2 (across.y, across.x)).translated (c.x, c.y));
+        g.setColour (C (0xff111213));
+        g.fillPath (front);
+        const auto e0 = c + across * capFar, e1 = c - across * capFar;
+        juce::ColourGradient metal (C (0xff2a2c2f), e0.x, e0.y, C (0xff0e0f10), e1.x, e1.y, false);
+        metal.addColour (0.25, C (0xffb4b8bc));
+        metal.addColour (0.5, C (0xff53575b));
+        g.setGradientFill (metal);
+        g.fillPath (cap);
+        {
+            // slots in the cap, running round it
+            juce::Graphics::ScopedSaveState ss (g);
+            g.reduceClipRegion (cap);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            for (float t = 0.18f; t < 0.95f; t += 0.2f)
+            {
+                const auto p = c + axis * (capLen * t);
+                g.drawLine ({ p + across * capFar, p - across * capFar }, std::max (1.0f, hr * 0.09f));
+            }
+        }
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.strokePath (cap, juce::PathStrokeType (0.8f));
     }
     // the tail end faces us: the socket and its plug
     {
