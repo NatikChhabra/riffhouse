@@ -63,7 +63,8 @@ The looper is for your own playing: press **O**, play a rhythm part, press **O**
 
 ## It sets itself up
 
-- It listens on every input while you strum and picks the one your guitar is on.
+- You pick the input your guitar is on from a list, or leave it on "Find it for me" and it listens on every input while you strum.
+- With an audio interface it uses the interface's own driver when there is one, and sends the sound out of the interface too.
 - It tries the fastest audio modes your computer has and keeps the lowest delay that runs without crackles.
 - It asks you to play as hard as you ever will for a few seconds and sets the input level from that. If you later play harder still, the level turns itself down.
 - It measures the room's noise and sets the gate just above it. The gate then follows the room, so more hiss on another day does not get through.
@@ -73,6 +74,8 @@ The looper is for your own playing: press **O**, play a rhythm part, press **O**
 - Plug in late, pull the cable out, close the laptop lid: it reconnects by itself. If Windows swaps in another microphone, Riffhouse stays silent, because a laptop mic through an amp howls.
 
 Recording software: the same rig is a VST3 plugin. [Riffhouse in your recording software](docs/DAW.md) gets it running.
+
+Something not working? [Help and fixes](docs/TROUBLESHOOTING.md) covers what people run into most, and **Report a problem** in Settings gathers what a helper needs.
 
 ## What we measure
 

@@ -8,6 +8,17 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+## 0.1.1
+
+The first public release. 0.1.0 only went out to a few testers; this is what changed since, most of it because of what they ran into. What Riffhouse is and everything in it is in the [README](README.md).
+
+### Your audio interface, your choice
+
+- Fixed: picking another input by hand, an audio interface for example, was undone a moment later and the app went back to the microphone, even after a restart. The same happened to ASIO and DirectSound. A choice you make now stays, and is remembered.
+- Setup starts with a list of every input. Pick the one your guitar is on, or leave it on "Find it for me" and strum.
+- An audio interface is listened through as well as played into. When your guitar is on one, the sound comes out of it too, and the summary says so. You can send it elsewhere in the audio settings.
+- An interface's own ASIO driver is tried first, because that is where the lowest delay is.
+
 ### Sounds right on a mic jack
 
 - Input Fix is rebuilt. A guitar plugged into a computer's mic jack loses most of its treble, over 20 dB at 3 kHz on the PC this was measured on, and heavy tones turned loud and harsh because the amp only got bass. The fix is now the exact opposite of that loss and goes up to 24 dB.
@@ -25,6 +36,13 @@ Each release on GitHub carries the notes of its version from this file.
 - Four steps instead of three, each with one clear instruction. After each step it stops for a moment and shows what it found.
 - The noise is measured only once the strings have really stopped.
 - Installs from an earlier version are offered one new run of setup.
+
+### How it moves
+
+- Buttons give under the finger, switches slide, lamps warm up and die down, and a knob that undo puts back travels there. Panels arrive from where they belong, and pages and tones dissolve into each other.
+- When setup is done the rig powers on, each piece lighting in the order the signal runs.
+- Nothing moves while you are not touching anything, and a new press always wins over a move still running.
+- "Less motion" in Settings turns sliding off and keeps fades short. It starts from what Windows is set to.
 
 ### Audio drivers
 
@@ -46,12 +64,14 @@ Each release on GitHub carries the notes of its version from this file.
 
 - The 29 pedals are modelled in 3D now, with real metal, paint and shadows. Knobs and lights still move live.
 - The exact version is shown in Settings and in the window title of test builds.
-- Settings has "Save a report for help": a text file with your audio settings and what setup measured, written into your recordings folder. Nothing is sent anywhere.
+- Settings has "Save a report": a text file with your audio settings, the names of your inputs and outputs, and what setup measured, written into your recordings folder. Nothing is sent anywhere.
+- "Report a problem" in Settings puts that report on your clipboard and opens the page where problems are reported. "Help and fixes" opens [the common problems and how to fix them](docs/TROUBLESHOOTING.md).
+- A test build updates itself to the next test build, and then to the release.
 - A saved tone no longer carries the name of your Windows account.
 
 ## 0.1.0
 
-The first version.
+The first version. It went out as a test build only.
 
 ### What is in it
 

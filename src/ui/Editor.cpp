@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "AudioPicker.h"
 #include "Editor.h"
+#include "Motion.h"
 #include "../plugin/StandaloneHost.h"
 #include "TakesView.h"
 
@@ -209,15 +210,17 @@ public:
     void show (const juce::String& t)
     {
         text = t;
-        alpha = 1.0f;
-        hold = 75;
         setVisible (true);
-        startTimerHz (30);
+        // it comes up from the bar it lies on, stays two and a half seconds, and fades where it is
+        shown.to (1.0f, motion::ui, motion::Curve::out, true);
+        motion::run (*this, [this] { return shown.moving(); });
+        startTimer (2500);
         repaint();
     }
     void paint (juce::Graphics& g) override
     {
         // a strip that lies on the bottom bar's upper edge, the same place every message appears
+        const float alpha = shown.get();
         const auto r = getLocalBounds().toFloat();
         g.setColour (juce::Colour (0xff1d1c1b).withAlpha (alpha));
         g.fillRect (r);
@@ -225,20 +228,23 @@ public:
         g.fillRect (r.withHeight (1.0f));
         g.setFont (font (14.0f, Weight::medium));
         g.setColour (colours::text.withAlpha (alpha));
-        g.drawText (text, r, juce::Justification::centred);
+        g.drawText (text, r.translated (0.0f, leaving ? 0.0f : 5.0f * (1.0f - alpha)), juce::Justification::centred);
     }
 
 private:
     void timerCallback() override
     {
-        if (--hold > 0) return;
-        alpha -= 0.08f;
-        if (alpha <= 0.0f) { setVisible (false); stopTimer(); }
-        repaint();
+        stopTimer();
+        leaving = true;
+        shown.to (0.0f, motion::leave, motion::Curve::out, true);
+        motion::run (*this, [this] { return shown.moving(); },
+                     [this] { if (! shown.moving() && shown.target() <= 0.0f) { setVisible (false); leaving = false; } });
+        if (! shown.moving()) { setVisible (false); leaving = false; }
     }
+    void visibilityChanged() override { if (! isVisible()) { stopTimer(); shown.snap (0.0f); leaving = false; } }
     juce::String text;
-    float alpha = 0.0f;
-    int hold = 0;
+    motion::Glide shown;
+    bool leaving = false;
 };
 
 // A message about the audio connection that stays until the problem is gone: the input was
@@ -456,10 +462,12 @@ public:
 
         showPage ((int) proc.uiState.getProperty ("page", (int) mAmp));
         refreshTop();
+        motion::attach (*this);
     }
 
     ~Root() override
     {
+        motion::detach (*this);
         proc.onFootMessage = nullptr; // the rig lives on after its window closes
         proc.onFootJob = nullptr;
         proc.footTeachStop();
@@ -469,6 +477,9 @@ public:
     void showPage (int i)
     {
         i = juce::jlimit (0, numModules - 1, i);
+        // the page that is leaving dissolves over the one that is already there
+        if (i != shownPage && shownPage >= 0) motion::ghost (*this, amp.getBounds(), motion::leave, topPage());
+        shownPage = i;
         chain.setSelected (i);
         amp.setVisible (i == mAmp);
         for (int k = 0; k < pages.size(); ++k)
@@ -476,11 +487,27 @@ public:
         proc.uiState.setProperty ("page", i, nullptr);
     }
 
+    // the page furthest to the front, so a leaving picture lies on the pages and under everything else
+    juce::Component* topPage()
+    {
+        juce::Component* top = &amp;
+        for (auto* pg : pages)
+            if (pg != nullptr && getIndexOfChildComponent (pg) > getIndexOfChildComponent (top)) top = pg;
+        return top;
+    }
+
+    // A whole new tone: the rig that was there dissolves into the one that is.
+    void toneWillChange()
+    {
+        if (openOverlay == nullptr) motion::ghost (*this, chain.getBounds().getUnion (amp.getBounds()), motion::leave, topPage());
+    }
+
     void stepPreset (int d)
     {
         const int n = (int) proc.presets().all().size();
         if (n == 0) return;
         const int cur = proc.currentPresetIndex();
+        toneWillChange();
         proc.loadPreset (cur < 0 ? 0 : (cur + d + n) % n);
         refreshTop();
         editor.showToast (proc.currentPresetName());
@@ -546,6 +573,12 @@ public:
         }
     }
 
+    void powerOn()
+    {
+        const double ampAt = chain.powerOn (motion::now() + 90.0);
+        if (shownPage == mAmp) amp.powerOn (ampAt);
+    }
+
     void closeOverlays()
     {
         closePopovers();
@@ -583,6 +616,7 @@ public:
     // Undo or redo one step of the tone, and say what came back.
     void stepHistory (bool forward)
     {
+        motion::announceJump(); // the knob that comes back travels to its place
         const auto what = forward ? proc.redo() : proc.undo();
         if (what.isEmpty()) return;
         refreshTop();
@@ -897,6 +931,13 @@ public:
     int noticeTicks = 0;
     bool quietNotices = false; // pictures of the app are taken without a message about the missing guitar
     std::unique_ptr<SetupWizard> wizard;
+    int shownPage = -1;
+    // how each panel arrives and leaves
+    motion::Presence inBrowser { browser, motion::Enter::rise }, inTuner { tuner, motion::Enter::rise },
+                     inSettings { settings, motion::Enter::rise }, inTakes { takesView, motion::Enter::rise },
+                     inScrim { scrim, motion::Enter::fade },
+                     inRecord { recordPanel, motion::Enter::drop }, inMetro { metroPanel, motion::Enter::drop },
+                     inLooper { looperPanel, motion::Enter::drop }, inSave { saveDialog, motion::Enter::drop };
 
     juce::String lastStatus;
     bool demoLevels = false;
@@ -1012,12 +1053,21 @@ void RiffhouseEditor::showSetupWizard (bool again)
     root->wizard = std::make_unique<SetupWizard> (proc);
     root->addAndMakeVisible (*root->wizard);
     root->wizard->setBounds (root->getLocalBounds());
+    motion::enter (*root->wizard, motion::Enter::fade);
     root->wizard->onFinished = [this]
     {
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this)]
         {
             if (safe == nullptr) return;
+            bool ranToTheEnd = false;
+            if (safe->root->wizard != nullptr)
+            {
+                ranToTheEnd = safe->root->wizard->ranToTheEnd;
+                motion::ghost (*safe->root->wizard, motion::ui);
+            }
             safe->root->wizard.reset();
+            // the one staged moment in the app: setup is done, and the rig powers on
+            if (ranToTheEnd) safe->root->powerOn();
             safe->root->repaint();
         });
     };
@@ -1159,9 +1209,135 @@ void RiffhouseEditor::showToast (const juce::String& m)
     root->toast.show (m);
 }
 
+void RiffhouseEditor::saveFilmstrips (const juce::File& folder)
+{
+    folder.createDirectory();
+    auto& r = *root;
+    r.wizard.reset();
+    r.quietNotices = true;
+    r.demoLevels = true;
+    r.noticeBar.set ({});
+    motion::freeze (false);
+    motion::setReduced (false);
+    double clock = 10000.0;
+    motion::setClock (clock);
+    // `act` happens at time 0; the strip shows the area at each of the given milliseconds after it
+    auto film = [&] (const juce::String& name, juce::Rectangle<int> area, std::function<void()> act,
+                     std::initializer_list<int> times = { 0, 30, 60, 100, 150, 200, 260, 330 }, float scale = 1.0f)
+    {
+        clock += 5000.0; // whatever was in flight is long over
+        motion::setClock (clock);
+        motion::step();
+        r.tick();
+        // paint, let whatever that painting set off run out, and paint again: every glide is at rest where it starts
+        (void) r.createComponentSnapshot (area, true, scale);
+        clock += 2000.0;
+        motion::setClock (clock);
+        motion::step();
+        (void) r.createComponentSnapshot (area, true, scale);
+        act();
+        const int w = juce::roundToInt ((float) area.getWidth() * scale), h = juce::roundToInt ((float) area.getHeight() * scale);
+        juce::Image strip (juce::Image::RGB, (w + 6) * (int) times.size() - 6, h + 22, true);
+        juce::Graphics sg (strip);
+        sg.fillAll (juce::Colour (0xff2a2a2a));
+        int x = 0;
+        for (int ms : times)
+        {
+            motion::setClock (clock + (double) ms);
+            motion::step();
+            const auto img = r.createComponentSnapshot (area, true, scale);
+            sg.drawImageAt (img, x, 22);
+            sg.setColour (juce::Colours::white);
+            sg.setFont (font (13.0f));
+            sg.drawText (juce::String (ms) + " ms", x + 4, 2, 100, 18, juce::Justification::centredLeft);
+            x += w + 6;
+        }
+        clock += 1000.0;
+        motion::setClock (clock);
+        motion::step();
+        juce::PNGImageFormat png;
+        auto f = folder.getChildFile (name + ".png");
+        f.deleteFile();
+        if (auto out = f.createOutputStream()) png.writeImageToStream (strip, *out);
+    };
+
+    const auto whole = r.getLocalBounds();
+    const auto strip = r.chain.getBounds();
+    r.showPage (mAmp);
+    film ("page-switch", strip.getUnion (r.amp.getBounds().withHeight (260)).withTrimmedRight (whole.getWidth() / 2),
+          [&] { r.showPage (mDrive); }, { 0, 30, 60, 100, 150, 200, 260, 330 }, 0.6f);
+    r.showPage (mDrive);
+    const float driveWas = proc.value (P::drvOn);
+    proc.setValue (P::drvOn, 1.0f);
+    film ("pedal-off", r.amp.getBounds().withSizeKeepingCentre (300, r.amp.getHeight()).getUnion (r.chain.getBounds().withWidth (whole.getWidth() / 2)).withTrimmedLeft (380),
+          [&] { proc.setValue (P::drvOn, 0.0f); }, { 0, 30, 60, 100, 150, 200, 260 }, 0.6f);
+    film ("pedal-on", r.amp.getBounds().withSizeKeepingCentre (300, r.amp.getHeight()).getUnion (r.chain.getBounds().withWidth (whole.getWidth() / 2)).withTrimmedLeft (380),
+          [&] { proc.setValue (P::drvOn, 1.0f); }, { 0, 20, 40, 60, 100, 150, 200 }, 0.6f);
+    proc.setValue (P::drvOn, driveWas);
+    r.showPage (mAmp);
+    const float ampWas = proc.value (P::ampOn);
+    proc.setValue (P::ampOn, 0.0f);
+    film ("amp-on", r.amp.getBounds().withTrimmedLeft (r.amp.getWidth() / 2), [&] { proc.setValue (P::ampOn, 1.0f); },
+          { 0, 40, 80, 120, 180, 240, 300 }, 0.5f);
+    film ("amp-off", r.amp.getBounds().withTrimmedLeft (r.amp.getWidth() / 2), [&] { proc.setValue (P::ampOn, 0.0f); },
+          { 0, 60, 120, 200, 300, 420, 480 }, 0.5f);
+    proc.setValue (P::ampOn, ampWas);
+    film ("settings-open", whole, [&] { r.toggleOverlay (r.settings); }, { 0, 40, 80, 120, 180, 240, 300 }, 0.35f);
+    film ("settings-close", whole, [&] { r.closeOverlays(); }, { 0, 30, 60, 100, 150, 200 }, 0.35f);
+    film ("popover-open", whole.withTrimmedLeft (whole.getWidth() / 2).withHeight (420),
+          [&] { r.showPopover (r.recordPanel, r.recordOptions.getBounds().getUnion (r.record.getBounds()), 420, 560); }, { 0, 40, 80, 120, 180, 240, 300 }, 0.5f);
+    film ("popover-close", whole.withTrimmedLeft (whole.getWidth() / 2).withHeight (420), [&] { r.closePopovers(); }, { 0, 30, 60, 100, 150, 200 }, 0.5f);
+    film ("tone-step", strip.getUnion (r.amp.getBounds()), [&] { r.stepPreset (1); }, { 0, 30, 60, 100, 150, 200 }, 0.35f);
+    r.stepPreset (-1);
+    film ("toast", whole.withTop (whole.getBottom() - 150).withSizeKeepingCentre (700, 150), [&] { showToast ("Saved. Press L to listen to your takes."); },
+          { 0, 40, 80, 120, 200, 2400, 2540, 2600, 2700 }, 0.6f);
+    r.toast.setVisible (false);
+    {
+        // a knob that undo puts back travels there
+        auto& b = r.saveButton;
+        film ("button-press", b.getBounds().expanded (24), [&] { b.setState (juce::Button::buttonDown); }, { 0, 20, 40, 60, 90, 120 }, 2.0f);
+        film ("button-release", b.getBounds().expanded (24), [&] { b.setState (juce::Button::buttonNormal); }, { 0, 30, 60, 100, 150, 200 }, 2.0f);
+    }
+    {
+        const float was = proc.value (P::outLevel);
+        proc.historyTick (false);
+        film ("knob-undo", r.volume.getBounds().expanded (12),
+              [&]
+              {
+                  proc.setValue (P::outLevel, was > -6.0f ? was - 14.0f : was + 14.0f);
+                  motion::announceJump();
+                  proc.setValue (P::outLevel, was);
+              }, { 0, 40, 80, 130, 180, 230, 260, 300 }, 2.0f);
+        proc.setValue (P::outLevel, was);
+    }
+    {
+        // setup: a step finishes, the summary arrives, and the rig powers on behind it
+        r.showPage (mAmp);
+        r.wizard = std::make_unique<SetupWizard> (proc);
+        auto& w = *r.wizard;
+        r.addAndMakeVisible (w);
+        w.setBounds (whole);
+        w.showExample (0);
+        const auto card = whole.withSizeKeepingCentre (700, 600);
+        film ("setup-step-done", card, [&] { w.showExample (4, true); }, { 0, 40, 80, 120, 180, 240, 300 }, 0.5f);
+        w.showExample (3);
+        film ("setup-summary", card, [&] { w.showExample (5, true); }, { 0, 60, 120, 180, 240, 320, 400, 500, 600, 700 }, 0.5f);
+        film ("setup-power-on", whole.withHeight (r.amp.getY() + 330),
+              [&]
+              {
+                  motion::ghost (w, motion::ui);
+                  r.wizard.reset();
+                  r.powerOn();
+              }, { 0, 60, 130, 200, 280, 360, 450, 560, 700 }, 0.5f);
+    }
+    motion::freeClock();
+    motion::freeze (true);
+}
+
 void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
 {
     folder.createDirectory();
+    motion::freeze (true); // pictures show finished states, never something half way
     auto& r = *root;
     r.wizard.reset();
     r.quietNotices = true;
@@ -1317,9 +1493,12 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         SetupWizard w (proc);
         r.addAndMakeVisible (w);
         w.setBounds (r.getLocalBounds());
-        w.begin();
+        const std::vector<AutoSetup::Input> pretend { { "ASIO", "USB Audio Interface ASIO" },
+                                                      { "Windows Audio", "Microphone (High Definition Audio)" },
+                                                      { "Windows Audio", "Analogue 1 + 2 (USB Audio Interface)" } };
+        w.begin (false, &pretend);
         shoot ("setup");
-        w.begin (true);
+        w.begin (true, &pretend);
         shoot ("setup-again");
         const char* names[] = { "setup-1-find", "setup-2-delay", "setup-3-play", "setup-4-quiet", "setup-found", "setup-done" };
         for (int i = 0; i < 6; ++i) { w.showExample (i); shoot (names[i]); }

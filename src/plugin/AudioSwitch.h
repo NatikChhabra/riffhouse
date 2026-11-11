@@ -33,6 +33,9 @@ public:
     bool busy() const noexcept { return isTimerRunning(); }
 
     static juce::String friendlyType (const juce::String& typeName);
+    // Someone with an audio interface listens through it. When the input they pick is one, this
+    // is the output to open with it; empty leaves the output alone (a mic jack, a headset, ASIO).
+    static juce::String outputToFollow (const juce::String& type, const juce::String& input, const juce::StringArray& outputs);
     // One sentence on what is running now, for the status line.
     static juce::String running (juce::AudioDeviceManager&, const RiffhouseProcessor&);
 

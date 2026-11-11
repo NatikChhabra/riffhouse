@@ -103,6 +103,8 @@ juce::Rectangle<float> pedalArtArea (juce::Rectangle<float> box);
 // The print on the face alone (name, stripes, small print) on a clear ground, for the 3D renderer.
 juce::Image renderPedalPrint (const PedalDesign&, const PedalLayout&, juce::Rectangle<float> area, float scale);
 void drawPedalLed (juce::Graphics&, const PedalLayout&, const PedalDesign&, bool on);
+// A light between off (0) and on (1), for the moment it takes to come on or go out.
+void drawPedalLed (juce::Graphics&, const PedalLayout&, const PedalDesign&, float level);
 
 // Amp head.
 struct AmpLayout
@@ -126,6 +128,9 @@ juce::Rectangle<float> ampArtArea (juce::Rectangle<float> ampArea);
 // For the 3D renderer: what is printed flat on the amp, and (as outlines) what stands up off its face.
 juce::Image renderAmpPrint (const AmpDesign&, const AmpLayout&, juce::Rectangle<float> area, float scale, juce::var& raisedParts);
 void drawAmpJewel (juce::Graphics&, const AmpLayout&, const AmpDesign&, bool on);
+void drawAmpJewel (juce::Graphics&, const AmpLayout&, const AmpDesign&, float level);
+// How long an amp's power light takes to come on and go out: a jewel lamp warms up, a switch just flips.
+int ampLampMs (const AmpDesign&, bool comingOn);
 
 // Speaker cabinet seen from the front with the grille off, and the mic on it.
 struct CabLayout

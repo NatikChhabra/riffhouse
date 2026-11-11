@@ -19,6 +19,7 @@
 #include "engine/Presets.h"
 #include "engine/Rig.h"
 #include "engine/UpdateInfo.h"
+#include "engine/DeviceNames.h"
 #include "plugin/LevelMatcher.h"
 #include "plugin/Takes.h"
 
@@ -1173,6 +1174,18 @@ void testUpdates()
         CHECK (newestRelease ("[]", "").version.isEmpty() && newestRelease ("not json", "").version.isEmpty(), "an empty or broken list offers nothing");
         CHECK (parseRelease (entry ("v0.1.0-rc3", true, false), "").version.isEmpty(), "a full release never follows test releases");
         CHECK (parseRelease (entry ("v0.1.0-rc3", true, false), "", true).version == "0.1.0-rc3", "a test release is read when asked for");
+    }
+
+    {
+        // an audio interface is listened through as well as played into: its output is found by the hardware's name
+        const juce::StringArray outs { "Speakers (Realtek(R) Audio)", "Line 3/4 (Scarlett 4i4 USB)", "Speakers (Scarlett 4i4 USB)", "Headphones (USB Headset)" };
+        CHECK (hardwareOf ("Analogue 1 + 2 (Scarlett 4i4 USB)") == "Scarlett 4i4 USB" && hardwareOf ("Realtek ASIO").isEmpty(), "the hardware's name is what stands in the last brackets");
+        CHECK (outputBeside ("Analogue 1 + 2 (Scarlett 4i4 USB)", outs) == "Speakers (Scarlett 4i4 USB)", "an interface's main output is found: got '%s'",
+               outputBeside ("Analogue 1 + 2 (Scarlett 4i4 USB)", outs).toRawUTF8());
+        CHECK (outputBeside ("Microphone (Realtek(R) Audio)", outs) == "Speakers (Realtek(R) Audio)", "brackets inside the hardware's name do not confuse it");
+        CHECK (hardwareOf ("Microphone (Realtek(R) Audio)") == "Realtek(R) Audio", "got '%s'", hardwareOf ("Microphone (Realtek(R) Audio)").toRawUTF8());
+        CHECK (outputBeside ("Microphone (USB Guitar Cable)", outs).isEmpty() && outputBeside ("Some input", outs).isEmpty(), "an input with no output of its own gets none");
+        CHECK (outputBeside ("Line In (scarlett 4i4 usb)", { "Line 3/4 (Scarlett 4i4 USB)" }) == "Line 3/4 (Scarlett 4i4 USB)", "any output of the interface beats none");
     }
 
     const juce::String hash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";

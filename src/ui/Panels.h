@@ -117,10 +117,12 @@ private:
     RiffhouseProcessor& proc;
     IconButton close { icons::close() };
     juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and buffer..." };
-    juce::TextButton website { "Project page and help" }, report { "Save a report for help" };
+    juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report a problem" };
+    juce::String reportText() const;
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
-    juce::Rectangle<int> updateHeading, updateStatus;
+    juce::Rectangle<int> updateHeading, updateStatus, motionHeading;
+    juce::ToggleButton lessMotion { "Less motion: nothing slides, fades are short" };
     void refreshUpdate();
     juce::String lastUpdateText;
     Knob inGain, gate;

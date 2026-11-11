@@ -655,12 +655,34 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     addChildComponent (advanced);
     runSetup.setColour (juce::TextButton::buttonColourId, colours::accent);
     runSetup.setColour (juce::TextButton::textColourOffId, colours::bg);
-    website.onClick = [] { juce::URL ("https://github.com/NatikChhabra/riffhouse").launchInDefaultBrowser(); };
+    website.setTooltip ("Opens the page of common problems and how to fix them.");
+    website.onClick = [] { juce::URL ("https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md").launchInDefaultBrowser(); };
     addAndMakeVisible (website);
+    problem.setTooltip ("Copies the report to your clipboard and opens the page where problems are reported. "
+                        "Paste it there and say what went wrong. Nothing is sent by itself.");
+    problem.onClick = [this]
+    {
+        juce::SystemClipboard::copyTextToClipboard (reportText());
+        juce::URL ("https://github.com/NatikChhabra/riffhouse/issues/new")
+            .withParameter ("title", "Problem: ")
+            .withParameter ("body", "What happened:\n\n\nWhat I expected:\n\n\nReport (press Ctrl+V here, Riffhouse put it on your clipboard):\n\n")
+            .launchInDefaultBrowser();
+        if (onMessage) onMessage ("The report is on your clipboard. Paste it into the page that just opened.");
+    };
+    addAndMakeVisible (problem);
     report.setTooltip ("Writes your settings and what setup measured into a text file in your recordings folder. "
                        "Nothing is sent anywhere. Attach it when you ask for help.");
     report.onClick = [this] { saveReport(); };
     addAndMakeVisible (report);
+
+    // starts from what Windows is set to ("Animation effects"); the choice made here is kept
+    lessMotion.setToggleState (motion::reduced(), juce::dontSendNotification);
+    lessMotion.onClick = [this]
+    {
+        motion::setReduced (lessMotion.getToggleState());
+        proc.uiState.setProperty ("lessMotion", lessMotion.getToggleState() ? 1 : 0, nullptr);
+    };
+    addAndMakeVisible (lessMotion);
 
     if (auto* host = StandaloneHost::get())
         if (auto* up = host->updater())
@@ -736,7 +758,13 @@ SettingsView::~SettingsView() = default;
 
 void SettingsView::visibilityChanged()
 {
-    if (isVisible()) { summary = deviceSummary(); resized(); startTimerHz (30); }
+    if (isVisible())
+    {
+        summary = deviceSummary();
+        lessMotion.setToggleState (motion::reduced(), juce::dontSendNotification);
+        resized();
+        startTimerHz (30);
+    }
     else stopTimer();
 }
 
@@ -794,9 +822,9 @@ juce::String SettingsView::deviceSummary() const
     return s;
 }
 
-void SettingsView::saveReport()
+juce::String SettingsView::reportText() const
 {
-    // Everything someone helping would ask for first, in one file the player can read and
+    // Everything someone helping would ask for first, in one text the player can read and
     // hand over. Device names are in it; nothing about the person is.
     juce::String t;
     auto line = [&t] (const juce::String& k, const juce::String& v) { t << k << ": " << v << "\n"; };
@@ -824,6 +852,13 @@ void SettingsView::saveReport()
         for (auto* type : dm.getAvailableDeviceTypes())
             drivers.add (type->getTypeName() + " (" + juce::String (type->getDeviceNames (true).size()) + " inputs)");
         line ("Drivers on this computer", drivers.joinIntoString (", "));
+        for (auto* type : dm.getAvailableDeviceTypes())
+        {
+            // which interface, and what Windows calls its inputs and outputs: the first thing a helper needs
+            if (type->getTypeName() != "Windows Audio" && type->getTypeName() != "ASIO" && type->getTypeName() != dm.getCurrentAudioDeviceType()) continue;
+            line ("  " + type->getTypeName() + " inputs", type->getDeviceNames (true).joinIntoString (" | "));
+            line ("  " + type->getTypeName() + " outputs", type->getDeviceNames (false).joinIntoString (" | "));
+        }
         t << "\nLast setup\n";
         auto& st = host->settings();
         for (auto* k : { "setupVersion", "setupInput", "setupPeakDb", "setupNoiseDb", "setupTiltDb", "setupToneSeconds", "setupPlayedSeconds", "setupFixDb", "setupGainDb", "setupGateDb", "setupFixHeldBack" })
@@ -841,7 +876,12 @@ void SettingsView::saveReport()
     line ("Auto level", proc.value (P::autoLevel) > 0.5f ? db (proc.levels().trimDb()) + (proc.levels().hasPlayersPhrase() ? " (matched to your playing)" : " (house phrase)") : juce::String ("off"));
     for (const auto& s : paramSpecs())
         t << "  " << s.key << " = " << juce::String (proc.value (s.id), 2) << "\n";
+    return t;
+}
 
+void SettingsView::saveReport()
+{
+    const auto t = reportText();
     auto folder = proc.recordingFolder == juce::File() ? Recorder::defaultFolder() : proc.recordingFolder;
     folder.createDirectory();
     const auto f = folder.getChildFile ("Riffhouse report " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H%M") + ".txt");
@@ -892,9 +932,11 @@ void SettingsView::resized()
     left.removeFromTop (36);
     left.removeFromTop (aboutH); // about text
     auto helpRow = left.removeFromTop (36);
-    website.setBounds (helpRow.removeFromLeft (230));
+    website.setBounds (helpRow.removeFromLeft (150));
     helpRow.removeFromLeft (10);
-    report.setBounds (helpRow.removeFromLeft (230));
+    problem.setBounds (helpRow.removeFromLeft (150));
+    helpRow.removeFromLeft (10);
+    report.setBounds (helpRow.removeFromLeft (150));
     left.removeFromTop (24);
     updateHeading = left.removeFromTop (36);
     updateStatus = left.removeFromTop (24);
@@ -902,6 +944,9 @@ void SettingsView::resized()
     autoUpdate.setBounds (left.removeFromTop (30));
     left.removeFromTop (12);
     updateButton.setBounds (left.removeFromTop (36).removeFromLeft (230));
+    left.removeFromTop (20);
+    motionHeading = left.removeFromTop (36);
+    lessMotion.setBounds (left.removeFromTop (30));
 
     // right: input
     right.removeFromTop (36);
@@ -975,6 +1020,7 @@ void SettingsView::paint (juce::Graphics& g)
                       font (13.5f), colours::textDim);
         about.draw (g, left.removeFromTop (aboutH).toFloat());
     }
+    heading (motionHeading, "Motion");
     if (updateButton.isVisible())
     {
         heading (updateHeading, "Updates");

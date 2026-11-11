@@ -148,7 +148,7 @@ public:
         runLock.enter (0); // lets the installer see that the app is still open
         updates = std::make_unique<Updater> (*s, versionLabel());
         updates->onChange = [this] { if (auto* ed = editor()) ed->repaint(); };
-        if (! commandLine.contains ("--snapshots"))
+        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
         {
             updates->start();
             const auto fresh = updates->justUpdatedTo();
@@ -161,6 +161,17 @@ public:
 
         // riffhouse --snapshots <folder> [scale]: render every screen to PNG and quit
         auto args = juce::StringArray::fromTokens (commandLine, true);
+        if (const int m = args.indexOf ("--motion"); m >= 0 && m + 1 < args.size())
+        {
+            // riffhouse --motion <folder>: every move in the app as a strip of frames, then quit
+            const juce::File folder (juce::File::getCurrentWorkingDirectory().getChildFile (args[m + 1].unquoted()));
+            juce::Timer::callAfterDelay (1500, [this, folder]
+            {
+                if (auto* ed = dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()))
+                    ed->saveFilmstrips (folder);
+                systemRequestedQuit();
+            });
+        }
         const int at = args.indexOf ("--snapshots");
         if (at >= 0 && at + 1 < args.size())
         {

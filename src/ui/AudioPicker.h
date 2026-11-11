@@ -35,5 +35,6 @@ private:
     juce::Array<int> bufferSizes;
     juce::String status, note; // what happened last; and a standing remark about the driver type
     bool statusIsProblem = false, filling = false, isAsio = false, example = false;
+    bool followed = false; // the output was moved to the interface that was just picked as the input
 };
 } // namespace rh::ui

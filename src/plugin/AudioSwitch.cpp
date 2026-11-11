@@ -3,6 +3,7 @@
 #include "AudioSwitch.h"
 
 #include "AutoSetup.h"
+#include "../engine/DeviceNames.h"
 
 namespace rh
 {
@@ -33,6 +34,12 @@ juce::String AudioSwitch::friendlyType (const juce::String& t)
     if (t == "DirectSound") return "DirectSound (old and slow)";
     if (t == "ASIO") return "ASIO (audio interface drivers)";
     return t;
+}
+
+juce::String AudioSwitch::outputToFollow (const juce::String& type, const juce::String& input, const juce::StringArray& outputs)
+{
+    if (type == "ASIO" || AutoSetup::looksLikeOnboardInput (input, type)) return {};
+    return outputBeside (input, outputs);
 }
 
 juce::String AudioSwitch::running (juce::AudioDeviceManager& dm, const RiffhouseProcessor& proc)

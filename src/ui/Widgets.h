@@ -5,6 +5,7 @@
 #include "../plugin/PluginProcessor.h"
 #include "Gear.h"
 #include "Theme.h"
+#include "Motion.h"
 
 namespace rh::ui
 {
@@ -38,6 +39,8 @@ private:
         void mouseExit (const juce::MouseEvent& e) override { Slider::mouseExit (e); if (onHover) onHover(); }
     } slider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+    void follow();
+    motion::Glide shown;
     juce::String label;
     int labelH = 34;
     bool gear = false, gearUpper = false;

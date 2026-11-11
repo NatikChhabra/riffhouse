@@ -285,27 +285,30 @@ public:
     void paint (juce::Graphics& g) override
     {
         updateThumb();
-        const bool on = power.isOn();
+        const bool on = power.isOn() && motion::now() >= darkUntil;
         const bool hover = isMouseOver (true);
         {
             juce::Graphics::ScopedSaveState s (g);
             g.addTransform (thumbTransform());
-            g.drawImage (on ? thumb.image : dim, thumb.area);
-            if (index == mAmp) drawAmpJewel (g, thumb.amp, ampDesign (currentType()), on);
-            else if (index != mCab) drawPedalLed (g, thumb.pedal, *pedalDesignFor (index, currentType()), on);
+            // switched off, the gear drops back into the shadow over a fifth of a second; it never blinks
+            if (! litPrimed) { lit.snap (on ? 1.0f : 0.0f); litPrimed = true; }
+            lit.to (on ? 1.0f : 0.0f, motion::ui, motion::Curve::out, true);
+            const float l = lit.get();
+            if (l < 1.0f) g.drawImage (dim, thumb.area);
+            if (l > 0.0f) { g.setOpacity (l); g.drawImage (thumb.image, thumb.area); g.setOpacity (1.0f); }
+            if (lit.moving()) motion::run (*this, [this] { return lit.moving(); });
+            if (index == mAmp) drawAmpJewel (g, thumb.amp, ampDesign (currentType()), l);
+            else if (index != mCab) drawPedalLed (g, thumb.pedal, *pedalDesignFor (index, currentType()), l);
         }
 
         auto lab = getLocalBounds().toFloat().removeFromBottom (20.0f);
         // the label only says which page is open; on and off is the gear's own light
         const auto col = selected ? colours::text : (hover ? colours::text.withAlpha (0.85f) : colours::textDim);
         drawCaps (g, info.title, lab, 11.5f, col, juce::Justification::centred, 0.12f);
-        if (selected)
-        {
-            const float tw = capsWidth (info.title, 11.5f, 0.12f);
-            g.setColour (colours::accent);
-            g.fillRect (juce::Rectangle<float> (tw, 1.5f).withCentre ({ lab.getCentreX(), lab.getBottom() - 1.0f }));
-        }
+        // the line under the open page's name is the strip's: it slides from name to name
     }
+
+    float titleWidth() const { return capsWidth (info.title, 11.5f, 0.12f); }
 
     void mouseUp (const juce::MouseEvent& e) override
     {
@@ -341,6 +344,9 @@ public:
     juce::String lastKey { "none" };
     GearThumb thumb;
     juce::Image dim;
+    motion::Glide lit { 1.0f };
+    bool litPrimed = false;
+    double darkUntil = 0.0; // powering on after setup: its turn has not come yet
 };
 
 ChainStrip::ChainStrip (RiffhouseProcessor& p) : proc (p)
@@ -364,6 +370,57 @@ void ChainStrip::setSelected (int i)
         tiles[k]->selected = (k == i);
         tiles[k]->repaint();
     }
+    placeMark (true);
+}
+
+void ChainStrip::placeMark (bool glide)
+{
+    if (selected < 0 || selected >= tiles.size() || getWidth() <= 0) return;
+    const auto* t = tiles[selected];
+    const float x = (float) t->getBounds().getCentreX(), w = t->titleWidth();
+    if (! glide || ! markPlaced || ! isShowing())
+    {
+        markX.snap (x);
+        markW.snap (w);
+        markPlaced = true;
+    }
+    else
+    {
+        markX.to (x, motion::travel, motion::Curve::inOut);
+        markW.to (w, motion::travel, motion::Curve::inOut);
+        motion::run (*this, [this] { return markX.moving() || markW.moving(); });
+    }
+    repaint();
+}
+
+double ChainStrip::powerOn (double at)
+{
+    // The rig comes on the way a board does when the supply is plugged in: each piece that
+    // is switched on lights in the order the signal runs, the whole row inside 400 ms.
+    if (motion::still()) return at;
+    int count = 0;
+    for (auto* t : tiles) count += t->power.isOn() ? 1 : 0;
+    const double step = count > 1 ? std::min (55.0, 400.0 / (double) (count - 1)) : 0.0;
+    double ampAt = at, when = at;
+    for (auto* t : tiles)
+    {
+        if (! t->power.isOn()) continue;
+        t->lit.snap (0.0f);
+        t->litPrimed = true;
+        t->darkUntil = when;
+        if (t->index == mAmp) ampAt = when;
+        when += step;
+    }
+    wakeEnd = when;
+    motion::run (*this, [this] { return motion::now() < wakeEnd; }, [this] { for (auto* t : tiles) t->repaint(); });
+    return ampAt;
+}
+
+void ChainStrip::paintOverChildren (juce::Graphics& g)
+{
+    if (! markPlaced) return;
+    g.setColour (colours::accent);
+    g.fillRect (juce::Rectangle<float> (markW.get(), 1.5f).withCentre ({ markX.get(), (float) getHeight() - 1.0f }));
 }
 
 void ChainStrip::refresh()
@@ -387,6 +444,7 @@ void ChainStrip::resized()
         x += w + (float) gap;
     }
     cableY = 2.0f + ((float) getHeight() - 26.0f) * 0.32f;
+    placeMark (false);
 }
 
 void ChainStrip::paint (juce::Graphics& g)
@@ -894,6 +952,10 @@ void ModulePage::resized()
 void ModulePage::paint (juce::Graphics& g)
 {
     const bool on = power.isOn();
+    if (! lampPrimed) { lamp.snap (on ? 1.0f : 0.0f); lampPrimed = true; }
+    lamp.to (on ? 1.0f : 0.0f, on ? motion::ledUp : motion::ledDown, motion::Curve::out, true);
+    if (lamp.moving()) motion::run (*this, [this] { return lamp.moving(); });
+    const float lit = lamp.get();
     drawCaps (g, spec (info.onParam).name, titleArea.toFloat(), 12.0f, colours::textDim);
     if (types == nullptr || index == mWah)
         drawCaps (g, spec (info.onParam).name, getLocalBounds().removeFromTop (headerH).toFloat(), 22.0f, colours::text,
@@ -908,7 +970,7 @@ void ModulePage::paint (juce::Graphics& g)
     {
         if (pedalImage.isValid())
         {
-            g.setOpacity (on ? 1.0f : 0.55f);
+            g.setOpacity (0.55f + 0.45f * lit);
             g.drawImage (pedalImage, cabArea);
             g.drawImage (preImage, preArea);
             g.setOpacity (1.0f);
@@ -918,7 +980,7 @@ void ModulePage::paint (juce::Graphics& g)
     }
     if (pedalImage.isValid())
         g.drawImage (pedalImage, pedalDraw);
-    drawPedalLed (g, pedal, design(), on);
+    drawPedalLed (g, pedal, design(), lit);
     if (! faders.isEmpty())
     {
         // the scale the sliders are read against, printed beside the first one
@@ -1073,9 +1135,22 @@ void AmpPage::resized()
     }
 }
 
+void AmpPage::powerOn (double at)
+{
+    if (motion::still() || ! power.isOn()) return;
+    lamp.snap (0.0f);
+    lampModel = current;
+    darkUntil = at;
+    motion::run (*this, [this] { return motion::now() < darkUntil; });
+}
+
 void AmpPage::paint (juce::Graphics& g)
 {
-    const bool on = power.isOn();
+    const bool on = power.isOn() && motion::now() >= darkUntil;
+    if (lampModel != current) { lamp.snap (on ? 1.0f : 0.0f); lampModel = current; }
+    lamp.to (on ? 1.0f : 0.0f, ampLampMs (ampDesign (current), on), motion::Curve::out, true);
+    if (lamp.moving()) motion::run (*this, [this] { return lamp.moving(); });
+    const float lit = lamp.get();
     drawCaps (g, "Amp", titleArea.toFloat(), 12.0f, colours::textDim);
     if (current != choices::neuralCapture)
     {
@@ -1091,10 +1166,10 @@ void AmpPage::paint (juce::Graphics& g)
 
     if (ampImage.isValid())
     {
-        g.setOpacity (on ? 1.0f : 0.55f);
+        g.setOpacity (0.55f + 0.45f * lit);
         g.drawImage (ampImage, ampArtArea (ampArea));
         g.setOpacity (1.0f);
     }
-    drawAmpJewel (g, layout, ampDesign (current), on);
+    drawAmpJewel (g, layout, ampDesign (current), lit);
 }
 } // namespace rh::ui

@@ -28,8 +28,13 @@ public:
     AutoSetup (juce::AudioDeviceManager&, RiffhouseProcessor&);
     ~AutoSetup() override;
 
-    void start();
+    // Every input a guitar could be on, in the order setup listens to them.
+    struct Input { juce::String type, name; };
+    static std::vector<Input> inputs (juce::AudioDeviceManager&);
+    // `only`: the player said where the guitar is, so only that input is listened to.
+    void start (const Input* only = nullptr);
     void cancel();
+    bool listeningOnOne() const noexcept { return candidates.size() == 1; }
     Phase phase() const noexcept { return currentPhase; }
     float progress() const noexcept { return phaseProgress; }
     juce::String detail() const { return detailText; }
@@ -53,6 +58,7 @@ public:
         double toneSeconds = 0;           // how much playing the tone measurement heard
         double playedSeconds = 0;         // how much hard playing the level was taken from
         bool fixHeldBack = false;         // the full fix would have brought too much hiss up with it
+        bool outputFollows = false;       // the input is an interface, and the sound was put on its output too
     };
     const Summary& summary() const noexcept { return result; }
 
@@ -62,13 +68,14 @@ public:
     static bool isAsioWrapper (const juce::String& driverName);
 
 private:
-    struct Candidate { juce::String type, input; };
+    using Candidate = Input;
     struct Mode { juce::String type; };
 
     void timerCallback() override;
     void setPhase (Phase);
     bool openCandidate (const Candidate&);
     void buildCandidates();
+    static std::vector<Candidate> findCandidates (juce::AudioDeviceManager&);
     void beginTuning();
     bool openMode (const juce::String& type, int bufferSize);
     void finishTuning();
@@ -100,6 +107,8 @@ private:
     float dwellPeak = 0.0f;
     Candidate chosen;
     float chosenPeak = 0.0f;
+    juce::String followOutput; // the chosen interface's own output, while it opens
+    juce::String outputFor (const Candidate&, juce::AudioIODeviceType*, const juce::String& current) const;
 
     // tuning
     juce::StringArray modes;

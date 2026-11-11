@@ -2319,6 +2319,30 @@ void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bo
     g.fillEllipse (R (r.getWidth() * 0.24f, r.getWidth() * 0.18f).withCentre (r.getCentre().translated (-r.getWidth() * 0.17f, -r.getWidth() * 0.2f)));
 }
 
+void drawPedalLed (juce::Graphics& g, const PedalLayout& l, const PedalDesign& d, float level)
+{
+    if (level <= 0.0f || level >= 1.0f) { drawPedalLed (g, l, d, level >= 1.0f); return; }
+    drawPedalLed (g, l, d, false);
+    g.beginTransparencyLayer (level);
+    drawPedalLed (g, l, d, true);
+    g.endTransparencyLayer();
+}
+
+void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, float level)
+{
+    if (level <= 0.0f || level >= 1.0f) { drawAmpJewel (g, l, d, level >= 1.0f); return; }
+    drawAmpJewel (g, l, d, false);
+    g.beginTransparencyLayer (level);
+    drawAmpJewel (g, l, d, true);
+    g.endTransparencyLayer();
+}
+
+int ampLampMs (const AmpDesign& d, bool comingOn)
+{
+    if (d.lamp != 0) return 90; // a lever or a rocker: it is simply over
+    return comingOn ? 240 : 420; // a filament behind coloured glass
+}
+
 //==============================================================================
 namespace
 {

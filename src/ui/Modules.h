@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Widgets.h"
+#include "Motion.h"
 
 namespace rh::ui
 {
@@ -35,17 +36,25 @@ public:
     ~ChainStrip() override;
     void resized() override;
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void setSelected (int index);
     int getSelected() const noexcept { return selected; }
     std::function<void (int)> onSelect;
     void refresh(); // called by the editor's timer
+    // After setup the rig powers on: every piece that is on lights in signal order, starting at
+    // `at` on the motion clock. Returns when the amp's turn comes, so its page can light with it.
+    double powerOn (double at);
 
 private:
     class Tile;
+    void placeMark (bool glide);
     RiffhouseProcessor& proc;
     float cableY = 0.0f;
     juce::OwnedArray<Tile> tiles;
     int selected = mAmp;
+    motion::Glide markX, markW; // the line under the open page's name slides from one name to the next
+    bool markPlaced = false;
+    double wakeEnd = 0.0;
 };
 
 // The speaker and the mic drawn from above, on the cabinet page. It shows what the two
@@ -107,6 +116,9 @@ private:
     PedalLayout pedal;
     juce::Rectangle<float> pedalArea, pedalDraw;
     juce::Image pedalImage;
+    void visibilityChanged() override { lampPrimed = false; }
+    motion::Glide lamp { 1.0f }; // the light coming on or going out
+    bool lampPrimed = false;
 };
 
 // The amp gets its own page: it is the heart of the tone.
@@ -117,6 +129,7 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     void refresh();
+    void powerOn (double at); // the lamp stays dark until `at`, then warms up
 
 private:
     void loadCapture();
@@ -132,6 +145,10 @@ private:
     juce::Rectangle<float> ampArea;
     AmpLayout layout;
     juce::Image ampImage;
+    void visibilityChanged() override { lampModel = -1; }
+    motion::Glide lamp { 1.0f }; // the power light warming up or dying down
+    int lampModel = -1;
+    double darkUntil = 0.0;
     juce::String status;
     std::unique_ptr<juce::FileChooser> chooser;
 };

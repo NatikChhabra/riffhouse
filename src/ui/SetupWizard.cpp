@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "SetupWizard.h"
 #include "../plugin/StandaloneHost.h"
+#include "../engine/DeviceNames.h"
 
 namespace rh::ui
 {
@@ -33,12 +34,19 @@ juce::StringArray SetupWizard::scanInputs() const
     return names;
 }
 
-void SetupWizard::begin (bool again)
+void SetupWizard::begin (bool again, const std::vector<AutoSetup::Input>* pretend)
 {
-    if (auto* h = StandaloneHost::get()) h->setupRunning (true);
+    auto* host = StandaloneHost::get();
+    if (host != nullptr) host->setupRunning (true);
+    if (pretend != nullptr) inputs = *pretend;
+    else if (host != nullptr) inputs = AutoSetup::inputs (host->deviceManager());
+    picked = hoverRow = -1;
+    firstRow = 0;
     offeredAgain = again;
     step = Step::welcome;
+    cardH.snap ((float) heightFor (step));
     layoutButtons();
+    if (pretend != nullptr) return;
     startTimerHz (30);
     repaint();
 }
@@ -57,7 +65,7 @@ void SetupWizard::startSetup()
         shownProgress = setup->pausing() ? 1.0f : 0.0f;
         if (setup->phase() == AutoSetup::Phase::finished)
         {
-            step = Step::done;
+            go (Step::done);
             if (auto* h = StandaloneHost::get())
             {
                 h->saveAudioState();
@@ -81,16 +89,17 @@ void SetupWizard::startSetup()
         }
         else if (setup->phase() == AutoSetup::Phase::noSignal)
         {
-            step = Step::failed;
+            go (Step::failed);
             inputsAtFailure = scanInputs();
             ticksSinceScan = 0;
         }
         layoutButtons();
         repaint();
     };
-    step = Step::running;
+    for (auto& r : rowDone) r.snap (0.0f);
+    go (Step::running);
     layoutButtons();
-    setup->start();
+    setup->start (juce::isPositiveAndBelow (picked, (int) inputs.size()) ? &inputs[(size_t) picked] : nullptr);
 }
 
 SetupWizard::View SetupWizard::view() const
@@ -120,7 +129,7 @@ void SetupWizard::noteFound()
     }
 }
 
-void SetupWizard::showExample (int which)
+void SetupWizard::showExample (int which, bool moving)
 {
     using Phase = AutoSetup::Phase;
     example = true;
@@ -133,7 +142,7 @@ void SetupWizard::showExample (int which)
         exampleSummary.inputName = input;
         exampleSummary.latencyMs = 9.3; exampleSummary.bufferSize = 144; exampleSummary.exclusive = true;
         exampleSummary.inputGainDb = 1.5f; exampleSummary.inputFix = true; exampleSummary.inputFixDb = 21.0f; exampleSummary.gateDb = -52.0f;
-        step = Step::done;
+        if (moving) go (Step::done); else step = Step::done;
     }
     else
     {
@@ -146,16 +155,25 @@ void SetupWizard::showExample (int which)
         if (doneSteps > 0) found[0] = input;
         if (doneSteps > 1) found[1] = "9.3 ms";
         if (doneSteps > 2) found[2] = "+1.5 dB input level, Input Fix 21 dB";
-        step = Step::running;
+        if (moving) go (Step::running); else step = Step::running;
         meter.setLevel (which == 3 ? 0.004f : 0.3f);
     }
     shownProgress = exampleView.progress;
+    if (! moving)
+    {
+        cardH.snap ((float) heightFor (step));
+        contentIn.snap (1.0f);
+        titleIn.snap (1.0f);
+        lastTitle = {};
+        doneAt = -1.0e12;
+    }
     layoutButtons();
     repaint();
 }
 
 void SetupWizard::complete (bool keep)
 {
+    ranToTheEnd = keep && step == Step::done;
     if (! keep && setup != nullptr) setup->cancel();
     setup.reset();
     stopTimer();
@@ -207,9 +225,18 @@ void SetupWizard::layoutButtons()
             primary.setColour (juce::TextButton::textColourOffId, colours::bg);
             primary.setButtonText ("Try again");
             primary.onClick = [this] { startSetup(); };
-            secondary.setButtonText ("Skip");
+            // back to the list of inputs, where another one can be picked or setup skipped
+            secondary.setButtonText ("Back");
             secondary.setVisible (true);
-            secondary.onClick = [this] { complete (true); };
+            secondary.onClick = [this]
+            {
+                if (setup != nullptr) setup->cancel();
+                setup.reset();
+                if (auto* h = StandaloneHost::get()) inputs = AutoSetup::inputs (h->deviceManager());
+                picked = std::min (picked, (int) inputs.size() - 1);
+                go (Step::welcome);
+                layoutButtons();
+            };
            #if JUCE_WINDOWS
             tertiary.setButtonText ("Open Windows microphone privacy");
             tertiary.setVisible (true);
@@ -220,10 +247,87 @@ void SetupWizard::layoutButtons()
     resized();
 }
 
+int SetupWizard::heightFor (Step s) const
+{
+    const int list = listRows() > 0 ? 44 + listRows() * kRowH : 0;
+    return s == Step::welcome ? 372 + list : s == Step::running ? 504 : s == Step::failed ? 470 : 560;
+}
+
+juce::Rectangle<int> SetupWizard::listArea() const
+{
+    if (step != Step::welcome || listRows() == 0) return {};
+    // under the headphones note: title 52, text 48, gap 16, note 104, gap 14, heading 26
+    return cardBounds().reduced (48, 40).withTrimmedTop (52 + 48 + 16 + 104 + 14 + 26).withHeight (listRows() * kRowH);
+}
+
+int SetupWizard::rowAt (juce::Point<int> p) const
+{
+    const auto area = listArea();
+    if (! area.contains (p)) return -1;
+    return firstRow + (p.y - area.getY()) / kRowH;
+}
+
+void SetupWizard::mouseDown (const juce::MouseEvent& e)
+{
+    const int row = rowAt (e.getPosition());
+    if (row < 0 || row > (int) inputs.size()) return;
+    picked = row - 1;
+    repaint();
+}
+
+void SetupWizard::mouseMove (const juce::MouseEvent& e)
+{
+    const int row = rowAt (e.getPosition());
+    if (row == hoverRow) return;
+    hoverRow = row;
+    setMouseCursor (row >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    repaint();
+}
+
+void SetupWizard::mouseExit (const juce::MouseEvent&)
+{
+    hoverRow = -1;
+    repaint();
+}
+
+void SetupWizard::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+{
+    const int hidden = (int) inputs.size() + 1 - listRows();
+    if (hidden <= 0 || ! listArea().contains (e.getPosition())) return;
+    firstRow = juce::jlimit (0, hidden, firstRow + (w.deltaY < 0.0f ? 1 : -1));
+    repaint();
+}
+
 juce::Rectangle<int> SetupWizard::cardBounds() const
 {
-    const int h = step == Step::welcome ? 372 : step == Step::running ? 504 : step == Step::failed ? 470 : 560;
-    return getLocalBounds().withSizeKeepingCentre (640, h);
+    // an even height, so the centred card never sits on a half pixel while it grows
+    return getLocalBounds().withSizeKeepingCentre (640, 2 * juce::roundToInt (cardH.get() * 0.5f));
+}
+
+void SetupWizard::go (Step s)
+{
+    if (s == step) return;
+    step = s;
+    lastTitle = {};
+    titleIn.snap (1.0f);
+    contentIn.snap (0.0f);
+    contentIn.to (1.0f, motion::ui, motion::Curve::out, true);
+    cardH.to ((float) heightFor (s), motion::overlay, motion::Curve::inOut);
+    if (s == Step::done) doneAt = motion::now();
+    animate();
+}
+
+void SetupWizard::animate()
+{
+    // the buttons and the meter ride on the card while it changes size
+    motion::run (*this,
+                 [this]
+                 {
+                     bool moving = cardH.moving() || contentIn.moving() || titleIn.moving() || motion::now() < doneAt + 800.0;
+                     for (auto& r : rowDone) moving = moving || r.moving();
+                     return moving;
+                 },
+                 [this] { resized(); });
 }
 
 void SetupWizard::resized()
@@ -265,26 +369,57 @@ void SetupWizard::paint (juce::Graphics& g)
     drawCard (g, card.toFloat(), colours::panel, 18.0f);
     auto r = card.reduced (48, 40);
 
+    // what is on the card fades in after a change of step, and never spills over a card still growing
+    juce::Graphics::ScopedSaveState whole (g);
+    g.reduceClipRegion (card.reduced (2));
+    const float in = contentIn.get();
+    if (in < 1.0f) g.beginTransparencyLayer (in);
+
+    float headIn = 1.0f; // the heading and the line under it: they change within a step too
     auto title = [&] (const juce::String& t)
     {
-        g.setColour (colours::text);
+        if (t != lastTitle)
+        {
+            if (lastTitle.isNotEmpty())
+            {
+                titleIn.snap (0.0f);
+                titleIn.to (1.0f, motion::ui, motion::Curve::out, true);
+                animate();
+            }
+            lastTitle = t;
+        }
+        headIn = titleIn.get();
+        g.setColour (colours::text.withMultipliedAlpha (headIn));
         g.setFont (font (30.0f, Weight::display));
         g.drawText (t, r.removeFromTop (44), juce::Justification::centredLeft);
         r.removeFromTop (8);
     };
     auto body = [&] (const juce::String& t, int h, juce::Colour c = colours::textDim)
     {
-        g.setColour (c);
+        g.setColour (c.withMultipliedAlpha (headIn));
         g.setFont (font (16.0f));
         g.drawFittedText (t, r.removeFromTop (h), juce::Justification::topLeft, 6, 1.0f);
     };
+    // a check mark is drawn the way a pen would: from its short leg to the end of its long one
+    auto check = [&] (juce::Rectangle<float> box, float drawn, float thickness)
+    {
+        if (drawn <= 0.0f) return;
+        juce::Graphics::ScopedSaveState s (g);
+        const auto room = box.expanded (4.0f);
+        if (drawn < 1.0f) g.reduceClipRegion (room.withWidth (room.getWidth() * drawn).toNearestInt());
+        strokeIcon (g, icons::check(), box, colours::good, thickness);
+    };
+    int line = 0;
+    bool oneByOne = false; // the summary's lines arrive one after another; a list of things to check is simply there
     auto bullet = [&] (bool ok, const juce::String& t)
     {
         auto row = r.removeFromTop (32);
+        const int wait = 70 + 45 * line++;
+        const float shown = oneByOne ? motion::after (doneAt, wait, motion::ui) : 1.0f;
         const auto icon = row.removeFromLeft (30).toFloat().withSizeKeepingCentre (18, 18);
-        if (ok) strokeIcon (g, icons::check(), icon, colours::good, 2.2f);
-        else { g.setColour (colours::warn); g.fillEllipse (icon.withSizeKeepingCentre (8, 8)); }
-        g.setColour (colours::text);
+        if (ok) check (icon, oneByOne ? motion::after (doneAt, wait + 60, motion::overlay) : 1.0f, 2.2f);
+        else { g.setColour (colours::warn.withMultipliedAlpha (shown)); g.fillEllipse (icon.withSizeKeepingCentre (8, 8)); }
+        g.setColour (colours::text.withMultipliedAlpha (shown));
         g.setFont (font (15.0f));
         g.drawFittedText (t, row, juce::Justification::centredLeft, 1);
     };
@@ -302,7 +437,7 @@ void SetupWizard::paint (juce::Graphics& g)
             else
             {
                 title ("Let's get your guitar sounding right");
-                body ("Riffhouse finds your guitar, picks the fastest audio settings this computer can run without crackles, "
+                body ("Riffhouse picks the fastest audio settings this computer can run without crackles, "
                       "and sets your input level and noise gate from how you really play. It takes under a minute.", 48);
             }
             r.removeFromTop (16);
@@ -320,6 +455,37 @@ void SetupWizard::paint (juce::Graphics& g)
             g.drawFittedText ("If your guitar is plugged into the computer's mic jack, speakers can howl. "
                               "Plug the guitar in, turn its volume up, and press Start.",
                               box.reduced (0, 4).toNearestInt().withTrimmedRight (16), juce::Justification::topLeft, 3, 1.0f);
+            if (listRows() == 0) break;
+
+            // where the guitar is: say so, or let Riffhouse listen for it
+            r.removeFromTop (14);
+            drawCaps (g, "Where is your guitar plugged in?", r.removeFromTop (26).toFloat(), 11.5f, colours::textFaint);
+            for (int line = 0; line < listRows(); ++line)
+            {
+                const int row = firstRow + line;
+                auto area = r.removeFromTop (kRowH);
+                const bool on = row - 1 == picked, over = row == hoverRow;
+                const auto ring = area.removeFromLeft (30).toFloat().withSizeKeepingCentre (14.0f, 14.0f);
+                g.setColour (on ? colours::accent : (over ? colours::textDim : colours::textFaint));
+                g.drawEllipse (ring, 1.5f);
+                if (on) g.fillEllipse (ring.reduced (4.0f));
+                const bool isAuto = row == 0;
+                const auto& in = inputs[(size_t) std::max (0, row - 1)];
+                const juce::String side = isAuto ? "Strum, and Riffhouse listens on each input" : (in.type == "ASIO" ? "ASIO driver" : "");
+                g.setColour (colours::textFaint);
+                g.setFont (font (13.0f));
+                const int sideW = side.isEmpty() ? 0 : juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), side)) + 8;
+                g.drawText (side, area.removeFromRight (sideW), juce::Justification::centredRight);
+                g.setColour (on || over ? colours::text : colours::textDim);
+                g.setFont (font (15.0f, on ? Weight::semibold : Weight::regular));
+                g.drawFittedText (isAuto ? juce::String ("Find it for me") : in.name, area, juce::Justification::centredLeft, 1, 0.85f);
+            }
+            if ((int) inputs.size() + 1 > listRows())
+            {
+                g.setColour (colours::textFaint);
+                g.setFont (font (12.5f));
+                g.drawText ("Scroll for more inputs", r.removeFromTop (18), juce::Justification::centredLeft);
+            }
             break;
         }
         case Step::running:
@@ -362,7 +528,9 @@ void SetupWizard::paint (juce::Graphics& g)
             else
             {
                 title ("Strum your guitar");
-                body ("Play anything, in any tuning, and keep going. Riffhouse is listening on each input to find the one your guitar is on.", 66);
+                body (juce::isPositiveAndBelow (picked, (int) inputs.size())
+                          ? "Play anything, in any tuning, and keep going. Riffhouse is listening on " + inputs[(size_t) picked].name + "."
+                          : juce::String ("Play anything, in any tuning, and keep going. Riffhouse is listening on each input to find the one your guitar is on."), 66);
             }
 
             r.removeFromTop (28); // the live level meter sits here (child component)
@@ -388,7 +556,17 @@ void SetupWizard::paint (juce::Graphics& g)
                 auto row = r.removeFromTop (32);
                 const bool isDone = i < active || (i == active && v.pausing), isNow = i == active && ! v.pausing;
                 const auto mark = row.removeFromLeft (30).toFloat().withSizeKeepingCentre (16, 16);
-                if (isDone) strokeIcon (g, icons::check(), mark, colours::good, 2.2f);
+                if (isDone)
+                {
+                    if (rowDone[i].target() < 1.0f)
+                    {
+                        rowDone[i].to (1.0f, motion::overlay, motion::Curve::out);
+                        animate();
+                    }
+                }
+                else rowDone[i].snap (0.0f);
+                const float drawn = rowDone[i].get();
+                if (isDone) check (mark, drawn, 2.2f);
                 else if (isNow)
                 {
                     g.setColour (colours::accent.withAlpha (0.55f + 0.45f * std::sin (pulse * 2.2f)));
@@ -405,7 +583,7 @@ void SetupWizard::paint (juce::Graphics& g)
                 g.drawText (names[i], row.removeFromLeft (190), juce::Justification::centredLeft);
                 if (isDone)
                 {
-                    g.setColour (colours::textDim);
+                    g.setColour (colours::textDim.withMultipliedAlpha (drawn));
                     g.setFont (font (13.5f));
                     g.drawFittedText (found[i], row, juce::Justification::centredRight, 1, 0.9f);
                 }
@@ -418,7 +596,10 @@ void SetupWizard::paint (juce::Graphics& g)
             title ("You're all set");
             body ("Here's what Riffhouse set up. You can change any of it later in Settings.", 30);
             r.removeFromTop (10);
-            bullet (true, "Guitar on " + s.inputName);
+            oneByOne = true;
+            // an interface carries both ways: the name Windows gives the hardware stands in brackets at the end
+            const auto hardware = hardwareOf (s.inputName);
+            bullet (true, s.outputFollows ? "Guitar in and sound out on " + (hardware.isNotEmpty() ? hardware : s.inputName) : "Guitar on " + s.inputName);
             bullet (s.latencyMs < 15.0, "About " + juce::String (s.latencyMs, 1) + " ms from string to ear ("
                                           + juce::String (s.bufferSize) + " samples" + (s.exclusive ? ", exclusive mode)" : ")"));
             bullet (true, "Input level " + juce::String (s.inputGainDb >= 0 ? "+" : "") + juce::String (s.inputGainDb, 1)
@@ -441,7 +622,9 @@ void SetupWizard::paint (juce::Graphics& g)
         case Step::failed:
         {
             title ("We can't hear your guitar");
-            body ("Riffhouse listened on every input but didn't hear anything. Plug in now and it starts again by itself, or check these:", 50);
+            body (juce::isPositiveAndBelow (picked, (int) inputs.size())
+                      ? "Riffhouse listened on " + inputs[(size_t) picked].name + " but didn't hear anything. Go back to pick another input, or check these:"
+                      : juce::String ("Riffhouse listened on every input but didn't hear anything. Plug in now and it starts again by itself, or check these:"), 50);
             r.removeFromTop (6);
             bullet (false, "The cable is pushed all the way into the mic (pink) or line-in jack");
             bullet (false, "The guitar's volume knob is turned up");
@@ -454,5 +637,6 @@ void SetupWizard::paint (juce::Graphics& g)
             break;
         }
     }
+    if (in < 1.0f) g.endTransparencyLayer();
 }
 } // namespace rh::ui

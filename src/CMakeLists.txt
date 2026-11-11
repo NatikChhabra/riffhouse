@@ -10,6 +10,7 @@ set(RIFFHOUSE_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/LevelMatch.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/PhraseCatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/UpdateInfo.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/DeviceNames.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/History.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Looper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Song.cpp

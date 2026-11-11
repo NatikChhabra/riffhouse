@@ -39,6 +39,8 @@ public:
 
     // Renders every screen to PNG files (used for docs and visual checks).
     void saveSnapshots (const juce::File& folder, float scale);
+    // Every move in the app as a strip of frames, with the motion clock driven by hand: riffhouse --motion <folder>
+    void saveFilmstrips (const juce::File& folder);
 
 private:
     class Root;

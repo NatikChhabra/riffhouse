@@ -29,7 +29,17 @@ AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
     }
     buffer.setTextWhenNothingSelected ("Set by the driver");
     type.onChange = [this] { if (! filling) typePicked(); };
-    input.onChange = [this] { if (! filling) apply(); };
+    input.onChange = [this]
+    {
+        if (filling) return;
+        // an audio interface is listened through too: its output comes with it, and can be changed back below
+        juce::StringArray outputs;
+        for (int i = 0; i < output.getNumItems(); ++i) outputs.add (output.getItemText (i));
+        const auto follow = AudioSwitch::outputToFollow (pickedType(), input.getText(), outputs);
+        followed = follow.isNotEmpty() && follow != output.getText();
+        if (followed) output.setSelectedItemIndex (outputs.indexOf (follow), juce::dontSendNotification);
+        apply();
+    };
     output.onChange = [this] { if (! filling) apply(); };
     buffer.onChange = [this] { if (! filling) apply(); };
     addChildComponent (panel);
@@ -178,6 +188,8 @@ void AudioPicker::apply()
         if (safe == nullptr) return;
         for (auto* b : { &safe->type, &safe->input, &safe->output, &safe->buffer }) b->setEnabled (true);
         safe->status = r.message;
+        if (r.ok && safe->followed) safe->status << " Sound now comes out of " << safe->output.getText() << ".";
+        safe->followed = false;
         safe->statusIsProblem = ! r.ok;
         safe->refresh();
     });
@@ -245,7 +257,7 @@ void AudioPicker::paint (juce::Graphics& g)
     {
         g.setColour (statusIsProblem ? colours::warn : colours::text);
         g.setFont (font (14.0f, statusIsProblem ? Weight::semibold : Weight::regular));
-        g.drawFittedText (status, r.removeFromTop (statusIsProblem ? 56 : 22), juce::Justification::topLeft, 3, 1.0f);
+        g.drawFittedText (status, r.removeFromTop (statusIsProblem ? 56 : (status.length() > 76 ? 40 : 22)), juce::Justification::topLeft, 3, 1.0f);
         r.removeFromTop (6);
     }
     if (note.isNotEmpty())

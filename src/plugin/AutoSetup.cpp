@@ -3,6 +3,7 @@
 #include "AutoSetup.h"
 
 #include "../engine/InputGuard.h"
+#include "AudioSwitch.h"
 
 namespace rh
 {
@@ -64,7 +65,11 @@ bool AutoSetup::looksLikeOnboardInput (const juce::String& inputName, const juce
                      "volt", "apollo", "arturia", "minifuse", "m-audio", "m-track", "native instruments", "komplete audio",
                      "irig", "line 6", "helix", "pod ", "boss", "zoom", "tascam", "roland", "rubix", "yamaha", "esi ",
                      "solid state logic", "ssl ", "ik multimedia", "mackie", "nux", "valeton", "guitar", "instrument",
-                     "hi-z", "usb audio codec", "rme", "antelope", "apogee", "id4", "id14", "evo" })
+                     "hi-z", "usb audio codec", "rme", "antelope", "apogee", "id4", "id14", "evo",
+                     "audiobox", "clarett", "saffire", "babyface", "fireface", "ur22", "ur12", "quad-capture", "duo-capture",
+                     "katana", "hx stomp", "pod go", "kemper", "quad cortex", "ampero", "mooer", "hotone", "sonic port",
+                     "alesis", "akai", "lexicon", "xenyx", "u-phoria", "uphoria", "soundcraft", "goxlr", "rodecaster",
+                     "audio interface", "usb interface" })
         if (n.contains (w)) return false;
     return true;
 }
@@ -93,9 +98,9 @@ void AutoSetup::pauseThen (const juce::String& found, std::function<void()> next
     if (onPhaseChanged) onPhaseChanged();
 }
 
-void AutoSetup::buildCandidates()
+std::vector<AutoSetup::Candidate> AutoSetup::findCandidates (juce::AudioDeviceManager& dm)
 {
-    candidates.clear();
+    std::vector<Candidate> candidates;
     for (auto* t : dm.getAvailableDeviceTypes())
         t->scanForDevices();
 
@@ -133,10 +138,18 @@ void AutoSetup::buildCandidates()
                     candidates.push_back ({ t->getTypeName(), names[i] });
         }
     }
+    return candidates;
+}
+
+std::vector<AutoSetup::Input> AutoSetup::inputs (juce::AudioDeviceManager& dm) { return findCandidates (dm); }
+
+void AutoSetup::buildCandidates()
+{
+    candidates = findCandidates (dm);
     candidatePeak.assign (candidates.size(), 0.0f);
 }
 
-void AutoSetup::start()
+void AutoSetup::start (const Input* only)
 {
     stopTimer();
     originalState = dm.createStateXml();
@@ -150,7 +163,17 @@ void AutoSetup::start()
     pass = 0;
     candidateIndex = 0;
     proc.muteOutput.store (true);
+    followOutput = {};
     buildCandidates();
+    if (only != nullptr)
+        for (const auto& c : candidates)
+            if (c.type == only->type && c.name == only->name)
+            {
+                // the player said where the guitar is: listen there and nowhere else
+                candidates = { c };
+                candidatePeak.assign (1, 0.0f);
+                break;
+            }
     if (candidates.empty())
     {
         detailText = "No audio inputs found on this computer.";
@@ -175,6 +198,15 @@ void AutoSetup::cancel()
     currentPhase = Phase::idle;
 }
 
+juce::String AutoSetup::outputFor (const Candidate& c, juce::AudioIODeviceType* t, const juce::String& current) const
+{
+    if (c.type == "ASIO") return c.name;
+    const auto outputs = t != nullptr ? t->getDeviceNames (false) : juce::StringArray();
+    if (followOutput.isNotEmpty() && outputs.contains (followOutput)) return followOutput;
+    if (current.isNotEmpty() && outputs.contains (current)) return current;
+    return defaultOutputFor (t);
+}
+
 bool AutoSetup::openCandidate (const Candidate& c)
 {
     proc.tiltProbe().restart(); // a new input: measure its tone from scratch
@@ -182,14 +214,14 @@ bool AutoSetup::openCandidate (const Candidate& c)
         dm.setCurrentAudioDeviceType (c.type, true);
     juce::AudioDeviceManager::AudioDeviceSetup s;
     dm.getAudioDeviceSetup (s);
-    s.inputDeviceName = c.input;
-    s.outputDeviceName = c.type == "ASIO" ? c.input : (s.outputDeviceName.isNotEmpty() ? s.outputDeviceName : defaultOutputFor (findType (dm, c.type)));
+    s.inputDeviceName = c.name;
+    s.outputDeviceName = outputFor (c, findType (dm, c.type), s.outputDeviceName);
     s.useDefaultInputChannels = false;
     s.inputChannels.clear();
     s.inputChannels.setRange (0, 2, true);
     s.useDefaultOutputChannels = true;
     const auto err = dm.setAudioDeviceSetup (s, true);
-    detailText = "Listening on " + c.input;
+    detailText = "Listening on " + c.name;
     dwellStart = nowMs();
     dwellPeak = 0.0f;
     proc.rawInputPeak.store (0.0f);
@@ -228,7 +260,7 @@ void AutoSetup::timerCallback()
                 {
                     chosen = candidates[0];
                     chosenPeak = dwellPeak;
-                    pauseThen ("Found your guitar on " + chosen.input, [this] { beginTuning(); });
+                    pauseThen ("Found your guitar on " + chosen.name, [this] { beginTuning(); });
                 }
                 else if (elapsed > 15000.0)
                 {
@@ -243,7 +275,7 @@ void AutoSetup::timerCallback()
             {
                 chosen = candidates[(size_t) candidateIndex];
                 chosenPeak = dwellPeak;
-                pauseThen ("Found your guitar on " + chosen.input, [this] { beginTuning(); });
+                pauseThen ("Found your guitar on " + chosen.name, [this] { beginTuning(); });
                 return;
             }
             if (elapsed < kDwellMs) return;
@@ -257,7 +289,7 @@ void AutoSetup::timerCallback()
                 {
                     chosen = candidates[(size_t) (it - candidatePeak.begin())];
                     chosenPeak = *it;
-                    pauseThen ("Found your guitar on " + chosen.input, [this] { beginTuning(); });
+                    pauseThen ("Found your guitar on " + chosen.name, [this] { beginTuning(); });
                     return;
                 }
                 if (pass >= 3)
@@ -373,6 +405,9 @@ void AutoSetup::beginTuning()
 {
     setPhase (Phase::tuning);
     strumPeak = chosenPeak;
+    // An audio interface is listened through as well as played into: its own output comes with it.
+    if (auto* t = findType (dm, chosen.type))
+        followOutput = AudioSwitch::outputToFollow (chosen.type, chosen.name, t->getDeviceNames (false));
     modes.clear();
     if (chosen.type == "ASIO")
         modes.add ("ASIO");
@@ -400,10 +435,8 @@ bool AutoSetup::openMode (const juce::String& type, int bufferSize)
     if (t == nullptr) return false;
     juce::AudioDeviceManager::AudioDeviceSetup s;
     dm.getAudioDeviceSetup (s);
-    s.inputDeviceName = chosen.input;
-    if (type == "ASIO") s.outputDeviceName = chosen.input;
-    else if (s.outputDeviceName.isEmpty() || ! t->getDeviceNames (false).contains (s.outputDeviceName))
-        s.outputDeviceName = defaultOutputFor (t);
+    s.inputDeviceName = chosen.name;
+    s.outputDeviceName = outputFor ({ type, chosen.name }, t, s.outputDeviceName);
     s.useDefaultInputChannels = false;
     s.inputChannels.clear();
     s.inputChannels.setRange (0, 2, true);
@@ -416,8 +449,16 @@ bool AutoSetup::openMode (const juce::String& type, int bufferSize)
         if (rates.contains (48000.0)) s.sampleRate = 48000.0;
         else if (rates.contains (44100.0)) s.sampleRate = 44100.0;
     }
-    const auto err = dm.setAudioDeviceSetup (s, true);
+    auto err = dm.setAudioDeviceSetup (s, true);
     auto* dev = dm.getCurrentAudioDevice();
+    if ((err.isNotEmpty() || dev == nullptr) && bufferSize == 0 && followOutput.isNotEmpty() && type != "ASIO")
+    {
+        // the interface's output would not open alongside its input: stay on the output that was playing
+        followOutput = {};
+        s.outputDeviceName = defaultOutputFor (t);
+        err = dm.setAudioDeviceSetup (s, true);
+        dev = dm.getCurrentAudioDevice();
+    }
     lastOpenFailed = err.isNotEmpty() || dev == nullptr;
     if (lastOpenFailed)
     {
@@ -474,6 +515,7 @@ void AutoSetup::finishTuning()
         result.sampleRate = dev->getCurrentSampleRate();
         result.latencyMs = measuredLatencyMs();
         result.exclusive = result.deviceType.contains ("Exclusive");
+        result.outputFollows = followOutput.isNotEmpty() && s.outputDeviceName == followOutput;
     }
     detailText = {};
     pauseThen ("About " + juce::String (result.latencyMs, 1) + " ms from string to ear", [this] { beginPlaying(); });

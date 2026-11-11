@@ -57,6 +57,7 @@ target_sources(Riffhouse PRIVATE
     plugin/Updater.cpp
     plugin/LevelMatcher.cpp
     plugin/Version.cpp
+    ui/Motion.cpp
     ui/Theme.cpp
     ui/Widgets.cpp
     ui/AudioPicker.cpp

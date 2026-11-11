@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Widgets.h"
+#include "Motion.h"
 
 namespace rh::ui
 {
@@ -39,13 +40,37 @@ Knob::Knob (RiffhouseProcessor& proc, P id, juce::Colour colour, juce::String la
     slider.getProperties().set ("bipolar", s.min < 0.0f && std::abs (s.min + s.max) < 1e-3f);
     slider.setPopupMenuEnabled (false);
     slider.onHover = [this] { repaint(); };
-    slider.onValueChange = [this] { repaint(); };
+    slider.onValueChange = [this] { follow(); repaint(); };
     slider.onDragStart = [this] { repaint(); };
     slider.onDragEnd = [this] { repaint(); };
     addAndMakeVisible (slider);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.state(), s.key, slider);
     slider.setDoubleClickReturnValue (true, s.def);
+    shown.snap ((float) slider.valueToProportionOfLength (slider.getValue()));
     setTitle (label);
+}
+
+// Where the pointer is drawn. A hand, a foot pedal or a DAW moving the knob is followed exactly.
+// Only when undo or redo puts it somewhere else does it travel there, so the eye sees which knob it was.
+void Knob::follow()
+{
+    static const juce::Identifier id ("shown");
+    const float p = (float) slider.valueToProportionOfLength (slider.getValue());
+    if (! motion::jumpJustHappened() || slider.isMouseButtonDown())
+    {
+        shown.snap (p);
+        slider.getProperties().remove (id);
+        return;
+    }
+    shown.to (p, motion::travel, motion::Curve::inOut);
+    if (! shown.moving()) { slider.getProperties().remove (id); return; }
+    slider.getProperties().set (id, shown.get());
+    motion::run (slider, [this] { return shown.moving(); },
+                 [this]
+                 {
+                     if (shown.moving()) slider.getProperties().set (id, shown.get());
+                     else slider.getProperties().remove (id);
+                 });
 }
 
 void Knob::setColour (juce::Colour c)
@@ -321,10 +346,14 @@ void IconButton::paintButton (juce::Graphics& g, bool over, bool down)
 {
     auto r = getLocalBounds().toFloat();
     const bool on = getToggleState();
+    auto& feel = motion::Feel::of (*this);
+    feel.follow (*this, over && isEnabled(), down, on);
+    const float lit = feel.hover.get();
+    g.addTransform (juce::AffineTransform::scale (feel.scale(), feel.scale(), r.getCentreX(), r.getCentreY()));
     if (drawBackground)
     {
-        auto bgc = on ? activeColour.withAlpha (0.16f) : (over ? colours::raisedHi : colours::raised);
-        if (down) bgc = bgc.darker (0.1f);
+        auto bgc = on ? activeColour.withAlpha (0.16f) : colours::raised.interpolatedWith (colours::raisedHi, lit);
+        bgc = bgc.darker (0.1f * feel.down.get());
         g.setColour (bgc);
         g.fillRoundedRectangle (r.reduced (0.5f), std::min (6.0f, r.getHeight() * 0.5f));
     }
@@ -334,7 +363,7 @@ void IconButton::paintButton (juce::Graphics& g, bool over, bool down)
         g.setColour (activeColour);
         g.fillRect (r.withSizeKeepingCentre (18.0f, 2.0f).withY (r.getBottom() - 4.0f));
     }
-    const auto c = ! isEnabled() ? colours::textFaint : (on ? activeColour : (over ? colours::text : iconColour));
+    const auto c = ! isEnabled() ? colours::textFaint : (on ? activeColour : iconColour.interpolatedWith (colours::text, lit));
     const auto caption = getButtonText();
     if (caption.isEmpty())
     {

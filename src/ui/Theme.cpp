@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Theme.h"
+#include "Motion.h"
 #include "Gear.h"
 #include "GearArt.h"
 
@@ -357,6 +358,8 @@ juce::Typeface::Ptr LookAndFeel::getTypefaceForFont (const juce::Font& f)
 void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int h, float pos,
                                     float start, float end, juce::Slider& s)
 {
+    // a knob that is travelling to a new place after undo or redo is drawn where it has got to
+    if (const auto& shown = s.getProperties()["shown"]; ! shown.isVoid()) pos = (float) (double) shown;
     using namespace colours;
     const auto area = juce::Rectangle<float> ((float) x, (float) y, (float) w, (float) h).reduced (2.0f);
     if (const int gear = s.getProperties()["gear"]; gear > 0)
@@ -512,17 +515,22 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int 
 
 void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour& base, bool over, bool down)
 {
+    auto& feel = motion::Feel::of (b);
+    feel.follow (b, over && b.isEnabled(), down, b.getToggleState());
+    const float lit = feel.hover.get(), pressed = feel.down.get();
     auto r = b.getLocalBounds().toFloat().reduced (0.5f);
+    // The button gives a little under the finger. Its text is drawn straight after this through
+    // the same Graphics, so it gives with it.
+    g.addTransform (juce::AffineTransform::scale (feel.scale(), feel.scale(), r.getCentreX(), r.getCentreY()));
     const float radius = std::min (8.0f, r.getHeight() * 0.5f);
     auto c = b.getToggleState() ? b.findColour (juce::TextButton::buttonOnColourId) : base;
     if (! b.isEnabled()) c = c.withMultipliedAlpha (0.5f);
-    if (down) c = c.darker (0.15f);
-    else if (over) c = c.brighter (0.12f);
+    c = c.brighter (0.12f * lit * (1.0f - pressed)).darker (0.15f * pressed);
     g.setColour (c);
     g.fillRoundedRectangle (r, radius);
     if (! b.getToggleState())
     {
-        g.setColour (juce::Colours::white.withAlpha (over ? 0.10f : 0.05f));
+        g.setColour (juce::Colours::white.withAlpha (0.05f + 0.05f * lit));
         g.drawRoundedRectangle (r, radius, 1.0f);
     }
 }
@@ -541,12 +549,15 @@ void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bo
     using namespace colours;
     const auto r = b.getLocalBounds().toFloat();
     const auto sw = juce::Rectangle<float> (34.0f, 20.0f).withY (r.getCentreY() - 10.0f).withX (r.getX() + 1.0f);
-    const bool on = b.getToggleState();
+    auto& feel = motion::Feel::of (b);
+    feel.follow (b, over && b.isEnabled(), false, b.getToggleState());
+    const float on = feel.on.get(), lit = feel.hover.get();
     const auto onColour = b.findColour (juce::ToggleButton::tickColourId);
-    g.setColour (on ? onColour : (over ? raisedHi.brighter (0.1f) : raisedHi));
+    g.setColour (raisedHi.brighter (0.1f * lit).interpolatedWith (onColour, on));
     g.fillRoundedRectangle (sw, 10.0f);
-    const auto knob = juce::Rectangle<float> (14.0f, 14.0f).withCentre ({ on ? sw.getRight() - 10.0f : sw.getX() + 10.0f, sw.getCentreY() });
-    g.setColour (on ? bg : textDim);
+    // the thumb slides across; it never jumps
+    const auto knob = juce::Rectangle<float> (14.0f, 14.0f).withCentre ({ sw.getX() + 10.0f + (sw.getWidth() - 20.0f) * on, sw.getCentreY() });
+    g.setColour (textDim.interpolatedWith (bg, on));
     g.fillEllipse (knob);
     g.setColour (b.findColour (juce::ToggleButton::textColourId).withMultipliedAlpha (b.isEnabled() ? 1.0f : 0.5f));
     g.setFont (font (14.0f));
