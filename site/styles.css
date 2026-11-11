@@ -131,6 +131,7 @@ button.btn { border: 0; cursor: pointer; }
 .steps li::before { content: counter(step); grid-row: 1 / 3; font: 800 44px/.9 var(--font-display); color: var(--soft); }
 .steps p { color: var(--soft); grid-column: 2; }
 .jack-shot img { aspect-ratio: 3 / 2; object-fit: cover; object-position: 0 0; }
+.shot a { display: block; }
 .shot img { width: 100%; border-radius: var(--r-m); background: var(--stage); }
 .shot figcaption { margin-top: 12px; color: var(--soft); font-size: var(--t-small); }
 
@@ -272,7 +273,11 @@ details:not([open]) > p { display: none; }
 }
 @media (max-width: 699px) {
   :root { --top: 64px; --t-body: 17px; }
-  .top nav a:nth-child(-n+3) { display: none; }
+  .top nav { gap: 14px; }
+  .top nav a:last-child { display: none; }
+  .wordmark { font-size: 18px; gap: 8px; letter-spacing: .1em; }
+  .pan .shot { margin-inline: calc(var(--g) * -1); }
+  .pan .shot img { border-radius: 0; }
   .get-notes { grid-template-columns: minmax(0, 1fr); }
   .chain { flex-wrap: wrap; min-height: 0; gap: 16px 12px; }
   .chain li { flex: 0 0 calc(var(--w, 1) * 22% - 12px); max-width: none; font-size: 13px; }

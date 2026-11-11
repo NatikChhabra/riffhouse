@@ -26,7 +26,9 @@
         if (note) note.textContent = `Version ${r.tag_name.replace(/^v/, '')}, ${mb} MB, released ${day}.`;
         return;
       }
-      if (note) note.textContent = 'The first public version is in final testing.';
+      if (note) note.textContent = releases.length
+        ? `Version ${releases[0].tag_name.replace(/^v/, '')} is out. Its installer is still being built, try again in a few minutes.`
+        : 'The first public version is in final testing.';
     } catch { /* offline or rate limited: the link to GitHub Releases still works */ }
   }
 
