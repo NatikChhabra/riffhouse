@@ -26,6 +26,7 @@ The first version.
 - Drop a file on the window: a `.nam` capture becomes the amp, an impulse response the cabinet, a song the backing track, a tone file the tone.
 - Undo and redo for the whole tone: Ctrl+Z and Ctrl+Y, or the two arrows left of the tone's name. One turn of a knob is one step, and so is loading a tone.
 - A looper: press O to record a part, O again to let it go round, and again to add a layer. Up to two minutes. It plays to your ears only, so a take you record over it holds just the guitar.
+- Foot control: a MIDI foot controller, expression pedal or keyboard turns any knob, switches pedals on and off, steps through your starred tones, presses the looper, taps the tempo and starts a take. You teach it by touching the control in Riffhouse and then moving the pedal. An expression pedal rocks the wah without being taught.
 - A VST3 plugin of the same rig for recording software.
 - Updates by itself on Windows. The download is checked against the SHA-256 that GitHub publishes for the file, and it goes in when you close the app.
 - Reconnects by itself when a cable or a device comes and goes. If Windows swaps in another microphone, it stays silent.

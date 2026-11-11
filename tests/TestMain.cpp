@@ -12,6 +12,7 @@
 #include "engine/History.h"
 #include "engine/Looper.h"
 #include "engine/Song.h"
+#include "engine/FootControl.h"
 #include "engine/Presets.h"
 #include "engine/Rig.h"
 #include "engine/UpdateInfo.h"
@@ -970,6 +971,72 @@ void testSong()
     }
 }
 
+void testFootControl()
+{
+    std::printf ("foot control\n");
+    FootControl fc;
+    FootControl::Action a;
+    bool learned = false;
+    const FootTarget wah { FootJob::param, (int) P::wahPos }, drive { FootJob::param, (int) P::drvOn }, looper { FootJob::looper, 0 }, next { FootJob::nextTone, 0 };
+
+    CHECK (fc.controllerFor (wah) == 11, "out of the box an expression pedal rocks the wah");
+    CHECK (fc.moved (11, 127, 0.0, a, learned) && a.target == wah && a.value == 1.0f && ! a.flip && ! learned, "toe down is the top of the wah");
+    CHECK (fc.moved (11, 0, 0.1, a, learned) && a.value == 0.0f, "heel down is the bottom");
+    CHECK (! fc.moved (20, 127, 0.2, a, learned), "a controller nobody taught does nothing");
+
+    // a switch that stays where it is put: 127 on one press, 0 on the next
+    fc.learn (drive);
+    CHECK (fc.learning() && fc.learningFor() == drive, "teaching waits for a controller");
+    CHECK (fc.moved (20, 127, 1.0, a, learned) && learned && a.target == drive && a.value == 1.0f && ! a.flip, "the press that teaches a switch also switches it on");
+    CHECK (! fc.learning() && fc.controllerFor (drive) == 20, "taught");
+    CHECK (fc.moved (20, 0, 3.0, a, learned) && ! learned && a.value == 0.0f && ! a.flip, "its next press sends off, and off it goes");
+    CHECK (fc.moved (20, 127, 5.0, a, learned) && a.value == 1.0f, "and on again");
+    CHECK (! fc.moved (20, 127, 5.1, a, learned), "the same value twice is one press");
+
+    // a switch that springs back: 127 on the press, 0 on the release
+    fc.learn (looper);
+    CHECK (fc.moved (64, 127, 10.0, a, learned) && learned && a.target == looper && a.flip, "the press that teaches a job also does it");
+    CHECK (! fc.moved (64, 0, 10.15, a, learned), "the quick release after it does nothing");
+    CHECK (fc.bindings().back().press, "and tells that this switch springs back");
+    CHECK (fc.moved (64, 127, 12.0, a, learned) && a.flip, "from then on every press presses");
+    CHECK (! fc.moved (64, 0, 12.2, a, learned), "and no release does");
+    CHECK (fc.moved (64, 127, 13.0, a, learned) && a.flip, "press again");
+
+    // a job on a switch that stays put: every change is a press
+    fc.learn (next);
+    CHECK (fc.moved (30, 127, 20.0, a, learned) && a.flip, "next tone taught and done");
+    CHECK (fc.moved (30, 0, 22.0, a, learned) && a.flip && a.target == next, "a staying switch going back is its next press");
+
+    // one controller, one job
+    fc.learn (wah);
+    CHECK (fc.moved (20, 64, 30.0, a, learned) && learned && a.target == wah, "a controller can be given a new job");
+    CHECK (fc.controllerFor (drive) == -1 && fc.controllerFor (wah) == 20, "which takes it from the old one, and the wah from controller 11");
+    int wahs = 0;
+    for (auto& b : fc.bindings()) if (b.target == wah) ++wahs;
+    CHECK (wahs == 1 && fc.bindings().size() == 3, "nothing is listed twice");
+
+    const std::string text = fc.toText();
+    FootControl back;
+    back.fromText (text);
+    CHECK (back.toText() == text && back.bindings().size() == 3, "the settings file gives back what was saved: %s", text.c_str());
+    CHECK (back.bindings()[0].press && back.bindings()[0].target == looper, "a springing switch stays one");
+    back.fromText ("garbage 300=tap 5=p:nothing 7=tap 9=p:amp_gain!");
+    CHECK (back.bindings().size() == 2 && back.controllerFor ({ FootJob::tapTempo, 0 }) == 7 && ! back.bindings()[1].press, "a damaged file keeps what can be read and drops the rest");
+    back.fromText ("???");
+    CHECK (back.bindings().size() == 2, "a file with nothing readable changes nothing");
+    back.fromText ("none");
+    CHECK (back.bindings().empty(), "an empty list stays empty instead of coming back as the start");
+    back.backToStart();
+    CHECK (back.controllerFor (wah) == 11 && back.bindings().size() == 1, "back to the start");
+
+    CHECK (footTargetName (wah) == "Wah: Pedal" && footTargetName (drive) == "Drive Pedal on and off" && footTargetName (next) == "Next tone"
+               && footTargetName ({ FootJob::param, (int) P::ampLevel }) == "Amp Level" && footTargetName ({ FootJob::param, (int) P::dlyMix }) == "Delay: Mix",
+           "every target has a name that says whose it is");
+    fc.remove (0);
+    fc.setPress (0, true);
+    CHECK (fc.bindings().size() == 2 && fc.bindings()[0].press, "a line can be removed and a switch's kind corrected");
+}
+
 void testTakes()
 {
     std::printf ("takes\n");
@@ -1226,6 +1293,7 @@ int main (int argc, char** argv)
     testHistory();
     testLooper();
     testSong();
+    testFootControl();
     if (args.contains ("--takes")) { testTakes(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args.contains ("--updates")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testTakes();

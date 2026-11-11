@@ -33,6 +33,7 @@ What changed in each version is in the [changelog](CHANGELOG.md). Every older ve
 - **Looper:** press O to record a part, O again to let it go round, and again to add a layer.
 - **Undo and redo** for the whole tone, with Ctrl+Z and Ctrl+Y.
 - **Drop files on the window:** a `.nam` capture becomes the amp, an impulse response the cabinet, a song the backing track, a tone file the tone.
+- **Foot control:** plug in a MIDI foot controller, expression pedal or keyboard. Touch a knob or switch in Riffhouse, move the pedal, and the two are tied. Program changes pick your starred tones.
 - A **VST3 plugin** of the same rig for recording software.
 
 Every amp, pedal and cabinet is its own piece of gear, drawn by the app itself.

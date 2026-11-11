@@ -510,15 +510,8 @@ void LooperPanel::paint (juce::Graphics& g)
 
 void MetronomePanel::tap()
 {
-    const double now = juce::Time::getMillisecondCounterHiRes();
-    if (! taps.empty() && now - taps.back() > 2000.0) taps.clear();
-    taps.push_back (now);
-    if (taps.size() > 6) taps.erase (taps.begin());
-    if (taps.size() >= 2)
-    {
-        const double avg = (taps.back() - taps.front()) / (double) (taps.size() - 1);
-        bpm.setValue (juce::jlimit (30.0, 300.0, std::round (60000.0 / avg)));
-    }
+    proc.tapTempo(); // the same tap a footswitch gives
+    bpm.setValue (proc.metronomeBpm.load());
 }
 
 void MetronomePanel::resized()
@@ -560,6 +553,92 @@ void MetronomePanel::paint (juce::Graphics& g)
 }
 
 //==============================================================================
+// What each controller does, one line each, with the two things you can do to a line.
+class SettingsView::FootList : public juce::Component
+{
+public:
+    explicit FootList (RiffhouseProcessor& p) : proc (p) {}
+    static constexpr int rowH = 28;
+
+    void refresh()
+    {
+        setSize (getWidth(), std::max (rowH, (int) proc.footControl().bindings().size() * rowH));
+        repaint();
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        const auto& list = proc.footControl().bindings();
+        g.setFont (font (13.5f));
+        if (list.empty())
+        {
+            g.setColour (colours::textFaint);
+            g.drawText ("Nothing is taught yet.", getLocalBounds().removeFromTop (rowH), juce::Justification::centredLeft);
+            return;
+        }
+        for (size_t i = 0; i < list.size(); ++i)
+        {
+            const auto a = areas ((int) i, list[i].target.isSwitch());
+            g.setColour (colours::textDim);
+            g.drawText ("Controller " + juce::String (list[i].controller), a.number, juce::Justification::centredLeft);
+            g.setColour (colours::text);
+            g.drawText (juce::String (footTargetName (list[i].target)), a.name, juce::Justification::centredLeft, true);
+            if (list[i].target.isSwitch()) link (g, list[i].press ? "Momentary" : "Latching", a.kind);
+            link (g, "Remove", a.remove);
+        }
+    }
+
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        const auto& list = proc.footControl().bindings();
+        const int i = e.y / rowH;
+        if (i < 0 || i >= (int) list.size()) return;
+        const auto a = areas (i, list[(size_t) i].target.isSwitch());
+        if (a.remove.contains (e.getPosition())) proc.footRemove ((size_t) i);
+        else if (a.kind.contains (e.getPosition())) proc.footSetPress ((size_t) i, ! list[(size_t) i].press);
+        else return;
+        refresh();
+    }
+
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto& list = proc.footControl().bindings();
+        const int i = e.y / rowH;
+        bool onLink = false;
+        if (i >= 0 && i < (int) list.size())
+        {
+            const auto a = areas (i, list[(size_t) i].target.isSwitch());
+            onLink = a.remove.contains (e.getPosition()) || a.kind.contains (e.getPosition());
+        }
+        setMouseCursor (onLink ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+    }
+
+private:
+    struct Areas { juce::Rectangle<int> number, name, kind, remove; };
+    Areas areas (int row, bool isSwitch) const
+    {
+        auto r = juce::Rectangle<int> (0, row * rowH, getWidth(), rowH);
+        Areas a;
+        a.number = r.removeFromLeft (112);
+        a.remove = r.removeFromRight (62);
+        r.removeFromRight (14);
+        if (isSwitch) { a.kind = r.removeFromRight (84); r.removeFromRight (10); }
+        a.name = r;
+        return a;
+    }
+    static void link (juce::Graphics& g, const juce::String& text, juce::Rectangle<int> area)
+    {
+        const auto f = font (13.5f);
+        g.setFont (f);
+        g.setColour (colours::text);
+        g.drawText (text, area, juce::Justification::centredRight);
+        const int w = juce::roundToInt (juce::GlyphArrangement::getStringWidth (f, text));
+        g.setColour (colours::textDim);
+        g.fillRect (area.getRight() - w, area.getCentreY() + 9, w, 1);
+    }
+    RiffhouseProcessor& proc;
+};
+
 SettingsView::SettingsView (RiffhouseProcessor& p)
     : proc (p), inGain (p, P::inGain, colours::accent, "Input level"), gate (p, P::gateThresh, juce::Colour (0xff94a3b8), "Gate threshold")
 {
@@ -619,6 +698,32 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     looks->setSelected ((int) look());
     addChildComponent (*looks); // one look now: the gear brings the colour
     addAndMakeVisible (inMeter);
+
+    footList = std::make_unique<FootList> (proc);
+    footView.setViewedComponent (footList.get(), false);
+    footView.setScrollBarsShown (true, false);
+    footView.setScrollBarThickness (8);
+    addAndMakeVisible (footView);
+    // Teaching happens on the rig itself, so this screen steps aside for it.
+    teachControl.onClick = [this] { proc.footTeachTouch(); if (onClose) onClose(); };
+    teachJob.onClick = [this]
+    {
+        juce::PopupMenu m;
+        int id = 1;
+        for (auto job : { FootJob::nextTone, FootJob::previousTone, FootJob::looper, FootJob::looperStop, FootJob::tapTempo, FootJob::tuner, FootJob::record, FootJob::song })
+            m.addItem (id++, juce::String (footTargetName ({ job, 0 })));
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (teachJob).withMinimumWidth (teachJob.getWidth()),
+                         [safe = juce::Component::SafePointer<SettingsView> (this)] (int picked)
+                         {
+                             if (safe == nullptr || picked <= 0) return;
+                             static constexpr FootJob jobs[] = { FootJob::nextTone, FootJob::previousTone, FootJob::looper, FootJob::looperStop,
+                                                                 FootJob::tapTempo, FootJob::tuner, FootJob::record, FootJob::song };
+                             safe->proc.footTeachJob (jobs[picked - 1]);
+                             if (safe->onClose) safe->onClose();
+                         });
+    };
+    addAndMakeVisible (teachControl);
+    addAndMakeVisible (teachJob);
 }
 
 SettingsView::~SettingsView() = default;
@@ -752,6 +857,18 @@ void SettingsView::resized()
     right.removeFromTop (40);
     right.removeFromTop (26);
     hum->setBounds (right.removeFromTop (34));
+    right.removeFromTop (10 + 40 + 14);
+    footHeading = right.removeFromTop (36);
+    footText = right.removeFromTop (40);
+    right.removeFromTop (8);
+    row = right.removeFromTop (36);
+    teachControl.setBounds (row.removeFromLeft (230));
+    row.removeFromLeft (10);
+    teachJob.setBounds (row.removeFromLeft (230));
+    right.removeFromTop (10);
+    footView.setBounds (right);
+    footList->setSize (right.getWidth() - 12, FootList::rowH);
+    footList->refresh();
 }
 
 void SettingsView::paint (juce::Graphics& g)
@@ -822,6 +939,15 @@ void SettingsView::paint (juce::Graphics& g)
     g.drawFittedText ("Auto listens for the 50 Hz (India, Europe, most of Asia and Africa) or 60 Hz (Americas) buzz from "
                       "power lines and removes just that, leaving your low notes alone.",
                       right.removeFromTop (40), juce::Justification::topLeft, 3, 1.0f);
+
+    heading (footHeading, "Foot control");
+    g.setColour (colours::textDim);
+    g.setFont (font (13.0f));
+    g.drawFittedText (juce::String (StandaloneHost::get() != nullptr
+                                        ? "A MIDI foot controller, expression pedal or keyboard works the moment you plug it in. "
+                                        : "Send MIDI from a foot controller, expression pedal or keyboard to this plugin. ")
+                          + "Program changes pick your starred tones in order.",
+                      footText, juce::Justification::topLeft, 2, 1.0f);
 }
 
 //==============================================================================

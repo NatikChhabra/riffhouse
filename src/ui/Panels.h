@@ -76,7 +76,6 @@ private:
     juce::ToggleButton enabled { "Click on" };
     juce::Slider bpm, level;
     juce::TextButton tapButton { "Tap tempo" }, minus { "-" }, plus { "+" };
-    std::vector<double> taps;
 };
 
 // The looper: one big button that does what the pedal's switch does, then stop, clear and volume.
@@ -131,6 +130,12 @@ private:
     juce::Rectangle<int> meterCaption;
     juce::String summary;
     int summaryHeight() const; // the device summary is one line or four: what follows sits right under it
+    // Foot control: teach a controller, and the list of what is taught
+    class FootList;
+    juce::TextButton teachControl { "Teach a knob or switch" }, teachJob { "Teach a button..." };
+    juce::Viewport footView;
+    std::unique_ptr<FootList> footList;
+    juce::Rectangle<int> footHeading, footText;
     static constexpr int aboutH = 100;
 };
 

@@ -424,10 +424,34 @@ public:
         addChildComponent (toast);
         addChildComponent (noticeBar);
         addChildComponent (takeBar);
-        noticeBar.onAction = [] { if (auto* host = StandaloneHost::get()) host->audioNoticeAction(); };
+        noticeBar.onAction = [this]
+        {
+            if (proc.footTeaching() != RiffhouseProcessor::FootTeach::off) { proc.footTeachStop(); noticeTicks = 99; return; }
+            if (auto* host = StandaloneHost::get()) host->audioNoticeAction();
+        };
+        // the foot controller changed a tone, taught itself a job, or pressed something that lives in this window
+        proc.onFootMessage = [this] (const juce::String& m)
+        {
+            refreshTop();
+            if (footStrip) { footStrip = false; noticeBar.set ({}); } // teaching is over: its strip makes room for the result
+            editor.showToast (m);
+        };
+        proc.onFootJob = [this] (FootJob job)
+        {
+            if (job == FootJob::tuner) { toggleOverlay (tuner); return true; }
+            if (job == FootJob::record) { toggleRecording(); return true; }
+            return false;
+        };
 
         showPage ((int) proc.uiState.getProperty ("page", (int) mAmp));
         refreshTop();
+    }
+
+    ~Root() override
+    {
+        proc.onFootMessage = nullptr; // the rig lives on after its window closes
+        proc.onFootJob = nullptr;
+        proc.footTeachStop();
     }
 
     // -------------------------------------------------------------------------
@@ -449,6 +473,17 @@ public:
         proc.loadPreset (cur < 0 ? 0 : (cur + d + n) % n);
         refreshTop();
         editor.showToast (proc.currentPresetName());
+    }
+
+    // What the strip on the bottom bar says while a foot controller is being taught.
+    StandaloneHost::Notice footNotice() const
+    {
+        const auto teach = proc.footTeaching();
+        if (teach == RiffhouseProcessor::FootTeach::touch)
+            return { "Foot control: turn the knob or flip the switch you want under your foot.", "Cancel", false };
+        if (teach == RiffhouseProcessor::FootTeach::move)
+            return { juce::String (footTargetName (proc.footControl().learningFor())) + ": now move the pedal or press the switch on your controller.", "Cancel", false };
+        return {};
     }
 
     void toggleRecording()
@@ -577,14 +612,14 @@ public:
         if (! quietNotices && ++noticeTicks >= 10)
         {
             noticeTicks = 0;
-            if (auto* host = StandaloneHost::get())
-            {
-                noticeBar.set (wizard == nullptr && ! takeBar.isActive() ? host->audioNotice() : StandaloneHost::Notice());
-                if (noticeBar.isVisible())
-                {
-                    noticeBar.setBounds (0, bottomY - 34, getWidth(), 34);
-                }
-            }
+            proc.footTick();
+            auto n = footNotice();
+            footStrip = n.text.isNotEmpty();
+            if (! footStrip)
+                if (auto* host = StandaloneHost::get(); host != nullptr && wizard == nullptr && ! takeBar.isActive())
+                    n = host->audioNotice();
+            noticeBar.set (n);
+            if (noticeBar.isVisible()) noticeBar.setBounds (0, bottomY - 34, getWidth(), 34);
         }
         amp.refresh();
         for (auto* pg : pages) if (pg != nullptr && pg->isVisible()) pg->refresh();
@@ -803,6 +838,7 @@ public:
     Toast toast;
     DropHint dropHint;
     NoticeBar noticeBar;
+    bool footStrip = false; // the strip is showing how to teach a foot controller
     TakeBar takeBar;
     TakesView takesView;
     int noticeTicks = 0;
@@ -1084,6 +1120,33 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         r.noticeBar.setBounds (0, Root::bottomY - 34, r.getWidth(), 34);
         shoot ("notice");
         r.noticeBar.set ({});
+    }
+    {
+        // teaching a footswitch, the way a player does it: flip the drive pedal's switch, then press the switch on the floor
+        const float driveWas = proc.value (P::drvOn);
+        const auto listWas = proc.footControl().toText();
+        proc.footTeachTouch();
+        r.footStrip = true;
+        r.noticeBar.set (r.footNotice());
+        r.noticeBar.setBounds (0, Root::bottomY - 34, r.getWidth(), 34);
+        shoot ("foot-touch");
+        proc.setValue (P::drvOn, driveWas > 0.5f ? 0.0f : 1.0f);
+        proc.footTick();
+        r.noticeBar.set (r.footNotice());
+        shoot ("foot-move");
+        proc.footMoved (20, 127); // the press: it is taught, and the pedal goes on
+        const bool onAfterPress = proc.value (P::drvOn) > 0.5f;
+        proc.footMoved (20, 0);   // a quick release: this switch springs back
+        proc.footMoved (20, 127); // so the next press flips the pedal off
+        std::printf ("foot control: %s; taught=%d on-after-press=%d off-after-next=%d\n", proc.footControl().toText().c_str(),
+                     (int) (proc.footTeaching() == RiffhouseProcessor::FootTeach::off), (int) onAfterPress, (int) (proc.value (P::drvOn) < 0.5f));
+        shoot ("foot-taught");
+        // and everything back as it was
+        for (size_t i = proc.footControl().bindings().size(); i-- > 0;)
+            if (proc.footControl().bindings()[i].controller == 20) proc.footRemove (i);
+        proc.setValue (P::drvOn, driveWas);
+        std::printf ("foot control restored: %d\n", (int) (proc.footControl().toText() == listWas));
+        r.toast.setVisible (false);
     }
     {
         // the takes list with one take playing, then the rig with a take running through it

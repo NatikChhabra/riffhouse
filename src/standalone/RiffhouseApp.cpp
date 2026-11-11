@@ -130,7 +130,8 @@ public:
 
         juce::Array<juce::StandalonePluginHolder::PluginInOuts> channels;
         channels.add ({ 2, 2 });
-        holder = std::make_unique<juce::StandalonePluginHolder> (s, false, juce::String(), nullptr, channels, false);
+        // the last argument: every MIDI input is opened as it appears, so a foot controller works the moment it is plugged in
+        holder = std::make_unique<juce::StandalonePluginHolder> (s, false, juce::String(), nullptr, channels, true);
         holder->getMuteInputValue().setValue (false);
         instance = this;
 

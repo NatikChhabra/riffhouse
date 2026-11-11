@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include "../engine/FootControl.h"
 #include "../engine/History.h"
 #include "../engine/Looper.h"
 #include "../engine/Song.h"
@@ -31,7 +32,7 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
     const juce::String getName() const override { return "Riffhouse"; }
-    bool acceptsMidi() const override { return false; }
+    bool acceptsMidi() const override { return true; } // foot controllers; no notes are played
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 8.0; }
     int getNumPrograms() override { return 1; }
@@ -114,6 +115,23 @@ public:
     Looper& looper() noexcept { return loop; }
     void loopPress(); // the looper's one big button (message thread); takes its memory the first time
 
+    // Foot control: a MIDI foot controller, expression pedal or keyboard works the rig.
+    enum class FootTeach { off, touch, move }; // touch: waiting for a control in Riffhouse; move: waiting for the controller
+    const FootControl& footControl() const noexcept { return foot; }
+    FootTeach footTeaching() const noexcept { return footTeach; }
+    void footTeachTouch();               // the next control you touch in Riffhouse, then the next controller that moves
+    void footTeachJob (FootJob job);     // a job such as "Next tone", then the next controller that moves
+    void footTeachStop();
+    void footRemove (size_t index);
+    void footSetPress (size_t index, bool press);
+    void footTick();                     // message thread, a few times a second while teaching
+    void footMoved (int controller, int value); // message thread: what the controller sent
+    void footProgram (int number);       // program change: your starred tones in order, or all tones when none is starred
+    void stepTone (int by);              // through the starred tones, or all tones when none is starred
+    void tapTempo();
+    std::function<void (const juce::String&)> onFootMessage; // something worth a line on screen
+    std::function<bool (FootJob)> onFootJob;                  // tuner and record belong to the window, when there is one
+
     // Takes: listen to a recording, or feed its clean guitar back through the rig
     TakePlayer& takes() noexcept { return takePlayer; }
     ReampJob::Setup reampSetup() const; // the rig as it is set right now
@@ -174,6 +192,18 @@ private:
     SongStretch songStretch;
     SongSection songSection;
     juce::CriticalSection jamLock;
+    FootControl foot;
+    FootTeach footTeach = FootTeach::off;
+    ParamValues footBefore {};
+    void footSave();
+    void footDo (const FootControl::Action&);
+    std::vector<int> toneSteps() const;
+    std::vector<double> taps;
+    // what arrives on the audio thread waits here for the message thread
+    struct MidiNote { int kind, number, value; };
+    std::array<MidiNote, 256> midiQueue {};
+    juce::AbstractFifo midiFifo { 256 };
+    std::atomic<bool> writeTake { false };
     Looper loop;
     juce::SpinLock loopLock; // held while the loop's memory is (re)made; the audio thread only ever tries it
     bool loopReady = false;

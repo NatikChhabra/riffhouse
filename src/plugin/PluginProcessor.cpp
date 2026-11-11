@@ -146,8 +146,25 @@ void RiffhouseProcessor::loopPress()
 
 void RiffhouseProcessor::releaseResources() { jam.releaseResources(); takePlayer.release(); }
 
-void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
+void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
+    if (! midi.isEmpty())
+    {
+        // controllers and program changes go to the message thread; notes are nobody's business here
+        bool any = false;
+        for (const auto meta : midi)
+        {
+            const auto m = meta.getMessage();
+            MidiNote note { 0, 0, 0 };
+            if (m.isController()) note = { 1, m.getControllerNumber(), m.getControllerValue() };
+            else if (m.isProgramChange()) note = { 2, m.getProgramChangeNumber(), 0 };
+            else continue;
+            const auto scope = midiFifo.write (1);
+            if (scope.blockSize1 > 0) { midiQueue[(size_t) scope.startIndex1] = note; any = true; }
+        }
+        midi.clear();
+        if (any) triggerAsyncUpdate();
+    }
     juce::ScopedNoDenormals noDenormals;
     blockCounter.fetch_add (1, std::memory_order_relaxed);
     const int n = buffer.getNumSamples();
@@ -275,7 +292,10 @@ void RiffhouseProcessor::renderClick (float* l, float* r, int n)
             {
                 // count-in: one bar of four, then recording starts
                 if (countInRemaining.fetch_sub (1) == 1 && startAfterCountIn.exchange (false))
+                {
+                    writeTake.store (true);
                     triggerAsyncUpdate();
+                }
             }
         }
         beatCounter -= 1.0;
@@ -293,7 +313,160 @@ void RiffhouseProcessor::renderClick (float* l, float* r, int n)
 void RiffhouseProcessor::handleAsyncUpdate()
 {
     // count-in finished: start writing
-    rec.start (recordingFolder, sampleRate, saveDi.load(), currentPresetName());
+    if (writeTake.exchange (false))
+        rec.start (recordingFolder, sampleRate, saveDi.load(), currentPresetName());
+
+    // what the foot controller sent since last time
+    for (;;)
+    {
+        MidiNote note { 0, 0, 0 };
+        {
+            const auto scope = midiFifo.read (1);
+            if (scope.blockSize1 == 0) break;
+            note = midiQueue[(size_t) scope.startIndex1];
+        }
+        if (note.kind == 1) footMoved (note.number, note.value);
+        else if (note.kind == 2) footProgram (note.number);
+    }
+}
+
+//==============================================================================
+void RiffhouseProcessor::footSave() { uiState.setProperty ("foot", juce::String (foot.toText()), nullptr); }
+
+void RiffhouseProcessor::footTeachTouch()
+{
+    foot.stopLearning();
+    footTeach = FootTeach::touch;
+    for (int i = 0; i < kNumParams; ++i) footBefore[(size_t) i] = raw[(size_t) i]->load();
+}
+
+void RiffhouseProcessor::footTeachJob (FootJob job)
+{
+    foot.learn ({ job, 0 });
+    footTeach = FootTeach::move;
+}
+
+void RiffhouseProcessor::footTeachStop()
+{
+    foot.stopLearning();
+    footTeach = FootTeach::off;
+}
+
+void RiffhouseProcessor::footRemove (size_t index) { foot.remove (index); footSave(); }
+void RiffhouseProcessor::footSetPress (size_t index, bool press) { foot.setPress (index, press); footSave(); }
+
+void RiffhouseProcessor::footTick()
+{
+    if (footTeach != FootTeach::touch) return;
+    // the control that moved since teaching began is the one that is meant
+    int changed = -1, count = 0;
+    for (int i = 0; i < kNumParams; ++i)
+    {
+        const auto& sp = paramSpecs()[(size_t) i];
+        if (std::abs (raw[(size_t) i]->load() - footBefore[(size_t) i]) > (sp.max - sp.min) * 1.0e-4f) { changed = i; ++count; }
+    }
+    if (count == 0) return;
+    if (count > 2)
+    {
+        // a whole tone was loaded: that is not pointing at a control
+        for (int i = 0; i < kNumParams; ++i) footBefore[(size_t) i] = raw[(size_t) i]->load();
+        return;
+    }
+    foot.learn ({ FootJob::param, changed });
+    footTeach = FootTeach::move;
+}
+
+void RiffhouseProcessor::footMoved (int controller, int value)
+{
+    FootControl::Action action;
+    bool learned = false;
+    const bool act = foot.moved (controller, value, juce::Time::getMillisecondCounterHiRes() * 0.001, action, learned);
+    if (learned)
+    {
+        footTeach = FootTeach::off;
+        footSave();
+        if (onFootMessage) onFootMessage (juce::String (footTargetName (action.target)) + " now follows controller " + juce::String (controller));
+    }
+    else if (foot.kindFound())
+        footSave(); // the switch just showed that it springs back
+    if (act) footDo (action);
+}
+
+void RiffhouseProcessor::footDo (const FootControl::Action& a)
+{
+    switch (a.target.job)
+    {
+        case FootJob::param:
+        {
+            if (a.target.param < 0 || a.target.param >= kNumParams) return;
+            const auto i = (size_t) a.target.param;
+            float v = a.value; // along the knob's travel, the way the knob itself moves
+            if (a.flip) v = params[i]->getValue() > 0.5f ? 0.0f : 1.0f;
+            if (std::abs (params[i]->getValue() - v) > 1.0e-6f) params[i]->setValueNotifyingHost (v);
+            return;
+        }
+        case FootJob::nextTone:      stepTone (1); return;
+        case FootJob::previousTone:  stepTone (-1); return;
+        case FootJob::looper:        loopPress(); return;
+        case FootJob::looperStop:    loop.stop(); return;
+        case FootJob::tapTempo:      tapTempo(); return;
+        case FootJob::song:          if (jamFile != juce::File()) setJamPlaying (! isJamPlaying()); return;
+        case FootJob::tuner:
+        case FootJob::record:
+            if (onFootJob && onFootJob (a.target.job)) return;
+            if (a.target.job == FootJob::record) // no window open: the foot can still start and stop a take
+            {
+                if (rec.isRecording() || isCountingIn()) stopRecording();
+                else startRecording ((bool) uiState.getProperty ("countIn", true));
+            }
+            return;
+        case FootJob::count: return;
+    }
+}
+
+std::vector<int> RiffhouseProcessor::toneSteps() const
+{
+    std::vector<int> starred, all;
+    const auto& tones = library.all();
+    for (int i = 0; i < (int) tones.size(); ++i)
+    {
+        all.push_back (i);
+        if (tones[(size_t) i].favourite) starred.push_back (i);
+    }
+    return starred.empty() ? all : starred;
+}
+
+void RiffhouseProcessor::stepTone (int by)
+{
+    const auto steps = toneSteps();
+    if (steps.empty()) return;
+    // from a tone that is not in the list, forward goes to the first and back to the last
+    const auto here = std::find (steps.begin(), steps.end(), currentPreset);
+    const int n = (int) steps.size();
+    const int at = here != steps.end() ? (int) (here - steps.begin()) : (by > 0 ? -1 : n);
+    loadPreset (steps[(size_t) (((at + by) % n + n) % n)]);
+    if (onFootMessage) onFootMessage (currentPresetName());
+}
+
+void RiffhouseProcessor::footProgram (int number)
+{
+    const auto steps = toneSteps();
+    if (number < 0 || number >= (int) steps.size()) return;
+    loadPreset (steps[(size_t) number]);
+    if (onFootMessage) onFootMessage (currentPresetName());
+}
+
+void RiffhouseProcessor::tapTempo()
+{
+    const double now = juce::Time::getMillisecondCounterHiRes();
+    if (! taps.empty() && now - taps.back() > 2000.0) taps.clear();
+    taps.push_back (now);
+    if (taps.size() > 6) taps.erase (taps.begin());
+    if (taps.size() >= 2)
+    {
+        const double beat = (taps.back() - taps.front()) / (double) (taps.size() - 1);
+        metronomeBpm.store ((float) juce::jlimit (30.0, 300.0, std::round (60000.0 / beat)));
+    }
 }
 
 bool RiffhouseProcessor::startRecording (bool countIn)
@@ -644,6 +817,7 @@ void RiffhouseProcessor::setStateInformation (const void* data, int size)
     auto st = juce::ValueTree::fromXml (*xml);
     if (! st.isValid()) return;
     if (auto ui = st.getChildWithName ("UI"); ui.isValid()) uiState.copyPropertiesAndChildrenFrom (ui, nullptr);
+    if (uiState.hasProperty ("foot")) foot.fromText (uiState.getProperty ("foot").toString().toStdString());
     apvts.replaceState (st);
     currentPreset = library.indexOf (st.getProperty ("preset").toString());
     for (int i = 0; i < kNumParams; ++i) presetSnapshot[(size_t) i] = raw[(size_t) i]->load();
