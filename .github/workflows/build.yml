@@ -206,6 +206,10 @@ jobs:
           $log = Join-Path $env:APPDATA 'Riffhouse\Riffhouse log.txt'
           if (-not (Test-Path $log)) { throw "The app kept no log of its start" }
           Get-Content $log -Tail 60
+          # the window's first sign of life, and how long the start took: shown on the run's page
+          $ready = Select-String -Path $log -Pattern 'ready (\d+) ms after starting' | Select-Object -Last 1
+          if (-not $ready) { throw "The app never wrote that its window was ready" }
+          "Installed app: window ready $($ready.Matches[0].Groups[1].Value) ms after starting" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if (Select-String -Path $log -Pattern 'stopped answering|Starting is taking more|ended in a crash' -Quiet) { throw "The log says the window froze or the app crashed" }
 
           $remove = Join-Path (Split-Path $app) 'unins000.exe'
