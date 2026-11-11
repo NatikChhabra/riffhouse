@@ -161,8 +161,48 @@ RecordPanel::RecordPanel (RiffhouseProcessor& p) : proc (p)
     songPos.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     songPos.setRange (0.0, 1.0);
     songPos.onDragEnd = [this] { proc.setJamPosition (songPos.getValue() * proc.jamLength()); };
+    songSpeed.setSliderStyle (juce::Slider::LinearHorizontal);
+    songSpeed.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    songSpeed.setRange (SongStretch::minSpeed * 100.0, SongStretch::maxSpeed * 100.0, 1.0);
+    songSpeed.setValue (proc.jamSpeed() * 100.0, juce::dontSendNotification);
+    songSpeed.setDoubleClickReturnValue (true, 100.0);
+    songSpeed.onValueChange = [this]
+    {
+        // normal speed is where the slider wants to rest
+        const double v = std::abs (songSpeed.getValue() - 100.0) < 2.5 ? 100.0 : songSpeed.getValue();
+        proc.setJamSpeed ((float) (v / 100.0));
+        repaint();
+    };
+    songSpeed.onDragEnd = [this] { songSpeed.setValue (proc.jamSpeed() * 100.0, juce::dontSendNotification); };
+    songSpeed.setTooltip ("Slower or faster, at the same pitch. Double-click for normal speed.");
+    keyDown.onClick = [this] { proc.setJamKey (proc.jamKey() - 1); repaint(); };
+    keyUp.onClick = [this] { proc.setJamKey (proc.jamKey() + 1); repaint(); };
+    keyDown.setTooltip ("The song one semitone lower, at the same speed");
+    keyUp.setTooltip ("The song one semitone higher, at the same speed");
+    partFrom.onClick = [this]
+    {
+        const double at = proc.jamPosition();
+        partNote = {};
+        if (proc.jamHasSection() && proc.setJamSection (at, proc.jamSectionEnd())) {} // the part now starts here
+        else { proc.clearJamSection(); partStart = at; }
+        repaint();
+    };
+    partTo.onClick = [this]
+    {
+        const double at = proc.jamPosition();
+        const double from = proc.jamHasSection() ? proc.jamSectionStart() : std::max (0.0, partStart);
+        if (proc.setJamSection (from, at)) { partStart = -1.0; partNote = {}; }
+        else partNote = at - from < SongSection::shortest ? "That part is too short to go round." : "That part could not be read.";
+        repaint();
+    };
+    partClear.onClick = [this] { proc.clearJamSection(); partStart = -1.0; partNote = {}; repaint(); };
+    partFrom.setTooltip ("The part to go round starts where the song is now");
+    partTo.setTooltip ("The part ends where the song is now, and starts going round");
+    partClear.setTooltip ("Stop going round and play the whole song");
     for (juce::Component* c : { (juce::Component*) &countIn, (juce::Component*) &saveDi, (juce::Component*) &openFolder, (juce::Component*) &changeFolder,
-                                (juce::Component*) &loadSong, (juce::Component*) &playSong, (juce::Component*) &songLevel, (juce::Component*) &songPos })
+                                (juce::Component*) &loadSong, (juce::Component*) &playSong, (juce::Component*) &songLevel, (juce::Component*) &songPos,
+                                (juce::Component*) &songSpeed, (juce::Component*) &keyDown, (juce::Component*) &keyUp,
+                                (juce::Component*) &partFrom, (juce::Component*) &partTo, (juce::Component*) &partClear })
         addAndMakeVisible (c);
 }
 
@@ -175,8 +215,21 @@ void RecordPanel::timerCallback()
 {
     const bool has = proc.jamTrackName().isNotEmpty();
     if (has && loadSong.getButtonText() != proc.jamTrackName()) loadSong.setButtonText (proc.jamTrackName()); // a song dropped on the window
-    playSong.setEnabled (has);
-    songPos.setEnabled (has);
+    for (juce::Component* c : { (juce::Component*) &playSong, (juce::Component*) &songPos, (juce::Component*) &songSpeed,
+                                (juce::Component*) &partFrom, (juce::Component*) &partTo })
+        c->setEnabled (has);
+    keyDown.setEnabled (has && proc.jamKey() > -SongStretch::maxKeyShift);
+    keyUp.setEnabled (has && proc.jamKey() < SongStretch::maxKeyShift);
+    partClear.setEnabled (has && (proc.jamHasSection() || partStart >= 0.0));
+    if (! songSpeed.isMouseButtonDown() && std::abs (songSpeed.getValue() - proc.jamSpeed() * 100.0) > 0.5)
+    {
+        // a new song is back at normal speed, and its part is gone
+        songSpeed.setValue (proc.jamSpeed() * 100.0, juce::dontSendNotification);
+        partStart = -1.0;
+        partNote = {};
+        repaint();
+    }
+    if (proc.jamHasSection() || partStart >= 0.0) repaint (songPos.getBounds().expanded (0, 6));
     playSong.setIcon (proc.isJamPlaying() ? icons::pause() : icons::play(), true);
     if (has && ! songPos.isMouseButtonDown() && proc.jamLength() > 0)
         songPos.setValue (proc.jamPosition() / proc.jamLength(), juce::dontSendNotification);
@@ -192,6 +245,9 @@ void RecordPanel::chooseSong()
                               const auto f = fc.getResult();
                               if (f.existsAsFile() && proc.loadJamTrack (f))
                               {
+                                  partStart = -1.0;
+                                  partNote = {};
+                                  songSpeed.setValue (100.0, juce::dontSendNotification);
                                   loadSong.setButtonText (f.getFileNameWithoutExtension());
                                   proc.setJamPlaying (true);
                               }
@@ -223,6 +279,53 @@ void RecordPanel::resized()
     row = r.removeFromTop (26);
     row.removeFromLeft (80);
     songLevel.setBounds (row);
+    r.removeFromTop (4);
+    row = r.removeFromTop (26);
+    row.removeFromLeft (80);
+    row.removeFromRight (48);
+    songSpeed.setBounds (row);
+    r.removeFromTop (6);
+    row = r.removeFromTop (30);
+    row.removeFromLeft (80 + 6);
+    keyDown.setBounds (row.removeFromLeft (34));
+    keyUp.setBounds (row.removeFromRight (34));
+    r.removeFromTop (12 + 24);
+    row = r.removeFromTop (32);
+    const int third = (row.getWidth() - 16) / 3;
+    partFrom.setBounds (row.removeFromLeft (third));
+    row.removeFromLeft (8);
+    partTo.setBounds (row.removeFromLeft (third));
+    row.removeFromLeft (8);
+    partClear.setBounds (row);
+}
+
+namespace
+{
+juce::String minSec (double seconds)
+{
+    const int s = (int) std::max (0.0, seconds);
+    return juce::String (s / 60) + ":" + juce::String (s % 60).paddedLeft ('0', 2);
+}
+}
+
+void RecordPanel::paintOverChildren (juce::Graphics& g)
+{
+    // the part that goes round, drawn on the line that shows where the song is
+    const double length = proc.jamLength();
+    if (length <= 0.0) return;
+    const auto track = songPos.getBounds().toFloat();
+    const auto xAt = [&] (double seconds) { return track.getX() + songPos.getPositionOfValue (juce::jlimit (0.0, 1.0, seconds / length)); };
+    const float y = track.getCentreY() + 9.0f;
+    g.setColour (colours::lamp);
+    if (proc.jamHasSection())
+    {
+        const float a = xAt (proc.jamSectionStart()), b = xAt (proc.jamSectionEnd());
+        g.fillRect (a, y, std::max (2.0f, b - a), 2.0f);
+        g.fillRect (a, y - 4.0f, 2.0f, 6.0f);
+        g.fillRect (std::max (a, b - 2.0f), y - 4.0f, 2.0f, 6.0f);
+    }
+    else if (partStart >= 0.0)
+        g.fillRect (xAt (partStart), y - 4.0f, 2.0f, 6.0f);
 }
 
 void RecordPanel::paint (juce::Graphics& g)
@@ -248,6 +351,33 @@ void RecordPanel::paint (juce::Graphics& g)
     g.setFont (font (13.0f));
     g.setColour (colours::textDim);
     g.drawText ("Song level", r.removeFromTop (26), juce::Justification::centredLeft);
+    r.removeFromTop (4);
+    auto row = r.removeFromTop (26);
+    g.drawText ("Speed", row, juce::Justification::centredLeft);
+    const bool has = proc.jamTrackName().isNotEmpty();
+    const int percent = juce::roundToInt (proc.jamSpeed() * 100.0f);
+    g.setColour (! has ? colours::textFaint : percent == 100 ? colours::textDim : colours::text);
+    g.drawText (juce::String (percent) + "%", row, juce::Justification::centredRight);
+    r.removeFromTop (6);
+    row = r.removeFromTop (30);
+    g.setColour (colours::textDim);
+    g.drawText ("Key", row, juce::Justification::centredLeft);
+    const int key = proc.jamKey();
+    g.setColour (! has ? colours::textFaint : key == 0 ? colours::textDim : colours::text);
+    g.drawText (key == 0 ? juce::String ("As recorded")
+                         : juce::String (std::abs (key)) + (std::abs (key) == 1 ? " semitone " : " semitones ") + (key > 0 ? "higher" : "lower"),
+                row.withTrimmedLeft (80 + 6 + 34).withTrimmedRight (34), juce::Justification::centred);
+    r.removeFromTop (12);
+    row = r.removeFromTop (24);
+    g.setColour (colours::textDim);
+    g.drawText ("Go round one part", row, juce::Justification::centredLeft);
+    juce::String part = partNote;
+    if (part.isEmpty() && proc.jamHasSection()) part = minSec (proc.jamSectionStart()) + " to " + minSec (proc.jamSectionEnd());
+    if (part.isEmpty() && partStart >= 0.0) part = "From " + minSec (partStart) + ". Now mark the end.";
+    g.setColour (partNote.isNotEmpty() ? colours::hot : colours::text);
+    g.setFont (font (12.5f));
+    g.drawText (part, row, juce::Justification::centredRight);
+    r.removeFromTop (32 + 8);
     g.setColour (colours::textFaint);
     g.setFont (font (12.0f));
     g.drawFittedText ("The song and the click go to your headphones only. Recordings contain just your guitar.",
@@ -276,6 +406,106 @@ MetronomePanel::MetronomePanel (RiffhouseProcessor& p) : proc (p)
     for (juce::Component* c : { (juce::Component*) &enabled, (juce::Component*) &bpm, (juce::Component*) &level,
                                 (juce::Component*) &tapButton, (juce::Component*) &minus, (juce::Component*) &plus })
         addAndMakeVisible (c);
+}
+
+//==============================================================================
+LooperPanel::LooperPanel (RiffhouseProcessor& p) : proc (p)
+{
+    title = "Looper";
+    main.onClick = [this] { proc.loopPress(); timerCallback(); };
+    stopButton.onClick = [this] { proc.looper().stop(); };
+    clearButton.onClick = [this] { proc.looper().clear(); };
+    level.setSliderStyle (juce::Slider::LinearHorizontal);
+    level.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+    level.setRange (0.0, 1.0);
+    level.setValue (proc.looper().level.load(), juce::dontSendNotification);
+    level.onValueChange = [this] { proc.looper().level.store ((float) level.getValue()); };
+    for (juce::Component* c : { (juce::Component*) &main, (juce::Component*) &stopButton, (juce::Component*) &clearButton, (juce::Component*) &level })
+        addAndMakeVisible (c);
+    timerCallback();
+}
+
+juce::String LooperPanel::stateLine (RiffhouseProcessor& proc)
+{
+    auto& lp = proc.looper();
+    const auto secs = [] (double s) { return juce::String (s, 1) + " s"; };
+    switch (lp.state())
+    {
+        case Looper::State::empty:       return "Nothing recorded yet";
+        case Looper::State::recording:   return "Recording " + secs (lp.positionSeconds());
+        case Looper::State::playing:     return "Playing a loop of " + secs (lp.lengthSeconds());
+        case Looper::State::overdubbing: return "Adding a layer to a loop of " + secs (lp.lengthSeconds());
+        case Looper::State::stopped:     return "Stopped, with a loop of " + secs (lp.lengthSeconds());
+    }
+    return {};
+}
+
+void LooperPanel::visibilityChanged()
+{
+    if (isVisible()) { timerCallback(); startTimerHz (20); } else stopTimer();
+}
+
+void LooperPanel::timerCallback()
+{
+    const auto st = proc.looper().state();
+    // the button always says what the next press will do
+    const char* next = st == Looper::State::empty ? "Record"
+                     : st == Looper::State::recording ? "Close the loop and play it"
+                     : st == Looper::State::playing ? "Add a layer"
+                     : st == Looper::State::overdubbing ? "Stop adding"
+                     : "Play";
+    if (main.getButtonText() != next) main.setButtonText (next);
+    stopButton.setEnabled (st != Looper::State::empty && st != Looper::State::stopped);
+    clearButton.setEnabled (st != Looper::State::empty);
+    repaint();
+}
+
+void LooperPanel::resized()
+{
+    auto r = getLocalBounds().reduced (20, 16);
+    r.removeFromTop (34);
+    r.removeFromTop (26 + 8 + 10 + 16); // the state line and the bar that shows where the loop is
+    main.setBounds (r.removeFromTop (38));
+    r.removeFromTop (10);
+    auto row = r.removeFromTop (32);
+    stopButton.setBounds (row.removeFromLeft ((row.getWidth() - 10) / 2));
+    row.removeFromLeft (10);
+    clearButton.setBounds (row);
+    r.removeFromTop (14);
+    row = r.removeFromTop (26);
+    row.removeFromLeft (60);
+    level.setBounds (row);
+}
+
+void LooperPanel::paint (juce::Graphics& g)
+{
+    Popover::paint (g);
+    auto r = getLocalBounds().reduced (20, 16);
+    r.removeFromTop (34);
+    auto& lp = proc.looper();
+    const auto st = lp.state();
+    g.setFont (font (14.5f, Weight::medium));
+    g.setColour (st == Looper::State::recording ? colours::record : st == Looper::State::empty ? colours::textDim : colours::text);
+    g.drawText (stateLine (proc), r.removeFromTop (26), juce::Justification::centredLeft);
+    r.removeFromTop (8);
+    // where the loop is: the bar fills once per time round; while recording it fills toward the longest a loop can be
+    const auto bar = r.removeFromTop (10).toFloat();
+    g.setColour (juce::Colours::white.withAlpha (0.08f));
+    g.fillRoundedRectangle (bar, 2.0f);
+    const double whole = st == Looper::State::recording ? lp.maxSeconds() : lp.lengthSeconds();
+    if (whole > 0.0 && st != Looper::State::empty)
+    {
+        g.setColour (st == Looper::State::recording ? colours::record : st == Looper::State::overdubbing ? colours::hot : colours::accent);
+        g.fillRoundedRectangle (bar.withWidth (bar.getWidth() * (float) juce::jlimit (0.0, 1.0, lp.positionSeconds() / whole)), 2.0f);
+    }
+    r.removeFromTop (16 + 38 + 10 + 32 + 14);
+    g.setFont (font (14.0f));
+    g.setColour (colours::textDim);
+    g.drawText ("Volume", r.removeFromTop (26), juce::Justification::centredLeft);
+    r.removeFromTop (8);
+    g.setFont (font (12.5f));
+    g.drawText ("The O key is the big button.", r.removeFromTop (18), juce::Justification::centredLeft);
+    g.drawText ("The loop is for your ears. Takes you record leave it out.", r.removeFromTop (18), juce::Justification::centredLeft);
 }
 
 void MetronomePanel::tap()
@@ -556,7 +786,7 @@ void SettingsView::paint (juce::Graphics& g)
         about.append ("Riffhouse " JucePlugin_VersionString ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
                       "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
                       "any artist, band or equipment maker, and all trademarks belong to their owners. "
-                      "Built with JUCE and Neural Amp Modeler Core. Fonts: Inter, Instrument Sans, Doto and Big Shoulders (SIL Open Font License).",
+                      "Built with JUCE, Neural Amp Modeler Core and Signalsmith Stretch. Fonts under the SIL Open Font License and the Apache License 2.0.",
                       font (13.5f), colours::textDim);
         about.draw (g, left.removeFromTop (aboutH).toFloat());
     }

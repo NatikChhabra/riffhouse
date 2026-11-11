@@ -29,7 +29,9 @@ What changed in each version is in the [changelog](CHANGELOG.md). Every older ve
 - **Neural captures:** load any `.nam` file as the amp.
 - **Tuner** for any tuning, **metronome**, and a **recorder** that also keeps the clean guitar.
 - **Takes:** press L to listen to what you recorded. Pick a take, turn the knobs or choose another tone while it plays, and save it as a new take. You played it once, you can re-amp it as often as you like.
-- **Play along:** load a song, it plays in your headphones and stays out of your recording.
+- **Play along:** load a song, it plays in your headphones and stays out of your recording. Slow it down without changing its pitch, change its key without changing its speed, and mark one part to go round until you have it.
+- **Looper:** press O to record a part, O again to let it go round, and again to add a layer.
+- **Undo and redo** for the whole tone, with Ctrl+Z and Ctrl+Y.
 - **Drop files on the window:** a `.nam` capture becomes the amp, an impulse response the cabinet, a song the backing track, a tone file the tone.
 - A **VST3 plugin** of the same rig for recording software.
 
@@ -47,6 +49,16 @@ Every take is saved twice: once the way you heard it, once as the clean guitar. 
 | | |
 |---|---|
 | ![The list of takes](docs/screenshots/takes.png) | ![A take running through a new tone](docs/screenshots/take-tone.png) |
+
+## Practise with the song
+
+Load a song, or drop it on the window. It plays in your headphones and never ends up in a take. Slow it down to 50 percent and the pitch stays where it was. Move it up or down a few semitones and the speed stays where it was, which helps when the record is tuned half a step down and your guitar is not. Mark the start and the end of the hard part and it goes round until you have it.
+
+The looper is for your own playing: press **O**, play a rhythm part, press **O** again and solo over it.
+
+| | |
+|---|---|
+| ![A song slowed to 80 percent with one part going round](docs/screenshots/play-along.png) | ![The looper](docs/screenshots/looper.png) |
 
 ## It sets itself up
 
@@ -97,6 +109,6 @@ A tone is a small JSON file. In the tone browser, **Copy tone code** puts the cu
 
 Riffhouse is made by [Natik Chhabra](https://github.com/NatikChhabra). It is free software under the GNU Affero General Public License, version 3 or later.
 
-It is built with [JUCE](https://juce.com) (AGPLv3) and [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT). Fonts: Instrument Sans, Inter, Doto and Big Shoulders, all under the SIL Open Font License.
+It is built with [JUCE](https://juce.com) (AGPLv3), [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT) and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) (MIT), which slows the song down. Fonts: Instrument Sans, Inter, Doto, Big Shoulders, Kaushan Script and Alfa Slab One under the SIL Open Font License, and Yellowtail under the Apache License 2.0.
 
 Every amp, pedal and cabinet in Riffhouse is an original design. Tones named "Inspired by" describe a style. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.

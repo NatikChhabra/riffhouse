@@ -40,8 +40,10 @@ public:
     explicit RecordPanel (RiffhouseProcessor&);
     void resized() override;
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void visibilityChanged() override;
     std::function<void()> onShowTakes;
+    void refresh() { timerCallback(); } // what the timer does while the window is open
 
 private:
     void timerCallback() override;
@@ -52,7 +54,11 @@ private:
     juce::TextButton openFolder { "Listen to your takes" }, changeFolder { "Change folder..." };
     juce::TextButton loadSong { "Load a song to play along..." };
     IconButton playSong { icons::play(), {}, true };
-    juce::Slider songLevel, songPos;
+    juce::Slider songLevel, songPos, songSpeed;
+    juce::TextButton keyDown { "-" }, keyUp { "+" };
+    juce::TextButton partFrom { "Start here" }, partTo { "End here" }, partClear { "Whole song" };
+    double partStart = -1.0; // a start that is marked and still waits for its end
+    juce::String partNote;
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
@@ -71,6 +77,23 @@ private:
     juce::Slider bpm, level;
     juce::TextButton tapButton { "Tap tempo" }, minus { "-" }, plus { "+" };
     std::vector<double> taps;
+};
+
+// The looper: one big button that does what the pedal's switch does, then stop, clear and volume.
+class LooperPanel : public Popover, private juce::Timer
+{
+public:
+    explicit LooperPanel (RiffhouseProcessor&);
+    void resized() override;
+    void paint (juce::Graphics&) override;
+    void visibilityChanged() override;
+    static juce::String stateLine (RiffhouseProcessor&); // "Recording 3.2 s", "Playing a loop of 8.0 s"
+
+private:
+    void timerCallback() override;
+    RiffhouseProcessor& proc;
+    juce::TextButton main { "Record" }, stopButton { "Stop" }, clearButton { "Clear" };
+    juce::Slider level;
 };
 
 // Input, audio and about. Audio settings appear only in the standalone app.

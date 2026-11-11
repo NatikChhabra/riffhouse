@@ -29,6 +29,26 @@ FetchContent_Declare(namcore
     SOURCE_SUBDIR do-not-add)
 FetchContent_MakeAvailable(namcore)
 
+# Signalsmith Stretch (MIT) and the maths library it sits on (MIT): song speed and key, header only
+FetchContent_Declare(signalsmith_stretch
+    GIT_REPOSITORY https://github.com/Signalsmith-Audio/signalsmith-stretch.git
+    GIT_TAG 1.4.0
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR do-not-add)
+FetchContent_Declare(signalsmith_linear
+    GIT_REPOSITORY https://github.com/Signalsmith-Audio/linear.git
+    GIT_TAG 0.6.6
+    GIT_SHALLOW ON
+    SOURCE_SUBDIR do-not-add)
+FetchContent_MakeAvailable(signalsmith_stretch signalsmith_linear)
+add_library(riffhouse_stretch INTERFACE)
+target_include_directories(riffhouse_stretch SYSTEM INTERFACE
+    "${signalsmith_stretch_SOURCE_DIR}/include"
+    "${signalsmith_linear_SOURCE_DIR}/include")
+if (MSVC)
+    add_compile_options(/bigobj) # the stretcher is one very large template
+endif()
+
 file(GLOB NAM_SOURCES "${namcore_SOURCE_DIR}/NAM/*.cpp" "${namcore_SOURCE_DIR}/NAM/*/*.cpp")
 add_library(nam_core OBJECT ${NAM_SOURCES})
 target_include_directories(nam_core SYSTEM PUBLIC

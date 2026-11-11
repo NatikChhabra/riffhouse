@@ -23,7 +23,7 @@ namespace
 
     struct Faces
     {
-        juce::Typeface::Ptr inter[4], instrument[3], doto, shoulders;
+        juce::Typeface::Ptr inter[4], instrument[3], doto, shoulders, script, brush, slab;
         Faces()
         {
            #if RIFFHOUSE_HAS_ASSETS
@@ -37,6 +37,9 @@ namespace
             instrument[2] = load (InstrumentSansSemiBold_ttf, InstrumentSansSemiBold_ttfSize);
             doto = load (DotoBlack_ttf, DotoBlack_ttfSize);
             shoulders = load (BigShouldersExtraBold_ttf, BigShouldersExtraBold_ttfSize);
+            script = load (YellowtailRegular_ttf, YellowtailRegular_ttfSize);
+            brush = load (KaushanScriptRegular_ttf, KaushanScriptRegular_ttfSize);
+            slab = load (AlfaSlabOneRegular_ttf, AlfaSlabOneRegular_ttfSize);
            #endif
         }
     };
@@ -187,6 +190,9 @@ juce::Font faceFont (Face face, float height)
         case Face::instrumentSemi: tf = f.instrument[2]; break;
         case Face::doto:           tf = f.doto; height *= 1.4f; break;
         case Face::shoulders:      tf = f.shoulders; height *= 1.12f; break;
+        case Face::script:         tf = f.script; break;
+        case Face::brush:          tf = f.brush; break;
+        case Face::slab:           tf = f.slab; break;
     }
     if (tf == nullptr) return juce::Font (juce::FontOptions (height, juce::Font::bold));
     return juce::Font (juce::FontOptions (tf).withHeight (height));
@@ -666,6 +672,34 @@ namespace icons
     juce::Path chevronRight() { juce::Path p; p.startNewSubPath (9, 5); p.lineTo (16, 12); p.lineTo (9, 19); return p; }
     juce::Path chevronDown()  { juce::Path p; p.startNewSubPath (6, 9); p.lineTo (12, 15); p.lineTo (18, 9); return p; }
     juce::Path check()        { juce::Path p; p.startNewSubPath (5, 12.5f); p.lineTo (10, 17.5f); p.lineTo (19, 7); return p; }
+
+    juce::Path undo()
+    {
+        // an arrow that comes back round on itself
+        juce::Path p;
+        p.startNewSubPath (9, 14); p.lineTo (4, 9); p.lineTo (9, 4);
+        p.startNewSubPath (4, 9); p.lineTo (14.5f, 9);
+        p.addCentredArc (14.5f, 14.5f, 5.5f, 5.5f, 0.0f, 0.0f, juce::MathConstants<float>::pi, false);
+        p.lineTo (11, 20);
+        return p;
+    }
+    juce::Path redo()
+    {
+        auto p = undo();
+        p.applyTransform (juce::AffineTransform::scale (-1.0f, 1.0f).translated (24.0f, 0.0f));
+        return p;
+    }
+
+    juce::Path loop()
+    {
+        // two arrows chasing each other round
+        juce::Path p;
+        p.startNewSubPath (17, 2); p.lineTo (21, 6); p.lineTo (17, 10);
+        p.startNewSubPath (3, 11); p.lineTo (3, 10); p.quadraticTo (3, 6, 7, 6); p.lineTo (21, 6);
+        p.startNewSubPath (7, 22); p.lineTo (3, 18); p.lineTo (7, 14);
+        p.startNewSubPath (21, 13); p.lineTo (21, 14); p.quadraticTo (21, 18, 17, 18); p.lineTo (3, 18);
+        return p;
+    }
 
     juce::Path star (bool)
     {

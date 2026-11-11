@@ -69,7 +69,7 @@ void drawCaps (juce::Graphics&, const juce::String&, juce::Rectangle<float>, flo
 juce::Image renderStage (int width, int height);
 
 // A specific bundled face, whatever the look: for lettering printed on gear.
-enum class Face { inter, interBold, instrument, instrumentSemi, doto, shoulders };
+enum class Face { inter, interBold, instrument, instrumentSemi, doto, shoulders, script, brush, slab };
 juce::Font faceFont (Face, float height);
 
 class LookAndFeel : public juce::LookAndFeel_V4
@@ -140,6 +140,9 @@ namespace icons
     juce::Path share();
     juce::Path music();
     juce::Path check();
+    juce::Path undo();
+    juce::Path redo();
+    juce::Path loop();
 } // namespace icons
 
 // Surfaces

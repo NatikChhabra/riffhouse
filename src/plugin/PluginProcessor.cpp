@@ -112,9 +112,36 @@ void RiffhouseProcessor::prepareToPlay (double sr, int block)
     rig.prepare (sr, block);
     setLatencySamples (rig.latencySamples());
     tun.prepare (sr);
-    jam.prepareToPlay (block, sr);
+    // a song played faster than it was recorded asks for more than a block of it at a time
+    const int songBlock = SongStretch::most (std::max (block, 16));
+    jam.prepareToPlay (songBlock, sr);
     takePlayer.prepare (sr, block);
-    jamBuffer.setSize (2, std::max (block, 16));
+    {
+        const juce::ScopedLock sl (jamLock);
+        jamBuffer.setSize (2, songBlock);
+        jamOut.setSize (2, std::max (block, 16));
+        songStretch.prepare (sr);
+    }
+    if (songSection.active()) // the part in memory was made for the old sample rate
+        setJamSection (songSection.startSeconds(), songSection.endSeconds());
+    if (loopReady) // a loop recorded at another sample rate would play at the wrong speed: start clean
+    {
+        const juce::SpinLock::ScopedLockType sl (loopLock);
+        loop.prepare (sr);
+    }
+}
+
+void RiffhouseProcessor::loopPress()
+{
+    if (! loopReady)
+    {
+        // two minutes of stereo is a lot of memory to take from someone who never loops,
+        // so it is taken on the first press
+        const juce::SpinLock::ScopedLockType sl (loopLock);
+        loop.prepare (sampleRate > 0.0 ? sampleRate : 48000.0);
+        loopReady = true;
+    }
+    loop.press();
 }
 
 void RiffhouseProcessor::releaseResources() { jam.releaseResources(); takePlayer.release(); }
@@ -198,16 +225,31 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     // Listening to a take as it was recorded: that is all you hear while it plays.
     takePlayer.readSound (l, r, n);
 
+    // the looper hears the rig and plays its loop back on top, for your ears only
+    {
+        const juce::SpinLock::ScopedTryLockType sl (loopLock);
+        if (sl.isLocked()) loop.process (l, r, n);
+    }
+
     // jam track and metronome go to your ears only
     {
         const juce::ScopedTryLock sl (jamLock);
-        if (sl.isLocked() && jam.isPlaying() && jamBuffer.getNumSamples() >= n)
+        if (sl.isLocked() && jam.isPlaying() && jamOut.getNumSamples() >= n && jamBuffer.getNumSamples() >= SongStretch::most (n))
         {
-            juce::AudioSourceChannelInfo info (&jamBuffer, 0, n);
-            jam.getNextAudioBlock (info);
+            // slower takes less of the song per block, faster takes more
+            const int need = songStretch.wants (n);
+            if (songSection.active())
+                songSection.read (jamBuffer.getWritePointer (0), jamBuffer.getWritePointer (1), need);
+            else if (need > 0)
+            {
+                juce::AudioSourceChannelInfo info (&jamBuffer, 0, need);
+                jam.getNextAudioBlock (info);
+            }
+            songStretch.process (jamBuffer.getReadPointer (0), jamBuffer.getReadPointer (1), need,
+                                 jamOut.getWritePointer (0), jamOut.getWritePointer (1), n);
             const float g = jamLevel.load();
-            buffer.addFrom (0, 0, jamBuffer, 0, 0, n, g);
-            buffer.addFrom (1, 0, jamBuffer, jamBuffer.getNumChannels() > 1 ? 1 : 0, 0, n, g);
+            buffer.addFrom (0, 0, jamOut, 0, 0, n, g);
+            buffer.addFrom (1, 0, jamOut, 1, 0, n, g);
         }
     }
     renderClick (buffer.getWritePointer (0), buffer.getWritePointer (1), n);
@@ -318,14 +360,9 @@ void RiffhouseProcessor::applyPreset (const Preset& p)
 {
     // Input-side settings belong to your setup, not to the tone, so presets
     // never touch them (like a "global lock").
-    static const P keep[] = { P::inGain, P::inputFix, P::inputFixAmt, P::humFilter, P::gateThresh };
     for (const auto& s : paramSpecs())
-    {
-        bool skip = false;
-        for (P k : keep) skip |= (k == s.id);
-        if (skip) continue;
-        setValue (s.id, p.values[(size_t) s.id]);
-    }
+        if (! belongsToSetup (s.id))
+            setValue (s.id, p.values[(size_t) s.id]);
     // high-gain presets need the gate: keep the user's calibrated threshold,
     // but switch the gate on if the preset asks for it
 }
@@ -352,6 +389,64 @@ void RiffhouseProcessor::applySharedPreset (const Preset& p)
     currentPreset = -1;
     externalName = p.name;
     for (int i = 0; i < kNumParams; ++i) presetSnapshot[(size_t) i] = raw[(size_t) i]->load();
+}
+
+//==============================================================================
+ToneState RiffhouseProcessor::toneNow() const
+{
+    ToneState t;
+    for (int i = 0; i < kNumParams; ++i) t.values[(size_t) i] = raw[(size_t) i]->load();
+    t.snapshot = presetSnapshot;
+    if (currentPreset >= 0 && currentPreset < (int) library.all().size())
+        t.libraryName = library.all()[(size_t) currentPreset].name;
+    t.external = externalName;
+    return t;
+}
+
+juce::String RiffhouseProcessor::restoreTone (const ToneState& to)
+{
+    // say what is being put back before it happens: the tone's name, the one control, or how many
+    const auto from = toneNow();
+    juce::String what;
+    int changed = 0;
+    const ParamSpec* one = nullptr;
+    for (const auto& s : paramSpecs())
+        if (! belongsToSetup (s.id) && std::abs (from.values[(size_t) s.id] - to.values[(size_t) s.id]) > 1.0e-4f * std::max (1.0f, std::abs (s.max - s.min)))
+        {
+            ++changed;
+            one = &s;
+        }
+    for (const auto& s : paramSpecs())
+        if (! belongsToSetup (s.id))
+            setValue (s.id, to.values[(size_t) s.id]);
+    currentPreset = to.libraryName.isNotEmpty() ? library.indexOf (to.libraryName) : -1;
+    externalName = currentPreset >= 0 ? juce::String() : (to.external.isNotEmpty() ? to.external : to.libraryName);
+    presetSnapshot = to.snapshot;
+    if (from.libraryName != to.libraryName || from.external != to.external)
+        what = currentPresetName();
+    else if (changed == 1 && one != nullptr)
+        what = juce::String (one->name) + " " + param (one->id)->getCurrentValueAsText();
+    else
+        what = juce::String (changed) + " controls";
+    return what;
+}
+
+juce::String RiffhouseProcessor::undo()
+{
+    ToneState to;
+    if (! history.undo (toneNow(), to)) return {};
+    const auto what = restoreTone (to);
+    history.settle (toneNow());
+    return what;
+}
+
+juce::String RiffhouseProcessor::redo()
+{
+    ToneState to;
+    if (! history.redo (toneNow(), to)) return {};
+    const auto what = restoreTone (to);
+    history.settle (toneNow());
+    return what;
 }
 
 bool RiffhouseProcessor::isModified() const
@@ -443,6 +538,11 @@ bool RiffhouseProcessor::loadJamTrack (const juce::File& f)
     jam.setSource (src.get(), 32768, &disk, rate);
     jamReader = std::move (src);
     jamFile = f;
+    // a new song starts as it was recorded: the speed, key and part belonged to the last one
+    songSection.clear();
+    songStretch.setSpeed (1.0f);
+    songStretch.setKey (0);
+    songStretch.restart();
     return true;
 }
 
@@ -456,16 +556,69 @@ double RiffhouseProcessor::audioFileSeconds (const juce::File& f)
 void RiffhouseProcessor::setJamPlaying (bool shouldPlay)
 {
     const juce::ScopedLock sl (jamLock);
-    if (shouldPlay) jam.start(); else jam.stop();
+    if (shouldPlay) { songStretch.restart(); jam.start(); } else jam.stop();
 }
 
 bool RiffhouseProcessor::isJamPlaying() const { return jam.isPlaying(); }
-double RiffhouseProcessor::jamPosition() const { return jam.getCurrentPosition(); }
+double RiffhouseProcessor::jamPosition() const { return songSection.active() ? songSection.positionSeconds() : jam.getCurrentPosition(); }
 double RiffhouseProcessor::jamLength() const { return jam.getLengthInSeconds(); }
 void RiffhouseProcessor::setJamPosition (double s)
 {
     const juce::ScopedLock sl (jamLock);
-    jam.setPosition (s);
+    if (songSection.active()) songSection.seek (s); // inside the part: a part going round stays a part
+    else jam.setPosition (s);
+    songStretch.restart();
+}
+
+void RiffhouseProcessor::setJamSpeed (float timesNormal) { songStretch.setSpeed (timesNormal); }
+void RiffhouseProcessor::setJamKey (int semitones) { songStretch.setKey (semitones); }
+
+bool RiffhouseProcessor::setJamSection (double from, double to)
+{
+    const double length = jamLength();
+    if (jamFile == juce::File() || sampleRate <= 0.0 || length <= 0.0) return false;
+    from = juce::jlimit (0.0, length, from);
+    to = juce::jlimit (0.0, std::min (length, from + SongSection::longest), to);
+    if (to - from < SongSection::shortest) return false;
+
+    // The part is read into memory at the sample rate the device runs at, through the same
+    // resampler the whole song plays through, so going into the part changes nothing you can hear.
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (jamFile));
+    if (reader == nullptr || reader->sampleRate <= 0.0) return false;
+    const double fileRate = reader->sampleRate;
+    juce::AudioFormatReaderSource file (reader.release(), true);
+    file.setNextReadPosition ((juce::int64) (from * fileRate));
+    juce::ResamplingAudioSource atDeviceRate (&file, false, 2);
+    atDeviceRate.setResamplingRatio (fileRate / sampleRate);
+    atDeviceRate.prepareToPlay (4096, sampleRate);
+    const int total = (int) std::llround ((to - from) * sampleRate);
+    std::vector<float> l ((size_t) total), r ((size_t) total);
+    {
+        float* channels[2] = { l.data(), r.data() };
+        juce::AudioBuffer<float> into (channels, 2, total);
+        for (int done = 0; done < total;)
+        {
+            const int count = std::min (4096, total - done);
+            juce::AudioSourceChannelInfo info (&into, done, count);
+            atDeviceRate.getNextAudioBlock (info);
+            done += count;
+        }
+    }
+    {
+        const juce::ScopedLock sl (jamLock);
+        songSection.swapIn (l, r, from, sampleRate);
+        songStretch.restart();
+    }
+    return true; // the part that was going round before, if any, is freed here, outside the lock
+}
+
+void RiffhouseProcessor::clearJamSection()
+{
+    const juce::ScopedLock sl (jamLock);
+    if (! songSection.active()) return;
+    jam.setPosition (songSection.positionSeconds()); // the song carries on from where the part was
+    songSection.clear();
+    songStretch.restart();
 }
 
 //==============================================================================

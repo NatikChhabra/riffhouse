@@ -306,6 +306,13 @@ namespace
         g.setColour (ink);
         g.drawText (text, area, j, false);
     }
+    juce::String titled (const juce::String& s) // "hot rod" becomes "Hot Rod"
+    {
+        juce::StringArray words;
+        words.addTokens (s.toLowerCase(), " ", "");
+        for (auto& w : words) w = w.substring (0, 1).toUpperCase() + w.substring (1);
+        return words.joinIntoString (" ");
+    }
 } // namespace
 
 //==============================================================================
@@ -316,7 +323,7 @@ const PedalDesign& drivePedalDesign (int t)
         { "clean boost", "plus 20 dB of clean", 0xffaeb3b5, 0xff16191b, 0xffd9f1ff, Finish::brushed,    KnobStyle::dome,    0xff16191b, Face::instrumentSemi, false, 0.86f, 0, 1, 3 },
         { "TREBLE BOOSTER", "range 1", 0xff5f6f78, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xffece4cf, Face::shoulders,      true,  0.92f, 0, 2, 0 },
         { "GREEN DRIVE", "mid overdrive", 0xff2e6a42, 0xfff0e8cc, 0xff7dffa0, Finish::enamel,     KnobStyle::pedal,   0xfff0e8cc, Face::shoulders,      true,  1.0f,  1, 0, 0 },
-        { "blues drive", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::instrumentSemi, false, 1.0f,  0, 1, 0 },
+        { "blues drive", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::script, false, 1.0f,  0, 1, 0 },
         { "RODENT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
         { "big fuzz", "sustainer", 0xffe6dbc0, 0xff3b2a1a, 0xffffb547, Finish::enamel,     KnobStyle::skirted, 0xff1e1a16, Face::shoulders,      false, 1.28f, 3, 3, 2 },
         { "METAL BOX", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
@@ -328,17 +335,17 @@ const PedalDesign* pedalDesignFor (int module, int type)
 {
     // name, kind, body, ink, led, finish, knob, knob cap, face, upper, width, stripe, layout, form
     static const PedalDesign gate   { "SILENCER", "noise gate", 0xff3e4537, 0xfff0e8cc, 0xff7dffa0, Finish::hammertone, KnobStyle::pedal, 0xfff0e8cc, Face::shoulders, true, 0.95f, 0, 0, 1 };
-    static const PedalDesign comp   { "squeeze", "compressor", 0xff3f8fc4, 0xfff7f7f2, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.12f, 0, 3, 0 };
+    static const PedalDesign comp   { "squeeze", "compressor", 0xff3f8fc4, 0xfff7f7f2, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::slab, false, 1.12f, 0, 3, 0 };
     static const PedalDesign wah    { "FUNK FILTER", "wah and envelope", 0xffd9a521, 0xff2a1d10, 0xff7dffa0, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 0.9f, 0, 0, 5 };
-    static const PedalDesign pitch  { "deep octave", "pitch shifter", 0xff5b3c8f, 0xffeae6f4, 0xffd9c4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 0.95f, 0, 2, 0 };
+    static const PedalDesign pitch  { "deep octave", "pitch shifter", 0xff5b3c8f, 0xffeae6f4, 0xffd9c4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::slab, false, 0.95f, 0, 2, 0 };
     static const PedalDesign eq     { "GRAPHIC EQ", "seven band", 0xff18191b, 0xffeceae4, 0xff7dffa0, Finish::crinkle, KnobStyle::pedal, 0xffeceae4, Face::shoulders, true, 1.5f, 0, 0, 2 };
-    static const PedalDesign lofi   { "dusty tape", "lo-fi machine", 0xff6b5a44, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, false, 1.34f, 0, 0, 4 };
+    static const PedalDesign lofi   { "dusty tape", "lo-fi machine", 0xff6b5a44, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xfff1ead8, Face::brush, false, 1.34f, 0, 0, 4 };
     static const PedalDesign mods[] = {
-        { "liquid chorus", "chorus", 0xff6fc3b2, 0xff10302a, 0xffd9f1ff, Finish::enamel, KnobStyle::skirted, 0xff14201d, Face::instrumentSemi, false, 1.0f, 0, 1, 0 },
+        { "liquid chorus", "chorus", 0xff6fc3b2, 0xff10302a, 0xffd9f1ff, Finish::enamel, KnobStyle::skirted, 0xff14201d, Face::brush, false, 1.0f, 0, 1, 0 },
         { "JET FLANGER", "flanger", 0xffaeb3b5, 0xff2e2350, 0xffd9c4ff, Finish::brushed, KnobStyle::pedal, 0xfff7f7f2, Face::shoulders, true, 1.0f, 0, 2, 3 },
         { "PHASE FOUR", "phaser", 0xffb07a2a, 0xff1d140a, 0xffffb547, Finish::hammertone, KnobStyle::pedal, 0xfff1ead8, Face::shoulders, true, 0.9f, 0, 0, 0 },
         { "tremble", "tremolo", 0xffe6dbc0, 0xff1d1a16, 0xffffb547, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, false, 1.0f, 0, 0, 1 },
-        { "warble", "vibrato", 0xff1f4e5f, 0xffe6edf0, 0xff7fc4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.0f, 0, 1, 0 },
+        { "warble", "vibrato", 0xff1f4e5f, 0xffe6edf0, 0xff7fc4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::script, false, 1.0f, 0, 1, 0 },
         { "ROTARY VIBE", "vibe", 0xff4a3426, 0xfff1ead8, 0xffffb547, Finish::crinkle, KnobStyle::skirted, 0xff141516, Face::shoulders, true, 1.25f, 3, 3, 2 },
     };
     static const PedalDesign delays[] = {
@@ -353,7 +360,7 @@ const PedalDesign* pedalDesignFor (int module, int type)
         { "plate", "reverb", 0xffaeb3b5, 0xff16191b, 0xff7fc4ff, Finish::brushed, KnobStyle::dome, 0xff16191b, Face::instrumentSemi, false, 1.18f, 0, 3, 3 },
         { "SPRING TANK", "reverb", 0xff2a2a2c, 0xffd0d4d8, 0xffffb547, Finish::crinkle, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 1.36f, 1, 3, 4 },
         { "shimmer", "octave reverb", 0xffe8e6ef, 0xff4a3c78, 0xffd9c4ff, Finish::anodised, KnobStyle::dome, 0xff1b1d20, Face::instrumentSemi, false, 1.18f, 0, 1, 3 },
-        { "cloud", "ambient reverb", 0xffb8cbe0, 0xff17243a, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::instrumentSemi, false, 1.18f, 0, 3, 0 },
+        { "cloud", "ambient reverb", 0xffb8cbe0, 0xff17243a, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::script, false, 1.18f, 0, 3, 0 },
     };
     auto pick = [type] (const PedalDesign* arr, int n) { return &arr[juce::jlimit (0, n - 1, type)]; };
     switch (module)
@@ -409,13 +416,13 @@ void drawGearKnob (juce::Graphics& g, R area, float angle, float start, float en
     {
         const float rScale = size * 0.5f - (numbers ? 6.0f : 3.0f);
         g.setColour (ink.withAlpha (enabled ? 0.85f : 0.35f));
-        if (numbers) g.setFont (faceFont (Face::instrumentSemi, juce::jlimit (7.0f, 10.5f, size * 0.088f)));
+        if (numbers) g.setFont (faceFont (Face::instrumentSemi, juce::jlimit (8.5f, 12.0f, size * 0.105f)));
         for (int i = 0; i <= 10; ++i)
         {
             const float a = start + (end - start) * (float) i / 10.0f;
             const auto p = c.getPointOnCircumference (rScale, a);
             if (numbers)
-                g.drawText (juce::String (i), R (20.0f, 12.0f).withCentre (p), juce::Justification::centred, false);
+                g.drawText (juce::String (i), R (24.0f, 14.0f).withCentre (p), juce::Justification::centred, false);
             else
             {
                 const float d = (i == 0 || i == 10 || i == 5) ? 3.0f : 2.0f;
@@ -878,14 +885,17 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
     {
         const C letterInk = d.stripe == 3 ? body : ink;
         const auto nameR = l.name.withTrimmedBottom (l.name.getHeight() * 0.12f).withTrimmedTop (l.name.getHeight() * 0.12f);
-        const auto nameFont = faceFont (d.face, l.name.getHeight() * 0.62f);
+        // a hand-written name starts its words with capitals and stands taller in its line
+        const bool hand = d.face == Face::script || d.face == Face::brush;
+        const juce::String nameText = hand ? titled (d.name) : juce::String (d.name);
+        const auto nameFont = faceFont (d.face, l.name.getHeight() * (hand ? 0.78f : d.face == Face::slab ? 0.54f : 0.62f));
         if (form == 3 && d.stripe != 3)
         {
             const bool lightMetal = body.getPerceivedBrightness() > 0.5f;
             const C edge = lightMetal ? juce::Colours::white.withAlpha (0.55f) : juce::Colours::black.withAlpha (0.5f);
-            letter (g, juce::String (d.name), nameR.translated (0.0f, 1.0f * u), nameFont, edge, juce::Justification::centred);
+            letter (g, nameText, nameR.translated (0.0f, 1.0f * u), nameFont, edge, juce::Justification::centred);
         }
-        letter (g, juce::String (d.name), nameR, nameFont, letterInk, juce::Justification::centred);
+        letter (g, nameText, hand ? l.name : nameR, nameFont, letterInk, juce::Justification::centred);
 
         // the small print every real pedal carries: which socket is which, and whose it is
         auto small = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrumentSemi, 11.0f * u);
@@ -1045,6 +1055,8 @@ AmpLayout ampLayout (R area, const AmpDesign& d)
             l.panel = R (h.getX() + 24.0f, l.grille.getBottom() + 14.0f, h.getWidth() - 48.0f, h.getBottom() - 22.0f - (l.grille.getBottom() + 14.0f));
             placeControls (l, l.panel.reduced (18.0f, 8.0f).withTrimmedLeft (66.0f).withTrimmedRight (62.0f).withTrimmedTop (grouped ? 12.0f : 0.0f), d, 1);
             l.badge = R (l.grille.getX() + 44.0f, l.grille.getCentreY() - 38.0f, 380.0f, 76.0f);
+            if (d.weave == Weave::none) // nothing but covering on this face: the name stands in the middle of it
+                l.badge = R (std::min (420.0f, l.grille.getWidth() * 0.5f), std::min (112.0f, l.grille.getHeight() * 0.5f)).withCentre (l.grille.getCentre());
             break;
         }
         case 2: // combo: a narrow control strip on top, the speaker behind a big cloth
@@ -1252,11 +1264,27 @@ namespace
                     g.fillRect (r.getX(), y, r.getWidth(), 1.0f);
                 }
                 if (d.weave == Weave::silver)
-                    for (int i = 0; i < (int) (area / 420.0f); ++i)
+                {
+                    // the bright thread: short runs of tinsel that surface along the weft, some of them blue
+                    for (int i = 0; i < (int) (area / 70.0f); ++i)
                     {
-                        g.setColour (juce::Colours::white.withAlpha (0.08f + rnd.nextFloat() * 0.16f));
-                        g.fillRect (r.getX() + rnd.nextFloat() * r.getWidth(), r.getY() + rnd.nextFloat() * r.getHeight(), 1.0f, 1.0f);
+                        const float x = r.getX() + rnd.nextFloat() * r.getWidth();
+                        const float y = r.getY() + 2.5f * std::floor (rnd.nextFloat() * r.getHeight() / 2.5f);
+                        g.setColour ((rnd.nextInt (5) == 0 ? C (0xff9fc3e6) : C (0xffffffff)).withAlpha (0.10f + rnd.nextFloat() * 0.34f));
+                        g.fillRect (x, y, 2.0f + rnd.nextFloat() * 4.0f, 1.0f);
                     }
+                }
+                else if (d.weave == Weave::wheat)
+                {
+                    // darker stripes woven in, a hand apart
+                    for (float x = r.getX() + 9.0f; x < r.getRight(); x += 18.0f)
+                    {
+                        g.setColour (C (0xff3a2610).withAlpha (0.28f));
+                        g.fillRect (x, r.getY(), 2.4f, r.getHeight());
+                        g.setColour (C (0xffe8cf96).withAlpha (0.20f));
+                        g.fillRect (x + 3.4f, r.getY(), 1.0f, r.getHeight());
+                    }
+                }
                 break;
             }
             case Weave::diamond:
@@ -1278,15 +1306,34 @@ namespace
                 break;
             }
             case Weave::saltPepper:
-                g.setColour (C (0xff1d1d1d));
+            {
+                // basket weave: pairs of pale threads over pairs of dark ones, turn and turn about
+                g.setColour (C (0xff161616));
                 g.fillRect (r);
-                for (int i = 0; i < (int) (area / 3.5f); ++i)
+                const float cell = 3.4f;
+                int row = 0;
+                for (float y = r.getY(); y < r.getBottom(); y += cell, ++row)
                 {
-                    const float v = rnd.nextFloat();
-                    g.setColour (C (0xffe8e6e0).withAlpha (v * v * v * 0.45f));
-                    g.fillRect (r.getX() + rnd.nextFloat() * r.getWidth(), r.getY() + rnd.nextFloat() * r.getHeight(), 1.2f, 1.2f);
+                    int col = 0;
+                    for (float x = r.getX(); x < r.getRight(); x += cell, ++col)
+                    {
+                        const float v = 0.75f + 0.25f * rnd.nextFloat();
+                        if ((row + col) % 2 == 0)
+                        {
+                            g.setColour (C (0xffd9d5c8).withAlpha (0.50f * v));
+                            g.fillRect (x, y + 0.4f, cell, 0.9f);
+                            g.fillRect (x, y + 2.0f, cell, 0.9f);
+                        }
+                        else
+                        {
+                            g.setColour (C (0xff6a685f).withAlpha (0.55f * v));
+                            g.fillRect (x + 0.4f, y, 0.9f, cell);
+                            g.fillRect (x + 2.0f, y, 0.9f, cell);
+                        }
+                    }
                 }
                 break;
+            }
             case Weave::mesh:
             {
                 g.setColour (C (0xff2a2c2f));
@@ -1324,26 +1371,46 @@ namespace
 
 namespace
 {
-    // A leather strap seen edge on, bowed up between two metal end caps.
+    // A leather strap handle bowed up between two metal end caps. We look at it from the front and a
+    // little above, so its top face shows as a band along the bow, stitched down both edges.
     void strapHandle (juce::Graphics& g, R s, float cabinetTop)
     {
-        const float base = cabinetTop + 1.0f, peak = s.getY() + 3.0f;
-        juce::Path strap;
-        strap.startNewSubPath (s.getX() + 6.0f, base - 3.0f);
-        strap.quadraticTo (s.getCentreX(), 2.0f * peak - base + 3.0f, s.getRight() - 6.0f, base - 3.0f);
-        g.setColour (C (0xff060505));
-        g.strokePath (strap, juce::PathStrokeType (8.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
-        g.setColour (C (0xff2a2521));
-        g.strokePath (strap, juce::PathStrokeType (6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
-        g.setColour (C (0xff7a6f63).withAlpha (0.85f));
-        g.strokePath (strap, juce::PathStrokeType (1.2f), juce::AffineTransform::translation (0.0f, -2.4f));
-        for (auto x : { s.getX() - 4.0f, s.getRight() - 18.0f })
+        const float base = cabinetTop - 1.0f, peak = s.getY() + 2.0f;
+        const float x0 = s.getX() + 8.0f, x1 = s.getRight() - 8.0f;
+        auto bow = [&] (float lift)
         {
-            const R capR (x, base - 9.0f, 22.0f, 10.0f);
-            fillMetal (g, capR, C (0xffb6babd), 3.0f);
-            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            juce::Path p;
+            p.startNewSubPath (x0, base - lift);
+            p.quadraticTo (s.getCentreX(), 2.0f * peak - base - lift, x1, base - lift);
+            return p;
+        };
+        const auto edge = bow (0.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.55f)); // its shadow on the cabinet top
+        g.strokePath (edge, juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), juce::AffineTransform::translation (1.5f, 3.0f));
+        g.setColour (C (0xff0b0908)); // the cut edge of the leather, toward us
+        g.strokePath (edge, juce::PathStrokeType (9.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        g.setColour (C (0xff3b2c20)); // the top face
+        g.strokePath (bow (2.2f), juce::PathStrokeType (5.0f, juce::PathStrokeType::curved, juce::PathStrokeType::butt));
+        g.setColour (C (0xff8a6d52).withAlpha (0.7f)); // where the light runs along its back edge
+        g.strokePath (bow (4.4f), juce::PathStrokeType (1.0f));
+        {
+            // stitching: pale thread in short dashes along the top face
+            const float dashes[] = { 3.0f, 2.6f };
+            juce::Path stitched;
+            juce::PathStrokeType (0.9f).createDashedStroke (stitched, bow (2.2f), dashes, 2);
+            g.setColour (C (0xffd9c7a6).withAlpha (0.75f));
+            g.fillPath (stitched);
+        }
+        for (auto x : { s.getX() - 6.0f, s.getRight() - 20.0f })
+        {
+            const R capR (x, base - 9.0f, 26.0f, 11.0f);
+            juce::Path cp;
+            cp.addRoundedRectangle (capR, 3.0f);
+            juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 4, { 1, 2 }).drawForPath (g, cp);
+            fillMetal (g, capR, C (0xffc2c6c9), 3.0f);
+            g.setColour (juce::Colours::black.withAlpha (0.55f));
             g.drawRoundedRectangle (capR, 3.0f, 0.8f);
-            screw (g, capR.getCentre(), 4.5f, 0.4f);
+            screw (g, capR.getCentre(), 4.5f, 0.4f + x * 0.01f);
         }
     }
 
@@ -1374,11 +1441,204 @@ namespace
             g.fillRect (x, grip.getY() + 2.0f, 1.2f, grip.getHeight() - 4.0f);
     }
 
-    // The maker's name on the front: an engraved plate, or cast letters leaning forward over a flourish.
+    juce::Path wordPath (const juce::Font& f, const juce::String& text)
+    {
+        juce::GlyphArrangement ga;
+        ga.addLineOfText (f, text, 0.0f, 0.0f);
+        juce::Path p;
+        ga.createPath (p);
+        return p;
+    }
+
+    // Sizes a shape to sit inside a box, against its left edge or in its middle.
+    void seat (juce::Path& p, R box, bool centred)
+    {
+        const auto b = p.getBounds();
+        if (b.isEmpty() || box.isEmpty()) return;
+        const float k = std::min (box.getWidth() / b.getWidth(), box.getHeight() / b.getHeight());
+        const float w = b.getWidth() * k, h = b.getHeight() * k;
+        p.applyTransform (juce::AffineTransform::translation (-b.getX(), -b.getY()).scaled (k)
+                              .translated (centred ? box.getCentreX() - w * 0.5f : box.getX(), box.getCentreY() - h * 0.5f));
+    }
+
+    // A shape standing up off the surface: its wall on the shaded side, its face lit from above.
+    void raised (juce::Graphics& g, const juce::Path& p, C top, C bottom, float depth)
+    {
+        juce::DropShadow (juce::Colours::black.withAlpha (0.7f), juce::jmax (2, juce::roundToInt (depth * 2.5f)),
+                          { juce::jmax (1, juce::roundToInt (depth)), juce::jmax (1, juce::roundToInt (depth * 2.0f)) }).drawForPath (g, p);
+        g.setColour (bottom.darker (0.75f));
+        for (float k = depth; k > 0.0f; k -= 0.5f)
+            g.fillPath (p, juce::AffineTransform::translation (k * 0.7f, k));
+        const auto b = p.getBounds();
+        g.setGradientFill (juce::ColourGradient (top, 0, b.getY(), bottom, 0, b.getBottom(), false));
+        g.fillPath (p);
+        juce::Graphics::ScopedSaveState ss (g);
+        g.reduceClipRegion (p);
+        g.setColour (juce::Colours::white.withAlpha (0.5f));
+        g.strokePath (p, juce::PathStrokeType (1.0f), juce::AffineTransform::translation (0.5f, 0.7f));
+    }
+
+    // Each maker puts its name on the front its own way.
+    enum class Logo { script, plate, rules, moulded, pennant, milled, printed, enamel };
+    Logo logoFor (const AmpDesign& d)
+    {
+        const juce::String b (d.badge);
+        if (b == "glass")        return Logo::script;
+        if (b == "chime")        return Logo::rules;
+        if (b == "PLEXI")        return Logo::moulded;
+        if (b == "hot rod")      return Logo::pennant;
+        if (b == "MODERN")       return Logo::milled;
+        if (b == "TIGHT")        return Logo::printed;
+        if (b == "bass station") return Logo::enamel;
+        return Logo::plate;
+    }
+
     void ampBadge (juce::Graphics& g, const AmpDesign& d, R area)
     {
         const juce::String text = d.upper ? juce::String (d.badge).toUpperCase() : juce::String (d.badge);
-        if (d.badgePlate)
+        switch (logoFor (d))
+        {
+            case Logo::script:
+            {
+                // written by hand, cast in one piece and nickel plated
+                auto word = wordPath (faceFont (Face::script, 100.0f), titled (text));
+                seat (word, area, false);
+                raised (g, word, C (0xfff6f7f7), C (0xff8b9096), std::max (1.0f, area.getHeight() * 0.022f));
+                return;
+            }
+            case Logo::moulded:
+            {
+                // a brush-written name moulded in white plastic and pinned to the covering
+                auto word = wordPath (faceFont (Face::brush, 100.0f), titled (text));
+                seat (word, area, true);
+                raised (g, word, C (0xfffbf9f1), C (0xffd6d0bf), std::max (1.2f, area.getHeight() * 0.03f));
+                return;
+            }
+            case Logo::rules:
+            {
+                // brass capitals set wide between two brass rules, straight onto the cloth
+                auto f = faceFont (Face::instrumentSemi, 100.0f);
+                f.setExtraKerningFactor (0.42f);
+                auto word = wordPath (f, text.toUpperCase());
+                const auto band = area.withSizeKeepingCentre (area.getWidth(), area.getHeight() * 0.44f);
+                seat (word, band, false);
+                const auto wb = word.getBounds();
+                juce::Path all = word;
+                const float gap = area.getHeight() * 0.2f, th = std::max (1.6f, area.getHeight() * 0.045f);
+                all.addRectangle (wb.getX(), wb.getY() - gap - th, wb.getWidth(), th);
+                all.addRectangle (wb.getX(), wb.getBottom() + gap, wb.getWidth(), th);
+                raised (g, all, C (0xfff3dc9f), C (0xffa07c33), 1.0f);
+                return;
+            }
+            case Logo::pennant:
+            {
+                // an enamel pennant in a chromed rim, the name written across it
+                const float h = std::min (area.getHeight(), area.getWidth() * 0.27f);
+                const auto b = R (area.getX(), area.getCentreY() - h * 0.5f, std::min (area.getWidth(), h * 3.9f), h);
+                auto flag = [] (R r)
+                {
+                    juce::Path p;
+                    const float nose = r.getHeight() * 0.5f;
+                    p.startNewSubPath (r.getX(), r.getY());
+                    p.lineTo (r.getRight() - nose, r.getY());
+                    p.lineTo (r.getRight(), r.getCentreY());
+                    p.lineTo (r.getRight() - nose, r.getBottom());
+                    p.lineTo (r.getX(), r.getBottom());
+                    p.lineTo (r.getX() + nose * 0.45f, r.getCentreY());
+                    p.closeSubPath();
+                    return p.createPathWithRoundedCorners (r.getHeight() * 0.07f);
+                };
+                const auto rim = flag (b);
+                juce::DropShadow (juce::Colours::black.withAlpha (0.65f), 6, { 1, 3 }).drawForPath (g, rim);
+                juce::ColourGradient chrome (C (0xfffafbfb), 0, b.getY(), C (0xff5d6267), 0, b.getBottom(), false);
+                chrome.addColour (0.5, C (0xffb9bdc1));
+                g.setGradientFill (chrome);
+                g.fillPath (rim);
+                const float edge = std::max (2.0f, h * 0.07f);
+                const auto field = flag (b.reduced (edge * 1.9f, edge));
+                g.setGradientFill (juce::ColourGradient (C (0xffb92a1e), 0, b.getY(), C (0xff6a120d), 0, b.getBottom(), false));
+                g.fillPath (field);
+                {
+                    juce::Graphics::ScopedSaveState ss (g);
+                    g.reduceClipRegion (field);
+                    g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.22f), 0, b.getY(), juce::Colours::white.withAlpha (0.0f), 0, b.getCentreY(), false));
+                    g.fillRect (b.withHeight (h * 0.5f));
+                }
+                g.setColour (juce::Colours::black.withAlpha (0.45f));
+                g.strokePath (field, juce::PathStrokeType (0.8f));
+                auto word = wordPath (faceFont (Face::script, 100.0f), titled (text));
+                seat (word, R (b.getX() + h * 0.42f, b.getY() + h * 0.2f, b.getWidth() - h * 1.1f, h * 0.6f), true);
+                raised (g, word, C (0xffffffff), C (0xffd2d5d8), 0.8f);
+                return;
+            }
+            case Logo::milled:
+            {
+                // a thick black plate, the name milled through the anodising to the bare metal
+                auto f = faceFont (Face::shoulders, 100.0f);
+                f.setExtraKerningFactor (0.14f);
+                auto word = wordPath (f, text.toUpperCase());
+                const float h = std::min (area.getHeight(), 58.0f);
+                seat (word, R (area.getX() + h * 0.62f, area.getCentreY() - h * 0.24f, area.getWidth() - h * 1.24f, h * 0.48f), false);
+                const auto wb = word.getBounds();
+                const auto plate = R (area.getX(), area.getCentreY() - h * 0.5f, wb.getRight() + h * 0.62f - area.getX(), h);
+                juce::Path pp;
+                pp.addRoundedRectangle (plate, 3.0f);
+                juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 7, { 1, 3 }).drawForPath (g, pp);
+                g.setGradientFill (juce::ColourGradient (C (0xff2a2c2f), 0, plate.getY(), C (0xff0c0d0e), 0, plate.getBottom(), false));
+                g.fillPath (pp);
+                g.setColour (juce::Colours::white.withAlpha (0.28f)); // the chamfer catches the light along the top
+                g.drawLine (plate.getX() + 3.0f, plate.getY() + 0.8f, plate.getRight() - 3.0f, plate.getY() + 0.8f, 1.2f);
+                g.setColour (juce::Colours::black.withAlpha (0.8f));
+                g.drawRoundedRectangle (plate, 3.0f, 0.9f);
+                for (auto x : { plate.getX() + h * 0.3f, plate.getRight() - h * 0.3f })
+                    screw (g, { x, plate.getCentreY() }, std::max (3.5f, h * 0.085f), x * 0.21f);
+                g.setColour (juce::Colours::black.withAlpha (0.85f)); // the cut's upper wall, in shade
+                g.fillPath (word, juce::AffineTransform::translation (0.0f, -1.0f));
+                g.setGradientFill (juce::ColourGradient (C (0xffb4b9bd), 0, wb.getY(), C (0xfff1f2f3), 0, wb.getBottom(), false));
+                g.fillPath (word);
+                return;
+            }
+            case Logo::printed:
+            {
+                // screen printed on the steel in one colour
+                auto f = faceFont (Face::slab, 100.0f);
+                f.setExtraKerningFactor (0.06f);
+                auto word = wordPath (f, text.toUpperCase());
+                seat (word, area.withSizeKeepingCentre (area.getWidth(), std::min (area.getHeight() * 0.62f, 46.0f)), false);
+                g.setColour (C (d.ink));
+                g.fillPath (word);
+                const auto wb = word.getBounds();
+                g.fillRect (wb.getX(), wb.getBottom() + wb.getHeight() * 0.22f, wb.getWidth(), std::max (1.5f, wb.getHeight() * 0.08f));
+                return;
+            }
+            case Logo::enamel:
+            {
+                // a blue enamel plaque in a chromed frame
+                auto word = wordPath (faceFont (Face::slab, 100.0f), text.toUpperCase());
+                const float h = std::min (area.getHeight(), 50.0f);
+                seat (word, R (area.getX() + h * 0.5f, area.getCentreY() - h * 0.21f, area.getWidth() - h, h * 0.42f), false);
+                const auto wb = word.getBounds();
+                const auto plate = R (area.getX(), area.getCentreY() - h * 0.5f, wb.getRight() + h * 0.5f - area.getX(), h);
+                juce::Path pp;
+                pp.addRoundedRectangle (plate, h * 0.16f);
+                juce::DropShadow (juce::Colours::black.withAlpha (0.65f), 6, { 1, 3 }).drawForPath (g, pp);
+                fillMetal (g, plate, C (0xffc9cdd1), h * 0.16f);
+                const auto field = plate.reduced (std::max (2.0f, h * 0.07f));
+                g.setGradientFill (juce::ColourGradient (C (0xff2f67b4), 0, field.getY(), C (0xff163763), 0, field.getBottom(), false));
+                g.fillRoundedRectangle (field, h * 0.11f);
+                g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.2f), 0, field.getY(), juce::Colours::white.withAlpha (0.0f), 0, field.getCentreY(), false));
+                g.fillRoundedRectangle (field.withHeight (field.getHeight() * 0.5f), h * 0.11f);
+                g.setColour (juce::Colours::black.withAlpha (0.5f));
+                g.drawRoundedRectangle (field, h * 0.11f, 0.8f);
+                g.fillPath (word, juce::AffineTransform::translation (0.6f, 1.0f));
+                g.setColour (C (0xfff6f4ee));
+                g.fillPath (word);
+                return;
+            }
+            case Logo::plate:
+                break;
+        }
+        // an engraved metal plate: an oval of brass on the tweed, a screwed-on bar elsewhere
         {
             const bool oval = d.tolex == Tolex::tweed;
             auto f = faceFont (Face::shoulders, area.getHeight() * (oval ? 0.5f : 0.6f));
@@ -1405,34 +1665,6 @@ namespace
             letter (g, text, ta, f, C (0xff15130f), juce::Justification::centred);
             return;
         }
-        // cast letters: the name as one leaning shape in bright metal, underlined by a tapering stroke
-        auto f = faceFont (Face::shoulders, area.getHeight() * 0.92f);
-        juce::GlyphArrangement ga;
-        ga.addLineOfText (f, text, 0.0f, 0.0f);
-        juce::Path logo;
-        ga.createPath (logo);
-        logo.applyTransform (juce::AffineTransform::shear (-0.2f, 0.0f));
-        const auto lb = logo.getBounds();
-        const float k = std::min (1.0f, std::min (area.getWidth() / std::max (1.0f, lb.getWidth()), area.getHeight() * 0.8f / std::max (1.0f, lb.getHeight())));
-        logo.applyTransform (juce::AffineTransform::translation (-lb.getX(), -lb.getY()).scaled (k).translated (area.getX(), area.getY()));
-        const auto b2 = logo.getBounds();
-        juce::Path flourish;
-        const float fy = b2.getBottom() + area.getHeight() * 0.1f;
-        flourish.startNewSubPath (b2.getX() - 8.0f, fy + 5.0f);
-        flourish.quadraticTo (b2.getCentreX(), fy - 3.0f, b2.getRight() + 26.0f, fy + 0.5f);
-        flourish.quadraticTo (b2.getCentreX(), fy + 3.0f, b2.getX() - 8.0f, fy + 5.0f);
-        flourish.closeSubPath();
-        logo.addPath (flourish);
-        juce::DropShadow (juce::Colours::black.withAlpha (0.8f), 5, { 1, 3 }).drawForPath (g, logo);
-        const C metal = d.piping != 0 ? C (d.piping) : C (0xffdcd6c6);
-        const auto all = logo.getBounds();
-        juce::ColourGradient chrome (metal.brighter (0.9f), 0, all.getY(), metal.darker (0.7f), 0, all.getBottom(), false);
-        chrome.addColour (0.46, metal.brighter (0.3f));
-        chrome.addColour (0.52, metal.darker (0.35f));
-        g.setGradientFill (chrome);
-        g.fillPath (logo);
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.strokePath (logo, juce::PathStrokeType (0.8f));
     }
 
     // Slots punched in a steel case, with the dark of the chassis behind them.
@@ -1727,10 +1959,11 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
     else if (d.piping != 0)
     {
         // no cloth: the covering runs across the front, framed by a cord of piping
-        g.setColour (C (d.piping));
-        g.drawRoundedRectangle (l.grille.reduced (2.0f), 6.0f, 2.0f);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.drawRoundedRectangle (l.grille.reduced (3.6f), 5.0f, 0.8f);
+        const auto frame = l.grille.reduced (16.0f, 14.0f); // inside the corner protectors, so its own corners show
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.drawRoundedRectangle (frame.translated (0.6f, 1.2f), 9.0f, 2.6f);
+        g.setGradientFill (juce::ColourGradient (C (d.piping).brighter (0.25f), frame.getX(), frame.getY(), C (d.piping).darker (0.35f), frame.getRight(), frame.getBottom(), false));
+        g.drawRoundedRectangle (frame, 9.0f, 2.2f);
     }
 
     // one soft light over the whole thing
@@ -1864,6 +2097,31 @@ namespace
             default: return { 1, 1, 12.0f, 0xff5d6166, 0xff161616, 1.6f };  // your IR: one speaker beside a display
         }
     }
+    // What stands in front of the speakers, and whose box it is. Each cabinet belongs with one of
+    // the amps and is dressed like it.
+    struct CabLook
+    {
+        Weave weave;         // none = nothing over the speakers; mesh = a punched steel sheet
+        juce::uint32 piping; // a cord round the cloth (0 = none)
+        int amp;             // whose name is on it, -1 for no name
+        float show;          // how much of the speakers reads through the cloth
+        bool handle;         // a strap on top
+    };
+    CabLook cabLook (int m)
+    {
+        switch (m)
+        {
+            case 0:  return { Weave::black,      0,          5, 0.20f, true  };
+            case 1:  return { Weave::diamond,    0xffcbb48a, 2, 0.12f, true  };
+            case 2:  return { Weave::saltPepper, 0xffe9e2cf, 3, 0.16f, false };
+            case 3:  return { Weave::grid,       0,          6, 0.24f, false };
+            case 4:  return { Weave::silver,     0,          0, 0.15f, true  };
+            case 5:  return { Weave::wheat,      0,          1, 0.12f, true  };
+            case 6:
+            case 7:  return { Weave::mesh,       0,          8, 1.0f,  false };
+            default: return { Weave::none,       0,         -1, 1.0f,  false };
+        }
+    }
     // A loudspeaker seen from the front with the grille off: pressed steel rim, fibre gasket and
     // bolts, the cloth edge in two rolls, the paper cone falling away to the dust cap.
     void drawSpeaker (juce::Graphics& g, R sp, C frame, bool alloyCap, juce::int64 seed)
@@ -1983,7 +2241,7 @@ CabLayout cabLayout (R area, int model)
     CabLayout l;
     // small cabs are drawn smaller, so the size reads
     const float scale = spec.speakerInches < 10.0f ? 0.72f : 1.0f;
-    float h = area.getHeight() * scale, w = h * spec.aspect;
+    float h = (area.getHeight() - (cabLook (model).handle ? 14.0f : 0.0f)) * scale, w = h * spec.aspect;
     if (w > area.getWidth()) { w = area.getWidth(); h = w / spec.aspect; }
     l.box = R (w, h).withCentre (area.getCentre()).withBottomY (area.getBottom()); // every cab stands on the floor
     l.baffle = l.box.reduced (std::max (14.0f, w * 0.045f));
@@ -1992,6 +2250,8 @@ CabLayout cabLayout (R area, int model)
     for (int r = 0; r < spec.rows; ++r)
         for (int c = 0; c < spec.cols; ++c)
             l.speakers.push_back (R (d, d).withCentre ({ l.baffle.getX() + cw * ((float) c + 0.5f), l.baffle.getY() + ch * ((float) r + 0.5f) }));
+    if (model == 7) // the big driver sits high, over a port slot
+        l.speakers.front() = l.speakers.front().translated (0.0f, -l.baffle.getHeight() * 0.045f);
     if (model == 8) // the speaker moves right to leave room for the display that names the loaded file
         l.speakers.front() = l.speakers.front().withCentre ({ l.baffle.getRight() - l.baffle.getHeight() * 0.5f, l.baffle.getCentreY() });
     return l;
@@ -2033,28 +2293,140 @@ juce::Image renderCab (int model, const CabLayout& l, R area, float scale, const
         g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.6f), 0, l.baffle.getY(), juce::Colours::black.withAlpha (0.0f), 0, l.baffle.getY() + 16.0f, false));
         g.fillRect (l.baffle.withHeight (16.0f));
     }
-    // a thin cord of piping round the baffle on the older boxes
-    if (model == 0 || model == 2 || model == 4 || model == 5)
-    {
-        const auto pipe = l.baffle.expanded (2.0f);
-        g.setGradientFill (juce::ColourGradient (C (0xffe9e2cf), pipe.getX(), pipe.getY(), C (0xff7d7767), pipe.getRight(), pipe.getBottom(), false));
-        g.drawRoundedRectangle (pipe, 5.0f, 1.8f);
-        g.setColour (juce::Colours::black.withAlpha (0.5f));
-        g.drawRoundedRectangle (pipe.reduced (1.4f), 4.0f, 0.8f);
-    }
+    const auto look = cabLook (model);
+    const float bw = l.baffle.getWidth(), bh = l.baffle.getHeight();
     // the box's rim stands proud of the baffle and shades its top and left
     g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.5f), l.baffle.getX(), 0, juce::Colours::black.withAlpha (0.0f), l.baffle.getX() + 14.0f, 0, false));
     g.fillRect (l.baffle.withWidth (14.0f));
-    for (int i = 0; i < 4; ++i)
-        screw (g, { i % 2 == 0 ? l.baffle.getX() + 9.0f : l.baffle.getRight() - 9.0f, i < 2 ? l.baffle.getY() + 9.0f : l.baffle.getBottom() - 9.0f },
-               5.0f, 0.5f + 0.9f * (float) i);
+    if (look.weave == Weave::none)
+        for (int i = 0; i < 4; ++i)
+            screw (g, { i % 2 == 0 ? l.baffle.getX() + 9.0f : l.baffle.getRight() - 9.0f, i < 2 ? l.baffle.getY() + 9.0f : l.baffle.getBottom() - 9.0f },
+                   5.0f, 0.5f + 0.9f * (float) i);
     // speakers
     for (size_t i = 0; i < l.speakers.size(); ++i)
         drawSpeaker (g, l.speakers[i], C (spec.frame), model == 6, (juce::int64) model * 16 + (juce::int64) i);
+    if (model == 6)
+    {
+        // a horn for the top end, in the middle of the four
+        const auto horn = R (bw * 0.17f, bw * 0.085f).withCentre (l.baffle.getCentre());
+        g.setColour (C (0xff050505));
+        g.fillRoundedRectangle (horn.expanded (3.0f), 4.0f);
+        g.setGradientFill (juce::ColourGradient (C (0xff3a3c3f), horn.getX(), horn.getY(), C (0xff101112), horn.getRight(), horn.getBottom(), false));
+        g.fillRoundedRectangle (horn, 3.0f);
+        g.setGradientFill (juce::ColourGradient (C (0xff000000), horn.getCentreX(), horn.getCentreY(), C (0x00000000), horn.getX(), horn.getCentreY(), true));
+        g.fillRoundedRectangle (horn.reduced (2.0f), 3.0f);
+    }
+    if (model == 7)
+    {
+        // the port: a slot through the baffle, black all the way in
+        const auto port = R (bw * 0.56f, bh * 0.07f).withCentre ({ l.baffle.getCentreX(), l.baffle.getBottom() - bh * 0.075f });
+        g.setColour (juce::Colours::white.withAlpha (0.08f));
+        g.fillRoundedRectangle (port.translated (0.0f, 1.2f), port.getHeight() * 0.5f);
+        g.setGradientFill (juce::ColourGradient (C (0xff000000), 0, port.getY(), C (0xff141414), 0, port.getBottom(), false));
+        g.fillRoundedRectangle (port, port.getHeight() * 0.5f);
+    }
+    // what covers the speakers
+    if (look.weave == Weave::mesh)
+    {
+        // a punched steel sheet: the speakers stand in the dark behind it
+        g.setColour (juce::Colours::black.withAlpha (0.16f));
+        g.fillRoundedRectangle (l.baffle, 4.0f);
+        juce::Path sheet;
+        sheet.setUsingNonZeroWinding (false);
+        sheet.addRoundedRectangle (l.baffle, 4.0f);
+        const float pitch = std::max (6.0f, bw / 64.0f), hole = pitch * 0.64f;
+        int row = 0;
+        for (float y = l.baffle.getY() + pitch * 0.85f; y < l.baffle.getBottom() - pitch * 0.6f; y += pitch * 0.866f, ++row)
+            for (float x = l.baffle.getX() + pitch * 0.85f + (row % 2 == 1 ? pitch * 0.5f : 0.0f); x < l.baffle.getRight() - pitch * 0.6f; x += pitch)
+                sheet.addEllipse (x - hole * 0.5f, y - hole * 0.5f, hole, hole);
+        g.setColour (C (0xff7b8086).withAlpha (0.75f)); // the lower wall of every hole faces the light
+        g.fillPath (sheet, juce::AffineTransform::translation (0.0f, -0.9f));
+        g.setGradientFill (juce::ColourGradient (C (0xff33363a), 0, l.baffle.getY(), C (0xff131416), 0, l.baffle.getBottom(), false));
+        g.fillPath (sheet);
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.06f), l.baffle.getCentreX(), l.baffle.getY() + bh * 0.25f,
+                                                 juce::Colours::black.withAlpha (0.3f), l.baffle.getX(), l.baffle.getBottom(), true));
+        g.fillRoundedRectangle (l.baffle, 4.0f);
+        for (int i = 0; i < 6; ++i) // screwed down round its edge
+            screw (g, { l.baffle.getX() + 8.0f + (bw - 16.0f) * (float) (i % 3) * 0.5f, i < 3 ? l.baffle.getY() + 8.0f : l.baffle.getBottom() - 8.0f }, 4.5f, 0.7f * (float) i);
+    }
+    else if (look.weave != Weave::none)
+    {
+        juce::Image cloth (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (bw * scale)), juce::jmax (1, juce::roundToInt (bh * scale)), true);
+        {
+            juce::Graphics cg (cloth);
+            cg.addTransform (juce::AffineTransform::translation (-l.baffle.getX(), -l.baffle.getY()).scaled (scale));
+            AmpDesign c {};
+            c.weave = look.weave;
+            weave (cg, l.baffle, c);
+        }
+        juce::Graphics::ScopedSaveState ss (g);
+        juce::Path clip;
+        clip.addRoundedRectangle (l.baffle, 4.0f);
+        g.reduceClipRegion (clip);
+        g.setOpacity (1.0f - look.show);
+        g.drawImage (cloth, l.baffle);
+        g.setOpacity (1.0f);
+        // the cloth is stretched over a frame: it dips a little where each speaker pulls the air
+        for (const auto& sp : l.speakers)
+        {
+            const auto c = sp.getCentre();
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.16f), c.x, c.y, juce::Colours::black.withAlpha (0.0f), c.x + sp.getWidth() * 0.5f, c.y, true));
+            g.fillEllipse (sp);
+        }
+        if (model == 2)
+        {
+            // the top of this one leans back: the cloth above the bend faces the light a little more
+            const float bend = l.baffle.getY() + bh * 0.46f;
+            g.setColour (juce::Colours::white.withAlpha (0.045f));
+            g.fillRect (l.baffle.withBottom (bend));
+            g.setColour (juce::Colours::black.withAlpha (0.4f));
+            g.fillRect (l.baffle.getX(), bend, bw, 1.4f);
+            g.setColour (juce::Colours::white.withAlpha (0.10f));
+            g.fillRect (l.baffle.getX(), bend + 1.4f, bw, 1.0f);
+        }
+    }
+    if (model == 2)
+    {
+        // the bend shows on the covering either side as well
+        const float bend = l.baffle.getY() + bh * 0.46f;
+        g.setColour (juce::Colours::black.withAlpha (0.55f));
+        g.fillRect (b.getX(), bend, l.baffle.getX() - b.getX(), 1.4f);
+        g.fillRect (l.baffle.getRight(), bend, b.getRight() - l.baffle.getRight(), 1.4f);
+    }
+    if (look.piping != 0)
+    {
+        const auto pipe = l.baffle.expanded (2.0f);
+        g.setGradientFill (juce::ColourGradient (C (look.piping).brighter (0.2f), pipe.getX(), pipe.getY(), C (look.piping).darker (0.5f), pipe.getRight(), pipe.getBottom(), false));
+        g.drawRoundedRectangle (pipe, 5.0f, 2.2f);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.drawRoundedRectangle (pipe.reduced (1.6f), 4.0f, 0.8f);
+    }
+    if (model == 4)
+    {
+        // tilt-back legs folded against the sides, seen edge on
+        for (auto x : { b.getX() - 5.5f, b.getRight() + 1.0f })
+        {
+            const R leg (x, b.getY() + b.getHeight() * 0.2f, 4.5f, b.getHeight() * 0.62f);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.fillRoundedRectangle (leg.translated (1.0f, 2.0f), 2.2f);
+            juce::ColourGradient tube (C (0xff6c7176), leg.getX(), 0, C (0xff2b2d30), leg.getRight(), 0, false);
+            tube.addColour (0.35, C (0xfff3f4f5));
+            g.setGradientFill (tube);
+            g.fillRoundedRectangle (leg, 2.2f);
+            screw (g, { leg.getCentreX(), leg.getY() + 5.0f }, 4.0f, x * 0.13f);
+        }
+    }
+    if (look.handle)
+        strapHandle (g, R (std::min (200.0f, b.getWidth() * 0.34f), 18.0f).withCentre ({ b.getCentreX(), b.getY() - 4.0f }), b.getY());
     // corners
     if (model != 5)
         for (int i = 0; i < 4; ++i)
             cabinetCorner (g, b, i % 2 == 1, i >= 2, std::min (32.0f, b.getWidth() * 0.075f));
+    if (look.amp >= 0)
+    {
+        const float hh = juce::jlimit (16.0f, 58.0f, bh * 0.125f);
+        ampBadge (g, ampDesign (look.amp), R (l.baffle.getX() + std::max (12.0f, bw * 0.045f), l.baffle.getY() + std::max (10.0f, bh * 0.05f), std::min (bw * 0.42f, hh * 6.0f), hh));
+    }
     if (model == 8)
     {
         const float room = l.speakers.front().getX() - l.baffle.getX();

@@ -2,6 +2,9 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include "../engine/History.h"
+#include "../engine/Looper.h"
+#include "../engine/Song.h"
 #include "../engine/Presets.h"
 #include "../engine/Rig.h"
 #include "Recorder.h"
@@ -59,6 +62,14 @@ public:
     void toggleFavourite (int index);
     static juce::File userFolder();
 
+    // Undo and redo of the whole tone (message thread). The window calls historyTick a few times
+    // a second; see ToneHistory for when a change becomes a step.
+    void historyTick (bool handsOn) { history.tick (toneNow(), handsOn); }
+    bool canUndo() const { return history.canUndo (toneNow()); }
+    bool canRedo() const noexcept { return history.canRedo(); }
+    juce::String undo(); // what it put back, in words for the user; empty when there was nothing to undo
+    juce::String redo();
+
     // Neural captures and IRs (message thread)
     void loadCaptureAsync (const juce::File& file, std::function<void (juce::String)> done);
     juce::String captureName() const { return captureFile.getFileNameWithoutExtension(); }
@@ -87,6 +98,21 @@ public:
     double jamPosition() const;
     double jamLength() const;
     void setJamPosition (double seconds);
+    // Practising: slower or faster at the same pitch, another key at the same speed,
+    // and one part of the song going round.
+    void setJamSpeed (float timesNormal);
+    float jamSpeed() const noexcept { return songStretch.speed(); }
+    void setJamKey (int semitones);
+    int jamKey() const noexcept { return songStretch.key(); }
+    bool setJamSection (double fromSeconds, double toSeconds); // false when the part is too short or cannot be read
+    void clearJamSection();
+    bool jamHasSection() const noexcept { return songSection.active(); }
+    double jamSectionStart() const noexcept { return songSection.startSeconds(); }
+    double jamSectionEnd() const noexcept { return songSection.endSeconds(); }
+
+    // Looper: play a part, let it go round, play over it. Your ears only: takes do not contain it.
+    Looper& looper() noexcept { return loop; }
+    void loopPress(); // the looper's one big button (message thread); takes its memory the first time
 
     // Takes: listen to a recording, or feed its clean guitar back through the rig
     TakePlayer& takes() noexcept { return takePlayer; }
@@ -121,6 +147,10 @@ private:
     juce::String externalName;
     ParamValues presetSnapshot {};
 
+    ToneState toneNow() const;
+    juce::String restoreTone (const ToneState& to);
+    ToneHistory history;
+
     Recorder rec;
     Tuner tun;
     std::atomic<int> countInRemaining { 0 };
@@ -140,8 +170,13 @@ private:
     std::unique_ptr<juce::AudioFormatReaderSource> jamReader;
     juce::AudioTransportSource jam;
     juce::File jamFile;
-    juce::AudioBuffer<float> jamBuffer;
+    juce::AudioBuffer<float> jamBuffer, jamOut;
+    SongStretch songStretch;
+    SongSection songSection;
     juce::CriticalSection jamLock;
+    Looper loop;
+    juce::SpinLock loopLock; // held while the loop's memory is (re)made; the audio thread only ever tries it
+    bool loopReady = false;
 
     std::vector<float> mono, di;
     double sampleRate = 48000.0;

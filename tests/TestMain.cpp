@@ -9,6 +9,9 @@
 //   riffhouse_tests report          print loudness/latency/CPU table
 
 #include "TestSignals.h"
+#include "engine/History.h"
+#include "engine/Looper.h"
+#include "engine/Song.h"
 #include "engine/Presets.h"
 #include "engine/Rig.h"
 #include "engine/UpdateInfo.h"
@@ -695,6 +698,278 @@ void testUpdates()
 }
 } // namespace
 
+void testHistory()
+{
+    std::printf ("undo and redo\n");
+    ToneHistory h;
+    ToneState t;
+    t.values = defaultParamValues();
+    t.libraryName = "First";
+    auto show = [&] (bool hands = false) { h.tick (t, hands); };
+    show();
+    CHECK (! h.canUndo (t) && ! h.canRedo(), "nothing to undo before anything was changed");
+
+    // one long drag of one knob is one step, however many values it passes through
+    for (int i = 1; i <= 20; ++i) { t.values[(size_t) P::ampGain] = 5.0f + 0.15f * (float) i; show (true); }
+    show(); show(); show();
+    CHECK (h.depth() == 1, "a drag became one step (%d)", h.depth());
+
+    // a change that has only just been made can be undone before it has settled
+    t.values[(size_t) P::ampBass] = 9.0f;
+    CHECK (h.canUndo (t), "a fresh change can be undone straight away");
+    ToneState to;
+    CHECK (h.undo (t, to) && std::abs (to.values[(size_t) P::ampBass] - defaultParamValues()[(size_t) P::ampBass]) < 1.0e-6f
+               && std::abs (to.values[(size_t) P::ampGain] - 8.0f) < 1.0e-4f, "undo gave back the bass and kept the gain");
+    t = to; h.settle (t);
+    CHECK (h.undo (t, to) && std::abs (to.values[(size_t) P::ampGain] - defaultParamValues()[(size_t) P::ampGain]) < 1.0e-6f, "a second undo gave back the gain");
+    t = to; h.settle (t);
+    CHECK (! h.undo (t, to), "nothing left to undo");
+    CHECK (h.redo (t, to) && std::abs (to.values[(size_t) P::ampGain] - 8.0f) < 1.0e-4f, "redo brought the gain back");
+    t = to; h.settle (t);
+    CHECK (h.redo (t, to) && std::abs (to.values[(size_t) P::ampBass] - 9.0f) < 1.0e-6f, "a second redo brought the bass back");
+    t = to; h.settle (t);
+    CHECK (! h.canRedo(), "nothing left to redo");
+
+    // loading another tone is a step, and undo names the tone it came from
+    t.libraryName = "Second";
+    t.values[(size_t) P::ampModel] = (float) choices::tightMetal;
+    show(); show(); show();
+    CHECK (h.undo (t, to) && to.libraryName == "First", "undo went back to the tone before");
+    t = to; h.settle (t);
+
+    // a new change after an undo throws the forward steps away
+    t.values[(size_t) P::ampMid] = 2.0f;
+    show(); show(); show();
+    CHECK (! h.canRedo(), "a new change cleared redo");
+
+    // your input setup is not part of the tone: changing it makes no step and undo leaves it alone
+    const int before = h.depth();
+    t.values[(size_t) P::inGain] = 11.0f;
+    t.values[(size_t) P::gateThresh] = -40.0f;
+    show(); show(); show();
+    CHECK (h.depth() == before, "input settings made no step");
+
+    // it never grows without end
+    for (int i = 0; i < 300; ++i)
+    {
+        t.values[(size_t) P::ampTreble] = (i % 2 == 0) ? 3.0f : 7.0f;
+        show(); show(); show();
+    }
+    CHECK (h.depth() == (int) ToneHistory::maxSteps, "the history stops at %d steps (%d)", (int) ToneHistory::maxSteps, h.depth());
+}
+
+void testLooper()
+{
+    std::printf ("looper\n");
+    const double sr = 48000.0;
+    const int block = 256;
+    Looper lp;
+    lp.prepare (sr, 4.0);
+    std::vector<float> l ((size_t) block), r ((size_t) block);
+    long played = 0;
+    // a rising ramp per sample, so every sample of the loop can be told from every other
+    auto run = [&] (int blocks, float inputGain, std::vector<float>* outL = nullptr)
+    {
+        for (int b = 0; b < blocks; ++b)
+        {
+            for (int i = 0; i < block; ++i, ++played)
+            {
+                l[(size_t) i] = inputGain * (0.1f + 0.5f * (float) (played % 4800) / 4800.0f);
+                r[(size_t) i] = -l[(size_t) i];
+            }
+            lp.process (l.data(), r.data(), block);
+            if (outL != nullptr) outL->insert (outL->end(), l.begin(), l.end());
+        }
+    };
+    lp.level = 1.0f;
+    run (4, 1.0f);
+    CHECK (lp.state() == Looper::State::empty, "it does nothing until it is pressed");
+
+    lp.press();
+    run (150, 1.0f); // 38400 samples = 0.8 s
+    CHECK (lp.state() == Looper::State::recording, "the first press records");
+    lp.press();
+    std::vector<float> first, second;
+    run (150, 0.0f, &first);
+    CHECK (lp.state() == Looper::State::playing && std::abs (lp.lengthSeconds() - 0.8) < 1.0e-6, "the second press plays a loop of 0.8 s (%.4f)", lp.lengthSeconds());
+    run (150, 0.0f, &second);
+    double diff = 0.0, energy = 0.0;
+    for (size_t i = 0; i < first.size(); ++i) { diff = std::max (diff, (double) std::abs (first[i] - second[i])); energy += (double) first[i] * first[i]; }
+    CHECK (diff < 1.0e-7 && energy > 1.0, "every time round is the same loop (difference %.2g, energy %.1f)", diff, energy);
+    CHECK (std::abs (first.front()) < 1.0e-6f && std::abs (first.back()) < 0.01f, "the join is faded, so it cannot click (%.4f, %.4f)", first.front(), first.back());
+
+    // layering adds to the loop without changing its length, and what you hear is loop plus live
+    lp.press();
+    run (150, 0.5f);
+    CHECK (lp.state() == Looper::State::overdubbing, "the third press layers");
+    lp.press();
+    run (150, 0.0f); // the layering fades out over the first few milliseconds of this round
+    std::vector<float> layered;
+    run (150, 0.0f, &layered);
+    double layeredEnergy = 0.0;
+    for (float x : layered) layeredEnergy += (double) x * x;
+    CHECK (lp.state() == Looper::State::playing && std::abs (lp.lengthSeconds() - 0.8) < 1.0e-6 && layeredEnergy > energy * 1.5,
+           "the layer is in the loop and the loop is as long as before (energy %.1f after %.1f)", layeredEnergy, energy);
+
+    lp.stop();
+    std::vector<float> silent;
+    run (20, 0.0f, &silent);
+    double left = 0.0;
+    for (float x : silent) left = std::max (left, (double) std::abs (x));
+    CHECK (lp.state() == Looper::State::stopped && left < 1.0e-9, "stop is silent and keeps the loop");
+    lp.press();
+    std::vector<float> again;
+    run (150, 0.0f, &again);
+    double d2 = 0.0;
+    for (size_t i = 0; i < again.size(); ++i) d2 = std::max (d2, (double) std::abs (again[i] - layered[i]));
+    CHECK (lp.state() == Looper::State::playing && d2 < 1.0e-7, "a press after stop plays it again from its start (difference %.2g)", d2);
+
+    lp.clear();
+    run (2, 0.0f);
+    CHECK (lp.state() == Looper::State::empty && lp.lengthSeconds() == 0.0, "clear throws it away");
+
+    // a tap is not a phrase
+    lp.press(); run (10, 1.0f); lp.press(); run (2, 1.0f);
+    CHECK (lp.state() == Looper::State::empty, "a recording shorter than a quarter second is dropped");
+
+    // run out of room: the loop closes by itself at its longest and plays
+    lp.press();
+    run ((int) (4.5 * sr) / block, 1.0f);
+    CHECK (lp.state() == Looper::State::playing && std::abs (lp.lengthSeconds() - 4.0) < 1.0e-6, "at the longest length it closes by itself (%.3f s)", lp.lengthSeconds());
+}
+
+void testSong()
+{
+    std::printf ("song speed, key and part\n");
+    const double sr = 48000.0;
+    const int block = 256;
+    const double twoPi = 6.283185307179586;
+    // the pitch of a steady tone, from how often it crosses zero going up
+    auto pitchOf = [&] (const std::vector<float>& x, size_t from)
+    {
+        int ups = 0;
+        for (size_t i = from + 1; i < x.size(); ++i)
+            if (x[i - 1] < 0.0f && x[i] >= 0.0f) ++ups;
+        return (double) ups * sr / (double) (x.size() - from);
+    };
+    auto rmsOf = [] (const std::vector<float>& x, size_t from)
+    {
+        double sum = 0.0;
+        for (size_t i = from; i < x.size(); ++i) sum += (double) x[i] * (double) x[i];
+        return std::sqrt (sum / (double) (x.size() - from));
+    };
+    // plays a 440 Hz tone through the stretcher and gives back what came out and how much song it used
+    auto play = [&] (SongStretch& st, double seconds, std::vector<float>& out, long& used, int& mostAsked, bool& exact)
+    {
+        std::vector<float> inL ((size_t) SongStretch::most (block)), inR (inL.size()), oL ((size_t) block), oR ((size_t) block);
+        out.clear();
+        used = 0;
+        mostAsked = 0;
+        exact = true;
+        for (long done = 0; done < (long) (seconds * sr); done += block)
+        {
+            const int need = st.wants (block);
+            mostAsked = std::max (mostAsked, need);
+            for (int i = 0; i < need; ++i)
+            {
+                inL[(size_t) i] = 0.4f * (float) std::sin (twoPi * 440.0 * (double) (used + i) / sr);
+                inR[(size_t) i] = inL[(size_t) i];
+            }
+            st.process (inL.data(), inR.data(), need, oL.data(), oR.data(), block);
+            if (need != block || ! std::equal (oL.begin(), oL.end(), inL.begin())) exact = false;
+            used += need;
+            out.insert (out.end(), oL.begin(), oL.end());
+        }
+    };
+
+    std::vector<float> out;
+    long used = 0;
+    int mostAsked = 0;
+    bool exact = false;
+    {
+        SongStretch st;
+        st.prepare (sr);
+        play (st, 1.0, out, used, mostAsked, exact);
+        CHECK (st.plain() && exact, "at normal speed in the original key the song passes through untouched, sample for sample");
+        st.setSpeed (1.003f);
+        CHECK (st.speed() == 1.0f, "a hair off normal speed is normal speed");
+        st.setSpeed (0.1f);
+        st.setKey (40);
+        CHECK (st.speed() == SongStretch::minSpeed && st.key() == SongStretch::maxKeyShift, "speed and key stay inside what the controls offer");
+    }
+    {
+        SongStretch st;
+        st.prepare (sr);
+        st.setSpeed (0.5f);
+        play (st, 4.0, out, used, mostAsked, exact);
+        const double total = (double) out.size();
+        CHECK (std::abs ((double) used - total * 0.5) <= 2.0, "half speed uses half as much song: %ld of %ld", used, (long) total);
+        const double hz = pitchOf (out, out.size() / 2);
+        CHECK (std::abs (hz - 440.0) < 4.4, "half speed keeps the pitch: %.1f Hz for 440", hz);
+        const double level = rmsOf (out, out.size() / 2) / (0.4 / std::sqrt (2.0));
+        CHECK (level > 0.7 && level < 1.4, "half speed keeps the loudness: %.2f times", level);
+    }
+    {
+        SongStretch st;
+        st.prepare (sr);
+        st.setSpeed (SongStretch::maxSpeed);
+        play (st, 2.0, out, used, mostAsked, exact);
+        CHECK (mostAsked <= SongStretch::most (block), "the fastest speed never asks for more song than there is room for");
+        CHECK (std::abs ((double) used - (double) out.size() * (double) SongStretch::maxSpeed) <= 2.0, "faster uses more song, exactly as much more");
+        const double hz = pitchOf (out, out.size() / 2);
+        CHECK (std::abs (hz - 440.0) < 4.4, "faster keeps the pitch: %.1f Hz for 440", hz);
+    }
+    {
+        SongStretch st;
+        st.prepare (sr);
+        st.setKey (12);
+        play (st, 3.0, out, used, mostAsked, exact);
+        CHECK (used == (long) out.size(), "another key keeps the speed");
+        const double hz = pitchOf (out, out.size() / 2);
+        CHECK (std::abs (hz - 880.0) < 8.8, "twelve semitones up is twice the pitch: %.1f Hz for 880", hz);
+        st.setKey (-5);
+        play (st, 3.0, out, used, mostAsked, exact);
+        const double down = pitchOf (out, out.size() / 2), want = 440.0 * std::pow (2.0, -5.0 / 12.0);
+        CHECK (std::abs (down - want) < want * 0.01, "five semitones down: %.1f Hz for %.1f", down, want);
+        st.setKey (0);
+        play (st, 0.5, out, used, mostAsked, exact);
+        CHECK (exact, "back in the original key at normal speed the song is untouched again");
+    }
+    {
+        // a part of the song going round: every sample must come back in its place, lap after lap
+        const size_t len = 4801;
+        std::vector<float> l (len), r (len);
+        for (size_t i = 0; i < len; ++i) { l[i] = 0.25f + 0.5f * (float) i / (float) len; r[i] = -l[i]; }
+        const auto wantL = l;
+        SongSection part;
+        CHECK (! part.active(), "no part goes round until one is set");
+        part.swapIn (l, r, 10.0, sr);
+        CHECK (part.active() && l.empty(), "the part is taken, and what it held before is handed back");
+        CHECK (std::abs (part.endSeconds() - (10.0 + (double) len / sr)) < 1e-9 && part.startSeconds() == 10.0, "the part knows where in the song it is");
+        std::vector<float> got, bl (333), br (333);
+        while (got.size() < len * 3) { part.read (bl.data(), br.data(), 333); got.insert (got.end(), bl.begin(), bl.end()); }
+        bool inPlace = true, softEnds = true;
+        const size_t fade = (size_t) (sr * 0.004);
+        for (size_t i = 0; i < len * 3; ++i)
+        {
+            const size_t at = i % len;
+            if (at >= fade && at < len - fade) { if (got[i] != wantL[at]) inPlace = false; }
+            else if (std::abs (got[i]) > std::abs (wantL[at])) softEnds = false;
+        }
+        CHECK (inPlace, "three laps of the part, every sample in its place");
+        CHECK (softEnds && std::abs (got[0]) < 0.01f && std::abs (got[len - 1]) < 0.01f, "the join is faded, so going round does not click");
+        part.seek (10.05);
+        CHECK (std::abs (part.positionSeconds() - 10.05) < 1.0 / sr, "jumping inside the part lands where asked");
+        part.seek (99.0);
+        CHECK (part.positionSeconds() < part.endSeconds(), "a jump past the part stays inside it");
+        std::vector<float> l2 (100, 0.5f), r2 (100, 0.5f);
+        part.swapIn (l2, r2, 3.0, sr);
+        CHECK (l2.size() == len && part.positionSeconds() == 3.0, "a new part starts from its beginning and hands the old one back");
+        part.clear();
+        CHECK (! part.active(), "the whole song again");
+    }
+}
+
 void testTakes()
 {
     std::printf ("takes\n");
@@ -948,6 +1223,9 @@ int main (int argc, char** argv)
     }
     const bool quick = args.contains ("--quick");
     testUpdates();
+    testHistory();
+    testLooper();
+    testSong();
     if (args.contains ("--takes")) { testTakes(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args.contains ("--updates")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testTakes();

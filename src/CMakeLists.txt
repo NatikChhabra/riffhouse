@@ -6,7 +6,10 @@ set(RIFFHOUSE_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Params.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Presets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Rig.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/engine/UpdateInfo.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/UpdateInfo.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/History.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/Looper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/Song.cpp)
 set(RIFFHOUSE_CORE_SOURCES ${RIFFHOUSE_CORE_SOURCES} PARENT_SCOPE)
 
 file(GLOB RIFFHOUSE_FACTORY_PRESETS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/presets/*.json")

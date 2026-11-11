@@ -679,7 +679,11 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
         addAndMakeVisible (*types);
     }
     for (auto id : info.knobs)
-        addAndMakeVisible (knobs.add (new Knob (proc, id, moduleColour (index), id == P::cabMic ? juce::String ("Position") : juce::String())));
+    {
+        // on the gear itself a control is called what the maker would print, not its full name in the host
+        const auto printed = id == P::cabMic ? "Position" : id == P::gateThresh ? "Threshold" : id == P::gateRelease ? "Release" : id == P::eqLevel ? "Level" : "";
+        addAndMakeVisible (knobs.add (new Knob (proc, id, moduleColour (index), juce::String (printed))));
+    }
 
     if (index == mEq)
     {

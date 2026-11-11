@@ -93,6 +93,7 @@ endif()
 target_link_libraries(Riffhouse
     PRIVATE
         nam_core
+        riffhouse_stretch
         riffhouse_assets
         juce::juce_audio_utils
         juce::juce_cryptography

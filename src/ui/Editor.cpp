@@ -216,13 +216,13 @@ public:
     }
     void paint (juce::Graphics& g) override
     {
-        g.setFont (font (14.5f, Weight::medium));
-        const float w = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text) + 40.0f;
-        const auto r = getLocalBounds().toFloat().withSizeKeepingCentre (std::min (w, (float) getWidth()), 40.0f);
-        g.setColour (juce::Colour (0xff232221).withAlpha (alpha));
-        g.fillRoundedRectangle (r, 4.0f);
-        g.setColour (juce::Colours::white.withAlpha (0.06f * alpha));
-        g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
+        // a strip that lies on the bottom bar's upper edge, the same place every message appears
+        const auto r = getLocalBounds().toFloat();
+        g.setColour (juce::Colour (0xff1d1c1b).withAlpha (alpha));
+        g.fillRect (r);
+        g.setColour (juce::Colours::white.withAlpha (0.09f * alpha));
+        g.fillRect (r.withHeight (1.0f));
+        g.setFont (font (14.0f, Weight::medium));
         g.setColour (colours::text.withAlpha (alpha));
         g.drawText (text, r, juce::Justification::centred);
     }
@@ -260,12 +260,13 @@ public:
     }
     void paint (juce::Graphics& g) override
     {
-        const auto r = getLocalBounds().toFloat().reduced (1.0f);
-        g.setColour (juce::Colour (0xff232221));
-        g.fillRoundedRectangle (r, 6.0f);
-        g.setColour ((notice.warning ? colours::hot : juce::Colours::white).withAlpha (notice.warning ? 0.45f : 0.10f));
-        g.drawRoundedRectangle (r.reduced (0.5f), 6.0f, 1.0f);
-        auto row = r.reduced (16.0f, 0.0f);
+        // a strip that lies on the bottom bar's upper edge, with the message in its middle
+        const auto band = getLocalBounds().toFloat();
+        g.setColour (juce::Colour (0xff1d1c1b));
+        g.fillRect (band);
+        g.setColour ((notice.warning ? colours::hot : juce::Colours::white).withAlpha (notice.warning ? 0.5f : 0.09f));
+        g.fillRect (band.withHeight (1.0f));
+        auto row = band.withSizeKeepingCentre (std::min (band.getWidth() - 32.0f, wantedWidth() - 32.0f), band.getHeight());
         g.setColour (notice.warning ? colours::hot : colours::textDim);
         g.fillEllipse (row.removeFromLeft (8.0f).withSizeKeepingCentre (8.0f, 8.0f));
         row.removeFromLeft (12.0f);
@@ -311,7 +312,7 @@ public:
         : editor (e), proc (p), presetBox (p), record (p), chain (p), amp (p),
           space (p, P::space, colours::accent, "Space"), doubler (p, P::doubler, colours::accent, "Doubler"),
           volume (p, P::outLevel, colours::accent, "Volume"),
-          browser (p), tuner (p), settings (p), recordPanel (p), metroPanel (p), saveDialog (p),
+          browser (p), tuner (p), settings (p), recordPanel (p), metroPanel (p), looperPanel (p), saveDialog (p),
           takeBar (p), takesView (p, takeBar)
     {
         // top bar
@@ -330,6 +331,12 @@ public:
         favourite.onClick = [this] { proc.toggleFavourite (proc.currentPresetIndex()); refreshTop(); };
         saveButton.setTooltip ("Save this tone (Ctrl+S)");
         saveButton.onClick = [this] { showPopover (saveDialog, saveButton.getBounds(), 360, 206); };
+        undoButton.setTooltip ("Undo (Ctrl+Z)");
+        undoButton.onClick = [this] { stepHistory (false); };
+        redoButton.setTooltip ("Redo (Ctrl+Y)");
+        redoButton.onClick = [this] { stepHistory (true); };
+        loopButton.setTooltip ("Looper (O records, plays and layers)");
+        loopButton.onClick = [this] { showPopover (looperPanel, loopButton.getBounds(), 320, 286); };
         tunerButton.setTooltip ("Tuner (T)");
         tunerButton.onClick = [this] { toggleOverlay (tuner); };
         metroButton.setTooltip ("Metronome");
@@ -337,9 +344,9 @@ public:
         settingsButton.setTooltip ("Settings");
         settingsButton.onClick = [this] { toggleOverlay (settings); };
         recordOptions.setTooltip ("Recording options and play-along");
-        recordOptions.onClick = [this] { showPopover (recordPanel, recordOptions.getBounds(), 380, 392); };
+        recordOptions.onClick = [this] { showPopover (recordPanel, recordOptions.getBounds(), 380, 522); };
         record.onClick = [this] { toggleRecording(); };
-        for (auto* b : { &favourite, &saveButton, &tunerButton, &metroButton, &settingsButton, &recordOptions })
+        for (auto* b : { &favourite, &saveButton, &undoButton, &redoButton, &loopButton, &tunerButton, &metroButton, &settingsButton, &recordOptions })
         {
             b->drawBackground = false;
             b->iconSize = 18.0f;
@@ -410,7 +417,7 @@ public:
         metroPanel.onChange = [this] { refreshTop(); };
         scrim.onClick = [this] { closePopovers(); };
         for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings,
-                                    (juce::Component*) &takesView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel,
+                                    (juce::Component*) &takesView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel, (juce::Component*) &looperPanel,
                                     (juce::Component*) &saveDialog })
             addChildComponent (c);
         addChildComponent (dropHint);
@@ -521,11 +528,20 @@ public:
     void closePopovers()
     {
         scrim.setVisible (false);
-        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &saveDialog })
+        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog })
             p->setVisible (false);
     }
 
     bool anyPopoverOpen() const { return scrim.isVisible(); }
+
+    // Undo or redo one step of the tone, and say what came back.
+    void stepHistory (bool forward)
+    {
+        const auto what = forward ? proc.redo() : proc.undo();
+        if (what.isEmpty()) return;
+        refreshTop();
+        editor.showToast ((forward ? "Redone: " : "Undone: ") + what);
+    }
 
     void refreshTop()
     {
@@ -546,6 +562,18 @@ public:
         inMeter.setLevel (demoLevels ? 0.2f : proc.meters().gateInPeak.load());
         outMeter.setLevel (demoLevels ? 0.42f : proc.meters().outPeak.load());
         chain.refresh();
+        if (++historyTicks >= 8) // about four times a second
+        {
+            historyTicks = 0;
+            proc.historyTick (juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown());
+            const auto loopState = proc.looper().state();
+            const auto loopColour = loopState == Looper::State::recording ? colours::record
+                                  : loopState == Looper::State::overdubbing ? colours::hot
+                                  : loopState == Looper::State::playing ? colours::accent : colours::textDim;
+            if (loopButton.iconColour != loopColour) { loopButton.iconColour = loopColour; loopButton.repaint(); }
+            undoButton.setEnabled (proc.canUndo());
+            redoButton.setEnabled (proc.canRedo());
+        }
         if (! quietNotices && ++noticeTicks >= 10)
         {
             noticeTicks = 0;
@@ -554,8 +582,7 @@ public:
                 noticeBar.set (wizard == nullptr && ! takeBar.isActive() ? host->audioNotice() : StandaloneHost::Notice());
                 if (noticeBar.isVisible())
                 {
-                    const int w = juce::jmin (getWidth() - 48, juce::roundToInt (noticeBar.wantedWidth()));
-                    noticeBar.setBounds ((getWidth() - w) / 2, bottomY - 40, w, 32);
+                    noticeBar.setBounds (0, bottomY - 34, getWidth(), 34);
                 }
             }
         }
@@ -620,24 +647,30 @@ public:
         auto top = juce::Rectangle<int> (0, 0, getWidth(), topH).reduced (24, 10);
         logoArea = top.removeFromLeft (180);
         settingsButton.setBounds (top.removeFromRight (36));
-        top.removeFromRight (10);
+        top.removeFromRight (6);
         recordOptions.setBounds (top.removeFromRight (18));
-        record.setBounds (top.removeFromRight (84));
-        top.removeFromRight (14);
-        metroButton.setBounds (top.removeFromRight (70));
-        tunerButton.setBounds (top.removeFromRight (36));
+        record.setBounds (top.removeFromRight (80));
+        top.removeFromRight (10);
+        metroButton.setBounds (top.removeFromRight (66));
+        tunerButton.setBounds (top.removeFromRight (34));
+        loopButton.setBounds (top.removeFromRight (34));
 
         // the tone's name sits dead centre between its two arrows; star and save follow on the right
         auto centre = juce::Rectangle<int> (0, 0, 380, topH).withCentre ({ getWidth() / 2, topH / 2 }).reduced (0, 8);
         toneWell = centre;
         prevPreset.setBounds (centre.removeFromLeft (28));
         nextPreset.setBounds (centre.removeFromRight (28));
-        auto right = juce::Rectangle<int> (centre.getRight() + 28, centre.getY(), 6 + 30 + 2 + 30, centre.getHeight());
+        auto right = juce::Rectangle<int> (centre.getRight() + 28, centre.getY(), 6 + 30 + 2 + 30, centre.getHeight()).translated (-6, 0);
         right.removeFromLeft (6);
         favourite.setBounds (right.removeFromLeft (30));
         right.removeFromLeft (2);
         saveButton.setBounds (right.removeFromLeft (30));
         presetBox.setBounds (centre.reduced (4, 0));
+        // undo and redo stand on the other side of the tone, as far from it as star and save
+        auto left = juce::Rectangle<int> (toneWell.getX() - 20 - 62, toneWell.getY(), 62, toneWell.getHeight());
+        undoButton.setBounds (left.removeFromLeft (30));
+        left.removeFromLeft (2);
+        redoButton.setBounds (left.removeFromLeft (30));
 
         chain.setBounds (0, chainY, getWidth(), chainH);
         const auto page = juce::Rectangle<int> (24, pageY, getWidth() - 48, bottomY - pageY - 6);
@@ -660,7 +693,7 @@ public:
         settings.setBounds (overlay);
         takesView.setBounds (overlay);
         placeBars();
-        toast.setBounds (getWidth() / 2 - 300, bottomY - 60, 600, 44);
+        toast.setBounds (0, bottomY - 34, getWidth(), 34);
         dropHint.setBounds (getLocalBounds());
         stage = {};
     }
@@ -746,6 +779,8 @@ public:
     PresetBox presetBox;
     IconButton prevPreset { icons::chevronLeft() }, nextPreset { icons::chevronRight() };
     IconButton favourite { icons::star (false) }, saveButton { icons::save() };
+    IconButton undoButton { icons::undo() }, redoButton { icons::redo() }, loopButton { icons::loop() };
+    int historyTicks = 0;
     IconButton tunerButton { icons::tuningFork() }, metroButton { icons::metronome(), "100" }, settingsButton { icons::gear() };
     RecordButton record;
     IconButton recordOptions { icons::chevronDown() };
@@ -763,6 +798,7 @@ public:
     Scrim scrim;
     RecordPanel recordPanel;
     MetronomePanel metroPanel;
+    LooperPanel looperPanel;
     SaveDialog saveDialog;
     Toast toast;
     DropHint dropHint;
@@ -1002,7 +1038,7 @@ void RiffhouseEditor::openFile (const juce::File& f)
 
 void RiffhouseEditor::showToast (const juce::String& m)
 {
-    root->toast.setTopLeftPosition (root->toast.getX(), Root::bottomY - (root->noticeBar.isVisible() ? 92 : 60));
+    root->toast.setTopLeftPosition (root->toast.getX(), Root::bottomY - (root->noticeBar.isVisible() ? 68 : 34));
     root->toast.toFront (false);
     root->toast.show (m);
 }
@@ -1045,8 +1081,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     {
         // one picture with the message that shows when no guitar is connected
         r.noticeBar.set ({ "No guitar input yet. Plug in and Riffhouse will find it.", "Run setup", false });
-        const int w = juce::roundToInt (r.noticeBar.wantedWidth());
-        r.noticeBar.setBounds ((r.getWidth() - w) / 2, Root::bottomY - 40, w, 32);
+        r.noticeBar.setBounds (0, Root::bottomY - 34, r.getWidth(), 34);
         shoot ("notice");
         r.noticeBar.set ({});
     }
@@ -1091,11 +1126,46 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     r.toggleOverlay (r.settings);
     shoot ("settings");
     r.closeOverlays();
-    r.showPopover (r.recordPanel, r.recordOptions.getBounds(), 380, 392);
+    r.showPopover (r.recordPanel, r.recordOptions.getBounds(), 380, 522);
     shoot ("record");
+    {
+        // the same window with a song in it, slowed down, one part going round
+        const auto song = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("Slow Blues in A.wav");
+        song.deleteFile();
+        {
+            juce::WavAudioFormat wav;
+            std::unique_ptr<juce::FileOutputStream> stream (song.createOutputStream());
+            std::unique_ptr<juce::AudioFormatWriter> writer;
+            if (stream != nullptr) writer.reset (wav.createWriterFor (stream.get(), 44100.0, 1, 16, {}, 0));
+            if (writer != nullptr)
+            {
+                stream.release(); // the writer owns it now
+                juce::AudioBuffer<float> tone (1, 44100);
+                for (int i = 0; i < tone.getNumSamples(); ++i) tone.setSample (0, i, 0.1f * std::sin ((float) i * 0.0313f));
+                for (int second = 0; second < 204; ++second) writer->writeFromAudioSampleBuffer (tone, 0, tone.getNumSamples());
+            }
+        }
+        if (proc.loadJamTrack (song))
+        {
+            proc.setJamSpeed (0.8f);
+            proc.setJamSection (52.0, 71.0);
+            proc.setJamPlaying (true);
+            r.recordPanel.refresh();
+            r.recordPanel.repaint();
+            shoot ("record-song");
+            proc.setJamPlaying (false);
+            proc.clearJamSection();
+            proc.setJamSpeed (1.0f);
+            r.recordPanel.refresh();
+        }
+        song.deleteFile();
+    }
     r.closePopovers();
     r.showPopover (r.metroPanel, r.metroButton.getBounds(), 300, 274);
     shoot ("metronome");
+    r.closePopovers();
+    r.showPopover (r.looperPanel, r.loopButton.getBounds(), 320, 286);
+    shoot ("looper");
     r.closePopovers();
     r.showPopover (r.saveDialog, r.saveButton.getBounds(), 360, 206);
     shoot ("save");
@@ -1228,9 +1298,28 @@ bool RiffhouseEditor::keyPressed (const juce::KeyPress& k)
         root->showPopover (root->saveDialog, root->saveButton.getBounds(), 360, 206);
         return true;
     }
+    if (k == juce::KeyPress ('z', juce::ModifierKeys::commandModifier, 0)) { root->stepHistory (false); return true; }
+    if (k == juce::KeyPress ('y', juce::ModifierKeys::commandModifier, 0)
+        || k == juce::KeyPress ('z', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0)) { root->stepHistory (true); return true; }
     if (root->openOverlay == &root->browser || root->anyPopoverOpen()) return false;
     if (k == juce::KeyPress::leftKey) { root->stepPreset (-1); return true; }
     if (k == juce::KeyPress::rightKey) { root->stepPreset (1); return true; }
+    if (k.getTextCharacter() == 'o' || k.getTextCharacter() == 'O')
+    {
+        // O is the looper's switch; with Shift it stops the loop
+        const auto was = proc.looper().state();
+        if (k.getModifiers().isShiftDown())
+        {
+            proc.looper().stop();
+            if (was != Looper::State::empty) showToast ("Looper: stopped");
+            return true;
+        }
+        proc.loopPress();
+        showToast (was == Looper::State::empty ? "Looper: recording. Press O again to close the loop."
+                   : was == Looper::State::playing ? "Looper: adding a layer"
+                   : "Looper: playing");
+        return true;
+    }
     if (k.getTextCharacter() == 't' || k.getTextCharacter() == 'T') { root->toggleOverlay (root->tuner); return true; }
     if (k.getTextCharacter() == 'r' || k.getTextCharacter() == 'R') { root->toggleRecording(); return true; }
     if (k.getTextCharacter() == 'l' || k.getTextCharacter() == 'L') { root->toggleOverlay (root->takesView); return true; }
