@@ -1,10 +1,23 @@
 name: Build
 
+# Writing and the website are not built here. (GitHub does not apply path filters to tags.)
 on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "site/**"
+      - "tools/site/**"
+      - ".github/workflows/pages.yml"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "site/**"
+      - "tools/site/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -23,8 +36,56 @@ jobs:
       - uses: actions/checkout@v5
       - run: python3 tools/release/notes.py check "$GITHUB_REF_NAME"
 
+  # Publishing a release makes the tag, and people then wait for the installer. When main already
+  # built this very commit as this very version, and every check passed, that installer is used
+  # and the release is complete in about a minute. Anything else is built from scratch as before.
+  reuse:
+    name: Use the build main already made
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      found: ${{ steps.find.outputs.found }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          want="${GITHUB_REF_NAME#v}"
+          run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow build.yml --branch main --event push \
+                  --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty' || true)
+          if [ -z "$run" ]; then echo "main has no finished build of $GITHUB_SHA: building now."; exit 0; fi
+          if ! gh run download "$run" --repo "$GITHUB_REPOSITORY" --name riffhouse-windows --dir dist; then
+            echo "The installer of run $run could not be fetched: building now."; rm -rf dist; exit 0
+          fi
+          made=$(tr -d '\r' < dist/BUILD.txt 2>/dev/null || true)
+          if [ "$made" != "$want $GITHUB_SHA" ]; then
+            echo "Run $run made '$made', not '$want $GITHUB_SHA': building now."; rm -rf dist; exit 0
+          fi
+          file="dist/Riffhouse-$want-windows-setup.exe"
+          hash=$(sha256sum "$file" | cut -d' ' -f1)
+          if ! grep -qi "$hash" dist/SHA256SUMS.txt; then
+            echo "The installer of run $run does not match its checksum: building now."; rm -rf dist; exit 0
+          fi
+          echo "Using the installer run $run built and tested: $file $hash"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: steps.find.outputs.found == 'true'
+        with:
+          name: riffhouse-windows
+          path: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+            dist/BUILD.txt
+          if-no-files-found: error
+
   windows:
     name: Windows installer
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.found != 'true' }}
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
@@ -46,10 +107,20 @@ jobs:
           "ASIO_SDK=$($sdk -replace '\\','/')" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # A tag build carries the tag as its version ("0.1.0-rc2"), so a tester can say which copy they run.
+      # On main, a commit whose version has no tag yet is the one that may become that release, so it is
+      # built as the release. Later commits, once the tag exists, are marked as built from source again.
       - name: Configure
         shell: pwsh
         run: |
-          $label = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME -replace '^v', '' } else { "" }
+          $v = (Select-String -Path CMakeLists.txt -Pattern 'project\(Riffhouse VERSION ([0-9.]+)').Matches[0].Groups[1].Value
+          $label = ""
+          if ($env:GITHUB_REF_TYPE -eq "tag") { $label = $env:GITHUB_REF_NAME -replace '^v', '' }
+          elseif ($env:GITHUB_REF -eq "refs/heads/main" -and $env:GITHUB_EVENT_NAME -eq "push") {
+            $tagged = git ls-remote --tags origin "refs/tags/v$v"
+            if ($LASTEXITCODE -eq 0 -and -not $tagged) { $label = $v }
+          }
+          "Building as '$label' (empty: built from source)"
+          "LABEL=$label" | Out-File -FilePath $env:GITHUB_ENV -Append
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DRIFFHOUSE_ASIO_SDK_DIR="${{ env.ASIO_SDK }}" "-DRIFFHOUSE_VERSION_LABEL=$label"
 
       - name: Build
@@ -81,6 +152,8 @@ jobs:
           $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
           "SHA-256 Riffhouse-$env:VERSION-windows-setup.exe $hash" | Out-File -FilePath dist\SHA256SUMS.txt -Encoding ascii
           Get-Content dist\SHA256SUMS.txt
+          # which version this was built as and from which commit: a release only reuses its own build
+          "$env:LABEL $env:GITHUB_SHA" | Out-File -FilePath dist\BUILD.txt -Encoding ascii
 
       - uses: actions/upload-artifact@v4
         with:
@@ -88,6 +161,7 @@ jobs:
           path: |
             dist/*.exe
             dist/SHA256SUMS.txt
+            dist/BUILD.txt
           if-no-files-found: error
 
       # The installer is what people get, so it is what gets tested: put it on this machine
@@ -134,6 +208,8 @@ jobs:
 
   linux:
     name: Linux build and tests
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.found != 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -152,8 +228,10 @@ jobs:
 
   release:
     name: Publish the release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [version, windows, linux]
+    needs: [version, reuse, windows, linux]
+    if: >-
+      ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && needs.version.result == 'success'
+          && (needs.reuse.outputs.found == 'true' || (needs.windows.result == 'success' && needs.linux.result == 'success')) }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
