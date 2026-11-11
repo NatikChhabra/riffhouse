@@ -13,7 +13,7 @@ namespace rh
 {
 // The main window. Everything is laid out on a fixed 1200 x 780 canvas and
 // scaled as a whole, so it looks identical at any window size.
-class RiffhouseEditor : public juce::AudioProcessorEditor, private juce::Timer
+class RiffhouseEditor : public juce::AudioProcessorEditor, public juce::FileDragAndDropTarget, private juce::Timer
 {
 public:
     explicit RiffhouseEditor (RiffhouseProcessor&);
@@ -23,6 +23,14 @@ public:
     bool keyPressed (const juce::KeyPress&) override;
 
     static constexpr int baseWidth = 1200, baseHeight = 780;
+
+    // Drop a file on the window: a .nam capture becomes the amp, a short sound file the
+    // cabinet, a long one the song to play along with, a tone file the tone.
+    bool isInterestedInFileDrag (const juce::StringArray& files) override;
+    void fileDragEnter (const juce::StringArray&, int, int) override;
+    void fileDragExit (const juce::StringArray&) override;
+    void filesDropped (const juce::StringArray& files, int, int) override;
+    void openFile (const juce::File&);
 
     void showSetupWizard();
     void showToast (const juce::String&);

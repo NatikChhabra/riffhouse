@@ -15,12 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    name: Version, tag and changelog agree
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - run: python3 tools/release/notes.py check "$GITHUB_REF_NAME"
+
   windows:
     name: Windows installer
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The ASIO SDK is GPLv3 since October 2025. MSYS2 packages its headers.
       - uses: msys2/setup-msys2@v2
@@ -73,12 +81,54 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
 
+      # The installer is what people get, so it is what gets tested: put it on this machine
+      # the way an update does, start the app, have it draw every screen, and take it off again.
+      - name: Install it, start it, remove it
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\*windows-setup.exe)[0].FullName
+          $p = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/LOG=$PWD\install.log" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "The installer did not finish in 5 minutes" }
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 40; throw "The installer ended with code $($p.ExitCode)" }
+
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Riffhouse\Riffhouse.exe'
+          $plugin = Join-Path $env:LOCALAPPDATA 'Programs\Common\VST3\Riffhouse.vst3'
+          if (-not (Test-Path $app)) { Get-Content install.log -Tail 40; throw "Riffhouse.exe was not installed" }
+          if (-not (Test-Path $plugin)) { throw "The VST3 plugin was not installed" }
+          $installed = (Get-Item $app).VersionInfo.ProductVersion
+          if (-not "$installed".StartsWith($env:VERSION)) { throw "Installed version is '$installed', expected $env:VERSION" }
+
+          $screens = Join-Path $PWD 'smoke'
+          $p = Start-Process $app -ArgumentList '--snapshots',"`"$screens`"",'1' -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(240000)) { $p.Kill(); throw "The app did not finish drawing its screens in 4 minutes" }
+          if ($p.ExitCode -ne 0) { throw "The app ended with code $($p.ExitCode)" }
+          $made = @(Get-ChildItem $screens -Recurse -Filter *.png | Where-Object { $_.Length -gt 2000 })
+          "The app drew $($made.Count) pictures"
+          if ($made.Count -lt 60) { throw "Expected at least 60 screens and gear pictures, got $($made.Count)" }
+
+          $remove = Join-Path (Split-Path $app) 'unins000.exe'
+          if (-not (Test-Path $remove)) { throw "No uninstaller next to the app" }
+          Start-Process $remove -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait
+          $left = $true
+          foreach ($i in 1..60) { if (-not (Test-Path $app)) { $left = $false; break }; Start-Sleep -Seconds 1 }
+          if ($left) { throw "Riffhouse.exe is still there after the uninstaller ran" }
+          "Installed $installed, started, drew its screens, removed."
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: riffhouse-windows-screens
+          path: smoke
+          if-no-files-found: ignore
+
   linux:
     name: Linux build and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install build tools
         run: |
           sudo apt-get update
@@ -94,18 +144,25 @@ jobs:
   release:
     name: Publish the release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, linux]
+    needs: [version, windows, linux]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           name: riffhouse-windows
           path: dist
+      # The notes are the version's section of CHANGELOG.md, then how to install and the checksum.
+      # A tag like v1.2.3-rc1 is published as a pre-release: the app's updater skips those.
       - name: Write the release notes
         run: |
           {
+            python3 tools/release/notes.py notes "$GITHUB_REF_NAME"
+            echo
+            echo "## Install"
+            echo
             echo "Download **$(basename dist/*.exe)** below and run it. Riffhouse updates itself after that."
             echo
             echo "Windows may show a blue \"Windows protected your PC\" box the first time, because the installer is not signed with a paid certificate. Press **More info**, then **Run anyway**."
@@ -114,10 +171,13 @@ jobs:
             cat dist/SHA256SUMS.txt
             echo '```'
           } > notes.md
+          echo "PRERELEASE=$(python3 tools/release/notes.py prerelease "$GITHUB_REF_NAME")" >> "$GITHUB_ENV"
+          cat notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.exe
             dist/SHA256SUMS.txt
           body_path: notes.md
+          prerelease: ${{ env.PRERELEASE == 'true' }}
           generate_release_notes: true

@@ -136,12 +136,7 @@ RecordPanel::RecordPanel (RiffhouseProcessor& p) : proc (p)
     countIn.onClick = [this] { proc.uiState.setProperty ("countIn", countIn.getToggleState(), nullptr); };
     saveDi.setToggleState (proc.saveDi.load(), juce::dontSendNotification);
     saveDi.onClick = [this] { proc.saveDi.store (saveDi.getToggleState()); };
-    openFolder.onClick = [this]
-    {
-        proc.recordingFolder.createDirectory();
-        if (proc.recorder().lastTake().existsAsFile()) proc.recorder().lastTake().revealToUser();
-        else proc.recordingFolder.startAsProcess();
-    };
+    openFolder.onClick = [this] { if (onShowTakes) onShowTakes(); };
     changeFolder.onClick = [this]
     {
         chooser = std::make_unique<juce::FileChooser> ("Where should recordings go?", proc.recordingFolder);
@@ -178,6 +173,7 @@ void RecordPanel::visibilityChanged()
 void RecordPanel::timerCallback()
 {
     const bool has = proc.jamTrackName().isNotEmpty();
+    if (has && loadSong.getButtonText() != proc.jamTrackName()) loadSong.setButtonText (proc.jamTrackName()); // a song dropped on the window
     playSong.setEnabled (has);
     songPos.setEnabled (has);
     playSong.setIcon (proc.isJamPlaying() ? icons::pause() : icons::play(), true);

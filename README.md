@@ -16,6 +16,8 @@ Windows may show a blue "Windows protected your PC" box the first time. That hap
 
 After that Riffhouse keeps itself up to date. A new version downloads in the background, its SHA-256 is checked against the one GitHub publishes for the file, and it goes in when you close the app. It never interrupts you while you play or record, and it leaves your tones and settings alone. You can switch this off in Settings.
 
+What changed in each version is in the [changelog](CHANGELOG.md). Every older version stays on the [releases page](https://github.com/NatikChhabra/riffhouse/releases), so you can go back: run the older installer over the newer one.
+
 **macOS and Linux:** build from source for now (see below).
 
 ## What you get
@@ -25,8 +27,10 @@ After that Riffhouse keeps itself up to date. A new version downloads in the bac
 - **29 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
 - **177 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
 - **Neural captures:** load any `.nam` file as the amp.
-- **Tuner** for any tuning, **metronome**, and a **recorder** that also keeps the clean guitar so you can change the tone later.
+- **Tuner** for any tuning, **metronome**, and a **recorder** that also keeps the clean guitar.
+- **Takes:** press L to listen to what you recorded. Pick a take, turn the knobs or choose another tone while it plays, and save it as a new take. You played it once, you can re-amp it as often as you like.
 - **Play along:** load a song, it plays in your headphones and stays out of your recording.
+- **Drop files on the window:** a `.nam` capture becomes the amp, an impulse response the cabinet, a song the backing track, a tone file the tone.
 - A **VST3 plugin** of the same rig for recording software.
 
 Every amp, pedal and cabinet is its own piece of gear, drawn by the app itself.
@@ -35,6 +39,14 @@ Every amp, pedal and cabinet is its own piece of gear, drawn by the app itself.
 |---|---|
 | ![A drive pedal](docs/screenshots/pedal.png) | ![The wah, which you rock with the mouse](docs/screenshots/wah.png) |
 | ![A cabinet with its microphone](docs/screenshots/cab.png) | ![The tone browser](docs/screenshots/browser.png) |
+
+## Record, then change your mind
+
+Every take is saved twice: once the way you heard it, once as the clean guitar. Press **L** for your takes. **Change the tone** plays the clean guitar through the rig, so you can turn knobs or pick another tone while your own playing loops, and save the result as a new take.
+
+| | |
+|---|---|
+| ![The list of takes](docs/screenshots/takes.png) | ![A take running through a new tone](docs/screenshots/take-tone.png) |
 
 ## It sets itself up
 
@@ -54,7 +66,7 @@ Every change runs 5,400 automatic checks on the sound engine before it ships.
 | Delay added by the rig | 5 samples, about 0.1 ms at 48 kHz |
 | Amp oversampling | 8x below 64 kHz, 4x above |
 | Aliasing on a hot amp | 42.9 dB below the wanted harmonics |
-| Everything switched on | about 9x faster than real time on one core |
+| Everything switched on | about 8x faster than real time on one core of a build server |
 | Loudness across all 177 tones | within 5 dB of each other |
 
 ## Build it yourself

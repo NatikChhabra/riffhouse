@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Editor.h"
 #include "../plugin/StandaloneHost.h"
+#include "TakesView.h"
 
 namespace rh
 {
@@ -148,6 +149,43 @@ public:
     void mouseDown (const juce::MouseEvent&) override { if (onClick) onClick(); }
 };
 
+// Shown while a file is held over the window: says what dropping it will do.
+class DropHint : public juce::Component
+{
+public:
+    DropHint() { setInterceptsMouseClicks (false, false); }
+    void show (const juce::String& head, const juce::String& line)
+    {
+        title = head;
+        detail = line;
+        setVisible (true);
+        toFront (false);
+        repaint();
+    }
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (juce::Colour (0xff0e0d0c).withAlpha (0.82f));
+        const auto frame = getLocalBounds().toFloat().reduced (28.0f);
+        juce::Path edge;
+        edge.addRoundedRectangle (frame, 10.0f);
+        juce::Path dashed;
+        const float dashes[] = { 10.0f, 8.0f };
+        juce::PathStrokeType (2.0f).createDashedStroke (dashed, edge, dashes, 2);
+        g.setColour (colours::lamp.withAlpha (0.9f));
+        g.fillPath (dashed);
+        auto text = getLocalBounds().withSizeKeepingCentre (getWidth() - 160, 110);
+        g.setColour (colours::text);
+        g.setFont (font (30.0f, Weight::semibold));
+        g.drawText (title, text.removeFromTop (48), juce::Justification::centred);
+        g.setColour (colours::textDim);
+        g.setFont (font (16.0f));
+        g.drawFittedText (detail, text.removeFromTop (52), juce::Justification::centredTop, 2);
+    }
+
+private:
+    juce::String title, detail;
+};
+
 class Toast : public juce::Component, private juce::Timer
 {
 public:
@@ -258,7 +296,8 @@ public:
         : editor (e), proc (p), presetBox (p), record (p), chain (p), amp (p),
           space (p, P::space, colours::accent, "Space"), doubler (p, P::doubler, colours::accent, "Doubler"),
           volume (p, P::outLevel, colours::accent, "Volume"),
-          browser (p), tuner (p), settings (p), recordPanel (p), metroPanel (p), saveDialog (p)
+          browser (p), tuner (p), settings (p), recordPanel (p), metroPanel (p), saveDialog (p),
+          takeBar (p), takesView (p, takeBar)
     {
         // top bar
         addAndMakeVisible (presetBox);
@@ -337,14 +376,31 @@ public:
                                              { if (safe != nullptr) safe->applyLook (l, true); });
         };
         saveDialog.onSaved = [this] (juce::String m) { closeOverlays(); refreshTop(); editor.showToast (m); };
+        takesView.onClose = [this] { closeOverlays(); };
+        takesView.onMessage = [this] (juce::String m) { editor.showToast (m); };
+        takesView.onPlay = [this] (const Take& t, bool changeTone)
+        {
+            takeBar.start (t, changeTone);
+            // changing the tone needs the rig in front of you, so the list steps aside
+            if (changeTone && takeBar.isChangingTone()) closeOverlays();
+        };
+        takeBar.onMessage = [this] (juce::String m) { editor.showToast (m); };
+        takeBar.onChanged = [this]
+        {
+            placeBars();
+            if (takesView.isVisible()) takesView.refresh();
+        };
+        recordPanel.onShowTakes = [this] { closePopovers(); toggleOverlay (takesView); };
         metroPanel.onChange = [this] { refreshTop(); };
         scrim.onClick = [this] { closePopovers(); };
         for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings,
-                                    (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel,
+                                    (juce::Component*) &takesView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel,
                                     (juce::Component*) &saveDialog })
             addChildComponent (c);
+        addChildComponent (dropHint);
         addChildComponent (toast);
         addChildComponent (noticeBar);
+        addChildComponent (takeBar);
         noticeBar.onAction = [] { if (auto* host = StandaloneHost::get()) host->audioNoticeAction(); };
 
         showPage ((int) proc.uiState.getProperty ("page", (int) mAmp));
@@ -379,10 +435,13 @@ public:
         {
             const auto take = proc.recorder().lastTake();
             proc.stopRecording();
-            if (take.existsAsFile()) editor.showToast ("Saved " + take.getFileName());
+            if (take.existsAsFile()) editor.showToast ("Saved. Press L to listen to your takes.");
+            if (takesView.isVisible()) takesView.refresh();
         }
         else
         {
+            // a take that is only being listened to would drown the guitar you are about to record
+            if (takeBar.isActive() && ! takeBar.isChangingTone()) takeBar.stop();
             const bool countIn = proc.uiState.getProperty ("countIn", true);
             if (! proc.startRecording (countIn))
                 editor.showToast ("Couldn't start recording. Check the recordings folder in the options.");
@@ -402,13 +461,26 @@ public:
         proc.tunerOpen.store (&c == &tuner);
         tunerButton.setToggleState (&c == &tuner, juce::dontSendNotification);
         settingsButton.setToggleState (&c == &settings, juce::dontSendNotification);
+        takeBar.toFront (false);
         toast.toFront (false);
+    }
+
+    // The strip for a playing take and the audio notice share one place above the bottom bar.
+    void placeBars()
+    {
+        if (takeBar.isActive())
+        {
+            const int w = juce::jmin (getWidth() - 48, 900);
+            takeBar.setBounds ((getWidth() - w) / 2, bottomY - 40, w, 32);
+            takeBar.toFront (false);
+            noticeBar.setVisible (false);
+        }
     }
 
     void closeOverlays()
     {
         closePopovers();
-        for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings })
+        for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings, (juce::Component*) &takesView })
             c->setVisible (false);
         openOverlay = nullptr;
         proc.tunerOpen.store (false);
@@ -462,7 +534,7 @@ public:
             noticeTicks = 0;
             if (auto* host = StandaloneHost::get())
             {
-                noticeBar.set (wizard == nullptr ? host->audioNotice() : StandaloneHost::Notice());
+                noticeBar.set (wizard == nullptr && ! takeBar.isActive() ? host->audioNotice() : StandaloneHost::Notice());
                 if (noticeBar.isVisible())
                 {
                     const int w = juce::jmin (getWidth() - 48, juce::roundToInt (noticeBar.wantedWidth()));
@@ -556,7 +628,10 @@ public:
         browser.setBounds (overlay);
         tuner.setBounds (overlay);
         settings.setBounds (overlay);
+        takesView.setBounds (overlay);
+        placeBars();
         toast.setBounds (getWidth() / 2 - 300, bottomY - 60, 600, 44);
+        dropHint.setBounds (getLocalBounds());
         stage = {};
     }
 
@@ -622,7 +697,10 @@ public:
     MetronomePanel metroPanel;
     SaveDialog saveDialog;
     Toast toast;
+    DropHint dropHint;
     NoticeBar noticeBar;
+    TakeBar takeBar;
+    TakesView takesView;
     int noticeTicks = 0;
     bool quietNotices = false; // pictures of the app are taken without a message about the missing guitar
     std::unique_ptr<SetupWizard> wizard;
@@ -725,6 +803,134 @@ void RiffhouseEditor::showSetupWizard()
     root->wizard->begin();
 }
 
+namespace
+{
+enum class Dropped { none, capture, tone, sound };
+
+Dropped kindOf (const juce::File& f)
+{
+    const auto ext = f.getFileExtension().toLowerCase();
+    if (ext == ".nam") return Dropped::capture;
+    if (ext == ".json") return Dropped::tone;
+    if (juce::StringArray { ".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg", ".m4a" }.contains (ext)) return Dropped::sound;
+    return Dropped::none;
+}
+
+// A cabinet impulse is a fraction of a second long. A song is not.
+constexpr double kLongestImpulseSeconds = 4.0;
+}
+
+bool RiffhouseEditor::isInterestedInFileDrag (const juce::StringArray& files)
+{
+    if (root->wizard != nullptr) return false;
+    for (const auto& f : files)
+        if (kindOf (juce::File (f)) != Dropped::none) return true;
+    return false;
+}
+
+void RiffhouseEditor::fileDragEnter (const juce::StringArray& files, int, int)
+{
+    juce::File first;
+    for (const auto& f : files)
+        if (kindOf (juce::File (f)) != Dropped::none) { first = juce::File (f); break; }
+    juce::String line;
+    switch (kindOf (first))
+    {
+        case Dropped::capture: line = "This capture becomes your amp."; break;
+        case Dropped::tone:    line = "This tone is loaded. Save it if you want to keep it."; break;
+        case Dropped::sound:
+            line = proc.audioFileSeconds (first) <= kLongestImpulseSeconds
+                       ? "This impulse response becomes your cabinet."
+                       : "This song plays in your headphones so you can play along. It stays out of your recording.";
+            break;
+        case Dropped::none: break;
+    }
+    root->dropHint.show ("Drop " + first.getFileName(), line);
+}
+
+void RiffhouseEditor::fileDragExit (const juce::StringArray&) { root->dropHint.setVisible (false); }
+
+void RiffhouseEditor::filesDropped (const juce::StringArray& files, int, int)
+{
+    root->dropHint.setVisible (false);
+    // one of each kind is enough: two amps cannot both be the amp
+    bool did[4] = {};
+    for (const auto& name : files)
+    {
+        const juce::File f (name);
+        const auto kind = kindOf (f);
+        if (kind == Dropped::none || did[(int) kind]) continue;
+        did[(int) kind] = true;
+        openFile (f);
+    }
+}
+
+void RiffhouseEditor::openFile (const juce::File& f)
+{
+    if (! f.existsAsFile()) return;
+    switch (kindOf (f))
+    {
+        case Dropped::capture:
+        {
+            root->closeOverlays();
+            showToast ("Loading " + f.getFileName());
+            juce::Component::SafePointer<RiffhouseEditor> safe (this);
+            proc.loadCaptureAsync (f, [safe, f] (juce::String err)
+            {
+                if (safe == nullptr) return;
+                if (err.isEmpty()) safe->root->showPage (mAmp);
+                safe->root->refreshTop();
+                safe->showToast (err.isEmpty() ? f.getFileNameWithoutExtension() + " is your amp now."
+                                               : "Couldn't load " + f.getFileName() + ": " + err);
+            });
+            break;
+        }
+        case Dropped::tone:
+        {
+            Preset p;
+            juce::String err;
+            if (! presetFromJson (f.loadFileAsString(), p, err))
+            {
+                showToast (f.getFileName() + " is not a Riffhouse tone.");
+                break;
+            }
+            if (p.name.isEmpty()) p.name = f.getFileNameWithoutExtension();
+            proc.applySharedPreset (p);
+            root->closeOverlays();
+            root->refreshTop();
+            showToast ("Loaded \"" + p.name + "\". Save it to keep it.");
+            break;
+        }
+        case Dropped::sound:
+        {
+            const double seconds = proc.audioFileSeconds (f);
+            if (seconds <= 0.0)
+            {
+                showToast ("Couldn't read " + f.getFileName() + ".");
+            }
+            else if (seconds <= kLongestImpulseSeconds)
+            {
+                if (proc.loadUserIr (f))
+                {
+                    root->closeOverlays();
+                    root->showPage (mCab);
+                    showToast (f.getFileNameWithoutExtension() + " is your cabinet now.");
+                }
+                else showToast ("Couldn't read " + f.getFileName() + ".");
+            }
+            else if (proc.loadJamTrack (f))
+            {
+                proc.setJamPlaying (true);
+                root->refreshTop();
+                showToast ("Playing " + f.getFileNameWithoutExtension() + ". Space pauses it.");
+            }
+            else showToast ("Couldn't read " + f.getFileName() + ".");
+            break;
+        }
+        case Dropped::none: break;
+    }
+}
+
 void RiffhouseEditor::showToast (const juce::String& m)
 {
     root->toast.setTopLeftPosition (root->toast.getX(), Root::bottomY - (root->noticeBar.isVisible() ? 92 : 60));
@@ -773,6 +979,21 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         r.noticeBar.setBounds ((r.getWidth() - w) / 2, Root::bottomY - 40, w, 32);
         shoot ("notice");
         r.noticeBar.set ({});
+    }
+    {
+        // the takes list with one take playing, then the rig with a take running through it
+        r.toggleOverlay (r.takesView);
+        const auto takes = listTakes (proc.recordingFolder);
+        if (takes.size() > 1) r.takeBar.start (takes[1], false);
+        r.takesView.refresh();
+        shoot ("takes");
+        r.closeOverlays();
+        if (takes.size() > 1 && takes[1].hasClean())
+        {
+            r.takeBar.start (takes[1], true);
+            shoot ("take-tone");
+        }
+        r.takeBar.stop();
     }
     r.toggleOverlay (r.browser);
     shoot ("browser");
@@ -857,6 +1078,21 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         }
     }
 
+    {
+        // a file held over the window, then a tone file dropped on it
+        r.showPage (mAmp);
+        r.dropHint.show ("Drop Midnight Lead.json", "This tone is loaded. Save it if you want to keep it.");
+        shoot ("drop");
+        r.dropHint.setVisible (false);
+        auto tone = proc.captureCurrent ("Dropped Tone", "Shared");
+        tone.values[(size_t) P::ampModel] = (float) choices::britPlexi;
+        const auto file = folder.getChildFile ("dropped-tone.json");
+        file.replaceWithText (presetToJson (tone));
+        openFile (file);
+        shoot ("dropped-tone");
+        file.deleteFile();
+    }
+
     // each piece of gear on its own with a clear background, for the website and the README
     {
         const auto cut = folder.getChildFile ("cutouts");
@@ -921,6 +1157,15 @@ bool RiffhouseEditor::keyPressed (const juce::KeyPress& k)
     if (k == juce::KeyPress::rightKey) { root->stepPreset (1); return true; }
     if (k.getTextCharacter() == 't' || k.getTextCharacter() == 'T') { root->toggleOverlay (root->tuner); return true; }
     if (k.getTextCharacter() == 'r' || k.getTextCharacter() == 'R') { root->toggleRecording(); return true; }
+    if (k.getTextCharacter() == 'l' || k.getTextCharacter() == 'L') { root->toggleOverlay (root->takesView); return true; }
+    if (k == juce::KeyPress::spaceKey)
+    {
+        // space is play and pause: the take if one is up, otherwise the song you play along with
+        if (root->takeBar.isActive()) proc.takes().setPlaying (! proc.takes().isPlaying());
+        else if (proc.jamTrackName().isNotEmpty()) proc.setJamPlaying (! proc.isJamPlaying());
+        else return false;
+        return true;
+    }
     return false;
 }
 } // namespace rh

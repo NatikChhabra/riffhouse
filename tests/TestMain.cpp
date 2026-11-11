@@ -12,6 +12,7 @@
 #include "engine/Presets.h"
 #include "engine/Rig.h"
 #include "engine/UpdateInfo.h"
+#include "plugin/Takes.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <chrono>
@@ -535,6 +536,45 @@ void testNeural (double sr)
 #endif
 }
 
+// Measured 3.6 with every pedal on (GCC, November 2026). The budget leaves room for a
+// different compiler and a noisy machine, and still catches a rig that got a third slower.
+constexpr double kRigCostBudget = 5.0;
+
+// A fixed piece of arithmetic of the kind the rig is made of, timed on the same machine
+// at the same moment. Shared build machines differ by a factor of two and more from
+// run to run, so a plain stopwatch failed good code and would pass bad code on a fast
+// day. The rig is judged against this instead.
+double referenceSeconds (double sr, double seconds)
+{
+    const auto in = test::guitarDi (sr, seconds);
+    const int over = 8;
+    double best = 1.0e9;
+    for (int attempt = 0; attempt < 3; ++attempt)
+    {
+        float z[12] = {};
+        float sum = 0.0f;
+        const auto t0 = std::chrono::steady_clock::now();
+        for (float x : in)
+            for (int k = 0; k < over; ++k)
+            {
+                float s = x;
+                for (int st = 0; st < 12; ++st)
+                {
+                    const float u = 3.0f * s + 0.1f;
+                    const float u2 = u * u;
+                    const float sat = u * (15.0f + u2) / (15.0f + 6.0f * u2);
+                    z[st] += 0.2f * (sat - z[st]);
+                    s = sat - 0.5f * z[st];
+                }
+                sum += s;
+            }
+        const double took = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+        best = std::min (best, took);
+        if (! std::isfinite (sum)) return 1.0e9;
+    }
+    return best;
+}
+
 void testCpu (double sr)
 {
     std::printf ("cpu @ %.0f Hz\n", sr);
@@ -543,11 +583,19 @@ void testCpu (double sr)
         v[(size_t) t] = 1;
     v[(size_t) P::ampModel] = choices::tightMetal;
     v[(size_t) P::doubler] = 5;
-    const auto di = test::guitarDi (sr, 20.0);
-    const auto r = renderWith (v, di, sr, 64);
-    const double rt = 20.0 / r.seconds;
-    std::printf ("  every pedal on, 64-sample blocks: %.1fx realtime\n", rt);
-    CHECK (rt > 8.0, "too slow: %.1fx realtime", rt);
+    const double length = 10.0;
+    const auto di = test::guitarDi (sr, length);
+    double took = 1.0e9;
+    for (int attempt = 0; attempt < 3; ++attempt)
+        took = std::min (took, renderWith (v, di, sr, 64).seconds);
+    const double rt = length / took;
+    const double ref = referenceSeconds (sr, length);
+    const double cost = took / ref;
+    std::printf ("  every pedal on, 64-sample blocks: %.1fx realtime, %.2f times the reference load\n", rt, cost);
+    // Two checks. The first holds on any machine: a change that makes the rig slower shows
+    // up as a higher cost against the reference. The second is the floor for playing live.
+    CHECK (cost < kRigCostBudget, "the rig got slower: %.2f times the reference load (budget %.2f)", cost, kRigCostBudget);
+    CHECK (rt > 3.0, "too slow to play live: %.1fx realtime", rt);
 }
 
 int render (const juce::String& presetArg, const juce::File& out, const juce::File& in, double sr)
@@ -647,6 +695,124 @@ void testUpdates()
 }
 } // namespace
 
+void testTakes()
+{
+    std::printf ("takes\n");
+    const double sr = 48000.0;
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-takes-test");
+    dir.deleteRecursively();
+    dir.getChildFile ("DI").createDirectory();
+    const auto di = test::guitarDi (sr, 3.0);
+
+    auto v1 = bare();
+    v1[(size_t) P::ampOn] = 1; v1[(size_t) P::cabOn] = 1;
+    auto v2 = v1;
+    v2[(size_t) P::ampModel] = (float) choices::tightMetal;
+    v2[(size_t) P::dlyOn] = 1;
+
+    const juce::String base = "2026-01-02 03-04-05 Test Tone";
+    const auto wetFile = dir.getChildFile (base + ".wav"), cleanFile = dir.getChildFile ("DI").getChildFile (base + " (DI).wav");
+    writeWav (wetFile, renderWith (v1, di, sr, 512), sr);
+    {
+        Render mono; mono.l = di; mono.r = di;
+        writeWav (cleanFile, mono, sr);
+    }
+
+    auto takes = listTakes (dir);
+    CHECK (takes.size() == 1, "one take is listed (%d)", (int) takes.size());
+    if (takes.empty()) return;
+    CHECK (takes[0].name == "Test Tone", "the tone name comes out of the file name (%s)", takes[0].name.toRawUTF8());
+    CHECK (takes[0].hasClean(), "the clean guitar beside it is found");
+    CHECK (std::abs (takes[0].seconds - 3.0) < 0.05, "length %.2f s", takes[0].seconds);
+
+    // re-amp with another tone, faster than real time, and compare with the rig run directly
+    ReampJob::Setup setup;
+    setup.params = v2;
+    setup.toneName = "Other: Tone";
+    const auto out = ReampJob::outputFileFor (takes[0], setup.toneName);
+    CHECK (out.getFileName().startsWith (base + " ~ "), "a re-amped take keeps the original's name in front (%s)", out.getFileName().toRawUTF8());
+    std::atomic<float> progress { 0.0f };
+    const auto t0 = std::chrono::steady_clock::now();
+    const auto err = ReampJob::render (takes[0].clean, out, setup, &progress, nullptr);
+    const double took = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+    CHECK (err.isEmpty(), "re-amp runs (%s)", err.toRawUTF8());
+    CHECK (out.existsAsFile() && progress.load() == 1.0f, "the new take is written and progress reached the end");
+    CHECK (took < 3.0, "re-amping 3 s took %.2f s", took);
+    CHECK (! out.getSiblingFile (out.getFileName() + ".part").exists(), "no half-written file is left behind");
+
+    juce::AudioFormatManager fm;
+    fm.registerBasicFormats();
+    if (std::unique_ptr<juce::AudioFormatReader> r { fm.createReaderFor (out) })
+    {
+        // the file holds the guitar rounded to its bit depth: compare against exactly what the job read
+        std::vector<float> fromFile (di.size());
+        if (std::unique_ptr<juce::AudioFormatReader> c { fm.createReaderFor (cleanFile) })
+        {
+            juce::AudioBuffer<float> tmp ((int) c->numChannels, (int) di.size());
+            c->read (&tmp, 0, (int) di.size(), 0, true, true);
+            for (size_t i = 0; i < di.size(); ++i)
+            {
+                float sum = 0.0f;
+                for (int ch = 0; ch < tmp.getNumChannels(); ++ch) sum += tmp.getSample (ch, (int) i);
+                fromFile[i] = sum / (float) tmp.getNumChannels();
+            }
+        }
+        const auto direct = renderWith (v2, fromFile, sr, 512);
+        CHECK (r->lengthInSamples > (juce::int64) di.size(), "the delay tail is kept after the last note (%d extra samples)", (int) (r->lengthInSamples - (juce::int64) di.size()));
+        CHECK (r->lengthInSamples < (juce::int64) di.size() + (juce::int64) (12.5 * sr), "and it stops once the tail has died");
+        juce::AudioBuffer<float> got (2, (int) di.size());
+        r->read (&got, 0, (int) di.size(), 0, true, true);
+        float worst = 0.0f;
+        for (size_t i = 0; i < di.size(); ++i) worst = std::max (worst, std::abs (got.getSample (0, (int) i) - direct.l[i]));
+        CHECK (worst < 1.0e-4f, "the re-amped sound equals the rig's own output (worst difference %.2g)", worst);
+        CHECK (got.getMagnitude (0, (int) di.size()) > 0.01f, "and is not silent");
+    }
+    else
+        CHECK (false, "the new take can be read back");
+
+    takes = listTakes (dir);
+    CHECK (takes.size() == 2, "both takes are listed (%d)", (int) takes.size());
+    for (const auto& t : takes)
+        if (t.sound == out)
+        {
+            CHECK (t.name == "Other Tone", "the re-amped take shows its new tone (%s)", t.name.toRawUTF8());
+            CHECK (t.clean == cleanFile, "and still points at the same clean guitar, so it can be re-amped again");
+            CHECK (ReampJob::outputFileFor (t, "Other: Tone") != out, "a second re-amp with the same tone gets its own file");
+        }
+
+    // play back at another device rate: same length in seconds, sound comes out, the stream ends by itself
+    for (auto mode : { TakePlayer::Mode::asRecorded, TakePlayer::Mode::throughRig })
+    {
+        TakePlayer player;
+        const double deviceRate = 44100.0;
+        player.prepare (deviceRate, 256);
+        CHECK (player.load (takes.back(), mode), "the take loads");
+        CHECK (std::abs (player.length() - 3.0) < 0.05, "length %.2f s", player.length());
+        std::vector<float> l (256), r (256);
+        CHECK (! player.readSound (l.data(), r.data(), 256) && ! player.readClean (l.data(), 256), "nothing is read while stopped");
+        player.setPlaying (true);
+        double energy = 0.0;
+        juce::int64 frames = 0;
+        int idle = 0;
+        while (player.isPlaying() && frames < (juce::int64) (8.0 * deviceRate))
+        {
+            const bool ok = mode == TakePlayer::Mode::asRecorded ? player.readSound (l.data(), r.data(), 256) : player.readClean (l.data(), 256);
+            const bool wrong = mode == TakePlayer::Mode::asRecorded ? player.readClean (r.data(), 256) : player.readSound (r.data(), r.data(), 256);
+            if (wrong) { CHECK (false, "only the chosen way of playing delivers sound"); break; }
+            if (! ok) { if (++idle > 2000) break; juce::Thread::sleep (1); continue; }
+            for (float x : l) energy += (double) x * x;
+            frames += 256;
+            if ((frames / 256) % 8 == 0) juce::Thread::sleep (1); // let the disk thread keep up, like real time would
+        }
+        CHECK (! player.isPlaying(), "playback stops at the end by itself");
+        CHECK (std::abs ((double) frames / deviceRate - 3.0) < 0.25, "about 3 s were played at the device's rate (%.2f s)", (double) frames / deviceRate);
+        CHECK (energy > 1.0, "sound came out (energy %.1f)", energy);
+        player.setPlaying (true);
+        CHECK (player.position() < 0.5, "pressing play at the end starts again from the top");
+    }
+    dir.deleteRecursively();
+}
+
 int main (int argc, char** argv)
 {
     juce::ConsoleApplication* unused = nullptr; (void) unused;
@@ -718,6 +884,47 @@ int main (int argc, char** argv)
         juce::File (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])).replaceWithText (juce::JSON::toString (juce::var (obj)));
         return 0;
     }
+    if (args[0] == "determinism")
+    {
+        const double sr = 48000.0;
+        const auto di = test::guitarDi (sr, 3.0);
+        for (P t : { P::count, P::gateOn, P::compOn, P::wahOn, P::pitchOn, P::drvOn, P::ampOn, P::cabOn, P::eqOn, P::modOn, P::dlyOn, P::revOn, P::lofiOn })
+        {
+            auto v = bare();
+            if (t != P::count) v[(size_t) t] = 1;
+            const auto a = renderWith (v, di, sr, 512), b = renderWith (v, di, sr, 512);
+            float w = 0.0f; size_t at = 0;
+            for (size_t i = 0; i < di.size(); ++i) { const float d = std::max (std::abs (a.l[i] - b.l[i]), std::abs (a.r[i] - b.r[i])); if (d > w) { w = d; at = i; } }
+            std::printf ("%-10s worst %.3g at %d\n", t == P::count ? "bypass" : spec (t).key, w, (int) at);
+        }
+        for (int combo = 0; combo < 6; ++combo)
+        {
+            auto v = bare();
+            v[(size_t) P::ampOn] = 1;
+            if (combo != 5) v[(size_t) P::cabOn] = 1;
+            if (combo == 1 || combo == 2 || combo == 5) v[(size_t) P::ampModel] = (float) choices::tightMetal;
+            if (combo == 2 || combo == 3 || combo == 5) v[(size_t) P::dlyOn] = 1;
+            if (combo == 4) { v[(size_t) P::ampOn] = 0; v[(size_t) P::dlyOn] = 1; }
+            for (int rep = 0; rep < 3; ++rep)
+            {
+                const auto a = renderWith (v, di, sr, 512), b = renderWith (v, di, sr, 512);
+                float w = 0.0f; size_t at = 0;
+                for (size_t i = 0; i < di.size(); ++i) { const float d = std::max (std::abs (a.l[i] - b.l[i]), std::abs (a.r[i] - b.r[i])); if (d > w) { w = d; at = i; } }
+                std::printf ("combo %d    worst %.3g at %d\n", combo, w, (int) at);
+            }
+        }
+        for (int m = 0; m < choices::neuralCapture; ++m)
+        {
+            auto v = bare();
+            v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = (float) m;
+            const auto a = renderWith (v, di, sr, 512), b = renderWith (v, di, sr, 512);
+            float w = 0.0f; size_t at = 0;
+            for (size_t i = 0; i < di.size(); ++i) { const float d = std::abs (a.l[i] - b.l[i]); if (d > w) { w = d; at = i; } }
+            std::printf ("amp %-2d     worst %.3g at %d\n", m, w, (int) at);
+        }
+        return 0;
+    }
+    if (args[0] == "cpu") { testCpu (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "profile")
     {
         const double sr = 48000.0;
@@ -734,7 +941,9 @@ int main (int argc, char** argv)
     }
     const bool quick = args.contains ("--quick");
     testUpdates();
+    if (args.contains ("--takes")) { testTakes(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args.contains ("--updates")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    testTakes();
     testParams();
     testToneStacks();
     for (double sr : { 48000.0, 44100.0 })

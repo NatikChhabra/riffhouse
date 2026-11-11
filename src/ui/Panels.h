@@ -41,6 +41,7 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     void visibilityChanged() override;
+    std::function<void()> onShowTakes;
 
 private:
     void timerCallback() override;
@@ -48,7 +49,7 @@ private:
     RiffhouseProcessor& proc;
     juce::ToggleButton countIn { "Count in 4 beats before recording" };
     juce::ToggleButton saveDi { "Also save the clean guitar (re-amp later)" };
-    juce::TextButton openFolder { "Open recordings" }, changeFolder { "Change folder..." };
+    juce::TextButton openFolder { "Listen to your takes" }, changeFolder { "Change folder..." };
     juce::TextButton loadSong { "Load a song to play along..." };
     IconButton playSong { icons::play(), {}, true };
     juce::Slider songLevel, songPos;

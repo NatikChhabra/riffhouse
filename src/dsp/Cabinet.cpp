@@ -218,7 +218,6 @@ void Cabinet::prepare (double sampleRate, int maxBlock)
     stopThread (2000);
     sr = sampleRate;
     spec = { sampleRate, (juce::uint32) maxBlock, 1 };
-    lastModel = -1;
     prepared = false;
     rebuildNow();
     conv.prepare (spec);
@@ -279,7 +278,12 @@ void Cabinet::installUserIr()
 
 void Cabinet::rebuildNow()
 {
+    // What is built here is what set() last asked for, so nothing is left for the worker to
+    // do. Without this the worker loaded the same IR a second time a moment after every
+    // start, and the convolver crossfaded into a copy of itself with an empty tail.
+    pending.store (false);
     const int m = model.load();
+    lastModel = m; lastMic = mic.load(); lastDist = distance.load();
     if (m >= numCabs())
     {
         if (userIrLoaded) installUserIr();

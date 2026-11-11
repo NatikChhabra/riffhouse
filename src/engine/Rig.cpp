@@ -233,6 +233,10 @@ void Rig::processStereo (float* l, float* r, int n)
 
 void Rig::process (const float* in, float* outL, float* outR, int total)
 {
+    // Filter tails decay into numbers so small the processor handles them many times
+    // slower. Whoever calls this (the sound card's thread, an offline render) gets them
+    // rounded to zero for the length of the call.
+    juce::ScopedNoDenormals noDenormals;
     int offset = 0;
     while (offset < total)
     {

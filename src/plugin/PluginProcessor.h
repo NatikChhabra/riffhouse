@@ -5,6 +5,7 @@
 #include "../engine/Presets.h"
 #include "../engine/Rig.h"
 #include "Recorder.h"
+#include "Takes.h"
 #include "Tuner.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -78,6 +79,7 @@ public:
 
     // Jam track (play along with a song)
     bool loadJamTrack (const juce::File& f);
+    double audioFileSeconds (const juce::File& f); // 0 when it cannot be read
     void setJamPlaying (bool shouldPlay);
     bool isJamPlaying() const;
     juce::String jamTrackName() const { return jamFile.getFileNameWithoutExtension(); }
@@ -85,6 +87,10 @@ public:
     double jamPosition() const;
     double jamLength() const;
     void setJamPosition (double seconds);
+
+    // Takes: listen to a recording, or feed its clean guitar back through the rig
+    TakePlayer& takes() noexcept { return takePlayer; }
+    ReampJob::Setup reampSetup() const; // the rig as it is set right now
 
     RigMeters& meters() noexcept { return rig.meters(); }
     TiltProbe& tiltProbe() noexcept { return rig.tiltProbe(); }
@@ -129,6 +135,8 @@ private:
     juce::ThreadPool loader { juce::ThreadPoolOptions{}.withThreadName ("Riffhouse loader").withNumberOfThreads (1) };
 
     juce::AudioFormatManager formats;
+    juce::TimeSliceThread disk { "Riffhouse song reader" }; // keeps file reading off the audio thread
+    TakePlayer takePlayer;
     std::unique_ptr<juce::AudioFormatReaderSource> jamReader;
     juce::AudioTransportSource jam;
     juce::File jamFile;

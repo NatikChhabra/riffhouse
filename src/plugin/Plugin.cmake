@@ -44,6 +44,7 @@ target_sources(Riffhouse PRIVATE
     ${RIFFHOUSE_CORE_SOURCES}
     plugin/PluginProcessor.cpp
     plugin/Recorder.cpp
+    plugin/Takes.cpp
     plugin/Tuner.cpp
     plugin/AutoSetup.cpp
     plugin/DeviceGuard.cpp
@@ -55,6 +56,7 @@ target_sources(Riffhouse PRIVATE
     ui/Panels.cpp
     ui/PresetBrowser.cpp
     ui/SetupWizard.cpp
+    ui/TakesView.cpp
     ui/Editor.cpp
     standalone/RiffhouseApp.cpp)
 

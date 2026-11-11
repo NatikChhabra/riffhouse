@@ -71,6 +71,7 @@ RiffhouseProcessor::RiffhouseProcessor()
         jassert (params[(size_t) s.id] != nullptr);
     }
     formats.registerBasicFormats();
+    disk.startThread();
     recordingFolder = Recorder::defaultFolder();
     reloadPresets();
     const int start = library.indexOf ("First Light Clean");
@@ -82,7 +83,9 @@ RiffhouseProcessor::~RiffhouseProcessor()
     alive->store (false);
     loader.removeAllJobs (true, 10000);
     rec.stop();
+    takePlayer.unload();
     jam.setSource (nullptr);
+    disk.stopThread (2000);
 }
 
 juce::File RiffhouseProcessor::userFolder()
@@ -110,10 +113,11 @@ void RiffhouseProcessor::prepareToPlay (double sr, int block)
     setLatencySamples (rig.latencySamples());
     tun.prepare (sr);
     jam.prepareToPlay (block, sr);
+    takePlayer.prepare (sr, block);
     jamBuffer.setSize (2, std::max (block, 16));
 }
 
-void RiffhouseProcessor::releaseResources() { jam.releaseResources(); }
+void RiffhouseProcessor::releaseResources() { jam.releaseResources(); takePlayer.release(); }
 
 void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
@@ -148,6 +152,9 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         std::copy (buffer.getReadPointer (0), buffer.getReadPointer (0) + n, mono.begin());
     else
         std::fill (mono.begin(), mono.begin() + n, 0.0f);
+
+    // Re-amping a take: its clean guitar stands in for the live input.
+    takePlayer.readClean (mono.data(), n);
 
     float pk = 0.0f;
     for (int i = 0; i < n; ++i) pk = std::max (pk, std::abs (mono[(size_t) i]));
@@ -187,6 +194,9 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     if (tunerOpen.load() && tunerMute.load())
         buffer.clear();
+
+    // Listening to a take as it was recorded: that is all you hear while it plays.
+    takePlayer.readSound (l, r, n);
 
     // jam track and metronome go to your ears only
     {
@@ -409,6 +419,17 @@ bool RiffhouseProcessor::loadUserIr (const juce::File& file)
     return true;
 }
 
+ReampJob::Setup RiffhouseProcessor::reampSetup() const
+{
+    ReampJob::Setup s;
+    for (int i = 0; i < kNumParams; ++i) s.params[(size_t) i] = raw[(size_t) i]->load();
+    s.capture = captureFile;
+    s.userIr = irFile;
+    s.tempo = metronomeBpm.load();
+    s.toneName = currentPresetName();
+    return s;
+}
+
 //==============================================================================
 bool RiffhouseProcessor::loadJamTrack (const juce::File& f)
 {
@@ -419,10 +440,17 @@ bool RiffhouseProcessor::loadJamTrack (const juce::File& f)
     src->setLooping (true);
     const juce::ScopedLock sl (jamLock);
     jam.stop();
-    jam.setSource (src.get(), 32768, nullptr, rate);
+    jam.setSource (src.get(), 32768, &disk, rate);
     jamReader = std::move (src);
     jamFile = f;
     return true;
+}
+
+double RiffhouseProcessor::audioFileSeconds (const juce::File& f)
+{
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (f));
+    if (reader == nullptr || reader->sampleRate <= 0.0) return 0.0;
+    return (double) reader->lengthInSamples / reader->sampleRate;
 }
 
 void RiffhouseProcessor::setJamPlaying (bool shouldPlay)
