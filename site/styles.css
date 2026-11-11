@@ -39,6 +39,7 @@
   --r-s: 6px;
   --r-m: 10px;
   --ease: cubic-bezier(.2, .7, .2, 1);
+  --land: cubic-bezier(.22, 1.28, .36, 1);
   --fast: 160ms;
   --slow: 800ms;
   --top: 76px;
@@ -112,14 +113,26 @@ button.btn { border: 0; cursor: pointer; }
 /* Hero: the amber poster */
 .hero { position: relative; min-height: min(100svh, 1080px); padding: calc(var(--top) + 8px) var(--g) clamp(32px, 5vw, 56px); display: flex; flex-direction: column; overflow: clip; }
 .hero h1 { font-size: var(--h1); line-height: .8; }
-.hero h1 .line { display: block; overflow: clip; padding-top: .04em; }
+.hero h1 .line { display: block; padding-top: .04em; }
 .hero h1 .line > span { display: block; white-space: nowrap; }
 .hero-say { position: relative; z-index: 1; margin-top: auto; padding-top: 32px; max-width: 30em; display: grid; gap: 28px; }
 .hero-say .lead { font-weight: 500; max-width: 26em; }
 .defs { position: absolute; }
 .hero-pedal { border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; display: block; }
-.hero-pedal img { width: 100%; height: auto; transition: transform 140ms var(--ease); transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
-.hero-pedal:active img, .hero-pedal.is-down img { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(1.2%) scale(.97); }
+/* The pedal is a solid object: a face, twelve copies of its shape stacked behind it as sides, light on top, and its dark patch on the page.
+   --tx and --ty run from -1 to 1 with the pointer. */
+.hero-pedal { perspective: 1100px; }
+.pedal-in, .pedal-turn, .pedal-body, .pedal-sides { display: block; transform-style: preserve-3d; }
+.pedal-body { position: relative; transform: rotateX(calc(9deg + var(--ty, 0) * -13deg)) rotateY(calc(-17deg + var(--tx, 0) * 17deg)) translateZ(var(--pz, 0px)); transition: transform 260ms var(--ease); }
+.hero-pedal:active .pedal-body, .hero-pedal.is-down .pedal-body { --pz: -26px; transition-duration: 90ms; }
+.pedal-body img { position: relative; display: block; width: 100%; height: auto; }
+.pedal-sides, .slab, .pedal-light, .pedal-ground { position: absolute; inset: 0; pointer-events: none; }
+.slab { background: url(img/hero-side.webp) center / 100% 100% no-repeat; transform: translateZ(calc(var(--k) * -3px)); }
+.slab:nth-child(1) { --k: 1; } .slab:nth-child(2) { --k: 2; } .slab:nth-child(3) { --k: 3; } .slab:nth-child(4) { --k: 4; } .slab:nth-child(5) { --k: 5; } .slab:nth-child(6) { --k: 6; } .slab:nth-child(7) { --k: 7; } .slab:nth-child(8) { --k: 8; } .slab:nth-child(9) { --k: 9; } .slab:nth-child(10) { --k: 10; } .slab:nth-child(11) { --k: 11; } .slab:nth-child(12) { --k: 12; }
+.pedal-light { transform: translateZ(1px); overflow: hidden; -webkit-mask: url(img/hero-pedal.webp) center / 100% 100% no-repeat; mask: url(img/hero-pedal.webp) center / 100% 100% no-repeat; }
+.pedal-light::before { content: ""; position: absolute; left: 10%; top: 0; width: 80%; aspect-ratio: 1; border-radius: 50%; background: var(--bone); opacity: .2; filter: blur(48px); translate: calc(var(--tx, 0) * -55%) calc(var(--ty, 0) * -45%); transition: translate 260ms var(--ease); }
+.pedal-ground { background: url(img/hero-side.webp) center / 100% 100% no-repeat; filter: brightness(0) blur(20px); opacity: .4; translate: calc(7% + var(--tx, 0) * -4%) calc(8% + var(--ty, 0) * -4%); transition: translate 260ms var(--ease), scale 160ms var(--ease), opacity 160ms var(--ease); }
+.hero-pedal:active .pedal-ground, .hero-pedal.is-down .pedal-ground { scale: .96; opacity: .55; translate: 4% 5%; }
 .stomp-say { font-size: var(--t-small); font-weight: 500; }
 .is-fuzz .hero h1, .is-fuzz .monument { filter: url(#fuzz); }
 .is-fuzz h2, .is-fuzz .num { filter: url(#fuzz-s); }
@@ -304,19 +317,25 @@ details:not([open]) > p { display: none; }
 }
 
 /* Motion: the poster arrives once, sections open as they are reached */
-@keyframes line-up { from { transform: translateY(104%); } }
-@keyframes pedal-in { from { opacity: 0; transform: translateY(14%) rotate(5deg); } }
+@keyframes line-up { from { opacity: 0; transform: perspective(900px) translateY(70%) rotateX(-78deg); } }
+@keyframes pedal-in { from { opacity: 0; } }
+@keyframes pedal-drop { from { transform: translate3d(8%, -46%, 380px) rotateX(58deg) rotateY(-64deg) rotateZ(16deg); } }
+@keyframes ground-in { from { opacity: 0; scale: 1.5; } }
+@keyframes sway { from { rotate: y -5deg; translate: 0 1%; } to { rotate: y 6deg; translate: 0 -1%; } }
+@keyframes turn { to { transform: rotateX(50deg) rotateY(-30deg) translateZ(-90px); } }
 @keyframes say-in { from { opacity: 0; transform: translateY(16px); } }
 @keyframes push { from { transform: translateX(5%); } }
-@keyframes drift { to { translate: 0 22vh; rotate: -15deg; } }
+@keyframes drift { to { translate: 0 22vh; rotate: -10deg; } }
 @keyframes pan-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes hit { 30% { transform: translateY(3px) scale(.95); } }
 @keyframes chain-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
 
 @media (prefers-reduced-motion: no-preference) {
-  .hero h1 .line > span { animation: line-up var(--slow) var(--ease) both; }
-  .hero h1 .line:nth-child(2) > span { animation-delay: 90ms; }
-  .hero-pedal { animation: pedal-in 900ms var(--ease) 160ms both; }
+  .hero h1 .line > span { transform-origin: 50% 100%; animation: line-up 820ms var(--ease) both; }
+  .hero h1 .line:nth-child(2) > span { animation-delay: 110ms; }
+  .hero-pedal { animation: pedal-in 320ms var(--ease) 200ms both; }
+  .pedal-in { animation: pedal-drop 1100ms var(--land) 200ms both, sway 6s ease-in-out 1400ms infinite alternate; }
+  .pedal-ground { animation: ground-in 1100ms var(--ease) 200ms both; }
   .hero-say { animation: say-in 560ms var(--ease) 420ms both; }
   .chain.is-fresh li { animation: chain-in 360ms var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
 
@@ -339,11 +358,13 @@ details:not([open]) > p { display: none; }
   .steps li:nth-child(4), .facts > li:nth-child(4) { transition-delay: 210ms; }
 
   @media (hover: hover) and (pointer: fine) {
+    .hero h1 { translate: calc(var(--tx, 0) * -12px) calc(var(--ty, 0) * -7px); transition: translate 420ms var(--ease); }
     .rail-row li:hover img { transform: translateY(-10px) rotate(-3deg); }
     .amp-row li:hover img { transform: translateY(-8px); }
   }
   @supports (animation-timeline: view()) {
-    .hero-pedal { animation: pedal-in 900ms var(--ease) 160ms both, drift linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 100svh; }
+    .hero-pedal { animation: pedal-in 320ms var(--ease) 200ms both, drift linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 100svh; }
+    .pedal-turn { animation: turn linear both; animation-timeline: scroll(root); animation-range: 0 100svh; }
     .monument span { animation: push linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
   }
 }
