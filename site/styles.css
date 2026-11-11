@@ -69,6 +69,7 @@ b { font-weight: 600; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 3px solid var(--ring); outline-offset: 3px; border-radius: 2px; }
 .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.nb { white-space: nowrap; }
 .skip { position: fixed; left: var(--g); top: 12px; z-index: 5; padding: 12px 16px; background: var(--coal); color: var(--bone); border-radius: var(--r-s); }
 .skip:not(:focus) { width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -145,7 +146,7 @@ button.btn { border: 0; cursor: pointer; }
 .chain img { width: 100%; height: auto; }
 .chain span { min-height: 2.4em; }
 .finder-pick { display: grid; gap: 16px; min-width: 0; }
-.finder-bar { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 12px var(--gap); align-items: center; }
+.finder-bar { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: 12px var(--gap); align-items: start; }
 .search input { width: 100%; min-height: 52px; padding: 0 20px; border-radius: var(--r-s); border: 1px solid var(--field-edge); background: var(--black); color: var(--bone); }
 .search input::placeholder { color: var(--ash); }
 .cats { display: flex; flex-wrap: wrap; gap: 8px; }
