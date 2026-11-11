@@ -688,6 +688,14 @@ void testUpdates()
     CHECK (parseRelease (release (asset (win, base + win, "sha256:" + hash), ",\"draft\":true"), "-windows-setup.exe").version.isEmpty(), "drafts are ignored");
     CHECK (parseRelease (release (asset (win, base + win, "sha256:" + hash), ",\"prerelease\":true"), "-windows-setup.exe").version.isEmpty(), "pre-releases are ignored");
     CHECK (parseRelease ("not json at all", "-windows-setup.exe").version.isEmpty(), "garbage gives an empty result");
+
+    // what the answer to the check means: only a real fault may be reported as one
+    CHECK (readCheckAnswer (404, "{\"message\":\"Not Found\"}") == CheckAnswer::nothingPublished, "404: nothing published yet, so this version is the latest");
+    CHECK (readCheckAnswer (200, "{}") == CheckAnswer::release, "200 with a body is a release to read");
+    CHECK (readCheckAnswer (200, {}) == CheckAnswer::unreachable, "200 with nothing in it is no answer");
+    CHECK (readCheckAnswer (0, {}) == CheckAnswer::unreachable, "no connection");
+    CHECK (readCheckAnswer (403, "{}") == CheckAnswer::unreachable, "turned away (too many requests)");
+    CHECK (readCheckAnswer (503, {}) == CheckAnswer::unreachable, "GitHub is down");
     CHECK (parseRelease ("{\"message\":\"API rate limit exceeded\"}", "-windows-setup.exe").version.isEmpty(), "an API error gives an empty result");
     CHECK (parseRelease ("[1,2,3]", "-windows-setup.exe").version.isEmpty(), "the wrong JSON shape gives an empty result");
 
@@ -1168,6 +1176,23 @@ int main (int argc, char** argv)
     juce::StringArray args;
     for (int i = 1; i < argc; ++i) args.add (argv[i]);
 
+    if (args[0] == "live-update")
+    {
+        // Ask the real releases address what the app asks, and say what the app would make of it.
+        // Needs the network, so it is run by hand and never as part of the checks.
+        int status = 0;
+        const auto options = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                 .withConnectionTimeoutMs (12000).withNumRedirectsToFollow (5).withStatusCode (&status)
+                                 .withExtraHeaders ("Accept: application/vnd.github+json\r\nUser-Agent: Riffhouse-Updater\r\nX-GitHub-Api-Version: 2022-11-28");
+        auto in = juce::URL ("https://api.github.com/repos/NatikChhabra/riffhouse/releases/latest").createInputStream (options);
+        const auto body = in != nullptr ? in->readEntireStreamAsString() : juce::String();
+        const auto answer = readCheckAnswer (status, status == 200 ? body : juce::String());
+        const auto r = parseRelease (body, "-windows-setup.exe");
+        std::printf ("status %d: %s; latest full release: %s\n", status,
+                     answer == CheckAnswer::release ? "a release to read" : answer == CheckAnswer::nothingPublished ? "nothing published yet, so up to date" : "could not reach the update server",
+                     r.version.isEmpty() ? "none" : r.version.toRawUTF8());
+        return 0;
+    }
     if (args[0] == "render" && args.size() >= 3)
         return render (args[1], juce::File::getCurrentWorkingDirectory().getChildFile (args[2]),
                        args.size() > 3 ? juce::File::getCurrentWorkingDirectory().getChildFile (args[3]) : juce::File(),

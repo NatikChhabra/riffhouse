@@ -85,9 +85,9 @@ void Updater::checkNow()
     startThread (juce::Thread::Priority::background);
 }
 
-juce::String Updater::fetch (const juce::String& url)
+juce::String Updater::fetch (const juce::String& url, int& status)
 {
-    int status = 0;
+    status = 0;
     const auto options = juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
                              .withConnectionTimeoutMs (12000)
                              .withNumRedirectsToFollow (5)
@@ -156,15 +156,25 @@ void Updater::run()
 {
     const bool asked = userAsked.load();
     set (State::checking);
-    const auto json = fetch (kLatestRelease);
+    int status = 0;
+    const auto json = fetch (kLatestRelease, status);
     if (threadShouldExit()) return;
-    if (json.isEmpty())
+    const auto answer = readCheckAnswer (status, json);
+    if (answer == CheckAnswer::unreachable)
     {
         // offline, or GitHub is busy: say so only when the player pressed the button
         set (asked ? State::failed : State::idle);
         return;
     }
     settings.setValue ("lastUpdateCheck", juce::String (juce::Time::currentTimeMillis()));
+    if (answer == CheckAnswer::nothingPublished)
+    {
+        // no full release yet (a test release does not count): this version is the newest there is
+        { const juce::ScopedLock sl (lock); info = {}; }
+        clearOldDownloads ({});
+        set (State::upToDate);
+        return;
+    }
 
     const auto latest = parseRelease (json, kInstallerSuffix);
     { const juce::ScopedLock sl (lock); info = latest; }

@@ -23,6 +23,12 @@ int compareVersions (const juce::String& a, const juce::String& b);
 // Drafts and pre-releases come back empty.
 ReleaseInfo parseRelease (const juce::String& json, const juce::String& installerSuffix);
 
+// What the answer from the "latest release" address means. GitHub answers 404 while nothing has
+// been published yet (test releases do not count): that is "you have the latest", not a fault.
+// Anything else that is not a 200 with a body means the check could not be made.
+enum class CheckAnswer { unreachable, nothingPublished, release };
+CheckAnswer readCheckAnswer (int httpStatus, const juce::String& body);
+
 // Only this project's own release downloads, over HTTPS.
 bool isTrustedDownloadUrl (const juce::String& url);
 

@@ -54,6 +54,11 @@ jobs:
       - name: Test the sound engine
         run: build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe
 
+      # What the app's update check gets from the real releases page on Windows, and what it makes of it.
+      # It only reports: the network is not ours to fail a build on.
+      - name: Ask the releases page what the app asks
+        run: build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe live-update
+
       - name: Read the version
         shell: pwsh
         run: |

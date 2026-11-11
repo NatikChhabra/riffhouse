@@ -50,6 +50,13 @@ int compareVersions (const juce::String& a, const juce::String& b)
     return 0;
 }
 
+CheckAnswer readCheckAnswer (int httpStatus, const juce::String& body)
+{
+    if (httpStatus == 404) return CheckAnswer::nothingPublished;
+    if (httpStatus == 200 && body.isNotEmpty()) return CheckAnswer::release;
+    return CheckAnswer::unreachable;
+}
+
 bool isTrustedDownloadUrl (const juce::String& url)
 {
     return url.startsWithIgnoreCase ("https://github.com/NatikChhabra/riffhouse/releases/download/")

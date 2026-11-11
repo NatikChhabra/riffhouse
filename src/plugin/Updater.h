@@ -49,7 +49,7 @@ private:
     void handleAsyncUpdate() override { if (onChange) onChange(); }
     void timerCallback() override;
     void set (State);
-    juce::String fetch (const juce::String& url);
+    juce::String fetch (const juce::String& url, int& status);
     bool download (const ReleaseInfo&, const juce::File& target);
     void clearOldDownloads (const juce::File& keep);
 
