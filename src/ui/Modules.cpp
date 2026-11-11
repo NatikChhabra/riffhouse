@@ -829,7 +829,10 @@ void ModulePage::resized()
     const bool fad = ! faders.isEmpty();
     pedalArea = gear.toFloat().withTrimmedBottom (10.0f);
     pedal = pedalLayout (pedalArea, d, fad ? faders.size() : (d.form == 5 ? knobs.size() - 1 : knobs.size()), fad);
-    pedalImage = renderPedal (d, pedal, pedalArea, 2.0f);
+    // the picture is wider and taller than the box: its side wall, its feet and the shadow it
+    // throws on the floor need the room
+    pedalDraw = pedalArea.expanded (70.0f, 0.0f).withBottom (pedalArea.getBottom() + 46.0f);
+    pedalImage = renderPedal (d, pedal, pedalDraw, 2.0f);
     foot->setStyle (footswitchStyle (pedal), juce::Colour (d.body));
     foot->setBounds (pedal.footswitch.toNearestInt());
     if (treadle != nullptr) treadle->setBounds (pedal.treadle.toNearestInt());
@@ -887,11 +890,14 @@ void ModulePage::paint (juce::Graphics& g)
         return;
     }
     if (pedalImage.isValid())
-        g.drawImage (pedalImage, pedalArea);
+        g.drawImage (pedalImage, pedalDraw);
     drawPedalLed (g, pedal, design(), on);
 }
 
 //==============================================================================
+// The amp's eight controls, in the order the engine knows them.
+constexpr P ampKnobs[] = { P::ampGain, P::ampBass, P::ampMid, P::ampTreble, P::ampPresence, P::ampDepth, P::ampMaster, P::ampLevel };
+
 AmpPage::AmpPage (RiffhouseProcessor& p)
     : proc (p), power (p, P::ampOn, colours::accent), jewel (p, P::ampOn, colours::accent), selector (p, P::ampModel)
 {
@@ -935,8 +941,7 @@ AmpPage::AmpPage (RiffhouseProcessor& p)
     selector.onChange = [this] (int m) { current = m; refresh(); resized(); repaint(); };
     addAndMakeVisible (selector);
 
-    const P ks[] = { P::ampGain, P::ampBass, P::ampMid, P::ampTreble, P::ampPresence, P::ampDepth, P::ampMaster, P::ampLevel };
-    for (auto id : ks)
+    for (auto id : ampKnobs)
         addAndMakeVisible (knobs.add (new Knob (proc, id, colours::accent, id == P::ampLevel ? "Volume" : juce::String())));
 
     loadNam.drawBackground = false;
@@ -1014,9 +1019,14 @@ void AmpPage::resized()
     {
         auto* k = knobs[i];
         k->setGear (d.knob, juce::Colour (d.knobCap), juce::Colour (d.ink), d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.upper);
-        k->setNumbers (layout.knobSize >= 64.0f);
+        const auto cell = layout.cells[(size_t) i];
+        k->setNumbers (cell.getWidth() >= 64.0f);
+        // each amp prints its own words under the same eight controls
+        k->setLabel (d.labels[i] != nullptr ? juce::String (d.labels[i]) : juce::String (i == 7 ? "Volume" : spec (ampKnobs[i]).name));
         k->setLabelHeight (labelH);
-        k->setBounds (layout.cells[(size_t) i].toNearestInt());
+        const auto box = cell.expanded (std::max (0.0f, 66.0f - cell.getWidth()) * 0.5f, 0.0f); // room for a small knob's label
+        k->setBounds (juce::Rectangle<int>::leftTopRightBottom (juce::roundToInt (box.getX()), juce::roundToInt (box.getY()),
+                                                                juce::roundToInt (box.getRight()), juce::roundToInt (box.getBottom()))); // one baseline for every label
     }
 }
 

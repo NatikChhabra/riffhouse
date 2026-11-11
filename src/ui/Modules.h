@@ -105,7 +105,7 @@ private:
     std::unique_ptr<Footswitch> foot;
     std::unique_ptr<Treadle> treadle;
     PedalLayout pedal;
-    juce::Rectangle<float> pedalArea;
+    juce::Rectangle<float> pedalArea, pedalDraw;
     juce::Image pedalImage;
 };
 

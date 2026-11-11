@@ -65,6 +65,12 @@ struct AmpDesign
     int groups = 0;        // how the eight controls are spaced: 0 evenly, 1 as 1+3+2+2, 2 as 4+4, 3 as 1+3+4
     int lamp = 0;          // 0 jewel pilot light; 1 toggle switch under a small lamp; 2 lit rocker switch
     float width = 1.0f;    // share of the available width the cabinet takes
+    // The panel as its maker would have laid it out. The eight controls are always gain, bass,
+    // mid, treble, presence, depth, master and level, but each amp calls them what it likes,
+    // puts them in its own order, and keeps the lesser ones as small trim knobs.
+    const char* labels[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+    juce::uint8 order[8] = { 0, 1, 2, 3, 4, 5, 6, 7 }; // which control stands at each place, left to right
+    juce::uint8 smallMask = 0;                         // bit n set: control n is a small knob
 };
 
 const PedalDesign& drivePedalDesign (int driveType);
@@ -89,14 +95,16 @@ PedalLayout pedalLayout (juce::Rectangle<float> area, const PedalDesign&, int nu
 // Where knob i of n sits on the pedal (one row up to four knobs, two rows above that).
 juce::Rectangle<float> pedalKnobCell (const PedalLayout&, int i, int n);
 // The finished box (no knobs, no switch) as an image, drawn at `scale` for sharp output.
-juce::Image renderPedal (const PedalDesign&, const PedalLayout&, juce::Rectangle<float> area, float scale);
+juce::Image renderPedal (const PedalDesign&, const PedalLayout&, juce::Rectangle<float> area, float scale, bool smallPrint = true);
 void drawPedalLed (juce::Graphics&, const PedalLayout&, const PedalDesign&, bool on);
 
 // Amp head.
 struct AmpLayout
 {
     juce::Rectangle<float> head, panel, knobs, grille, badge, jewel, handle;
+    juce::Rectangle<float> rack;               // the road case a rack unit is bolted into (empty for an amp)
     std::vector<juce::Rectangle<float>> cells; // where each of the eight controls sits: the knob with its label under it
+    std::vector<juce::Rectangle<float>> slots; // the same cells in the order they stand on the panel
     juce::Point<float> jack;                   // the input socket
     float knobSize = 0.0f;
     int form = 0;

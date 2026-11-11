@@ -799,13 +799,17 @@ void testTakes()
         int idle = 0;
         while (player.isPlaying() && frames < (juce::int64) (8.0 * deviceRate))
         {
+            // A block the disk thread had not read yet comes out silent and does not move the take on.
+            // This loop runs far faster than real time, so on a slow machine there are many of those:
+            // only the blocks that moved the take count as played.
+            const double before = player.position();
             const bool ok = mode == TakePlayer::Mode::asRecorded ? player.readSound (l.data(), r.data(), 256) : player.readClean (l.data(), 256);
             const bool wrong = mode == TakePlayer::Mode::asRecorded ? player.readClean (r.data(), 256) : player.readSound (r.data(), r.data(), 256);
             if (wrong) { CHECK (false, "only the chosen way of playing delivers sound"); break; }
             if (! ok) { if (++idle > 2000) break; juce::Thread::sleep (1); continue; }
+            if (player.position() <= before && player.isPlaying()) { if (++idle > 20000) break; juce::Thread::sleep (1); continue; }
             for (float x : l) energy += (double) x * x;
             frames += 256;
-            if ((frames / 256) % 8 == 0) juce::Thread::sleep (1); // let the disk thread keep up, like real time would
         }
         CHECK (! player.isPlaying(), "playback stops at the end by itself");
         CHECK (std::abs ((double) frames / deviceRate - 3.0) < 0.25, "about 3 s were played at the device's rate (%.2f s)", (double) frames / deviceRate);

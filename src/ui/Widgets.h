@@ -22,6 +22,7 @@ public:
     void setColour (juce::Colour c);
     juce::Slider& getSlider() noexcept { return slider; }
     void setLabelHeight (int h) { labelH = h; resized(); }
+    void setLabel (const juce::String& text) { if (label != text) { label = text; setTitle (text); repaint(); } }
     void setTooltip (const juce::String& t) { slider.setTooltip (t); }
     // Draw as a hardware knob printed on a piece of gear: its style, pointer or
     // cap colour, the panel's lettering colour and face.
