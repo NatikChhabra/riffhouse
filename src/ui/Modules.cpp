@@ -856,9 +856,13 @@ void ModulePage::resized()
     // throws on the floor need the room
     pedalDraw = pedalArea.expanded (70.0f, 0.0f).withBottom (pedalArea.getBottom() + 46.0f);
     pedalImage = renderPedal (d, pedal, pedalDraw, 2.0f);
-    foot->setStyle (footswitchStyle (pedal), juce::Colour (d.body));
+    foot->setStyle (footswitchStyle (pedal), juce::Colour (d.body), pedalPictured (d));
     foot->setBounds (pedal.footswitch.toNearestInt());
-    if (treadle != nullptr) treadle->setBounds (pedal.treadle.toNearestInt());
+    if (treadle != nullptr)
+    {
+        treadle->setBounds (pedal.treadle.toNearestInt());
+        treadle->setPicture (pedalPictured (d) ? &d : nullptr, pedal.box.getHeight());
+    }
     if (fad)
     {
         const int n = faders.size();
@@ -1044,12 +1048,12 @@ void AmpPage::resized()
 
     // the amp itself fills the rest of the page
     const auto gear = getLocalBounds().withTrimmedTop (gearTop).withTrimmedBottom (gearFloor).toFloat();
-    ampArea = gear.withSizeKeepingCentre (std::min (gear.getWidth(), 1080.0f), std::min (gear.getHeight(), 420.0f));
+    ampArea = gear.withSizeKeepingCentre (std::min (gear.getWidth(), ampCanvasW), std::min (gear.getHeight(), ampCanvasH));
     const auto& d = ampDesign (current);
     layout = ampLayout (ampArea, d);
     const juce::String display = current == choices::neuralCapture ? (proc.captureName().isNotEmpty() ? proc.captureName() : juce::String ("no capture"))
                                                                     : juce::String (spec (P::ampModel).choices[(size_t) current]).toLowerCase();
-    ampImage = renderAmp (d, layout, ampArea, 2.0f, display);
+    ampImage = renderAmp (d, layout, ampArtArea (ampArea), 2.0f, display);
     // the whole switch is the target: the lamp, and the lever or rocker under it
     jewel.setBounds ((d.lamp == 1 ? layout.jewel.expanded (10.0f, 22.0f).translated (0.0f, -10.0f) : layout.jewel.expanded (d.lamp == 2 ? 6.0f : 8.0f, d.lamp == 2 ? 12.0f : 8.0f)).toNearestInt());
 
@@ -1088,7 +1092,7 @@ void AmpPage::paint (juce::Graphics& g)
     if (ampImage.isValid())
     {
         g.setOpacity (on ? 1.0f : 0.55f);
-        g.drawImage (ampImage, ampArea);
+        g.drawImage (ampImage, ampArtArea (ampArea));
         g.setOpacity (1.0f);
     }
     drawAmpJewel (g, layout, ampDesign (current), on);

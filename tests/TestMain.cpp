@@ -8,14 +8,18 @@
 //   riffhouse_tests renderall <outdir> [rate]
 //   riffhouse_tests report          print loudness/latency/CPU table
 
+#include "engine/InputGuard.h"
 #include "TestSignals.h"
 #include "engine/History.h"
+#include "engine/LevelMatch.h"
+#include "engine/ReferenceGuitar.h"
 #include "engine/Looper.h"
 #include "engine/Song.h"
 #include "engine/FootControl.h"
 #include "engine/Presets.h"
 #include "engine/Rig.h"
 #include "engine/UpdateInfo.h"
+#include "plugin/LevelMatcher.h"
 #include "plugin/Takes.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -79,6 +83,7 @@ Render run (Rig& rig, const ParamValues& v, const std::vector<float>& in, int bl
 Render renderWith (const ParamValues& v, const std::vector<float>& in, double sr, int block = 256)
 {
     Rig rig;
+    rig.setOffline (true);
     rig.setParams (v);
     rig.prepare (sr, block);
     rig.setParams (v);
@@ -316,7 +321,7 @@ void testHum (double sr)
 void testInputFix (double sr)
 {
     std::printf ("input fix: measuring and restoring lost treble\n");
-    const auto di = test::guitarDi (sr, 10.0);
+    const auto di = playedGuitar (sr, 10.0, 0.32f, true); // with the treble of a recorded guitar
     auto measure = [sr] (const std::vector<float>& x)
     {
         TiltProbe p;
@@ -359,21 +364,57 @@ void testInputFix (double sr)
             lo = std::min (lo, t); hi = std::max (hi, t);
         }
         std::printf ("  2 s windows range %.1f to %.1f dB\n", lo, hi);
-        CHECK (TiltProbe::fixAmountFor (lo) <= 3.0f, "a darker 2 s of clean playing asks for %.1f dB of fix", TiltProbe::fixAmountFor (lo));
+        CHECK (TiltProbe::fixAmountFor (lo) <= 6.0f, "a darker 2 s of clean playing asks for %.1f dB of fix", TiltProbe::fixAmountFor (lo));
     }
+    CHECK (std::abs (clean - TiltProbe::referenceTiltDb) < 5.5f, "the test guitar reads %.1f dB, a recorded one %.1f", clean, TiltProbe::referenceTiltDb);
 
-    for (auto [hz, minAmt] : { std::pair<double, float> { 1000.0, 5.0f }, { 600.0, 7.0f }, { 320.0, 10.0f } })
+    auto band = [sr] (const std::vector<float>& x, double hz)
+    {
+        Biquad a, b;
+        a.set (Biquad::Type::bandpass, sr, hz, 2.0); b.set (Biquad::Type::bandpass, sr, hz, 2.0);
+        double e = 0;
+        for (float v : x) { const float y = b.process (a.process (v)); e += (double) y * y; }
+        return (float) (10.0 * std::log10 (e / (double) x.size() + 1e-20));
+    };
+    // The loading a mic jack puts on a pickup, from mild to the worst measured. Setup knows a
+    // mic jack when it sees one, so anything past 3 dB of loss is mended there.
+    for (double hz : { 1000.0, 600.0, 450.0, 320.0, 250.0 })
     {
         const auto loaded = load (di, hz);
         const float t = measure (loaded).first;
-        const float amt = TiltProbe::fixAmountFor (t);
-        const float after = measure (fix (loaded, amt)).first;
-        std::printf ("  loaded at %4.0f Hz: tilt %.1f, fix %.1f dB, after %.1f\n", hz, t, amt, after);
-        CHECK (amt >= minAmt, "loading at %.0f Hz should need at least %.0f dB of fix, got %.1f", hz, minAmt, amt);
-        CHECK (after > t + 0.6f * amt, "the fix did not restore treble (%.1f -> %.1f)", t, after);
-        CHECK (after < clean + 4.0f, "the fix overshoots: %.1f vs clean %.1f", after, clean);
-        CHECK (rmsDb (fix (loaded, amt)) < rmsDb (loaded) + 6.0f, "the fix makes the input much louder");
+        const float amt = TiltProbe::fixAmountFor (t, 3.0f);
+        const auto mended = fix (loaded, amt);
+        const float after = measure (mended).first;
+        const float exact = (float) (20.0 * std::log10 (4500.0 / hz));
+        std::printf ("  loaded at %4.0f Hz: tilt %.1f, fix %.1f dB (the exact opposite is %.1f), after %.1f\n", hz, t, amt, exact, after);
+        if (TiltProbe::referenceTiltDb - t >= 3.0f)
+        {
+            CHECK (amt >= 3.0f, "a loss of %.1f dB was left alone", TiltProbe::referenceTiltDb - t);
+            if (amt < TiltProbe::kMostFixDb)
+                CHECK (std::abs (after - TiltProbe::referenceTiltDb) < 2.5f, "after the fix the guitar reads %.1f, a guitar should read %.1f", after, TiltProbe::referenceTiltDb);
+        }
+        // never brighter than the guitar was before the jack got at it, give or take the reading
+        CHECK (amt <= exact + 4.0f, "loading at %.0f Hz is undone by %.1f dB, the fix adds %.1f", hz, exact, amt);
+        CHECK (rmsDb (mended) < rmsDb (loaded) + 6.0f, "the fix makes the input much louder");
+        for (double f : { 800.0, 1600.0, 3000.0 })
+        {
+            const float before = band (loaded, f) - band (di, f), now = band (mended, f) - band (di, f);
+            if (amt > 0.0f) CHECK (std::abs (now) < std::abs (before) - 2.0f || std::abs (now) < 3.0f, "loaded at %.0f Hz: the %.0f Hz band was %.1f dB off and is %.1f dB off after the fix", hz, f, before, now);
+            CHECK (now < 4.0f, "loaded at %.0f Hz: the fix overshoots the %.0f Hz band by %.1f dB", hz, f, now);
+        }
     }
+    // the curve itself: a loading and the fix sized as its exact opposite cancel to a flat line
+    for (double hz : { 900.0, 450.0, 300.0 })
+    {
+        const float exact = (float) (20.0 * std::log10 (4500.0 / hz));
+        const auto mended = fix (load (di, hz), exact);
+        for (double f : { 200.0, 400.0, 800.0, 1600.0, 3000.0 })
+            CHECK (std::abs (band (mended, f) - band (di, f)) < 2.0f, "a %.0f Hz loading and its opposite leave the %.0f Hz band %.1f dB off", hz, f, band (mended, f) - band (di, f));
+    }
+    // a guitar that is merely dark is left alone, and so is a bright one
+    CHECK (TiltProbe::fixAmountFor (TiltProbe::referenceTiltDb - 4.0f) == 0.0f, "a dark pickup was taken for a bad input");
+    CHECK (TiltProbe::fixAmountFor (TiltProbe::referenceTiltDb + 10.0f) == 0.0f, "a bright guitar got treble added");
+    CHECK (TiltProbe::fixAmountFor (TiltProbe::referenceTiltDb - 40.0f) == TiltProbe::kMostFixDb, "the fix does not stop at its limit");
 
     // silence and hiss are not playing
     {
@@ -384,7 +425,7 @@ void testInputFix (double sr)
     }
     // the fix must never add latency
     {
-        const auto imp = fix (test::impulse ((int) sr / 10, 0), 12.0f);
+        const auto imp = fix (test::impulse ((int) sr / 10, 0), 24.0f);
         int peak = 0;
         for (int i = 0; i < (int) imp.size(); ++i) if (std::abs (imp[(size_t) i]) > std::abs (imp[(size_t) peak])) peak = i;
         CHECK (peak <= 2, "input fix delays the signal by %d samples", peak);
@@ -405,6 +446,89 @@ void testGate (double sr)
     const auto di = test::guitarDi (sr, 4.0);
     const auto played = renderWith (v, di, sr);
     CHECK (rmsDb (played.l) > rmsDb (di) - 1.0f, "gate eats the playing");
+
+    // The gate follows the room. Hiss well above the threshold the player chose: after it
+    // has been steady for a moment the gate closes on it by itself.
+    {
+        NoiseGate g;
+        g.prepare (sr);
+        g.set (-70.0f, 80.0f);
+        std::vector<float> hiss ((size_t) (sr * 5));
+        for (auto& s : hiss) s = 0.004f * n.next(); // about -53 dBFS, peaks near -48
+        auto out = hiss;
+        for (size_t at = 0; at < out.size(); at += 256) g.process (out.data() + at, (int) std::min<size_t> (256, out.size() - at));
+        const std::vector<float> tail (out.end() - (long) sr, out.end());
+        CHECK (rmsDb (tail) < -100.0f, "steady hiss above the chosen threshold still comes through: %.1f dB", rmsDb (tail));
+        CHECK (g.noiseFloorDb() > -58.0f && g.noiseFloorDb() < -48.0f, "the floor reads %.1f dB for hiss at about -53", g.noiseFloorDb());
+        CHECK (g.thresholdNowDb() <= NoiseGate::kHighestFollowDb + 0.01f && g.thresholdNowDb() > -45.0f, "the gate sits at %.1f dB over a floor of %.1f", g.thresholdNowDb(), g.noiseFloorDb());
+        // the room goes quiet: the gate comes back down at once
+        std::vector<float> quiet ((size_t) (sr * 2.5));
+        for (auto& s : quiet) s = 0.0002f * n.next();
+        for (size_t at = 0; at < quiet.size(); at += 256) g.process (quiet.data() + at, (int) std::min<size_t> (256, quiet.size() - at));
+        CHECK (g.thresholdNowDb() < -60.0f, "the gate stayed at %.1f dB after the noise had gone", g.thresholdNowDb());
+        // loud and steady is a sound, not a floor: a held organ note is never gated away
+        NoiseGate h;
+        h.prepare (sr);
+        h.set (-60.0f, 80.0f);
+        std::vector<float> tone ((size_t) (sr * 4));
+        for (size_t i = 0; i < tone.size(); ++i) tone[i] = 0.05f * (float) std::sin (6.283185307 * 220.0 * (double) i / sr);
+        for (size_t at = 0; at < tone.size(); at += 256) h.process (tone.data() + at, (int) std::min<size_t> (256, tone.size() - at));
+        CHECK (h.thresholdNowDb() < -59.9f && h.isOpen(), "a steady note at -26 dBFS moved the gate to %.1f dB", h.thresholdNowDb());
+    }
+    // Playing over a little hiss, chords left to ring: following the floor takes nothing
+    // away that the fixed gate lets through.
+    {
+        auto withHiss = playedGuitar (sr, 12.0, 0.25f, true);
+        for (auto& s : withHiss) s += 0.0004f * n.next();
+        auto a = withHiss, b = withHiss;
+        NoiseGate fixed, following;
+        fixed.setFollowsNoise (false);
+        for (auto* g : { &fixed, &following }) { g->prepare (sr); g->set (-58.0f, 80.0f); }
+        float highest = -120.0f;
+        for (size_t at = 0; at < a.size(); at += 256)
+        {
+            const int k = (int) std::min<size_t> (256, a.size() - at);
+            fixed.process (a.data() + at, k);
+            following.process (b.data() + at, k);
+            highest = std::max (highest, following.thresholdNowDb());
+        }
+        std::printf ("  following the floor: threshold at most %.1f dB while playing over hiss at -68 (chosen: -58); output %.2f dB against %.2f fixed\n", highest, rmsDb (b), rmsDb (a));
+        CHECK (std::abs (rmsDb (b) - rmsDb (a)) < 0.3f, "following the noise floor changed the playing by %.2f dB", rmsDb (b) - rmsDb (a));
+        CHECK (highest < -50.0f, "playing was taken for noise: the gate went up to %.1f dB", highest);
+    }
+}
+
+void testInputGuard()
+{
+    std::printf ("input guard\n");
+    auto lin = [] (float db) { return std::pow (10.0f, db / 20.0f); };
+    {
+        InputGuard g;
+        float down = 0.0f;
+        for (int i = 0; i < 600; ++i) down += g.heard (lin (-12.0f + 3.0f * (float) std::sin (i * 0.7)), 0.2);
+        CHECK (down == 0.0f, "playing at the level setup chose was turned down by %.1f dB", down);
+    }
+    {
+        // 8 dB hotter than setup heard, as on the first test recording: three hard chords and it acts
+        InputGuard g;
+        float down = 0.0f;
+        int calls = 0;
+        const float peaks[] = { -30.0f, -4.5f, -18.0f, -9.0f, -4.0f, -20.0f, -5.0f, -15.0f };
+        for (float p : peaks) { ++calls; down = g.heard (lin (p), 0.2); if (down > 0.0f) break; }
+        CHECK (down == 6.0f && calls == 7, "three chords up to -4 dBFS: turned down %.1f dB after %d readings", down, calls);
+        // and once turned down, the same playing is left alone
+        float again = 0.0f;
+        for (int i = 0; i < 50; ++i) for (float p : peaks) again += g.heard (lin (p - down), 0.2);
+        CHECK (again == 0.0f, "turned down a second time by %.1f dB", again);
+    }
+    {
+        InputGuard g;
+        CHECK (g.heard (lin (-0.5f), 0.2) == 9.5f, "an input about to clip is not turned down at once");
+        // one bang a minute never adds up
+        float down = 0.0f;
+        for (int i = 0; i < 20; ++i) { down += g.heard (lin (-5.0f), 0.2); for (int k = 0; k < 300; ++k) down += g.heard (lin (-14.0f), 0.2); }
+        CHECK (down == 0.0f, "a stray bang now and then turned the input down by %.1f dB", down);
+    }
 }
 
 void testTimeEffects (double sr)
@@ -514,11 +638,388 @@ void testPresets (double sr)
     }
 }
 
+// Auto level: a tone you load comes up at the house loudness, a switch never changes the volume,
+// a knob still does.
+void testLevelMatch (double sr)
+{
+    std::printf ("auto level @ %.0f Hz\n", sr);
+    {
+        LevelKeeper k;
+        CHECK (std::abs (k.reading (-12.0f, ToneChange::none) - (kHouseLoudnessDb + 12.0f)) < 1.0e-4f, "a loaded tone is trimmed to the house loudness");
+        const float t0 = k.trimDb();
+        CHECK (std::abs (k.reading (-6.0f, ToneChange::knob) - t0) < 1.0e-4f, "turning a knob leaves the trim alone");
+        // the tone now plays 6 dB above the house loudness, and another amp must keep it exactly there
+        const float t1 = k.reading (-16.0f, ToneChange::swapped);
+        CHECK (std::abs ((-16.0f + t1) - (-6.0f + t0)) < 1.0e-4f, "another amp keeps the volume: %.2f against %.2f", -16.0f + t1, -6.0f + t0);
+        CHECK (std::abs (k.reading (-100.0f, ToneChange::swapped) - t1) < 1.0e-4f, "silence teaches nothing");
+        // a pedal: 2 dB louder by itself is let through, 11 dB louder comes out as the leeway
+        const float held = -16.0f + t1;
+        const float t2 = k.reading (-14.0f, ToneChange::toggled);
+        CHECK (std::abs ((-14.0f + t2) - (held + 2.0f)) < 1.0e-4f, "a small boost from a pedal is kept");
+        const float t3 = k.reading (-16.0f, ToneChange::toggled);
+        CHECK (std::abs ((-16.0f + t3) - held) < 1.0e-4f, "and goes again with the pedal");
+        const float t4 = k.reading (-5.0f, ToneChange::toggled);
+        CHECK (std::abs ((-5.0f + t4) - (held + kSwitchLeewayDb)) < 1.0e-4f, "a pedal 11 dB louder lifts the level by %.2f dB", (-5.0f + t4) - held);
+        const float t5 = k.reading (-16.0f, ToneChange::toggled);
+        CHECK (std::abs ((-16.0f + t5) - held) < 1.0e-4f, "and off again is where it started: %.2f against %.2f", -16.0f + t5, held);
+        k.rematch();
+        CHECK (std::abs (k.reading (-30.0f, ToneChange::none) - 10.0f) < 1.0e-4f, "loading a tone starts again from the house loudness");
+        CHECK (k.reading (-60.0f, ToneChange::swapped) <= kMostBoostDb + 1.0e-4f, "a very quiet chain is not boosted without limit");
+        LevelKeeper saved;
+        saved.restore (-7.5f);
+        CHECK (std::abs (saved.reading (-9.0f, ToneChange::none) + 7.5f) < 1.0e-4f, "a saved session comes back with the trim it had");
+        CHECK (std::abs ((-15.0f + saved.reading (-15.0f, ToneChange::swapped)) - (-9.0f - 7.5f)) < 1.0e-4f, "and a switch after that keeps its volume");
+    }
+    {
+        auto a = bare();
+        auto b = a;
+        b[(size_t) P::inGain] = 6.0f; b[(size_t) P::gateThresh] = -50.0f; b[(size_t) P::autoLevel] = 0.0f;
+        CHECK (changeBetween (toneForMeasuring (a), toneForMeasuring (b)) == ToneChange::none, "with the house phrase the player's setup is not part of the tone");
+        // their own phrase comes off the cable: the input level it goes through is part of what is heard
+        CHECK (changeBetween (toneForMeasuring (a, true), toneForMeasuring (b, true)) == ToneChange::knob, "with the player's phrase the input level is a knob");
+        b[(size_t) P::inGain] = a[(size_t) P::inGain];
+        b[(size_t) P::inputFixAmt] = 18.0f; // switched off: its strength changes nothing
+        CHECK (changeBetween (toneForMeasuring (a, true), toneForMeasuring (b, true)) == ToneChange::none, "gate, hum filter and a switched-off fix are not part of what is measured");
+        b[(size_t) P::inputFix] = 1.0f;
+        CHECK (changeBetween (toneForMeasuring (a, true), toneForMeasuring (b, true)) == ToneChange::knob, "Input Fix coming on is the player's own setting: it stands like a knob");
+        b = a;
+        b[(size_t) P::ampGain] = a[(size_t) P::ampGain] + 1.0f;
+        CHECK (changeBetween (a, b) == ToneChange::knob, "a knob is a change but not a switch");
+        b[(size_t) P::drvOn] = 1.0f - a[(size_t) P::drvOn];
+        CHECK (changeBetween (a, b) == ToneChange::toggled, "a pedal coming on is a switch");
+        b[(size_t) P::ampModel] = a[(size_t) P::ampModel] + 1.0f;
+        CHECK (changeBetween (a, b) == ToneChange::swapped, "another amp is a swap");
+        CHECK (toneHash (toneForMeasuring (a)) != toneHash (toneForMeasuring (b)), "different tones, different keys");
+    }
+
+    // the phrase catcher: what counts as playing, and that it hands back what went in
+    {
+        const auto di = playedGuitar (sr, 12.0, 0.25f, true);
+        float loud = 0.0f;
+        CHECK (worthKeeping (std::vector<float> (di.begin() + (long) (0.9 * sr), di.begin() + (long) (3.9 * sr)), sr, loud), "three seconds of strumming are not taken for playing");
+        CHECK (loud > -40.0f && loud < -10.0f, "strumming at -12 dBFS peaks reads %.1f dB", loud);
+        std::vector<float> hiss ((size_t) (3 * sr)), pop ((size_t) (3 * sr), 0.0f), clipped (di.begin(), di.begin() + (long) (3 * sr));
+        Noise n;
+        for (auto& v : hiss) v = 0.002f * n.next();
+        for (size_t i = (size_t) sr; i < (size_t) (sr * 1.05); ++i) pop[i] = 0.5f * n.next();
+        for (auto& v : clipped) v = std::clamp (v * 8.0f, -1.0f, 1.0f);
+        CHECK (! worthKeeping (hiss, sr, loud), "hiss was taken for playing");
+        CHECK (! worthKeeping (pop, sr, loud), "one pop was taken for playing");
+        CHECK (! worthKeeping (clipped, sr, loud), "a clipped input was kept as the player's phrase");
+        // one chord cut short and then nothing is not playing either; one left to ring is
+        std::vector<float> one ((size_t) (3 * sr), 0.0f);
+        std::copy (di.begin(), di.begin() + (long) (0.6 * sr), one.begin());
+        CHECK (! worthKeeping (one, sr, loud), "a single short strum and silence was kept as the player's phrase");
+        {
+            std::vector<float> ringing ((size_t) (3 * sr), 0.0f);
+            const auto note = playedGuitar (sr, 1.6, 0.25f, true); // the open chord, held
+            for (size_t i = 0; i < ringing.size(); ++i)
+            {
+                // held for the whole three seconds, fading the way a string does
+                const size_t from = (size_t) (0.2 * sr) + i % (size_t) (1.2 * sr);
+                ringing[i] = note[std::min (from, note.size() - 1)] * std::exp (-(float) i / (float) (1.5 * sr)) * (i < (size_t) (0.01 * sr) ? 0.0f : 1.0f);
+            }
+            CHECK (worthKeeping (ringing, sr, loud), "one chord left to ring was not taken for playing");
+        }
+
+        PhraseCatcher c;
+        c.prepare (sr);
+        std::vector<float> got;
+        CHECK (! c.latest (got), "the catcher has a phrase before it heard one");
+        for (size_t at = 0; at < di.size(); at += 480) c.push (di.data() + at, (int) std::min<size_t> (480, di.size() - at));
+        CHECK (c.latest (got) && got.size() == (size_t) (PhraseCatcher::kSeconds * sr), "the catcher did not give its three seconds");
+        bool same = ! got.empty();
+        for (size_t i = 0; i < got.size() && same; ++i) same = got[i] == di[di.size() - got.size() + i];
+        CHECK (same, "the catcher's phrase is not the last three seconds that went in");
+
+        LevelPhrase p;
+        p.samples = got; p.sampleRate = sr; p.inGainDb = 4.5f; p.fromPlayer = true;
+        const auto bytes = phraseToBytes (p);
+        LevelPhrase back;
+        CHECK (phraseFromBytes (bytes.getData(), bytes.getSize(), back) && back.samples.size() == p.samples.size() && back.inGainDb == 4.5f && back.fromPlayer, "a saved phrase does not come back");
+        float worst = 0.0f;
+        for (size_t i = 0; i < back.samples.size() && i < p.samples.size(); ++i) worst = std::max (worst, std::abs (back.samples[i] - p.samples[i]));
+        CHECK (worst < 1.0e-4f, "a saved phrase comes back changed by %.5f", worst);
+        CHECK (! phraseFromBytes (bytes.getData(), 40, back), "half a phrase file was accepted");
+        const auto slower = atRate (p, sr * 0.5);
+        CHECK (std::abs ((double) slower.samples.size() - 0.5 * (double) p.samples.size()) < 2.0, "a phrase at another rate has the wrong length");
+    }
+
+    Rig meter, stage;
+    stage.setOffline (true);
+    stage.prepare (sr, 256);
+    const auto presets = loadPresets();
+    const auto phrase = housePhrase (sr);
+    // other playing than the phrase the tones are matched with: longer, and played differently
+    const auto di = playedGuitar (sr, 6.0, 0.25f, true);
+    std::vector<float> raw, matched, played, allRaw;
+    double seconds = 0.0;
+    int count = 0;
+    for (const auto& p : presets)
+    {
+        // every tone at 48 kHz; at other rates every third is enough to show the rate changes nothing
+        if (count++ % 3 != 0 && sr != 48000.0) continue;
+        const auto tone = toneForMeasuring (p.values);
+        const auto t0 = std::chrono::steady_clock::now();
+        const float loud = measureLoudnessDb (meter, tone, phrase);
+        seconds += std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+        if (count % 5 == 1)
+        {
+            // something else in between, then the same tone again: it must read the same
+            measureLoudnessDb (meter, toneForMeasuring (presets[((size_t) count * 7 + 3) % presets.size()].values), phrase);
+            const float again = measureLoudnessDb (meter, tone, phrase);
+            CHECK (std::abs (again - loud) < 0.005f, "%s: the same tone reads %.4f then %.4f", p.name.toRawUTF8(), loud, again);
+        }
+        LevelKeeper k;
+        const float trim = k.reading (loud, ToneChange::none);
+        raw.push_back (loud);
+        matched.push_back (loud + trim);
+        // and on the stage rig, with the other playing (every second tone: it is the slow part)
+        if (count % 2 == 0) { raw.pop_back(); matched.pop_back(); allRaw.push_back (loud); continue; }
+        allRaw.push_back (loud);
+        stage.setLevelTrimDb (trim);
+        stage.snapParams (tone);
+        const auto r = run (stage, tone, di);
+        const float lv = loudHalfDb (r.l.data(), r.r.data(), r.l.size(), sr);
+        played.push_back (lv);
+        if (std::getenv ("RIFFHOUSE_LEVELS") != nullptr) std::printf ("    %6.1f raw %6.1f heard  %s\n", loud, lv, p.name.toRawUTF8());
+        CHECK (peakOf (r.l) <= 1.0f && allFinite (r), "%s peaks at %.2f with auto level", p.name.toRawUTF8(), peakOf (r.l));
+    }
+    if (! raw.empty())
+    {
+        auto spread = [] (const std::vector<float>& v) { const auto [mn, mx] = std::minmax_element (v.begin(), v.end()); return *mx - *mn; };
+        std::vector<float> unmatched;
+        for (size_t i = 0; i < played.size(); ++i) unmatched.push_back (played[i] - (matched[i] - raw[i]));
+        // the middle 90% says more than the two odd ones out
+        auto most = [] (std::vector<float> v) { std::sort (v.begin(), v.end()); return v[(size_t) ((double) (v.size() - 1) * 0.95)] - v[(size_t) ((double) (v.size() - 1) * 0.05)]; };
+        std::printf ("  %d tones: spread %.1f dB as made, %.2f dB matched; on other playing %.1f dB as made and %.1f dB matched (nine in ten within %.1f and %.1f dB); one reading takes %.0f ms (%.0fx real time)\n",
+                     (int) allRaw.size(), spread (allRaw), spread (matched), spread (unmatched), spread (played), most (unmatched), most (played),
+                     1000.0 * seconds / (double) allRaw.size(), kReferencePhraseSeconds * (double) allRaw.size() / seconds);
+        CHECK (spread (matched) < 0.1f, "matched tones differ by %.2f dB", spread (matched));
+        CHECK (most (played) < 0.6f * most (unmatched) && most (played) < 5.0f, "on other playing nine in ten matched tones are within %.1f dB, unmatched %.1f dB", most (played), most (unmatched));
+    }
+
+    // the player's phrase is their guitar off the cable: a clean tone follows the input level
+    // they set, and the house phrase does not care about it
+    {
+        LevelPhrase own;
+        own.samples.assign (di.begin() + (long) (1.8 * sr), di.begin() + (long) (4.8 * sr));
+        for (auto& x : own.samples) x *= 0.3f; // a weak signal, as off a mic jack
+        own.sampleRate = sr; own.fromPlayer = true;
+        auto v = bare();
+        const float flat = measureLoudnessDb (meter, toneForMeasuring (v, true), own);
+        v[(size_t) P::inGain] = 9.0f;
+        const float up = measureLoudnessDb (meter, toneForMeasuring (v, true), own);
+        CHECK (std::abs ((up - flat) - 9.0f) < 0.2f, "9 dB more input level reads %.2f dB louder with the player's phrase", up - flat);
+        CHECK (std::abs (measureLoudnessDb (meter, toneForMeasuring (v), phrase) - measureLoudnessDb (meter, toneForMeasuring (bare()), phrase)) < 1.0e-3f, "the house phrase read the input level");
+        v[(size_t) P::inputFix] = 1.0f; v[(size_t) P::inputFixAmt] = 18.0f;
+        const float fixed = measureLoudnessDb (meter, toneForMeasuring (v, true), own);
+        CHECK (fixed > up + 1.0f, "Input Fix is not heard in the measurement: %.2f against %.2f", fixed, up);
+        float lv = 0.0f;
+        CHECK (! worthKeeping (std::vector<float> (own.samples.size(), 0.0f), sr, lv, 30.0f), "silence was kept");
+        std::vector<float> faint = own.samples;
+        for (auto& x : faint) x *= 0.1f; // peaks near -42 dBFS
+        CHECK (! worthKeeping (faint, sr, lv), "a faint input with no gain on it was kept");
+        CHECK (worthKeeping (faint, sr, lv, 24.0f), "a faint input the player has turned up was not kept");
+    }
+
+    // a hot drive pedal coming on: a lift of the leeway, not of what the pedal does by itself
+    {
+        auto v = toneForMeasuring (presets.empty() ? bare() : presets.front().values);
+        v[(size_t) P::drvOn] = 0.0f;
+        LevelKeeper k;
+        const float before = measureLoudnessDb (meter, v, phrase);
+        const float trimBefore = k.reading (before, ToneChange::none);
+        auto w = v;
+        w[(size_t) P::drvOn] = 1.0f;
+        w[(size_t) P::drvLevel] = 9.0f;
+        const float after = measureLoudnessDb (meter, w, phrase);
+        const float trimAfter = k.reading (after, changeBetween (v, w));
+        const float heard = (after + trimAfter) - (before + trimBefore);
+        std::printf ("  a hot drive pedal changes the tone by %+.1f dB, heard as %+.2f dB\n", after - before, heard);
+        CHECK (std::abs (heard) <= kSwitchLeewayDb + 0.01f, "a pedal coming on changed the volume by %.1f dB", heard);
+    }
+
+    // a player whose guitar is quieter and duller than the house phrase: matched with their own
+    // playing, clean and heavy tones come out level for them, which the house phrase cannot promise
+    {
+        LevelPhrase own;
+        own.samples.assign (di.begin() + (long) (1.8 * sr), di.begin() + (long) (4.8 * sr));
+        float g = 0.0f;
+        { Biquad dull; dull.set (Biquad::Type::lowpass, sr, 900.0, 0.6); for (auto& x : own.samples) { x = 0.5f * dull.process (x); g = std::max (g, std::abs (x)); } }
+        own.sampleRate = sr; own.fromPlayer = true;
+        std::vector<float> theirs (di.size());
+        { Biquad dull; dull.set (Biquad::Type::lowpass, sr, 900.0, 0.6); for (size_t i = 0; i < di.size(); ++i) theirs[i] = 0.5f * dull.process (di[i]); }
+        std::vector<float> withHouse, withOwn;
+        for (const char* name : { "First Light Clean", "Heavy Starter", "Thrash Machine", "Warm Crunch", "Smooth Lead", "Neo-Soul Silk" })
+            for (const auto& p : presets)
+                if (p.name == name)
+                {
+                    const auto tone = toneForMeasuring (p.values);
+                    for (int own_ = 0; own_ < 2; ++own_)
+                    {
+                        LevelKeeper k;
+                        stage.setLevelTrimDb (k.reading (measureLoudnessDb (meter, tone, own_ ? own : phrase), ToneChange::none));
+                        stage.snapParams (tone);
+                        const auto r = run (stage, tone, theirs);
+                        (own_ ? withOwn : withHouse).push_back (loudHalfDb (r.l.data(), r.r.data(), r.l.size(), sr));
+                    }
+                }
+        if (withOwn.size() >= 4)
+        {
+            auto spread = [] (const std::vector<float>& v) { const auto [mn, mx] = std::minmax_element (v.begin(), v.end()); return *mx - *mn; };
+            std::printf ("  a quiet, dull guitar: clean to heavy tones differ by %.1f dB matched with the house phrase, %.1f dB matched with its own playing\n", spread (withHouse), spread (withOwn));
+            CHECK (spread (withOwn) < 6.5f, "matched with the player's own phrase their tones still differ by %.1f dB", spread (withOwn));
+            CHECK (spread (withOwn) < spread (withHouse), "the player's own phrase matched no better than the house phrase");
+        }
+    }
+    stage.setLevelTrimDb (0.0f);
+}
+
+void testLevelMatcher()
+{
+    std::printf ("auto level at work\n");
+    const double sr = 48000.0;
+    // the player's saved phrase is theirs: this test must neither read nor replace it
+    const auto phraseWas = LevelMatcher::phraseFile();
+    const bool hadPhrase = phraseWas.existsAsFile();
+    const auto aside = phraseWas.getSiblingFile ("your-playing.test-aside");
+    if (hadPhrase) phraseWas.moveFileTo (aside);
+
+    const auto presets = loadPresets();
+    auto find = [&] (const char* name) { for (const auto& p : presets) if (p.name == name) return p.values; return bare(); };
+    struct Shared { juce::CriticalSection lock; ParamValues v; } shared;
+    shared.v = find ("First Light Clean");
+    shared.v[(size_t) P::autoLevel] = 1.0f;
+    auto set = [&] (const ParamValues& v) { const juce::ScopedLock sl (shared.lock); shared.v = v; shared.v[(size_t) P::autoLevel] = 1.0f; };
+    auto waitFor = [] (auto&& done, int ms = 20000)
+    {
+        const auto t0 = juce::Time::getMillisecondCounter();
+        while (! done() && juce::Time::getMillisecondCounter() - t0 < (juce::uint32) ms) juce::Thread::sleep (5);
+        return done();
+    };
+    Rig meter;
+    const auto phrase = housePhrase (sr);
+    auto loud = [&] (const ParamValues& v) { return measureLoudnessDb (meter, toneForMeasuring (v), phrase); };
+    {
+        Rig stage;
+        stage.prepare (sr, 256);
+        LevelMatcher m (stage, [&] (ParamValues& v) { const juce::ScopedLock sl (shared.lock); v = shared.v; });
+        m.start (sr);
+        const float clean = loud (shared.v);
+        CHECK (waitFor ([&] { return std::abs (m.trimDb() - (kHouseLoudnessDb - clean)) < 0.01f; }), "the first tone was not brought to the house loudness: trim %.2f, wanted %.2f", m.trimDb(), kHouseLoudnessDb - clean);
+        CHECK (std::abs (stage.levelTrim() - m.trimDb()) < 1.0e-6f, "the trim did not reach the stage rig");
+
+        // a loaded tone: house loudness again, and quickly
+        auto heavy = find ("Thrash Machine");
+        const auto t0 = juce::Time::getMillisecondCounterHiRes();
+        set (heavy);
+        m.rematch();
+        const float h = loud (heavy);
+        CHECK (waitFor ([&] { return std::abs (m.trimDb() - (kHouseLoudnessDb - h)) < 0.01f; }), "a loaded tone was not matched: trim %.2f, wanted %.2f", m.trimDb(), kHouseLoudnessDb - h);
+        std::printf ("  a tone it has not met is matched %.0f ms after it is loaded\n", juce::Time::getMillisecondCounterHiRes() - t0);
+
+        // a knob: the trim stays, however long we wait
+        auto louder = heavy;
+        louder[(size_t) P::outLevel] = heavy[(size_t) P::outLevel] + 4.0f;
+        const float before = m.trimDb();
+        set (louder);
+        juce::Thread::sleep (700);
+        CHECK (std::abs (m.trimDb() - before) < 1.0e-4f, "turning the volume up moved the trim from %.2f to %.2f", before, m.trimDb());
+        // another amp after that: as loud as the tone with the volume up was
+        auto other = louder;
+        other[(size_t) P::ampModel] = (float) choices::britPlexi;
+        set (other);
+        const float want = (loud (louder) + before) - loud (other);
+        CHECK (waitFor ([&] { return std::abs (m.trimDb() - want) < 0.02f; }), "another amp: trim %.2f, wanted %.2f", m.trimDb(), want);
+
+        // tones measured ahead answer at once
+        std::vector<ParamValues> next { find ("Warm Crunch"), find ("Smooth Lead") };
+        m.measureAhead (next);
+        CHECK (waitFor ([&] { return m.tonesKnown() >= 6; }), "tones were not measured ahead (%d known)", m.tonesKnown());
+        const float sl = loud (next[1]);
+        const auto t1 = juce::Time::getMillisecondCounterHiRes();
+        set (next[1]);
+        m.rematch();
+        CHECK (waitFor ([&] { return std::abs (m.trimDb() - (kHouseLoudnessDb - sl)) < 0.01f; }), "a tone measured ahead was not matched");
+        const double took = juce::Time::getMillisecondCounterHiRes() - t1;
+        std::printf ("  a tone measured ahead is matched %.0f ms after it is loaded\n", took);
+        CHECK (took < 120.0, "a tone measured ahead took %.0f ms", took);
+
+        // switched off: no trim; a saved session: its trim, at once, and kept
+        auto off = next[1];
+        { const juce::ScopedLock sl2 (shared.lock); shared.v[(size_t) P::autoLevel] = 0.0f; }
+        CHECK (waitFor ([&] { return m.trimDb() == 0.0f && stage.levelTrim() == 0.0f; }), "auto level off leaves a trim of %.2f", m.trimDb());
+        set (off);
+        m.restore (-7.25f);
+        CHECK (stage.levelTrim() == -7.25f, "a restored trim waits for the thread");
+        juce::Thread::sleep (600);
+        CHECK (std::abs (m.trimDb() + 7.25f) < 1.0e-4f, "a restored session's trim became %.2f", m.trimDb());
+
+        // a bounce: answered on the spot, the same every time
+        Rig stage2;
+        stage2.prepare (sr, 256);
+        auto v = find ("Heavy Starter");
+        v[(size_t) P::autoLevel] = 1.0f;
+        LevelMatcher offline (stage2, [&v] (ParamValues& out) { out = v; }); // its thread sees the same tone the render does
+        offline.start (sr);
+        offline.matchNow (v);
+        CHECK (std::abs (stage2.levelTrim() - (kHouseLoudnessDb - loud (v))) < 0.01f, "an offline render got a trim of %.2f, wanted %.2f", stage2.levelTrim(), kHouseLoudnessDb - loud (v));
+    }
+
+    // the player's phrase: heard, taken, saved, and there again next time
+    {
+        Rig stage;
+        stage.prepare (sr, 256);
+        {
+            LevelMatcher m (stage, [&] (ParamValues& v) { const juce::ScopedLock sl (shared.lock); v = shared.v; });
+            set (find ("First Light Clean"));
+            m.start (sr);
+            CHECK (waitFor ([&] { return m.trimDb() != 0.0f; }), "no first match");
+            CHECK (! m.hasPlayersPhrase(), "a phrase before anything was played");
+            const float houseTrim = m.trimDb();
+            // a quiet, dull guitar plays for a few seconds
+            auto strums = playedGuitar (sr, 3.4, 0.12f, true); // two open chords
+            Biquad dull; dull.set (Biquad::Type::lowpass, sr, 900.0, 0.6);
+            for (auto& x : strums) x = dull.process (x);
+            auto di = strums;
+            di.insert (di.end(), strums.begin(), strums.end());
+            std::vector<float> l (256), r (256);
+            ParamValues v; { const juce::ScopedLock sl (shared.lock); v = shared.v; }
+            for (size_t at = 0; at + 256 <= di.size(); at += 256)
+            {
+                stage.setParams (v);
+                stage.process (di.data() + at, l.data(), r.data(), 256);
+                if (at % 9600 == 0) juce::Thread::sleep (2);
+            }
+            {
+                float lv = 0.0f;
+                std::vector<float> tail (di.end() - (long) (3 * sr), di.end());
+                float pk = 0.0f; for (float x : tail) pk = std::max (pk, std::abs (x));
+                const bool ok = worthKeeping (tail, sr, lv);
+                std::printf ("  (the last three seconds: peak %.3f, worth keeping %d, loud %.1f)\n", pk, (int) ok, lv);
+            }
+            CHECK (waitFor ([&] { return m.hasPlayersPhrase(); }, 5000), "six seconds of playing did not become the player's phrase");
+            CHECK (std::abs (m.trimDb() - houseTrim) < 1.0e-4f, "learning the phrase moved the level under the player's fingers");
+            m.rematch();
+            CHECK (waitFor ([&] { return m.trimDb() > houseTrim + 3.0f; }), "a quiet guitar's clean tone was not turned up: %.2f with its own phrase, %.2f with the house phrase", m.trimDb(), houseTrim);
+            CHECK (LevelMatcher::phraseFile().existsAsFile(), "the player's phrase was not saved");
+        }
+        LevelMatcher again (stage, [&] (ParamValues& v) { const juce::ScopedLock sl (shared.lock); v = shared.v; });
+        again.start (sr);
+        CHECK (waitFor ([&] { return again.hasPlayersPhrase(); }, 5000), "the saved phrase was not found the next time");
+        again.forgetPhrase();
+        CHECK (waitFor ([&] { return ! again.hasPlayersPhrase() && ! LevelMatcher::phraseFile().existsAsFile(); }, 5000), "the phrase could not be forgotten");
+    }
+    LevelMatcher::phraseFile().deleteFile();
+    if (hadPhrase) aside.moveFileTo (phraseWas);
+}
+
 void testNeural (double sr)
 {
     std::printf ("neural captures @ %.0f Hz\n", sr);
 #ifdef RIFFHOUSE_NAM_EXAMPLES
-    for (const char* file : { "wavenet.nam", "lstm.nam", "wavenet_a1_standard.nam" })
+    for (const char* file : { "wavenet.nam", "lstm.nam", "wavenet_a1_standard.nam", "A2.nam" })
     {
         const auto path = juce::File (RIFFHOUSE_NAM_EXAMPLES).getChildFile (file);
         if (! path.existsAsFile()) { std::printf ("  (skipping %s)\n", file); continue; }
@@ -652,6 +1153,25 @@ void testUpdates()
     CHECK (compareVersions ("0.2.0-beta", "0.2.0") < 0, "a pre-release is older than its release");
     CHECK (compareVersions ("0.2.0-beta", "0.1.9") > 0, "a pre-release is newer than the version before");
     CHECK (compareVersions ("", "0.1.0") < 0, "an empty version is older than anything");
+    CHECK (compareVersions ("0.1.0-rc1", "0.1.0-rc2") < 0 && compareVersions ("0.1.0-rc10", "0.1.0-rc9") > 0, "test builds of one version go in order");
+    CHECK (compareVersions ("0.1.0-rc2", "0.1.0") < 0 && compareVersions ("0.1.0-rc2", "0.1.0-rc2") == 0, "the release follows its last test build");
+    CHECK (compareVersions ("0.1.0-dev.1a2b3c4", "0.1.0-rc1") < 0, "a build from source is older than a test build of that version");
+    CHECK (isPreRelease ("0.1.0-rc1") && isPreRelease ("v0.2.0-dev.abc") && ! isPreRelease ("0.1.0") && ! isPreRelease ("0.1.0+build-7"), "telling a test build from a release");
+    {
+        // someone on a test build is offered the next test build, then the release
+        auto entry = [] (const char* tag, bool pre, bool draft)
+        {
+            return juce::String ("{\"tag_name\":\"") + tag + "\",\"prerelease\":" + (pre ? "true" : "false") + ",\"draft\":" + (draft ? "true" : "false")
+                 + ",\"html_url\":\"https://github.com/NatikChhabra/riffhouse/releases/tag/" + tag + "\",\"body\":\"\",\"assets\":[]}";
+        };
+        const auto tests = "[" + entry ("v0.1.0-rc1", true, false) + "," + entry ("v0.1.0-rc3", true, false) + "," + entry ("v0.1.0-rc2", true, false) + "," + entry ("v0.1.0-rc9", true, true) + "]";
+        CHECK (newestRelease (tests, "").version == "0.1.0-rc3", "newest test release: got '%s'", newestRelease (tests, "").version.toRawUTF8());
+        const auto out = "[" + entry ("v0.1.0-rc3", true, false) + "," + entry ("v0.1.0", false, false) + "]";
+        CHECK (newestRelease (out, "").version == "0.1.0", "the release beats its test builds");
+        CHECK (newestRelease ("[]", "").version.isEmpty() && newestRelease ("not json", "").version.isEmpty(), "an empty or broken list offers nothing");
+        CHECK (parseRelease (entry ("v0.1.0-rc3", true, false), "").version.isEmpty(), "a full release never follows test releases");
+        CHECK (parseRelease (entry ("v0.1.0-rc3", true, false), "", true).version == "0.1.0-rc3", "a test release is read when asked for");
+    }
 
     const juce::String hash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
     const juce::String base = "https://github.com/NatikChhabra/riffhouse/releases/download/v0.2.0/";
@@ -1258,6 +1778,75 @@ int main (int argc, char** argv)
         juce::File (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])).replaceWithText (juce::JSON::toString (juce::var (obj)));
         return 0;
     }
+    if (args[0] == "play" && args.size() >= 4)
+    {
+        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB]
+        // Plays a recorded clean guitar through a preset, for listening checks.
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr && args[1] != "@ref") { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        const double sr = reader != nullptr ? reader->sampleRate : 48000.0;
+        std::vector<float> di;
+        if (reader != nullptr)
+        {
+            juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+            reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+            di.assign (buf.getReadPointer (0), buf.getReadPointer (0) + buf.getNumSamples());
+        }
+        else
+            di = test::guitarDi (sr, 12.0);
+        {
+            TiltProbe probe;
+            probe.prepare (sr);
+            for (size_t at = 0; at < di.size(); at += 256) probe.process (di.data() + at, (int) std::min<size_t> (256, di.size() - at));
+            std::printf ("input: tilt %.1f dB over %.1f s, which asks for %.1f dB of fix\n", probe.tiltDb(), probe.secondsMeasured(), TiltProbe::fixAmountFor (probe.tiltDb()));
+        }
+        ParamValues v = defaultParamValues();
+        bool found = args[2] == "-";
+        for (const auto& p : loadPresets()) if (p.name == args[2]) { v = p.values; found = true; }
+        if (! found) { std::printf ("no preset %s\n", args[2].toRawUTF8()); return 1; }
+        float trim = 0.0f;
+        for (int i = 4; i < args.size(); ++i)
+        {
+            const auto key = args[i].upToFirstOccurrenceOf ("=", false, false);
+            const float value = args[i].fromFirstOccurrenceOf ("=", false, false).getFloatValue();
+            if (key == "trim") { trim = value; continue; }
+            const int id = findParamByKey (key.toStdString());
+            if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
+            v[(size_t) id] = value;
+        }
+        auto r = renderWith (v, di, sr, 256);
+        const float g = dbToGain (trim);
+        for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
+        std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));
+        return 0;
+    }
+    if (args[0] == "fresh")
+    {
+        // which block keeps something from the tone before: one rig, a tone, another tone, the first again
+        const double sr = 48000.0;
+        const auto di = test::guitarDi (sr, 2.0);
+        Rig rig;
+        auto render = [&] (const ParamValues& v) { rig.startFresh (v, sr, 256); return run (rig, v, di, 256); };
+        const auto presets = loadPresets();
+        for (P t : { P::count, P::gateOn, P::compOn, P::wahOn, P::pitchOn, P::drvOn, P::ampOn, P::cabOn, P::eqOn, P::modOn, P::dlyOn, P::revOn, P::lofiOn })
+        {
+            auto v = bare();
+            if (t != P::count) v[(size_t) t] = 1;
+            if (t == P::count) v[(size_t) P::doubler] = 6;
+            const auto a = render (v);
+            render (presets[7].values); render (presets[40].values);
+            const auto b = render (v);
+            float w = 0.0f; size_t at = 0;
+            for (size_t i = 0; i < di.size(); ++i) { const float d = std::max (std::abs (a.l[i] - b.l[i]), std::abs (a.r[i] - b.r[i])); if (d > w) { w = d; at = i; } }
+            size_t first = di.size();
+            for (size_t i = 0; i < di.size(); ++i) if (a.l[i] != b.l[i] || a.r[i] != b.r[i]) { first = i; break; }
+            std::printf ("%-10s worst %.3g at %d, first difference at %d (%g against %g)\n", t == P::count ? "doubler" : spec (t).key, w, (int) at, (int) first,
+                         first < di.size() ? a.l[first] : 0.0f, first < di.size() ? b.l[first] : 0.0f);
+        }
+        return 0;
+    }
     if (args[0] == "determinism")
     {
         const double sr = 48000.0;
@@ -1320,6 +1909,9 @@ int main (int argc, char** argv)
     testSong();
     testFootControl();
     if (args.contains ("--takes")) { testTakes(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args.contains ("--matcher")) { testLevelMatcher(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args.contains ("--levels")) { testLevelMatch (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args.contains ("--fix")) { testInputFix (48000.0); testInputFix (44100.0); testInputFix (96000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args.contains ("--updates")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testTakes();
     testParams();
@@ -1335,6 +1927,7 @@ int main (int argc, char** argv)
     testHum (48000.0);
     testHum (44100.0);
     testInputFix (48000.0);
+    testInputGuard();
     testGate (48000.0);
     testTimeEffects (48000.0);
     testAliasing (48000.0);
@@ -1342,6 +1935,9 @@ int main (int argc, char** argv)
     testNeural (44100.0);
     testPresets (48000.0);
     if (! quick) testPresets (44100.0);
+    testLevelMatch (48000.0);
+    if (! quick) testLevelMatch (44100.0);
+    testLevelMatcher();
     testCpu (48000.0);
 
     std::printf ("\n%d checks, %d failures\n", checks, failures);

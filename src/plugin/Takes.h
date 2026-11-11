@@ -77,6 +77,7 @@ public:
         ParamValues params {};
         juce::File capture, userIr; // what the amp and cab slots hold, if anything
         double tempo = 120.0;
+        float levelTrimDb = 0.0f; // auto level's trim, so the new take is as loud as what you heard
         juce::String toneName;
     };
 

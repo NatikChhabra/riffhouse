@@ -6,6 +6,9 @@ set(RIFFHOUSE_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Params.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Presets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Rig.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/ReferenceGuitar.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/LevelMatch.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/PhraseCatcher.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/UpdateInfo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/History.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Looper.cpp

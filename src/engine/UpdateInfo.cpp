@@ -28,16 +28,17 @@ namespace
 
 int compareVersions (const juce::String& a, const juce::String& b)
 {
-    auto split = [] (juce::String v, juce::StringArray& numbers, bool& pre)
+    auto split = [] (juce::String v, juce::StringArray& numbers, juce::String& pre)
     {
         v = v.trim();
         if (v.startsWithIgnoreCase ("v")) v = v.substring (1);
-        pre = v.containsAnyOf ("-+") && v.indexOfChar ('-') >= 0;
-        v = v.upToFirstOccurrenceOf ("-", false, false).upToFirstOccurrenceOf ("+", false, false);
+        v = v.upToFirstOccurrenceOf ("+", false, false);
+        pre = v.fromFirstOccurrenceOf ("-", false, false);
+        v = v.upToFirstOccurrenceOf ("-", false, false);
         numbers = juce::StringArray::fromTokens (v, ".", {});
     };
     juce::StringArray na, nb;
-    bool pa = false, pb = false;
+    juce::String pa, pb;
     split (a, na, pa);
     split (b, nb, pb);
     for (int i = 0; i < std::max (na.size(), nb.size()); ++i)
@@ -46,8 +47,14 @@ int compareVersions (const juce::String& a, const juce::String& b)
         const auto y = i < nb.size() ? nb[i].getLargeIntValue() : 0;
         if (x != y) return x < y ? -1 : 1;
     }
-    if (pa != pb) return pa ? -1 : 1;
-    return 0;
+    if (pa.isEmpty() != pb.isEmpty()) return pa.isNotEmpty() ? -1 : 1;
+    const int order = pa.compareNatural (pb);
+    return order < 0 ? -1 : order > 0 ? 1 : 0;
+}
+
+bool isPreRelease (const juce::String& version)
+{
+    return version.upToFirstOccurrenceOf ("+", false, false).containsChar ('-');
 }
 
 CheckAnswer readCheckAnswer (int httpStatus, const juce::String& body)
@@ -63,13 +70,33 @@ bool isTrustedDownloadUrl (const juce::String& url)
         && ! url.containsAnyOf (" \r\n\"'<>\\");
 }
 
-ReleaseInfo parseRelease (const juce::String& json, const juce::String& installerSuffix)
+static ReleaseInfo readRelease (const juce::var& root, const juce::String& installerSuffix, bool allowPreRelease);
+
+ReleaseInfo parseRelease (const juce::String& json, const juce::String& installerSuffix, bool allowPreRelease)
+{
+    return readRelease (juce::JSON::parse (json), installerSuffix, allowPreRelease);
+}
+
+ReleaseInfo newestRelease (const juce::String& listJson, const juce::String& installerSuffix)
+{
+    ReleaseInfo best;
+    const auto root = juce::JSON::parse (listJson);
+    if (auto* list = root.getArray())
+        for (auto& entry : *list)
+        {
+            const auto r = readRelease (entry, installerSuffix, true);
+            if (r.version.isNotEmpty() && (best.version.isEmpty() || compareVersions (r.version, best.version) > 0))
+                best = r;
+        }
+    return best;
+}
+
+static ReleaseInfo readRelease (const juce::var& root, const juce::String& installerSuffix, bool allowPreRelease)
 {
     ReleaseInfo info;
-    const auto root = juce::JSON::parse (json);
     auto* obj = root.getDynamicObject();
     if (obj == nullptr) return info;
-    if ((bool) obj->getProperty ("draft") || (bool) obj->getProperty ("prerelease")) return info;
+    if ((bool) obj->getProperty ("draft") || (! allowPreRelease && (bool) obj->getProperty ("prerelease"))) return info;
     const auto tag = obj->getProperty ("tag_name").toString().trim();
     if (tag.isEmpty() || ! tag.containsAnyOf ("0123456789")) return info;
     info.version = tag.startsWithIgnoreCase ("v") ? tag.substring (1) : tag;

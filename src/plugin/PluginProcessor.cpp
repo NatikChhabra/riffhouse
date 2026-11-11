@@ -71,11 +71,15 @@ RiffhouseProcessor::RiffhouseProcessor()
         jassert (params[(size_t) s.id] != nullptr);
     }
     formats.registerBasicFormats();
+    // only the app itself learns the player's phrase: a plugin on a drum bus must not
+    matcher.setLearns (wrapperType == wrapperType_Standalone);
     disk.startThread();
     recordingFolder = Recorder::defaultFolder();
     reloadPresets();
     const int start = library.indexOf ("First Light Clean");
     if (start >= 0) loadPreset (start);
+    // a plugin starts from the input settings the app's setup found; a project's own state comes after this
+    if (wrapperType != wrapperType_Standalone) recallSetup();
 }
 
 RiffhouseProcessor::~RiffhouseProcessor()
@@ -93,6 +97,43 @@ juce::File RiffhouseProcessor::userFolder()
     return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Riffhouse");
 }
 
+juce::File RiffhouseProcessor::setupFile()
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+        .getChildFile ("Riffhouse").getChildFile ("your-input.txt");
+}
+
+void RiffhouseProcessor::rememberSetup() const
+{
+    juce::String t;
+    for (const auto& s : paramSpecs())
+        if (belongsToSetup (s.id))
+            t << s.key << "=" << juce::String (value (s.id), 3) << "\n";
+    const auto f = setupFile();
+    f.getParentDirectory().createDirectory();
+    f.replaceWithText (t);
+}
+
+bool RiffhouseProcessor::recallSetup()
+{
+    const auto f = setupFile();
+    if (! f.existsAsFile() || f.getSize() > 4096) return false;
+    bool any = false;
+    for (const auto& l : juce::StringArray::fromLines (f.loadFileAsString()))
+    {
+        const auto key = l.upToFirstOccurrenceOf ("=", false, false).trim();
+        const auto text = l.fromFirstOccurrenceOf ("=", false, false).trim();
+        if (key.isEmpty() || text.isEmpty() || ! text.containsOnly ("0123456789.-")) continue;
+        for (const auto& s : paramSpecs())
+            if (belongsToSetup (s.id) && key == s.key)
+            {
+                setValue (s.id, juce::jlimit (s.min, s.max, text.getFloatValue()));
+                any = true;
+            }
+    }
+    return any;
+}
+
 bool RiffhouseProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 {
     const auto in = layouts.getMainInputChannelSet(), out = layouts.getMainOutputChannelSet();
@@ -104,13 +145,19 @@ void RiffhouseProcessor::prepareToPlay (double sr, int block)
 {
     sampleRate = sr;
     blockSize = block;
-    mono.assign ((size_t) std::max (block, 16), 0.0f);
-    di.assign ((size_t) std::max (block, 16), 0.0f);
+    // Hosts promise a largest block and some then send a bigger one (offline bounces, loop
+    // points). Room for far more than was promised costs nothing.
+    const size_t room = (size_t) std::max (block * 4, 8192);
+    mono.assign (room, 0.0f);
+    di.assign (room, 0.0f);
+    monoOut.assign (room, 0.0f);
     ParamValues v;
     for (int i = 0; i < kNumParams; ++i) v[(size_t) i] = raw[(size_t) i]->load();
     rig.setParams (v);
     rig.prepare (sr, block);
     setLatencySamples (rig.latencySamples());
+    latencyAmp.store ((int) std::lround (v[(size_t) P::ampModel]));
+    matcher.start (sr);
     tun.prepare (sr);
     // a song played faster than it was recorded asks for more than a block of it at a time
     const int songBlock = SongStretch::most (std::max (block, 16));
@@ -169,7 +216,15 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     blockCounter.fetch_add (1, std::memory_order_relaxed);
     const int n = buffer.getNumSamples();
     const int numIn = getTotalNumInputChannels();
-    if ((int) mono.size() < n) { buffer.clear(); return; } // host broke its promise about block size
+    if ((int) mono.size() < n)
+    {
+        // Bigger than anything allowed for, or a host that never called prepareToPlay.
+        // Making room here is not what an audio thread should do, but it happens once,
+        // and the other choice is silence.
+        mono.resize ((size_t) n);
+        di.resize ((size_t) n);
+        monoOut.resize ((size_t) n);
+    }
 
     // Pick the input channel that actually has the guitar. Many mic jacks
     // deliver audio on only one side, some duplicate it on both.
@@ -209,7 +264,15 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     ParamValues v;
     for (int i = 0; i < kNumParams; ++i) v[(size_t) i] = raw[(size_t) i]->load();
+    // A bounce runs faster than the clock: auto level answers here and now, so that the same
+    // project always renders the same file.
+    if (isNonRealtime()) matcher.matchNow (v);
     rig.setParams (v);
+    if (const int amp = (int) std::lround (v[(size_t) P::ampModel]); amp != latencyAmp.load (std::memory_order_relaxed))
+    {
+        latencyAmp.store (amp, std::memory_order_relaxed);
+        triggerAsyncUpdate(); // the host hears about a change in delay from the message thread
+    }
 
     double bpm = metronomeBpm.load();
     if (auto* ph = getPlayHead())
@@ -221,9 +284,10 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     if (buffer.getNumChannels() < 2)
     {
         // mono output: render stereo, fold down
-        juce::HeapBlock<float> tmp ((size_t) n);
-        rig.process (mono.data(), buffer.getWritePointer (0), tmp.get(), n);
-        for (int i = 0; i < n; ++i) buffer.getWritePointer (0)[i] = 0.5f * (buffer.getReadPointer (0)[i] + tmp[i]);
+        float* out = buffer.getWritePointer (0);
+        rig.process (mono.data(), out, monoOut.data(), n);
+        for (int i = 0; i < n; ++i) out[i] = 0.5f * (out[i] + monoOut[(size_t) i]);
+        if (muteOutput.load()) buffer.clear();
         return;
     }
 
@@ -310,8 +374,16 @@ void RiffhouseProcessor::renderClick (float* l, float* r, int n)
     }
 }
 
+void RiffhouseProcessor::refreshLatency()
+{
+    const int now = rig.latencySamples();
+    if (now != getLatencySamples()) setLatencySamples (now);
+}
+
 void RiffhouseProcessor::handleAsyncUpdate()
 {
+    refreshLatency(); // the amp in use may have changed (a capture has its own delay)
+
     // count-in finished: start writing
     if (writeTake.exchange (false))
         rec.start (recordingFolder, sampleRate, saveDi.load(), currentPresetName());
@@ -516,6 +588,14 @@ void RiffhouseProcessor::reloadPresets()
     for (auto& p : const_cast<std::vector<Preset>&> (library.all()))
         p.favourite = favs.contains (p.name);
     currentPreset = library.indexOf (current);
+
+    // auto level measures every tone in the library while nothing else is going on, the
+    // starred ones first, so that stepping through tones finds each level ready
+    std::vector<ParamValues> tones;
+    for (int starred = 1; starred >= 0; --starred)
+        for (const auto& p : library.all())
+            if ((int) p.favourite == starred) tones.push_back (p.values);
+    matcher.measureAhead (std::move (tones));
 }
 
 void RiffhouseProcessor::toggleFavourite (int index)
@@ -547,6 +627,7 @@ void RiffhouseProcessor::loadPreset (int index)
     currentPreset = index;
     externalName.clear();
     for (int i = 0; i < kNumParams; ++i) presetSnapshot[(size_t) i] = raw[(size_t) i]->load();
+    matcher.rematch(); // a loaded tone comes up at the house loudness
 }
 
 juce::String RiffhouseProcessor::currentPresetName() const
@@ -562,6 +643,7 @@ void RiffhouseProcessor::applySharedPreset (const Preset& p)
     currentPreset = -1;
     externalName = p.name;
     for (int i = 0; i < kNumParams; ++i) presetSnapshot[(size_t) i] = raw[(size_t) i]->load();
+    matcher.rematch();
 }
 
 //==============================================================================
@@ -642,7 +724,7 @@ Preset RiffhouseProcessor::captureCurrent (const juce::String& name, const juce:
 juce::File RiffhouseProcessor::savePreset (const juce::String& name, const juce::String& category)
 {
     auto p = captureCurrent (name, category);
-    p.author = juce::SystemStats::getFullUserName();
+    // no author: the name on this computer's account is nobody's business when a tone is shared
     auto folder = userFolder().getChildFile ("Presets");
     folder.createDirectory();
     auto f = folder.getChildFile (juce::File::createLegalFileName (name) + ".json");
@@ -654,25 +736,30 @@ juce::File RiffhouseProcessor::savePreset (const juce::String& name, const juce:
 }
 
 //==============================================================================
-void RiffhouseProcessor::loadCaptureAsync (const juce::File& file, std::function<void (juce::String)> done)
+void RiffhouseProcessor::loadCaptureAsync (const juce::File& file, std::function<void (juce::String)> done, bool select)
 {
     // Loading a capture can take a moment, so it happens on a worker thread.
     // The processor waits for the worker in its destructor, and the result is
     // only applied if the processor is still alive.
     auto aliveFlag = alive;
-    loader.addJob ([this, file, done, aliveFlag]
+    loader.addJob ([this, file, done, aliveFlag, select]
     {
         const auto err = rig.neural().load (file.getFullPathName().toStdString());
-        juce::MessageManager::callAsync ([this, file, err, done, aliveFlag]
+        juce::MessageManager::callAsync ([this, file, err, done, aliveFlag, select]
         {
             if (! aliveFlag->load()) return;
             if (err.empty())
             {
                 captureFile = file;
-                setValue (P::ampModel, (float) choices::neuralCapture);
-                setValue (P::ampOn, 1.0f);
+                matcher.setFiles (captureFile, irFile);
+                if (select)
+                {
+                    setValue (P::ampModel, (float) choices::neuralCapture);
+                    setValue (P::ampOn, 1.0f);
+                }
             }
             rig.neural().collectGarbage();
+            refreshLatency(); // a capture made at another sample rate brings a few samples of delay
             if (done) done (juce::String (err));
         });
     });
@@ -682,6 +769,7 @@ bool RiffhouseProcessor::loadUserIr (const juce::File& file)
 {
     if (! rig.cabinet().loadUserIr (file)) return false;
     irFile = file;
+    matcher.setFiles (captureFile, irFile);
     setValue (P::cabModel, (float) choices::cabUserIr);
     setValue (P::cabOn, 1.0f);
     return true;
@@ -695,6 +783,7 @@ ReampJob::Setup RiffhouseProcessor::reampSetup() const
     s.userIr = irFile;
     s.tempo = metronomeBpm.load();
     s.toneName = currentPresetName();
+    s.levelTrimDb = matcher.trimDb();
     return s;
 }
 
@@ -804,6 +893,7 @@ void RiffhouseProcessor::getStateInformation (juce::MemoryBlock& destData)
     st.setProperty ("metronomeBpm", metronomeBpm.load(), nullptr);
     st.setProperty ("saveDi", saveDi.load(), nullptr);
     st.setProperty ("recordingFolder", recordingFolder.getFullPathName(), nullptr);
+    st.setProperty ("levelTrim", matcher.trimDb(), nullptr);
     st.removeChild (st.getChildWithName ("UI"), nullptr);
     st.appendChild (uiState.createCopy(), nullptr);
     if (auto xml = st.createXml())
@@ -815,7 +905,7 @@ void RiffhouseProcessor::setStateInformation (const void* data, int size)
     auto xml = getXmlFromBinary (data, size);
     if (xml == nullptr) return;
     auto st = juce::ValueTree::fromXml (*xml);
-    if (! st.isValid()) return;
+    if (! st.isValid() || ! st.hasType (apvts.state.getType())) return; // not ours: leave everything as it is
     if (auto ui = st.getChildWithName ("UI"); ui.isValid()) uiState.copyPropertiesAndChildrenFrom (ui, nullptr);
     if (uiState.hasProperty ("foot")) foot.fromText (uiState.getProperty ("foot").toString().toStdString());
     apvts.replaceState (st);
@@ -826,9 +916,14 @@ void RiffhouseProcessor::setStateInformation (const void* data, int size)
     const juce::String folder = st.getProperty ("recordingFolder").toString();
     if (folder.isNotEmpty()) recordingFolder = juce::File (folder);
     const juce::File cap (st.getProperty ("capture").toString());
-    if (cap.existsAsFile()) loadCaptureAsync (cap, {});
+    // the capture goes back into its slot; which amp is selected is already restored with the knobs
+    if (cap.existsAsFile()) loadCaptureAsync (cap, {}, false);
     const juce::File ir (st.getProperty ("ir").toString());
     if (ir.existsAsFile()) { rig.cabinet().loadUserIr (ir); irFile = ir; }
+    matcher.setFiles (cap.existsAsFile() ? cap : juce::File(), irFile);
+    // A session comes back sounding as it was saved. One saved before auto level existed has
+    // no trim: it keeps the level it had, and matching starts with the next tone loaded.
+    matcher.restore ((float) st.getProperty ("levelTrim", 0.0));
 }
 
 juce::AudioProcessorEditor* RiffhouseProcessor::createEditor() { return new RiffhouseEditor (*this); }

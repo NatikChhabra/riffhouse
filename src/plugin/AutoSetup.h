@@ -11,13 +11,19 @@ namespace rh
 //  1. listen  - cycles through every input while you strum and keeps the loudest
 //  2. tune    - tries the fastest driver modes and the smallest buffers that run
 //               without dropouts on this PC
-//  3. quiet   - you mute the strings; it measures the noise and sets the input
-//               level and gate from what it heard
+//  3. play    - you play as hard as you ever will for a few seconds; the input level
+//               is set from that and not from the first careful strums, the treble
+//               your input loses is measured, and those seconds become the playing
+//               every tone is levelled with
+//  4. quiet   - you mute the strings; it waits until it hears them stop, measures
+//               the noise as it is with the level and Input Fix now on, and sets the gate
+// Between steps it stops for a moment and says what it found, so nobody is rushed along.
 // It only touches the device manager from the message thread.
 class AutoSetup : private juce::Timer
 {
 public:
-    enum class Phase { idle, listening, tuning, quiet, finished, noSignal };
+    enum class Phase { idle, listening, tuning, playing, quiet, finished, noSignal };
+    static constexpr int kSetupVersion = 2; // what a finished setup is stamped with; older ones are offered a new run
 
     AutoSetup (juce::AudioDeviceManager&, RiffhouseProcessor&);
     ~AutoSetup() override;
@@ -28,6 +34,12 @@ public:
     float progress() const noexcept { return phaseProgress; }
     juce::String detail() const { return detailText; }
     float liveLevel() const noexcept { return level; } // linear peak of the raw input
+    // A step has just finished: what it found, shown for a moment before the next one starts.
+    bool pausing() const noexcept { return afterPause != nullptr; }
+    juce::String found() const { return foundText; }
+    // In the quiet step: still waiting for the strings to stop, or measuring already.
+    bool measuringNoise() const noexcept { return noiseStarted; }
+    float hardestPeak() const noexcept { return playPeak; } // in the playing step, linear
 
     struct Summary
     {
@@ -39,6 +51,8 @@ public:
         bool inputFix = false, clipping = false, exclusive = false;
         float inputFixDb = 0, tiltDb = 0; // how much treble was restored, and the measured tone
         double toneSeconds = 0;           // how much playing the tone measurement heard
+        double playedSeconds = 0;         // how much hard playing the level was taken from
+        bool fixHeldBack = false;         // the full fix would have brought too much hiss up with it
     };
     const Summary& summary() const noexcept { return result; }
 
@@ -58,7 +72,11 @@ private:
     void beginTuning();
     bool openMode (const juce::String& type, int bufferSize);
     void finishTuning();
+    void pauseThen (const juce::String& found, std::function<void()> next);
+    void beginPlaying();
+    void finishPlaying();
     void beginQuiet();
+    void startNoise();
     void finish();
     double measuredLatencyMs() const;
 
@@ -66,7 +84,9 @@ private:
     RiffhouseProcessor& proc;
     Phase currentPhase = Phase::idle;
     float phaseProgress = 0.0f, level = 0.0f;
-    juce::String detailText;
+    juce::String detailText, foundText;
+    std::function<void()> afterPause;
+    double pauseUntil = 0;
     Summary result;
 
     std::unique_ptr<juce::XmlElement> originalState;
@@ -93,9 +113,15 @@ private:
     struct Best { juce::String type; int buffer = 0; double latency = 1e9; double rate = 0; } best;
     float strumPeak = 0.0f; // the loudest playing heard on the chosen input, across listening and tuning
 
+    // playing
+    float playPeak = 0.0f, fixedPeak = 0.0f; // the hardest playing: off the cable, and after Input Fix
+    double playedMs = 0, lastTick = 0, fixSetAt = 0;
+    bool fixSet = false;
+    void setFixFromTone();
+
     // quiet
-    float noisePeak = 0.0f;
-    double phaseStart = 0;
+    double phaseStart = 0, quietSince = 0, noiseStart = 0;
+    bool noiseStarted = false, fixRetried = false;
     juce::Array<float> noiseSamples;
 };
 } // namespace rh

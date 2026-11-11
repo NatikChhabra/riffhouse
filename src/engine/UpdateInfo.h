@@ -16,12 +16,20 @@ struct ReleaseInfo
 };
 
 // < 0 when a is older than b, 0 when equal, > 0 when newer. "v0.2.0" equals "0.2";
-// a pre-release ("0.2.0-beta") is older than the release with the same numbers.
+// a pre-release ("0.2.0-rc1") is older than the release with the same numbers, and
+// test builds of one version go in order: rc1, rc2, ... rc10.
 int compareVersions (const juce::String& a, const juce::String& b);
 
+// A test build ("0.1.0-rc2") or one built from source between releases ("0.1.0-dev.1a2b3c4").
+bool isPreRelease (const juce::String& version);
+
 // Reads GitHub's JSON for a release and picks the asset whose name ends in `installerSuffix`.
-// Drafts and pre-releases come back empty.
-ReleaseInfo parseRelease (const juce::String& json, const juce::String& installerSuffix);
+// Drafts always come back empty, and so do pre-releases unless they are asked for.
+ReleaseInfo parseRelease (const juce::String& json, const juce::String& installerSuffix, bool allowPreRelease = false);
+
+// From GitHub's list of releases: the newest one, test releases included. Someone running a
+// test build is offered the next test build, and the full release when it arrives.
+ReleaseInfo newestRelease (const juce::String& listJson, const juce::String& installerSuffix);
 
 // What the answer from the "latest release" address means. GitHub answers 404 while nothing has
 // been published yet (test releases do not count): that is "you have the latest", not a fault.

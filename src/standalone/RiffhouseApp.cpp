@@ -16,6 +16,8 @@
 #include "../plugin/DeviceGuard.h"
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
+#include "../plugin/Version.h"
+#include "../engine/UpdateInfo.h"
 #include "../ui/Editor.h"
 #include "../ui/Theme.h"
 
@@ -45,7 +47,8 @@ class MainWindow : public juce::DocumentWindow
 {
 public:
     MainWindow (juce::StandalonePluginHolder& h, juce::PropertiesFile& s)
-        : DocumentWindow ("Riffhouse", ui::colours::bg, DocumentWindow::allButtons), holder (h), settings (s)
+        : DocumentWindow (isPreRelease (versionLabel()) ? "Riffhouse " + versionForPeople() : juce::String ("Riffhouse"),
+                          ui::colours::bg, DocumentWindow::allButtons), holder (h), settings (s)
     {
         setUsingNativeTitleBar (true);
         editor.reset (holder.processor->createEditorIfNeeded());
@@ -114,7 +117,7 @@ public:
     }
 
     const juce::String getApplicationName() override { return "Riffhouse"; }
-    const juce::String getApplicationVersion() override { return JucePlugin_VersionString; }
+    const juce::String getApplicationVersion() override { return versionLabel(); }
     bool moreThanOneInstanceAllowed() override { return false; }
     void anotherInstanceStarted (const juce::String&) override
     {
@@ -143,7 +146,7 @@ public:
 
         // Updates arrive by themselves: fetched in the background, installed when the app closes.
         runLock.enter (0); // lets the installer see that the app is still open
-        updates = std::make_unique<Updater> (*s, JucePlugin_VersionString);
+        updates = std::make_unique<Updater> (*s, versionLabel());
         updates->onChange = [this] { if (auto* ed = editor()) ed->repaint(); };
         if (! commandLine.contains ("--snapshots"))
         {

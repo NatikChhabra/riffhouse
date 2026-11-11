@@ -183,6 +183,7 @@ juce::String ReampJob::render (const juce::File& clean, const juce::File& out, c
         if (! err.empty()) return "The amp capture could not be loaded: " + juce::String (err);
     }
     if (setup.userIr.existsAsFile()) rig->cabinet().loadUserIr (setup.userIr);
+    rig->setOffline (true); // nothing built behind this thread's back while it renders
     rig->setParams (setup.params);
     rig->prepare (sr, block);
     rig->setParams (setup.params);
@@ -190,6 +191,7 @@ juce::String ReampJob::render (const juce::File& clean, const juce::File& out, c
     rig->prepare (sr, block);
     rig->finishPendingWork();
     rig->setTempo (setup.tempo);
+    rig->setLevelTrimDb (setup.levelTrimDb);
 
     const auto temp = out.getSiblingFile (out.getFileName() + ".part");
     temp.deleteFile();

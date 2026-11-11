@@ -8,7 +8,7 @@ namespace rh
 {
 bool belongsToSetup (P id)
 {
-    return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter || id == P::gateThresh;
+    return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter || id == P::gateThresh || id == P::autoLevel;
 }
 
 bool sameTone (const ToneState& a, const ToneState& b)

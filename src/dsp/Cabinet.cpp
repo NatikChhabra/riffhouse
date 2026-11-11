@@ -224,7 +224,7 @@ void Cabinet::prepare (double sampleRate, int maxBlock)
     prepared = true;
     lowHz = highHz = 0;
     set (model.load(), mic.load(), distance.load(), 60.0f, 12000.0f);
-    startThread (juce::Thread::Priority::low);
+    if (! offline) startThread (juce::Thread::Priority::low);
 }
 
 void Cabinet::reset()

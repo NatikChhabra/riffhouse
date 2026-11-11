@@ -56,6 +56,9 @@ public:
 
     // Offline use: build and install the current IR right now.
     void rebuildNow();
+    // A cabinet nobody listens to live (a render, a measurement) needs no worker: its owner
+    // calls rebuildNow() when the settings changed. Call before prepare().
+    void setOffline (bool o) noexcept { offline = o; }
 
 private:
     void run() override;
@@ -77,7 +80,7 @@ private:
     int installedModel = -1;
     Biquad lowCut, highCut;
     float lowHz = 0, highHz = 0;
-    bool prepared = false;
+    bool prepared = false, offline = false;
     juce::CriticalSection userLock;
 };
 } // namespace rh

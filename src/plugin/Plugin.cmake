@@ -2,6 +2,11 @@
 
 file(GLOB RIFFHOUSE_FONTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/fonts/*.ttf")
 juce_add_binary_data(riffhouse_assets NAMESPACE RiffhouseAssets HEADER_NAME AssetData.h SOURCES ${RIFFHOUSE_FONTS})
+# Pictures of the gear from the 3D renderer (tools/gear3d). Without them the gear is drawn by hand.
+file(GLOB RIFFHOUSE_GEAR_ART CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/gear/*.jpg" "${CMAKE_SOURCE_DIR}/resources/gear/*.png")
+if (RIFFHOUSE_GEAR_ART)
+    juce_add_binary_data(riffhouse_gear NAMESPACE RiffhouseGear HEADER_NAME GearData.h SOURCES ${RIFFHOUSE_GEAR_ART})
+endif()
 
 set(RIFFHOUSE_FORMATS Standalone VST3)
 if (APPLE)
@@ -48,10 +53,15 @@ target_sources(Riffhouse PRIVATE
     plugin/Tuner.cpp
     plugin/AutoSetup.cpp
     plugin/DeviceGuard.cpp
+    plugin/AudioSwitch.cpp
     plugin/Updater.cpp
+    plugin/LevelMatcher.cpp
+    plugin/Version.cpp
     ui/Theme.cpp
     ui/Widgets.cpp
+    ui/AudioPicker.cpp
     ui/Gear.cpp
+    ui/GearArt.cpp
     ui/Modules.cpp
     ui/Panels.cpp
     ui/PresetBrowser.cpp
@@ -90,6 +100,11 @@ if (WIN32 AND RIFFHOUSE_ASIO_SDK_DIR)
     message(STATUS "Riffhouse: ASIO enabled from ${RIFFHOUSE_ASIO_SDK_DIR}")
 endif()
 
+if (RIFFHOUSE_GEAR_ART)
+    target_link_libraries(Riffhouse PRIVATE riffhouse_gear)
+    target_compile_definitions(Riffhouse PRIVATE RIFFHOUSE_HAS_GEAR_ART=1)
+endif()
+
 target_link_libraries(Riffhouse
     PRIVATE
         nam_core
@@ -110,3 +125,18 @@ endif()
 if (MSVC)
     target_compile_options(Riffhouse PRIVATE /bigobj)
 endif()
+
+# The version the player sees: "0.1.0" for a release, "0.1.0-rc2" for a test build (the release
+# workflow passes the tag), and the commit for anything built from source in between.
+set(RIFFHOUSE_VERSION_LABEL "" CACHE STRING "Version shown in the app. Empty: the project version, marked as built from source")
+set(_riffhouse_label "${RIFFHOUSE_VERSION_LABEL}")
+if (NOT _riffhouse_label)
+    set(_riffhouse_label "${PROJECT_VERSION}-dev")
+    execute_process(COMMAND git rev-parse --short=7 HEAD WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+                    OUTPUT_VARIABLE _riffhouse_sha OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if (_riffhouse_sha)
+        string(APPEND _riffhouse_label ".${_riffhouse_sha}")
+    endif()
+endif()
+set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/Version.cpp" PROPERTIES COMPILE_DEFINITIONS "RIFFHOUSE_VERSION_LABEL=\"${_riffhouse_label}\"")
+message(STATUS "Riffhouse: version label ${_riffhouse_label}")

@@ -106,16 +106,18 @@ public:
     void visibilityChanged() override;
     std::function<void()> onClose, onRunSetup;
     std::function<void (Look)> onLookChange;
+    std::function<void (const juce::String&)> onMessage;
 
 private:
     void timerCallback() override;
+    void saveReport();
     juce::String deviceSummary() const;
     void showAdvancedAudio();
 
     RiffhouseProcessor& proc;
     IconButton close { icons::close() };
-    juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Advanced audio settings..." };
-    juce::TextButton website { "Project page and help" };
+    juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and buffer..." };
+    juce::TextButton website { "Project page and help" }, report { "Save a report for help" };
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
     juce::Rectangle<int> updateHeading, updateStatus;

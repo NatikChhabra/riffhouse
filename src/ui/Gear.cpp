@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Gear.h"
+#include "GearArt.h"
 
 namespace rh::ui
 {
@@ -406,6 +407,77 @@ const AmpDesign& ampDesign (int m)
 }
 
 //==============================================================================
+// A knob photographed by the 3D renderer, standing on its own shadow, with the pointer line
+// drawn on it where it would be seen from the player's side. False when there is no picture.
+static bool drawKnobArt (juce::Graphics& g, juce::Point<float> c, float r, float angle, float start, float end,
+                         KnobStyle style, C cap, bool enabled, bool hot)
+{
+    const auto canvas = R (r * 4.0f, r * 4.0f).withCentre (c); // every knob picture is four radii wide round the foot of the shaft
+    const C cream (0xfff1ead8);
+    juce::String name;
+    C line = cap;
+    float from = 0.0f, to = 0.0f, top = 1.0f, width = std::max (1.8f, r * 0.075f);
+    float (*height) (float) = nullptr; // how high the knob stands at a distance from its middle, in radii
+    switch (style)
+    {
+        case KnobStyle::modern:  name = "knob_modern"; from = 0.3f; to = 0.8f; top = 1.01f; width *= 1.1f; break;
+        case KnobStyle::pedal:   name = "knob_pedal"; from = 0.16f; to = 0.72f; top = 1.3f; width *= 1.15f; break;
+        case KnobStyle::skirted:
+            if (cap.getPerceivedBrightness() >= 0.3f) return false;
+            name = "knob_skirted"; line = cream; from = 0.69f; to = 0.95f; top = 1.29f;
+            height = [] (float rho) { return 0.16f + (0.97f - rho) / 0.31f * 0.26f; };
+            break;
+        case KnobStyle::dome:
+            if (cap.getPerceivedBrightness() >= 0.3f) return false;
+            name = "knob_dome"; line = C (0xff16181a); from = 0.42f; to = 0.86f; top = 0.92f; width *= 1.1f;
+            height = [] (float rho) { return 0.5f + 0.42f * std::sqrt (std::max (0.0f, 1.0f - rho * rho)); };
+            break;
+        case KnobStyle::hat:
+            name = "knob_hat_" + juce::String::toHexString ((int) (cap.getARGB() & 0xffffff)).paddedLeft ('0', 6);
+            line = cream; from = 0.64f; to = 0.94f; top = 1.23f;
+            height = [] (float rho) { return 0.2f + (0.96f - rho) / 0.36f * 0.32f; };
+            break;
+        case KnobStyle::chicken: name = "knob_chicken"; top = 1.02f; break;
+    }
+    if (! art::has (name)) return false;
+    if (style == KnobStyle::chicken)
+    {
+        const int frames = 65;
+        const int f = juce::roundToInt ((angle - start) / (end - start) * (float) (frames - 1));
+        if (! art::drawFrame (g, name, f, frames, 13, canvas)) return false;
+    }
+    else
+    {
+        if (! art::draw (g, name, canvas)) return false;
+        juce::Path p;
+        const float sn = std::sin (angle), cs = std::cos (angle);
+        for (int i = 0; i <= 6; ++i)
+        {
+            const float rho = from + (to - from) * (float) i / 6.0f;
+            const float h = height != nullptr ? height (rho) : top;
+            const juce::Point<float> pt (c.x + rho * r * sn, c.y - rho * r * cs * art::squash - h * r * art::rise);
+            if (i == 0) p.startNewSubPath (pt); else p.lineTo (pt);
+        }
+        const juce::PathStrokeType stroke (width, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (p, stroke, juce::AffineTransform::translation (0.4f, 0.8f));
+        g.setColour (line);
+        g.strokePath (p, stroke);
+    }
+    if ((hot && enabled) || ! enabled)
+    {
+        // the whole knob as seen: its foot, its side and its top
+        juce::Path shape;
+        shape.addEllipse (R (r * 2.0f, r * 2.0f * art::squash).withCentre (c));
+        shape.addEllipse (R (r * 2.0f, r * 2.0f * art::squash).withCentre (c.translated (0.0f, -top * r * art::rise)));
+        shape.addRectangle (R (c.x - r, c.y - top * r * art::rise, r * 2.0f, top * r * art::rise));
+        shape.setUsingNonZeroWinding (true);
+        g.setColour (enabled ? juce::Colours::white.withAlpha (0.05f) : juce::Colours::black.withAlpha (0.5f));
+        g.fillPath (shape);
+    }
+    return true;
+}
+
 void drawGearKnob (juce::Graphics& g, R area, float angle, float start, float end, KnobStyle style, C cap, C ink, bool enabled, bool hot, bool numbers)
 {
     const float size = std::min (area.getWidth(), area.getHeight());
@@ -431,6 +503,7 @@ void drawGearKnob (juce::Graphics& g, R area, float angle, float start, float en
         }
     }
     const float r = size * 0.5f - (numbers ? 15.0f : 9.0f);
+    if (drawKnobArt (g, c, r, angle, start, end, style, cap, enabled, hot)) return;
     const auto body = R (r * 2.0f, r * 2.0f).withCentre (c);
     {
         // the knob stands proud of the panel: a long soft shadow away from the light,
@@ -705,12 +778,93 @@ R pedalKnobCell (const PedalLayout& l, int i, int n)
 
 int footswitchStyle (const PedalLayout& l) { return l.form == 1 ? 1 : (l.form == 3 ? 2 : 0); }
 
+bool pedalPictured (const PedalDesign& d) { return art::has ("pedal_" + art::slug (d.name)); }
+
+R pedalArtArea (R box)
+{
+    const float k = box.getHeight() / 420.0f;
+    return box.expanded (70.0f * k, 0.0f).withTop (box.getY() - 24.0f * k).withBottom (box.getBottom() + 56.0f * k);
+}
+
+// The ink on a pedal's face: its name, which socket is which, and whose it is. Printed on paint,
+// cut into bare metal. With `flat` it is the print alone, as the 3D renderer lays it on the box.
+static void pedalLettering (juce::Graphics& g, const PedalDesign& d, const PedalLayout& l, bool smallPrint, bool flat)
+{
+    const auto b = l.box;
+    const int form = l.form;
+    const float w = b.getWidth(), h = b.getHeight();
+    const float u = h / 420.0f;
+    const C body (d.body), ink (d.ink);
+    {
+        const C letterInk = d.stripe == 3 ? body : ink;
+        const auto nameR = l.name.withTrimmedBottom (l.name.getHeight() * 0.12f).withTrimmedTop (l.name.getHeight() * 0.12f);
+        // a hand-written name starts its words with capitals and stands taller in its line
+        const bool hand = d.face == Face::script || d.face == Face::brush;
+        const juce::String nameText = hand ? titled (d.name) : juce::String (d.name);
+        const auto nameFont = faceFont (d.face, l.name.getHeight() * (hand ? 0.78f : d.face == Face::slab ? 0.54f : 0.62f));
+        if (form == 3 && d.stripe != 3 && ! flat)
+        {
+            const bool lightMetal = body.getPerceivedBrightness() > 0.5f;
+            const C edge = lightMetal ? juce::Colours::white.withAlpha (0.55f) : juce::Colours::black.withAlpha (0.5f);
+            letter (g, nameText, nameR.translated (0.0f, 1.0f * u), nameFont, edge, juce::Justification::centred);
+        }
+        letter (g, nameText, hand ? l.name : nameR, nameFont, letterInk, juce::Justification::centred);
+
+        // the small print every real pedal carries: which socket is which, and whose it is
+        auto small = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrumentSemi, 11.0f * u);
+        small.setExtraKerningFactor (0.1f);
+        if (form != 4 && smallPrint)
+        {
+            const float jy = b.getY() + h * (form == 5 ? 0.13f : (form == 1 ? 0.19f : 0.22f));
+            const bool room = l.knobs.getBottom() < jy - 4.0f * u || form == 1 || form == 5; // not where a knob already is
+            float ly = room ? jy : l.knobs.getBottom() + 12.0f * u;
+            if (d.stripe == 1) // never on the pinstripes
+                for (const float sy : { l.name.getY() - 9.0f * u, l.name.getBottom() + 27.0f * u })
+                    if (std::abs (ly - sy) < 10.0f * u) ly = sy - 12.0f * u;
+            letter (g, "IN", R (b.getX() + 9.0f * u, ly - 7.0f * u, 30.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredLeft);
+            letter (g, "OUT", R (b.getRight() - 49.0f * u, ly - 7.0f * u, 40.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredRight);
+        }
+        if (smallPrint && (form == 0 || form == 2 || form == 3) && d.stripe != 2) // a tread plate leaves no room for it
+        {
+            // a model number made from the pedal's own name, so each one has its own
+            int sum = 0;
+            for (const char* ch = d.name; *ch != 0; ++ch) sum += *ch;
+            const juce::String mark = "RIFFHOUSE  " + juce::String::charToString ((juce::juce_wchar) juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) d.name[0]))
+                                      + "-" + juce::String (10 + sum % 89);
+            const float my = b.getBottom() - 19.0f * u;
+            letter (g, mark, R (b.getX(), my, w, 13.0f * u), small, ink.withAlpha (0.55f), juce::Justification::centred);
+        }
+    }
+}
+
+juce::Image renderPedalPrint (const PedalDesign& d, const PedalLayout& l, R area, float scale)
+{
+    juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
+                     juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
+    juce::Graphics g (img);
+    g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+    const auto b = l.box;
+    const float u = b.getHeight() / 420.0f;
+    g.setColour (juce::Colour (d.ink));
+    if (d.stripe == 1)
+    {
+        g.fillRect (b.getX(), l.name.getY() - 10.0f * u, b.getWidth(), 2.0f * u);
+        g.fillRect (b.getX(), l.name.getBottom() + 26.0f * u, b.getWidth(), 2.0f * u);
+    }
+    else if (d.stripe == 3)
+        g.fillRect (b.getX(), l.name.getY() - 6.0f * u, b.getWidth(), l.name.getHeight() + 12.0f * u);
+    pedalLettering (g, d, l, true, true);
+    return img;
+}
+
 juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, float scale, bool smallPrint)
 {
     juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
                      juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
     juce::Graphics g (img);
     g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+    if (pedalPictured (d) && art::draw (g, "pedal_" + art::slug (d.name), pedalArtArea (l.box)))
+        return img;
     const auto b = l.box;
     const int form = l.form;
     const float w = b.getWidth(), h = b.getHeight();
@@ -881,47 +1035,7 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
         }
     }
 
-    // lettering: printed on paint, cut into bare metal
-    {
-        const C letterInk = d.stripe == 3 ? body : ink;
-        const auto nameR = l.name.withTrimmedBottom (l.name.getHeight() * 0.12f).withTrimmedTop (l.name.getHeight() * 0.12f);
-        // a hand-written name starts its words with capitals and stands taller in its line
-        const bool hand = d.face == Face::script || d.face == Face::brush;
-        const juce::String nameText = hand ? titled (d.name) : juce::String (d.name);
-        const auto nameFont = faceFont (d.face, l.name.getHeight() * (hand ? 0.78f : d.face == Face::slab ? 0.54f : 0.62f));
-        if (form == 3 && d.stripe != 3)
-        {
-            const bool lightMetal = body.getPerceivedBrightness() > 0.5f;
-            const C edge = lightMetal ? juce::Colours::white.withAlpha (0.55f) : juce::Colours::black.withAlpha (0.5f);
-            letter (g, nameText, nameR.translated (0.0f, 1.0f * u), nameFont, edge, juce::Justification::centred);
-        }
-        letter (g, nameText, hand ? l.name : nameR, nameFont, letterInk, juce::Justification::centred);
-
-        // the small print every real pedal carries: which socket is which, and whose it is
-        auto small = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrumentSemi, 11.0f * u);
-        small.setExtraKerningFactor (0.1f);
-        if (form != 4 && smallPrint)
-        {
-            const float jy = b.getY() + h * (form == 5 ? 0.13f : (form == 1 ? 0.19f : 0.22f));
-            const bool room = l.knobs.getBottom() < jy - 4.0f * u || form == 1 || form == 5; // not where a knob already is
-            float ly = room ? jy : l.knobs.getBottom() + 12.0f * u;
-            if (d.stripe == 1) // never on the pinstripes
-                for (const float sy : { l.name.getY() - 9.0f * u, l.name.getBottom() + 27.0f * u })
-                    if (std::abs (ly - sy) < 10.0f * u) ly = sy - 12.0f * u;
-            letter (g, "IN", R (b.getX() + 9.0f * u, ly - 7.0f * u, 30.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredLeft);
-            letter (g, "OUT", R (b.getRight() - 49.0f * u, ly - 7.0f * u, 40.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredRight);
-        }
-        if (smallPrint && (form == 0 || form == 2 || form == 3) && d.stripe != 2) // a tread plate leaves no room for it
-        {
-            // a model number made from the pedal's own name, so each one has its own
-            int sum = 0;
-            for (const char* ch = d.name; *ch != 0; ++ch) sum += *ch;
-            const juce::String mark = "RIFFHOUSE  " + juce::String::charToString ((juce::juce_wchar) juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) d.name[0]))
-                                      + "-" + juce::String (10 + sum % 89);
-            const float my = b.getBottom() - 19.0f * u;
-            letter (g, mark, R (b.getX(), my, w, 13.0f * u), small, ink.withAlpha (0.55f), juce::Justification::centred);
-        }
-    }
+    pedalLettering (g, d, l, smallPrint, false);
 
     // the light sits in a turned chrome bezel
     {
@@ -956,6 +1070,22 @@ juce::Image renderPedal (const PedalDesign& d, const PedalLayout& l, R area, flo
 void drawPedalLed (juce::Graphics& g, const PedalLayout& l, const PedalDesign& d, bool on)
 {
     const C led (d.led);
+    if (pedalPictured (d))
+    {
+        // the lens and its bezel are in the picture, dark: only the light itself is drawn
+        if (! on) return;
+        const float k = l.box.getHeight() / 420.0f;
+        const float lr = 6.2f * k;
+        const auto c = l.led.getCentre().translated (0.0f, -lr * 1.1f * art::rise);
+        const auto lens = R (lr * 2.0f, lr * 2.0f * art::squash).withCentre (c);
+        g.setGradientFill (juce::ColourGradient (led.withAlpha (0.5f), c.x, c.y, led.withAlpha (0.0f), c.x + 26.0f * k, c.y, true));
+        g.fillEllipse (lens.expanded (26.0f * k));
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white, c.x - lr * 0.3f, c.y - lr * 0.3f, led, lens.getRight(), lens.getBottom(), true));
+        g.fillEllipse (lens);
+        g.setColour (juce::Colours::white.withAlpha (0.85f));
+        g.fillEllipse (R (lr * 0.5f, lr * 0.4f).withCentre (c.translated (-lr * 0.34f, -lr * 0.4f)));
+        return;
+    }
     if (on)
     {
         g.setGradientFill (juce::ColourGradient (led.withAlpha (0.45f), l.led.getCentreX(), l.led.getCentreY(),
@@ -1028,6 +1158,7 @@ AmpLayout ampLayout (R area, const AmpDesign& d)
 {
     AmpLayout l;
     l.form = d.form;
+    l.area = area;
     const float w = area.getWidth() * juce::jlimit (0.4f, 1.0f, d.width);
     // every amp stands on the same floor: the handle sits above the cabinet, the feet below it
     const auto full = R (w, area.getHeight() - 23.0f).withCentre ({ area.getCentreX(), area.getY() + 13.0f + (area.getHeight() - 23.0f) * 0.5f });
@@ -1461,9 +1592,32 @@ namespace
                               .translated (centred ? box.getCentreX() - w * 0.5f : box.getX(), box.getCentreY() - h * 0.5f));
     }
 
-    // A shape standing up off the surface: its wall on the shaded side, its face lit from above.
-    void raised (juce::Graphics& g, const juce::Path& p, C top, C bottom, float depth)
+    // What stands up off an amp's face, handed to the 3D renderer as outlines instead of being drawn:
+    // kind 0 plated metal, 1 moulded plastic, 2 enamel, 3 a screw head.
+    struct Relief { juce::Path path; C colour; float depth; int kind; float lift; };
+    std::vector<Relief>* reliefSink = nullptr;
+    void relief (const juce::Path& p, C colour, float depth, int kind, float lift = 0.0f)
     {
+        if (reliefSink != nullptr) reliefSink->push_back ({ p, colour, depth, kind, lift });
+    }
+    void reliefScrew (juce::Point<float> c, float size)
+    {
+        juce::Path p;
+        p.addEllipse (R (size, size).withCentre (c));
+        relief (p, C (0xffc9ccd0), 1.0f, 3);
+    }
+    juce::Path ring (const juce::Path& outer, const juce::Path& inner)
+    {
+        juce::Path p (outer);
+        p.addPath (inner);
+        p.setUsingNonZeroWinding (false);
+        return p;
+    }
+
+    // A shape standing up off the surface: its wall on the shaded side, its face lit from above.
+    void raised (juce::Graphics& g, const juce::Path& p, C top, C bottom, float depth, int kind = 0, float lift = 0.0f)
+    {
+        if (reliefSink != nullptr) { relief (p, top.interpolatedWith (bottom, 0.35f), depth, kind, lift); return; }
         juce::DropShadow (juce::Colours::black.withAlpha (0.7f), juce::jmax (2, juce::roundToInt (depth * 2.5f)),
                           { juce::jmax (1, juce::roundToInt (depth)), juce::jmax (1, juce::roundToInt (depth * 2.0f)) }).drawForPath (g, p);
         g.setColour (bottom.darker (0.75f));
@@ -1511,7 +1665,7 @@ namespace
                 // a brush-written name moulded in white plastic and pinned to the covering
                 auto word = wordPath (faceFont (Face::brush, 100.0f), titled (text));
                 seat (word, area, true);
-                raised (g, word, C (0xfffbf9f1), C (0xffd6d0bf), std::max (1.2f, area.getHeight() * 0.03f));
+                raised (g, word, C (0xfffbf9f1), C (0xffd6d0bf), std::max (1.2f, area.getHeight() * 0.03f), 1);
                 return;
             }
             case Logo::rules:
@@ -1549,6 +1703,17 @@ namespace
                     return p.createPathWithRoundedCorners (r.getHeight() * 0.07f);
                 };
                 const auto rim = flag (b);
+                if (reliefSink != nullptr)
+                {
+                    const float e = std::max (2.0f, h * 0.07f);
+                    const auto inner = flag (b.reduced (e * 1.9f, e));
+                    relief (ring (rim, inner), C (0xffd9dcde), 3.0f, 0);
+                    relief (inner, C (0xff8e1d15), 2.0f, 2);
+                    auto name = wordPath (faceFont (Face::script, 100.0f), titled (text));
+                    seat (name, R (b.getX() + h * 0.42f, b.getY() + h * 0.2f, b.getWidth() - h * 1.1f, h * 0.6f), true);
+                    relief (name, C (0xfff4f4f1), 0.9f, 1, 2.0f);
+                    return;
+                }
                 juce::DropShadow (juce::Colours::black.withAlpha (0.65f), 6, { 1, 3 }).drawForPath (g, rim);
                 juce::ColourGradient chrome (C (0xfffafbfb), 0, b.getY(), C (0xff5d6267), 0, b.getBottom(), false);
                 chrome.addColour (0.5, C (0xffb9bdc1));
@@ -1583,6 +1748,15 @@ namespace
                 const auto plate = R (area.getX(), area.getCentreY() - h * 0.5f, wb.getRight() + h * 0.62f - area.getX(), h);
                 juce::Path pp;
                 pp.addRoundedRectangle (plate, 3.0f);
+                if (reliefSink != nullptr)
+                {
+                    relief (pp, C (0xff1b1c1e), 3.0f, 0);
+                    for (auto x : { plate.getX() + h * 0.3f, plate.getRight() - h * 0.3f })
+                        reliefScrew ({ x, plate.getCentreY() }, std::max (7.0f, h * 0.17f));
+                    g.setColour (C (0xffd9dcde));
+                    g.fillPath (word);
+                    return;
+                }
                 juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 7, { 1, 3 }).drawForPath (g, pp);
                 g.setGradientFill (juce::ColourGradient (C (0xff2a2c2f), 0, plate.getY(), C (0xff0c0d0e), 0, plate.getBottom(), false));
                 g.fillPath (pp);
@@ -1621,6 +1795,17 @@ namespace
                 const auto plate = R (area.getX(), area.getCentreY() - h * 0.5f, wb.getRight() + h * 0.5f - area.getX(), h);
                 juce::Path pp;
                 pp.addRoundedRectangle (plate, h * 0.16f);
+                if (reliefSink != nullptr)
+                {
+                    const auto inner = plate.reduced (std::max (2.0f, h * 0.07f));
+                    juce::Path ip;
+                    ip.addRoundedRectangle (inner, h * 0.11f);
+                    relief (ring (pp, ip), C (0xffd9dcde), 3.0f, 0);
+                    relief (ip, C (0xff1f4c8a), 2.0f, 2);
+                    g.setColour (C (0xfff6f4ee));
+                    g.fillPath (word);
+                    return;
+                }
                 juce::DropShadow (juce::Colours::black.withAlpha (0.65f), 6, { 1, 3 }).drawForPath (g, pp);
                 fillMetal (g, plate, C (0xffc9cdd1), h * 0.16f);
                 const auto field = plate.reduced (std::max (2.0f, h * 0.07f));
@@ -1649,6 +1834,16 @@ namespace
             const C metal = oval ? C (0xffc9a550) : d.panel == Panel::gold ? C (0xffe7e1d2) : d.panel == Panel::brushed && d.tolex == Tolex::cream ? C (0xffd4b66a) : C (0xffd9dcde);
             juce::Path pp;
             pp.addRoundedRectangle (plate, rad);
+            if (reliefSink != nullptr)
+            {
+                relief (pp, metal, 2.2f, 0);
+                for (auto x : { plate.getX() + 12.0f, plate.getRight() - 12.0f })
+                    if (! oval) reliefScrew ({ x, plate.getCentreY() }, 6.0f);
+                g.setColour (C (0xff15130f).withAlpha (0.7f));
+                g.drawRoundedRectangle (plate.reduced (5.0f), std::max (2.0f, rad - 5.0f), 1.0f);
+                letter (g, text, plate.reduced (22.0f, 6.0f), f, C (0xff15130f), juce::Justification::centred);
+                return;
+            }
             juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 6, { 1, 3 }).drawForPath (g, pp);
             fillMetal (g, plate, metal, rad);
             g.setColour (juce::Colours::white.withAlpha (0.55f));
@@ -1753,6 +1948,58 @@ namespace
             k += n;
         }
     }
+
+    // Everything screen printed on the panel that is not under a knob.
+    void ampSilk (juce::Graphics& g, const AmpDesign& d, const AmpLayout& l)
+    {
+        const float labelCy = d.form == 4 ? l.jack.y + 36.0f : (l.cells.empty() ? l.jack.y + 36.0f : l.cells.front().getBottom() - ampLabelH * 0.5f);
+        const auto f = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.face == Face::shoulders ? 12.0f : 11.4f);
+        auto label = [&] (const char* t, float cx)
+        {
+            const juce::String text = d.upper ? juce::String (t).toUpperCase() : juce::String (t);
+            // on the same line as the names under the knobs
+            const bool withKnobs = d.form != 4 && ! l.cells.empty();
+            const auto box = withKnobs ? R (cx - 40.0f, l.cells.front().getBottom() - ampLabelH + 1.0f, 80.0f, ampLabelH)
+                                       : R (80.0f, 16.0f).withCentre ({ cx, labelCy });
+            letter (g, text, box, f, C (d.ink), withKnobs ? juce::Justification::centredTop : juce::Justification::centred);
+        };
+        label ("input", l.jack.x);
+        label ("power", l.jewel.getCentreX());
+        groupSilk (g, l, d);
+    }
+}
+
+static juce::String ampArtName (const AmpDesign& d) { return "amp_" + art::slug (d.badge); }
+
+bool ampPictured (const AmpDesign& d) { return art::has (ampArtName (d)); }
+
+// The photograph shows a little more than the amp's own place: the top of the cabinet, and its shadow.
+R ampArtArea (R area) { return area.expanded (36.0f, 0.0f).withTop (area.getY() - 16.0f).withBottom (area.getBottom() + 36.0f); }
+
+juce::Image renderAmpPrint (const AmpDesign& d, const AmpLayout& l, R area, float scale, juce::var& raisedParts)
+{
+    juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
+                     juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
+    juce::Graphics g (img);
+    g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+    ampSilk (g, d, l);
+    std::vector<Relief> parts;
+    reliefSink = &parts;
+    if (d.form != 5) ampBadge (g, d, l.badge);
+    reliefSink = nullptr;
+    juce::Array<juce::var> list;
+    for (const auto& r : parts)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("path", r.path.toString());
+        o->setProperty ("colour", juce::String::toHexString ((juce::int64) (r.colour.getARGB() & 0xffffff)).paddedLeft ('0', 6));
+        o->setProperty ("depth", r.depth);
+        o->setProperty ("kind", r.kind);
+        o->setProperty ("lift", r.lift);
+        list.add (juce::var (o));
+    }
+    raisedParts = list;
+    return img;
 }
 
 juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float scale, const juce::String& displayText)
@@ -1761,6 +2008,15 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
                      juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
     juce::Graphics g (img);
     g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+    // photographed at the size the amp page shows it: any other size is drawn
+    const bool rightSize = std::abs (l.area.getWidth() - ampCanvasW) < 0.5f && std::abs (l.area.getHeight() - ampCanvasH) < 0.5f;
+    if (rightSize && ampPictured (d) && art::draw (g, ampArtName (d), ampArtArea (l.area)))
+    {
+        if (d.form == 5)
+            letter (g, displayText.isNotEmpty() ? displayText : juce::String (d.badge), l.grille.reduced (14.0f, 0.0f),
+                    faceFont (Face::doto, std::min (30.0f, l.grille.getHeight() * 0.36f)), C (d.jewel), juce::Justification::centred);
+        return img;
+    }
     const auto h = l.head;
     const bool cabinet = d.form != 3 && d.form != 5;
     const float corner = cabinet ? 10.0f : d.form == 3 ? 12.0f : 3.0f;
@@ -1885,24 +2141,9 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
             }
         }
     // what is printed and fitted on the panel beside the controls: the input socket and the power switch
-    {
-        const float labelCy = d.form == 4 ? l.jack.y + 36.0f : (l.cells.empty() ? l.jack.y + 36.0f : l.cells.front().getBottom() - ampLabelH * 0.5f);
-        const auto f = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.face == Face::shoulders ? 12.0f : 11.4f);
-        auto label = [&] (const char* t, float cx)
-        {
-            const juce::String text = d.upper ? juce::String (t).toUpperCase() : juce::String (t);
-            // on the same line as the names under the knobs
-            const bool withKnobs = d.form != 4 && ! l.cells.empty();
-            const auto box = withKnobs ? R (cx - 40.0f, l.cells.front().getBottom() - ampLabelH + 1.0f, 80.0f, ampLabelH)
-                                       : R (80.0f, 16.0f).withCentre ({ cx, labelCy });
-            letter (g, text, box, f, C (d.ink), withKnobs ? juce::Justification::centredTop : juce::Justification::centred);
-        };
-        jackSocket (g, l.jack, l.knobSize < 62.0f ? 13.0f : 15.0f);
-        label ("input", l.jack.x);
-        lampHousing (g, l, d);
-        label ("power", l.jewel.getCentreX());
-        groupSilk (g, l, d);
-    }
+    jackSocket (g, l.jack, l.knobSize < 62.0f ? 13.0f : 15.0f);
+    lampHousing (g, l, d);
+    ampSilk (g, d, l);
 
     // the face above or below the controls
     if (d.form == 3)
@@ -2867,12 +3108,44 @@ void drawFootswitch (juce::Graphics& g, R b, bool pressed, bool hover, int style
 }
 void Footswitch::paint (juce::Graphics& g)
 {
+    if (pictured)
+    {
+        // the switch itself is in the pedal's picture: a press pushes it into shade, the pointer over it lifts it a little
+        if (! pressed && ! isMouseOver()) return;
+        const auto b = getLocalBounds().toFloat();
+        const float fs = std::min (b.getWidth(), b.getHeight());
+        g.setColour (pressed ? juce::Colours::black.withAlpha (0.32f) : juce::Colours::white.withAlpha (0.07f));
+        if (style == 1)      g.fillRoundedRectangle (b.reduced (1.0f), b.getHeight() * 0.03f);
+        else if (style == 2) g.fillEllipse (R (fs * 0.78f, fs * 0.78f * art::squash).withCentre (b.getCentre()));
+        else                 g.fillEllipse (R (fs * 0.44f, fs * 0.44f * art::squash).withCentre (b.getCentre().translated (0.0f, -fs * 0.118f)));
+        return;
+    }
     drawFootswitch (g, getLocalBounds().toFloat(), pressed, isMouseOver(), style, body);
 }
 
 //==============================================================================
-void drawTreadle (juce::Graphics& g, R well, float position, bool pressed, bool hover)
+R treadleArtArea (R well, float boxHeight)
 {
+    const float u = boxHeight / 420.0f;
+    return { well.getX() - 16.0f * u, well.getY() - 30.0f * u, well.getWidth() + 32.0f * u, well.getHeight() + 40.0f * u };
+}
+
+void drawTreadle (juce::Graphics& g, R well, float position, bool pressed, bool hover, const PedalDesign* pictured, float boxHeight)
+{
+    if (pictured != nullptr)
+    {
+        const int frames = 11;
+        const auto name = "pedal_" + art::slug (pictured->name) + "_treadle";
+        if (art::drawFrame (g, name, juce::roundToInt (juce::jlimit (0.0f, 1.0f, position) * (float) (frames - 1)), frames, frames, treadleArtArea (well, boxHeight)))
+        {
+            if (pressed || hover)
+            {
+                g.setColour (pressed ? juce::Colours::black.withAlpha (0.2f) : juce::Colours::white.withAlpha (0.04f));
+                g.fillRoundedRectangle (well.reduced (2.0f), 4.0f);
+            }
+            return;
+        }
+    }
     const float u = well.getHeight() / 245.0f;
     const float t = juce::jlimit (-1.0f, 1.0f, position * 2.0f - 1.0f); // +1 toe down, -1 heel down
     const float heelLift = std::max (0.0f, t), toeLift = std::max (0.0f, -t);
@@ -2962,8 +3235,8 @@ void drawTreadle (juce::Graphics& g, R well, float position, bool pressed, bool 
 
 Treadle::Treadle (juce::RangedAudioParameter& position, juce::RangedAudioParameter& onOff)
     : param (position),
-      pos (position, [this] (float v) { value = param.convertTo0to1 (v); repaint(); }),
-      power (onOff, [this] (float v) { on = v >= 0.5f; repaint(); if (onChange) onChange (on); })
+      pos (position, [this] (float v) { value = param.convertTo0to1 (v); refresh(); }),
+      power (onOff, [this] (float v) { on = v >= 0.5f; refresh(); if (onChange) onChange (on); })
 {
     pos.sendInitialUpdate();
     power.sendInitialUpdate();
@@ -2972,7 +3245,15 @@ Treadle::Treadle (juce::RangedAudioParameter& position, juce::RangedAudioParamet
 
 void Treadle::paint (juce::Graphics& g)
 {
-    drawTreadle (g, getLocalBounds().toFloat(), rocking ? value : 0.5f, pressed && ! dragging, isMouseOver());
+    drawTreadle (g, getLocalBounds().toFloat(), rocking ? value : 0.5f, pressed && ! dragging, isMouseOver(), design, boxHeight);
+}
+
+void Treadle::refresh()
+{
+    repaint();
+    if (design != nullptr)
+        if (auto* parent = getParentComponent()) // the photograph reaches past the component
+            parent->repaint (treadleArtArea (getBounds().toFloat(), boxHeight).getSmallestIntegerContainer());
 }
 
 void Treadle::mouseDown (const juce::MouseEvent&)
@@ -3058,8 +3339,8 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale, con
         }
     }
     if (t.pedal.form == 5)
-        drawTreadle (g, t.pedal.treadle, 0.62f, false, false);
-    else
+        drawTreadle (g, t.pedal.treadle, 0.62f, false, false, pedalPictured (d) ? &d : nullptr, t.pedal.box.getHeight());
+    else if (! pedalPictured (d))
         drawFootswitch (g, t.pedal.footswitch, false, false, footswitchStyle (t.pedal), C (d.body));
     return t;
 }
@@ -3067,12 +3348,13 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale, con
 GearThumb ampThumb (const AmpDesign& d, const juce::String& displayText, float scale, const juce::StringArray* labels)
 {
     GearThumb t;
-    t.area = R (0.0f, 0.0f, 1000.0f, 400.0f);
-    t.amp = ampLayout (t.area, d);
+    const R place (0.0f, 0.0f, ampCanvasW, ampCanvasH);
+    t.area = ampArtArea (place);
+    t.amp = ampLayout (place, d);
     t.box = d.form == 5 ? t.amp.rack : t.amp.handle.isEmpty() ? t.amp.head : t.amp.head.getUnion (t.amp.handle.withY (t.amp.handle.getY() - (d.form == 3 ? 18.0f : 0.0f)));
     t.image = renderAmp (d, t.amp, t.area, scale, displayText);
     juce::Graphics g (t.image);
-    g.addTransform (juce::AffineTransform::scale (scale));
+    g.addTransform (juce::AffineTransform::translation (-t.area.getX(), -t.area.getY()).scaled (scale));
     for (size_t i = 0; i < t.amp.cells.size(); ++i)
     {
         const auto cell = t.amp.cells[i];

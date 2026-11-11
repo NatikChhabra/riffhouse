@@ -1,8 +1,10 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
+#include "AudioPicker.h"
 #include "Panels.h"
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
+#include "../plugin/Version.h"
 
 namespace rh::ui
 {
@@ -655,6 +657,10 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     runSetup.setColour (juce::TextButton::textColourOffId, colours::bg);
     website.onClick = [] { juce::URL ("https://github.com/NatikChhabra/riffhouse").launchInDefaultBrowser(); };
     addAndMakeVisible (website);
+    report.setTooltip ("Writes your settings and what setup measured into a text file in your recordings folder. "
+                       "Nothing is sent anywhere. Attach it when you ask for help.");
+    report.onClick = [this] { saveReport(); };
+    addAndMakeVisible (report);
 
     if (auto* host = StandaloneHost::get())
         if (auto* up = host->updater())
@@ -788,6 +794,62 @@ juce::String SettingsView::deviceSummary() const
     return s;
 }
 
+void SettingsView::saveReport()
+{
+    // Everything someone helping would ask for first, in one file the player can read and
+    // hand over. Device names are in it; nothing about the person is.
+    juce::String t;
+    auto line = [&t] (const juce::String& k, const juce::String& v) { t << k << ": " << v << "\n"; };
+    auto db = [] (float v) { return juce::String (v, 1) + " dB"; };
+    line ("Riffhouse", versionLabel());
+    line ("System", juce::SystemStats::getOperatingSystemName() + ", " + juce::String (juce::SystemStats::getNumCpus()) + " cores");
+    line ("Written", juce::Time::getCurrentTime().toString (true, true, false, true));
+    t << "\nAudio\n";
+    if (auto* host = StandaloneHost::get())
+    {
+        auto& dm = host->deviceManager();
+        juce::AudioDeviceManager::AudioDeviceSetup s;
+        dm.getAudioDeviceSetup (s);
+        line ("Driver", dm.getCurrentAudioDeviceType());
+        line ("Input", s.inputDeviceName);
+        line ("Output", s.outputDeviceName);
+        if (auto* dev = dm.getCurrentAudioDevice())
+        {
+            line ("Buffer", juce::String (dev->getCurrentBufferSizeSamples()) + " samples at " + juce::String (dev->getCurrentSampleRate(), 0) + " Hz");
+            line ("Reported delay", juce::String (dev->getInputLatencyInSamples()) + " in, " + juce::String (dev->getOutputLatencyInSamples()) + " out (samples)");
+            line ("Dropouts", juce::String (dev->getXRunCount()));
+        }
+        else line ("Device", "none open");
+        juce::StringArray drivers;
+        for (auto* type : dm.getAvailableDeviceTypes())
+            drivers.add (type->getTypeName() + " (" + juce::String (type->getDeviceNames (true).size()) + " inputs)");
+        line ("Drivers on this computer", drivers.joinIntoString (", "));
+        t << "\nLast setup\n";
+        auto& st = host->settings();
+        for (auto* k : { "setupVersion", "setupInput", "setupPeakDb", "setupNoiseDb", "setupTiltDb", "setupToneSeconds", "setupPlayedSeconds", "setupFixDb", "setupGainDb", "setupGateDb", "setupFixHeldBack" })
+            if (st.containsKey (k)) line (juce::String (k).substring (5), st.getValue (k));
+    }
+    else line ("Host", "running as a plugin");
+    t << "\nInput\n";
+    line ("Input level", db (proc.value (P::inGain)));
+    line ("Input Fix", proc.value (P::inputFix) > 0.5f ? db (proc.value (P::inputFixAmt)) : juce::String ("off"));
+    line ("Hum filter", juce::String (juce::roundToInt (proc.value (P::humFilter))) + " (0 off, 1 auto, 2 50 Hz, 3 60 Hz), mains found: " + juce::String (proc.meters().mains.load()));
+    line ("Gate", juce::String (proc.value (P::gateOn) > 0.5f ? "on" : "off") + ", chosen " + db (proc.value (P::gateThresh)) + ", sitting at " + db (proc.meters().gateThreshNow.load()));
+    line ("Treble now against a full-range guitar", db (proc.tiltProbe().tiltDb() - TiltProbe::referenceTiltDb) + " over " + juce::String (proc.tiltProbe().secondsMeasured(), 1) + " s of playing");
+    t << "\nTone\n";
+    line ("Tone", proc.currentPresetName());
+    line ("Auto level", proc.value (P::autoLevel) > 0.5f ? db (proc.levels().trimDb()) + (proc.levels().hasPlayersPhrase() ? " (matched to your playing)" : " (house phrase)") : juce::String ("off"));
+    for (const auto& s : paramSpecs())
+        t << "  " << s.key << " = " << juce::String (proc.value (s.id), 2) << "\n";
+
+    auto folder = proc.recordingFolder == juce::File() ? Recorder::defaultFolder() : proc.recordingFolder;
+    folder.createDirectory();
+    const auto f = folder.getChildFile ("Riffhouse report " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H%M") + ".txt");
+    const bool ok = f.replaceWithText (t);
+    if (onMessage) onMessage (ok ? "Report saved in your recordings folder" : "Couldn't write the report into " + folder.getFullPathName());
+    if (ok) f.revealToUser();
+}
+
 int SettingsView::summaryHeight() const
 {
     const int lines = summary.containsChar ('\n') ? juce::StringArray::fromLines (summary).size() : (summary.length() > 68 ? 2 : 1);
@@ -798,10 +860,8 @@ void SettingsView::showAdvancedAudio()
 {
     auto* host = StandaloneHost::get();
     if (host == nullptr) return;
-    auto* sel = new juce::AudioDeviceSelectorComponent (host->deviceManager(), 1, 2, 2, 2, false, false, true, false);
-    sel->setSize (520, 420);
     juce::DialogWindow::LaunchOptions o;
-    o.content.setOwned (sel);
+    o.content.setOwned (new AudioPicker (proc));
     o.dialogTitle = "Audio settings";
     o.dialogBackgroundColour = colours::panel;
     o.escapeKeyTriggersCloseButton = true;
@@ -831,7 +891,10 @@ void SettingsView::resized()
     left.removeFromTop (32);
     left.removeFromTop (36);
     left.removeFromTop (aboutH); // about text
-    website.setBounds (left.removeFromTop (36).removeFromLeft (230));
+    auto helpRow = left.removeFromTop (36);
+    website.setBounds (helpRow.removeFromLeft (230));
+    helpRow.removeFromLeft (10);
+    report.setBounds (helpRow.removeFromLeft (230));
     left.removeFromTop (24);
     updateHeading = left.removeFromTop (36);
     updateStatus = left.removeFromTop (24);
@@ -877,7 +940,12 @@ void SettingsView::paint (juce::Graphics& g)
     auto r = getLocalBounds().reduced (60, 40);
     g.setColour (colours::text);
     g.setFont (font (28.0f, Weight::display));
-    g.drawText ("Settings", r.removeFromTop (50), juce::Justification::centredLeft);
+    auto titleRow = r.removeFromTop (50);
+    g.drawText ("Settings", titleRow, juce::Justification::centredLeft);
+    // which copy this is, where nobody has to look for it
+    g.setColour (colours::textDim);
+    g.setFont (font (14.0f));
+    g.drawText ("Riffhouse " + versionForPeople(), titleRow.withTrimmedLeft (180).withTrimmedRight (titleRow.getWidth() / 2 + 20).translated (0, 5), juce::Justification::centredLeft);
     auto cols = r;
     auto left = cols.removeFromLeft (cols.getWidth() / 2 - 20);
     cols.removeFromLeft (40);
@@ -900,7 +968,7 @@ void SettingsView::paint (juce::Graphics& g)
         juce::AttributedString about;
         about.setLineSpacing (4.0f);
         about.setWordWrap (juce::AttributedString::byWord);
-        about.append ("Riffhouse " JucePlugin_VersionString ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
+        about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
                       "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
                       "any artist, band or equipment maker, and all trademarks belong to their owners. "
                       "Built with JUCE, Neural Amp Modeler Core and Signalsmith Stretch. Fonts under the SIL Open Font License and the Apache License 2.0.",

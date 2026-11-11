@@ -36,7 +36,7 @@ What changed in each version is in the [changelog](CHANGELOG.md). Every older ve
 - **Foot control:** plug in a MIDI foot controller, expression pedal or keyboard. Touch a knob or switch in Riffhouse, move the pedal, and the two are tied. Program changes pick your starred tones.
 - A **VST3 plugin** of the same rig for recording software.
 
-Every amp, pedal and cabinet is its own piece of gear, drawn by the app itself.
+Every amp, pedal and cabinet is its own piece of gear.
 
 | | |
 |---|---|
@@ -65,14 +65,18 @@ The looper is for your own playing: press **O**, play a rhythm part, press **O**
 
 - It listens on every input while you strum and picks the one your guitar is on.
 - It tries the fastest audio modes your computer has and keeps the lowest delay that runs without crackles.
-- It sets the input level and the noise gate from what it hears.
+- It asks you to play as hard as you ever will for a few seconds and sets the input level from that. If you later play harder still, the level turns itself down.
+- It measures the room's noise and sets the gate just above it. The gate then follows the room, so more hiss on another day does not get through.
+- **Auto level** brings every tone up as loud as the one before it, clean or heavy, measured with your own playing.
 - It finds 50 or 60 Hz mains hum and removes only that.
-- **Input Fix** measures how much treble a mic jack takes away from a guitar and puts it back.
+- **Input Fix** measures how much treble a mic jack takes away from a guitar and puts it back, up to 24 dB. This is what makes heavy tones on a mic jack sound like an amp and not like a bee.
 - Plug in late, pull the cable out, close the laptop lid: it reconnects by itself. If Windows swaps in another microphone, Riffhouse stays silent, because a laptop mic through an amp howls.
+
+Recording software: the same rig is a VST3 plugin. [Riffhouse in your recording software](docs/DAW.md) gets it running.
 
 ## What we measure
 
-Every change runs 5,400 automatic checks on the sound engine before it ships.
+Every change runs 5,900 automatic checks on the sound engine before it ships.
 
 | | |
 |---|---|
@@ -80,7 +84,7 @@ Every change runs 5,400 automatic checks on the sound engine before it ships.
 | Amp oversampling | 8x below 64 kHz, 4x above |
 | Aliasing on a hot amp | 42.9 dB below the wanted harmonics |
 | Everything switched on | about 8x faster than real time on one core of a build server |
-| Loudness across all 177 tones | within 5 dB of each other |
+| Loudness across all 177 tones with Auto level | equal on the playing it measured with; nine in ten within 5 dB on other playing |
 
 ## Build it yourself
 

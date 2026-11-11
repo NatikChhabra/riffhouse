@@ -66,6 +66,10 @@ def main(argv):
         return
     if not body:
         fail(f"CHANGELOG.md has no notes under '## {version}'.")
+    # A test release also carries what has changed since the one before it.
+    fresh = section("Unreleased") if pre else ""
+    if fresh:
+        print("## New in this test release\n\n" + fresh + f"\n\n## {version}\n")
     print(body)
 
 

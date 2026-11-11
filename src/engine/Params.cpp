@@ -36,7 +36,7 @@ namespace
         s.push_back (tog (P::gateOn, "gate_on", "Noise Gate", true));
         s.push_back (cont (P::gateThresh, "gate_thresh", "Gate Threshold", -96.0f, -20.0f, -62.0f, "dB"));
         s.push_back (cont (P::gateRelease, "gate_release", "Gate Release", 10.0f, 500.0f, 80.0f, "ms", 80.0f));
-        s.push_back (cont (P::inputFixAmt, "input_fix_amt", "Input Fix Strength", 0.0f, 12.0f, 6.0f, "dB"));
+        s.push_back (cont (P::inputFixAmt, "input_fix_amt", "Input Fix Strength", 0.0f, 24.0f, 6.0f, "dB"));
 
         s.push_back (tog (P::compOn, "comp_on", "Compressor", false));
         s.push_back (knob (P::compSustain, "comp_sustain", "Sustain", 5.0f));
@@ -126,6 +126,7 @@ namespace
         s.push_back (knob (P::doubler, "doubler", "Doubler", 0.0f));
         s.push_back (cont (P::space, "space", "Space", 0.0f, 2.0f, 1.0f, "x"));
         s.push_back (cont (P::outLevel, "out_level", "Output", -36.0f, 12.0f, 0.0f, "dB"));
+        s.push_back (tog (P::autoLevel, "auto_level", "Auto level", true));
 
         assert ((int) s.size() == kNumParams);
         for (int i = 0; i < (int) s.size(); ++i)

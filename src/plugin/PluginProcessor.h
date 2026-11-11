@@ -8,6 +8,7 @@
 #include "../engine/Song.h"
 #include "../engine/Presets.h"
 #include "../engine/Rig.h"
+#include "LevelMatcher.h"
 #include "Recorder.h"
 #include "Takes.h"
 #include "Tuner.h"
@@ -72,7 +73,17 @@ public:
     juce::String redo();
 
     // Neural captures and IRs (message thread)
-    void loadCaptureAsync (const juce::File& file, std::function<void (juce::String)> done);
+    // `select`: also make the capture the amp in use (not when a saved session is coming back)
+    void loadCaptureAsync (const juce::File& file, std::function<void (juce::String)> done, bool select = true);
+    void refreshLatency(); // tell the host when the rig's delay changed; message thread
+
+    // What setup found for this player's input (level, Input Fix, gate, hum filter) is kept
+    // in a small file, so that a new copy of the plugin in a DAW starts from it and not
+    // from factory settings. The app writes it; plugins only read it, and a saved project
+    // keeps its own values.
+    static juce::File setupFile();
+    void rememberSetup() const;
+    bool recallSetup();
     juce::String captureName() const { return captureFile.getFileNameWithoutExtension(); }
     bool loadUserIr (const juce::File& file);
     juce::String userIrName() const { return irFile.getFileNameWithoutExtension(); }
@@ -136,6 +147,9 @@ public:
     TakePlayer& takes() noexcept { return takePlayer; }
     ReampJob::Setup reampSetup() const; // the rig as it is set right now
 
+    // Auto level: the trim it holds, whether it has heard the player yet, and a way to start over
+    LevelMatcher& levels() noexcept { return matcher; }
+
     RigMeters& meters() noexcept { return rig.meters(); }
     TiltProbe& tiltProbe() noexcept { return rig.tiltProbe(); }
     double currentSampleRate() const noexcept { return sampleRate; }
@@ -160,6 +174,7 @@ private:
     std::array<std::atomic<float>*, kNumParams> raw {};
 
     Rig rig;
+    LevelMatcher matcher { rig, [this] (ParamValues& v) { for (int i = 0; i < kNumParams; ++i) v[(size_t) i] = raw[(size_t) i]->load(); } };
     PresetLibrary library;
     int currentPreset = -1;
     juce::String externalName;
@@ -208,7 +223,8 @@ private:
     juce::SpinLock loopLock; // held while the loop's memory is (re)made; the audio thread only ever tries it
     bool loopReady = false;
 
-    std::vector<float> mono, di;
+    std::vector<float> mono, di, monoOut;
+    std::atomic<int> latencyAmp { -1 };
     double sampleRate = 48000.0;
     int blockSize = 512;
     std::atomic<float> channelPick { 0.5f };

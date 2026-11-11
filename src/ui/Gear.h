@@ -96,11 +96,18 @@ PedalLayout pedalLayout (juce::Rectangle<float> area, const PedalDesign&, int nu
 juce::Rectangle<float> pedalKnobCell (const PedalLayout&, int i, int n);
 // The finished box (no knobs, no switch) as an image, drawn at `scale` for sharp output.
 juce::Image renderPedal (const PedalDesign&, const PedalLayout&, juce::Rectangle<float> area, float scale, bool smallPrint = true);
+// Pedals photographed by the 3D renderer: whether this one has a picture, and the patch of
+// floor the picture covers for a box of any size (the box, its sockets, its front wall, its shadow).
+bool pedalPictured (const PedalDesign&);
+juce::Rectangle<float> pedalArtArea (juce::Rectangle<float> box);
+// The print on the face alone (name, stripes, small print) on a clear ground, for the 3D renderer.
+juce::Image renderPedalPrint (const PedalDesign&, const PedalLayout&, juce::Rectangle<float> area, float scale);
 void drawPedalLed (juce::Graphics&, const PedalLayout&, const PedalDesign&, bool on);
 
 // Amp head.
 struct AmpLayout
 {
+    juce::Rectangle<float> area;               // the place the amp was given to stand in
     juce::Rectangle<float> head, panel, knobs, grille, badge, jewel, handle;
     juce::Rectangle<float> rack;               // the road case a rack unit is bolted into (empty for an amp)
     std::vector<juce::Rectangle<float>> cells; // where each of the eight controls sits: the knob with its label under it
@@ -112,6 +119,12 @@ struct AmpLayout
 AmpLayout ampLayout (juce::Rectangle<float> area, const AmpDesign&);
 juce::Image renderAmp (const AmpDesign&, const AmpLayout&, juce::Rectangle<float> area, float scale,
                        const juce::String& displayText);
+// The amp page gives every amp the same place to stand in; the 3D photographs are taken at that size.
+inline constexpr float ampCanvasW = 1080.0f, ampCanvasH = 420.0f;
+bool ampPictured (const AmpDesign&);
+juce::Rectangle<float> ampArtArea (juce::Rectangle<float> ampArea);
+// For the 3D renderer: what is printed flat on the amp, and (as outlines) what stands up off its face.
+juce::Image renderAmpPrint (const AmpDesign&, const AmpLayout&, juce::Rectangle<float> area, float scale, juce::var& raisedParts);
 void drawAmpJewel (juce::Graphics&, const AmpLayout&, const AmpDesign&, bool on);
 
 // Speaker cabinet seen from the front with the grille off, and the mic on it.
@@ -156,7 +169,11 @@ GearThumb cabThumb (int cabModel, float scale);
 void drawFootswitch (juce::Graphics&, juce::Rectangle<float> bounds, bool pressed, bool hover, int style = 0, juce::Colour body = {});
 int footswitchStyle (const PedalLayout&);
 // The rocking plate of a treadle pedal. position 0 is heel down, 1 is toe down.
-void drawTreadle (juce::Graphics&, juce::Rectangle<float> well, float position, bool pressed, bool hover);
+// With `pictured`, the pedal has a picture and the treadle is drawn from its strip of photographs,
+// which reach a little past the well (treadleArtArea): boxHeight is the height of the pedal's box.
+void drawTreadle (juce::Graphics&, juce::Rectangle<float> well, float position, bool pressed, bool hover,
+                  const PedalDesign* pictured = nullptr, float boxHeight = 420.0f);
+juce::Rectangle<float> treadleArtArea (juce::Rectangle<float> well, float boxHeight);
 
 // A metal stomp switch bound to a module's on/off parameter.
 class Footswitch : public juce::Component, public juce::SettableTooltipClient
@@ -167,12 +184,13 @@ public:
     void mouseDown (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     bool isOn() const noexcept { return on; }
-    void setStyle (int s, juce::Colour bodyColour) { style = s; body = bodyColour; repaint(); }
+    void setStyle (int s, juce::Colour bodyColour, bool inPicture = false) { style = s; body = bodyColour; pictured = inPicture; repaint(); }
     std::function<void (bool)> onChange;
 
 private:
     juce::ParameterAttachment attachment;
     bool on = false, pressed = false;
+    bool pictured = false; // the switch is part of the pedal's picture: only a press is drawn
     int style = 0;
     juce::Colour body;
 };
@@ -189,7 +207,10 @@ public:
     void mouseEnter (const juce::MouseEvent&) override { repaint(); }
     void mouseExit (const juce::MouseEvent&) override { repaint(); }
     // When the pedal follows the picking by itself there is nothing to rock: it sits level.
-    void setRocking (bool canRock) { rocking = canRock; repaint(); }
+    void setRocking (bool canRock) { rocking = canRock; refresh(); }
+    // The pedal this treadle belongs to has a picture: the treadle is drawn from its photographs,
+    // which stand a little outside the component.
+    void setPicture (const PedalDesign* d, float boxH) { design = d; boxHeight = boxH; setPaintingIsUnclipped (d != nullptr); refresh(); }
     std::function<void (bool)> onChange;
 
 private:
@@ -197,5 +218,8 @@ private:
     juce::ParameterAttachment pos, power;
     float value = 0.5f, startValue = 0.5f;
     bool on = false, pressed = false, dragging = false, rocking = true;
+    const PedalDesign* design = nullptr;
+    float boxHeight = 420.0f;
+    void refresh();
 };
 } // namespace rh::ui

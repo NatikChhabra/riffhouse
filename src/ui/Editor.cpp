@@ -1,5 +1,6 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
+#include "AudioPicker.h"
 #include "Editor.h"
 #include "../plugin/StandaloneHost.h"
 #include "TakesView.h"
@@ -384,6 +385,15 @@ public:
         doubler.setTooltip ("Widens the guitar like two takes panned left and right");
         addAndMakeVisible (inMeter);
         addAndMakeVisible (outMeter);
+        addAndMakeVisible (levelSpot);
+        levelSpot.setTooltip (levelTip());
+        levelSpot.onClick = [this]
+        {
+            proc.setValue (P::autoLevel, proc.value (P::autoLevel) > 0.5f ? 0.0f : 1.0f);
+            if (proc.value (P::autoLevel) > 0.5f) proc.levels().rematch();
+            levelSpot.setTooltip (levelTip());
+            repaint();
+        };
 
         // overlays
         browser.onClose = [this] { closeOverlays(); };
@@ -392,6 +402,7 @@ public:
         tuner.onClose = [this] { closeOverlays(); };
         settings.onClose = [this] { closeOverlays(); };
         settings.onRunSetup = [this] { closeOverlays(); editor.showSetupWizard(); };
+        settings.onMessage = [this] (const juce::String& m) { editor.showToast (m); };
         settings.onLookChange = [this] (Look l)
         {
             // rebuild after the click has finished, never inside it
@@ -635,6 +646,31 @@ public:
         if (++frame % 15 == 0) refreshTop();
     }
 
+    // Auto level in the bottom bar: a lamp, what it is doing, and a click switches it.
+    struct HotSpot : public juce::Component, public juce::SettableTooltipClient
+    {
+        HotSpot() { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+        void mouseUp (const juce::MouseEvent& e) override { if (e.mouseWasClicked() && onClick) onClick(); }
+        std::function<void()> onClick;
+    };
+    juce::String levelText() const
+    {
+        if (proc.value (P::autoLevel) < 0.5f) return "Auto level off";
+        const float t = proc.levels().trimDb();
+        const juce::String minus (juce::CharPointer_UTF8 ("\xe2\x88\x92"));
+        const auto db = (std::abs (t) < 0.05f ? juce::String() : (t > 0.0f ? juce::String ("+") : minus)) + juce::String (std::abs (t), 1) + " dB";
+        return "Auto level " + db;
+    }
+    juce::String levelTip() const
+    {
+        if (proc.value (P::autoLevel) < 0.5f)
+            return "Auto level is off: every tone is as loud as it was made. Click to have Riffhouse keep them level.";
+        return juce::String ("Auto level keeps every tone equally loud, so nothing jumps out when you switch. ")
+             + (proc.levels().hasPlayersPhrase() ? "It measures them with your own playing, which it has heard. "
+                                                 : "It will measure them with your own playing once it has heard a few seconds of it. ")
+             + "Click to switch it off.";
+    }
+
     struct StatusItem { juce::String text; bool lit; };
     std::vector<StatusItem> statusItems() const
     {
@@ -656,7 +692,7 @@ public:
     {
         juce::String all;
         for (const auto& item : statusItems()) all << item.text << (item.lit ? "*" : "-");
-        all << inMeter.peakText() << outMeter.peakText();
+        all << inMeter.peakText() << outMeter.peakText() << levelText();
         return all;
     }
 
@@ -718,6 +754,7 @@ public:
         inMeter.setBounds (inMeterArea.getX() + 62, inMeterArea.getY() + 17, 226, 13);
         outMeterArea = bottom.removeFromRight (380);
         outMeter.setBounds (outMeterArea.getRight() - 226 - 54, outMeterArea.getY() + 17, 226, 13);
+        levelSpot.setBounds (outMeter.getX() - 70, outMeterArea.getY() + 36, 170, 20);
         auto macros = bottom.withSizeKeepingCentre (3 * 92, getHeight() - bottomY);
         for (auto* k : { &space, &doubler, &volume })
             k->setBounds (macros.removeFromLeft (92).withSizeKeepingCentre (64, 58));
@@ -792,6 +829,21 @@ public:
             drawCaps (g, item.text, { x + 13.0f, sy, w + 4.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
             x += 13.0f + w + 20.0f;
         }
+        {
+            // auto level, under the meter it works on
+            const bool on = proc.value (P::autoLevel) > 0.5f;
+            const float lx = (float) levelSpot.getX();
+            const auto lampR = juce::Rectangle<float> (6.0f, 6.0f).withCentre ({ lx + 3.0f, sy + 8.0f });
+            if (on)
+            {
+                g.setGradientFill (juce::ColourGradient (colours::lamp.withAlpha (0.45f), lampR.getCentreX(), lampR.getCentreY(),
+                                                         colours::lamp.withAlpha (0.0f), lampR.getCentreX() + 8.0f, lampR.getCentreY(), true));
+                g.fillEllipse (lampR.expanded (6.0f));
+            }
+            g.setColour (on ? colours::lamp : juce::Colour (0xff3b3936));
+            g.fillEllipse (lampR);
+            drawCaps (g, levelText(), { lx + 13.0f, sy, 170.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
+        }
         const int clips = proc.meters().clipEvents.load();
         const auto rightLine = juce::Rectangle<float> ((float) outMeterArea.getX(), sy, 380.0f, 16.0f);
         if (clips > 0)
@@ -826,6 +878,7 @@ public:
 
     Knob space, doubler, volume;
     Meter inMeter, outMeter;
+    HotSpot levelSpot;
 
     PresetBrowser browser;
     TunerView tuner;
@@ -866,15 +919,18 @@ RiffhouseEditor::RiffhouseEditor (RiffhouseProcessor& p) : AudioProcessorEditor 
     if (auto* c = getConstrainer()) c->setFixedAspectRatio ((double) baseWidth / baseHeight);
     const double scale = (double) proc.uiState.getProperty ("scale", 1.0);
     setSize (juce::roundToInt (baseWidth * scale), juce::roundToInt (baseHeight * scale));
-    setWantsKeyboardFocus (true);
+    setWantsKeyboardFocus (proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone);
 
     if (auto* host = StandaloneHost::get())
     {
         auto* dev = host->deviceManager().getCurrentAudioDevice();
         const bool noInput = dev == nullptr || dev->getActiveInputChannels().isZero();
-        if (! host->settings().getBoolValue ("setupDone", false) || noInput)
-            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this)]
-                                             { if (safe != nullptr) safe->showSetupWizard(); });
+        const bool done = host->settings().getBoolValue ("setupDone", false);
+        // a setup made by an older version is offered a new run, once
+        const bool old = done && host->settings().getIntValue ("setupVersion", 1) < AutoSetup::kSetupVersion;
+        if (! done || noInput || old)
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this), again = done && ! noInput]
+                                             { if (safe != nullptr) safe->showSetupWizard (again); });
     }
     startTimerHz (30);
 }
@@ -923,9 +979,33 @@ void RiffhouseEditor::resized()
 void RiffhouseEditor::timerCallback()
 {
     root->tick();
+    if (++guardTick >= 6) { guardTick = 0; watchInputLevel(); } // five times a second
 }
 
-void RiffhouseEditor::showSetupWizard()
+void RiffhouseEditor::watchInputLevel()
+{
+    // The standalone app looks after the input level setup chose, for as long as the player
+    // has not set another by hand. In a DAW the level belongs to the session.
+    if (root->wizard != nullptr) { inputGuard.reset(); return; } // setup is reading the same meter: leave it alone
+    const float peak = proc.meters().stagePeak.exchange (0.0f);
+    const float gain = proc.value (P::inGain);
+    const juce::var looked = proc.uiState.getProperty ("guardGain");
+    const bool ours = ! looked.isVoid() && std::abs ((float) looked - gain) < 0.01f;
+    if (StandaloneHost::get() == nullptr || root->takeBar.isActive() || ! ours)
+    {
+        inputGuard.reset();
+        return;
+    }
+    const float down = inputGuard.heard (peak, 0.2);
+    if (down <= 0.0f) return;
+    const float to = std::max (-24.0f, gain - down);
+    proc.setValue (P::inGain, to);
+    proc.uiState.setProperty ("guardGain", to, nullptr);
+    proc.rememberSetup();
+    showToast ("Input turned down " + juce::String (gain - to, 1).replace (".0", "") + " dB. You are playing harder than in setup.");
+}
+
+void RiffhouseEditor::showSetupWizard (bool again)
 {
     if (StandaloneHost::get() == nullptr || root->wizard != nullptr) return;
     root->closeOverlays();
@@ -941,7 +1021,7 @@ void RiffhouseEditor::showSetupWizard()
             safe->root->repaint();
         });
     };
-    root->wizard->begin();
+    root->wizard->begin (again);
 }
 
 namespace
@@ -1239,7 +1319,20 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         w.setBounds (r.getLocalBounds());
         w.begin();
         shoot ("setup");
+        w.begin (true);
+        shoot ("setup-again");
+        const char* names[] = { "setup-1-find", "setup-2-delay", "setup-3-play", "setup-4-quiet", "setup-found", "setup-done" };
+        for (int i = 0; i < 6; ++i) { w.showExample (i); shoot (names[i]); }
         r.removeChildComponent (&w);
+    }
+    {
+        // the audio settings on a PC with no ASIO driver, which is where people get lost
+        AudioPicker a (proc);
+        a.showExample();
+        r.addAndMakeVisible (a);
+        a.setCentrePosition (r.getLocalBounds().getCentre());
+        shoot ("audio-asio");
+        r.removeChildComponent (&a);
     }
 
     // every amp and every drive pedal, as drawn gear
@@ -1333,18 +1426,139 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
             names.add ("Volume");
             auto thumb = ampThumb (d, m == choices::neuralCapture ? juce::String ("your capture") : juce::String (spec (P::ampModel).choices[(size_t) m]).toLowerCase(), 1.6f, &names);
             juce::Graphics tg (thumb.image);
-            tg.addTransform (juce::AffineTransform::scale (1.6f));
+            tg.addTransform (juce::AffineTransform::translation (-thumb.area.getX(), -thumb.area.getY()).scaled (1.6f));
             drawAmpJewel (tg, thumb.amp, d, true);
             write ("amp-" + juce::String (m).paddedLeft ('0', 2), thumb.image);
         }
         for (int m = 0; m < 8; ++m)
             write ("cab-" + juce::String (m), cabThumb (m, 2.0f).image);
     }
+
+    // what the 3D renderer needs to build each pedal: its design, where its parts sit, and its print
+    {
+        const auto dir = folder.getChildFile ("gear");
+        dir.createDirectory();
+        juce::PNGImageFormat png;
+        auto rect = [] (juce::Rectangle<float> r)
+        {
+            juce::Array<juce::var> a;
+            for (float v : { r.getX(), r.getY(), r.getWidth(), r.getHeight() }) a.add (v);
+            return juce::var (a);
+        };
+        auto hex = [] (juce::uint32 c) { return juce::String::toHexString ((juce::int64) (c & 0xffffff)).paddedLeft ('0', 6); };
+        juce::Array<juce::var> pedals;
+        struct Family { int module; int types; const char* name; };
+        for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 1, "wah" }, Family { mPitch, 1, "pitch" },
+                          Family { mDrive, 7, "drive" }, Family { mEq, 1, "eq" }, Family { mMod, 6, "mod" }, Family { mDelay, 4, "delay" },
+                          Family { mReverb, 6, "reverb" }, Family { mLofi, 1, "lofi" } })
+            for (int t = 0; t < fam.types; ++t)
+            {
+                const auto& d = *pedalDesignFor (fam.module, t);
+                const bool faders = fam.module == mEq;
+                int n = faders ? 8 : (int) modules()[(size_t) fam.module].knobs.size();
+                if (d.form == 5) --n; // the treadle is the first control
+                const auto l = pedalLayout ({ 0.0f, 0.0f, 480.0f, 420.0f }, d, n, faders);
+                const auto area = pedalArtArea (l.box);
+                const auto id = juce::String (fam.name) + "-" + juce::String (t);
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("id", id);
+                o->setProperty ("name", d.name);
+                o->setProperty ("body", hex (d.body));
+                o->setProperty ("ink", hex (d.ink));
+                o->setProperty ("led", hex (d.led));
+                o->setProperty ("finish", (int) d.finish);
+                o->setProperty ("knob", (int) d.knob);
+                o->setProperty ("knobCap", hex (d.knobCap));
+                o->setProperty ("stripe", d.stripe);
+                o->setProperty ("form", l.form);
+                o->setProperty ("variant", l.variant);
+                o->setProperty ("faders", faders);
+                o->setProperty ("area", rect (area));
+                o->setProperty ("box", rect (l.box));
+                o->setProperty ("knobs", rect (l.knobs));
+                o->setProperty ("nameBox", rect (l.name));
+                o->setProperty ("ledBox", rect (l.led));
+                o->setProperty ("footswitch", rect (l.footswitch));
+                o->setProperty ("treadle", rect (l.treadle));
+                o->setProperty ("footStyle", footswitchStyle (l));
+                juce::Array<juce::var> cells;
+                if (! faders)
+                    for (int i = 0; i < n; ++i)
+                    {
+                        const auto cell = pedalKnobCell (l, i, n);
+                        const float size = (float) (int) std::min (cell.getWidth() - 6.0f, std::min (cell.getHeight() - 20.0f, 96.0f));
+                        cells.add (rect (cell.withSizeKeepingCentre (size, size + 20.0f).removeFromTop (size)));
+                    }
+                o->setProperty ("knobCells", cells);
+                pedals.add (juce::var (o));
+                auto f = dir.getChildFile (id + "-print.png");
+                f.deleteFile();
+                if (auto out = f.createOutputStream()) png.writeImageToStream (renderPedalPrint (d, l, area, 2.0f), *out);
+            }
+        juce::Array<juce::var> amps;
+        auto point = [] (juce::Point<float> p)
+        {
+            juce::Array<juce::var> a;
+            a.add (p.x);
+            a.add (p.y);
+            return juce::var (a);
+        };
+        for (int m = 0; m < choices::numAmpModels; ++m)
+        {
+            const auto& d = ampDesign (m);
+            const juce::Rectangle<float> place (0.0f, 0.0f, ampCanvasW, ampCanvasH);
+            const auto l = ampLayout (place, d);
+            const auto area = ampArtArea (place);
+            const auto id = "amp-" + juce::String (m).paddedLeft ('0', 2);
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", id);
+            o->setProperty ("name", d.badge);
+            o->setProperty ("tolex", (int) d.tolex);
+            o->setProperty ("tolexColour", hex (d.tolexColour));
+            o->setProperty ("panelKind", (int) d.panel);
+            o->setProperty ("ink", hex (d.ink));
+            o->setProperty ("weave", (int) d.weave);
+            o->setProperty ("piping", d.piping != 0 ? hex (d.piping) : juce::String());
+            o->setProperty ("knob", (int) d.knob);
+            o->setProperty ("knobCap", hex (d.knobCap));
+            o->setProperty ("jewelColour", hex (d.jewel));
+            o->setProperty ("form", d.form);
+            o->setProperty ("groups", d.groups);
+            o->setProperty ("lamp", d.lamp);
+            o->setProperty ("area", rect (area));
+            o->setProperty ("head", rect (l.head));
+            o->setProperty ("panel", rect (l.panel));
+            o->setProperty ("grille", rect (l.grille));
+            o->setProperty ("badge", rect (l.badge));
+            o->setProperty ("jewel", rect (l.jewel));
+            o->setProperty ("handle", rect (l.handle));
+            o->setProperty ("rack", rect (l.rack));
+            o->setProperty ("jack", point (l.jack));
+            o->setProperty ("knobSize", l.knobSize);
+            juce::Array<juce::var> cells;
+            for (const auto& cell : l.cells) cells.add (rect (cell.withHeight (cell.getWidth())));
+            o->setProperty ("knobCells", cells);
+            juce::var raisedParts;
+            const auto print = renderAmpPrint (d, l, area, 2.0f, raisedParts);
+            o->setProperty ("relief", raisedParts);
+            amps.add (juce::var (o));
+            auto f = dir.getChildFile (id + "-print.png");
+            f.deleteFile();
+            if (auto out = f.createOutputStream()) png.writeImageToStream (print, *out);
+        }
+        auto* root = new juce::DynamicObject();
+        root->setProperty ("scale", 2.0);
+        root->setProperty ("pedals", pedals);
+        root->setProperty ("amps", amps);
+        dir.getChildFile ("gear.json").replaceWithText (juce::JSON::toString (juce::var (root)));
+    }
 }
 
 bool RiffhouseEditor::keyPressed (const juce::KeyPress& k)
 {
     if (root->wizard != nullptr) return false;
+    // Inside a DAW the keyboard is the DAW's: space starts its transport, Ctrl+Z is its undo.
+    if (proc.wrapperType != juce::AudioProcessor::wrapperType_Standalone) return false;
     if (k == juce::KeyPress::escapeKey)
     {
         root->closeOverlays();

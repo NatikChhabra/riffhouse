@@ -25,7 +25,7 @@ void InputConditioner::reset()
 {
     dc.reset();
     for (auto& b : notches) b.reset();
-    fixShelf.reset(); fixPeak.reset(); fixLow.reset(); fixHiss.reset();
+    fixShelf.reset(); fixTop.reset();
     for (auto& g : gz) g.s1 = g.s2 = 0;
     g50 = g60 = total = 0;
     counted = 0;
@@ -44,20 +44,34 @@ void InputConditioner::set (int humMode, bool inputFix, float fixAmountDb)
         setNotches (want);
 }
 
-// Input Fix, sized by how much treble the input is missing. Measured on a
-// soundhole magnetic pickup into a PC mic jack: the highs fall away above
-// about 300 Hz and need up to +12 dB back around 1.7 to 4 kHz, while above
-// 5 kHz there is mostly hiss. So: lift the presence range by the amount, and
-// past 6 dB of lift start rolling off the hiss band instead of boosting it.
+// Input Fix, sized by how much treble the input is missing. A passive pickup is a
+// coil of a few henries; into the few kilohms of a PC mic jack it becomes a
+// first-order low-pass that starts as low as 300 Hz (measured on a real guitar
+// into an onboard mic jack: 20 dB down at 3 kHz against the same kind of guitar
+// on an instrument input). The fix is the same curve upside down: it rises 6 dB
+// per octave from the corner the amount stands for and levels off at 4.5 kHz,
+// where a pickup on a proper input has its own peak and falls away. Above that
+// there is mostly hiss, so the top is rolled off the way a pickup and cable do it.
+namespace { constexpr double kFixTopHz = 4500.0; }
+
+void InputConditioner::Shelf::set (double sampleRate, double lowHz, double highHz) noexcept
+{
+    const double k1 = 1.0 / std::tan (kPi * lowHz / sampleRate);
+    const double k2 = 1.0 / std::tan (kPi * std::min (highHz, 0.45 * sampleRate) / sampleRate);
+    b0 = (1.0 + k1) / (1.0 + k2);
+    b1 = (1.0 - k1) / (1.0 + k2);
+    a1 = (1.0 - k2) / (1.0 + k2);
+}
+
 void InputConditioner::setFixAmount (float db)
 {
-    db = std::clamp (db, 0.0f, 12.0f);
+    db = std::clamp (db, 0.0f, TiltProbe::kMostFixDb);
     if (std::abs (db - fixAmount) < 0.01f) return;
     fixAmount = db;
-    fixShelf.set (Biquad::Type::highShelf, sr, 1800.0, 0.6, 0.6 * db);
-    fixPeak.set (Biquad::Type::peak, sr, 3000.0, 0.8, 0.5 * db);
-    fixLow.set (Biquad::Type::peak, sr, 250.0, 0.9, -0.2 * db);
-    fixHiss.set (Biquad::Type::highShelf, sr, 7500.0, 0.7, -std::max (0.0f, db - 6.0f) * 1.5f);
+    fixShelf.set (sr, kFixTopHz / std::pow (10.0, db / 20.0), kFixTopHz);
+    // the more is lifted, the more hiss comes up with it: bring the top down to 5.2 kHz by 12 dB
+    const double top = 12000.0 + (5200.0 - 12000.0) * std::clamp ((db - 3.0) / 9.0, 0.0, 1.0);
+    fixTop.set (Biquad::Type::lowpass, sr, top, 0.85);
 }
 
 void InputConditioner::setNotches (int mainsHz)
@@ -140,7 +154,7 @@ void InputConditioner::process (float* x, int n)
 
     if (fix)
         for (int i = 0; i < n; ++i)
-            x[i] = fixHiss.process (fixLow.process (fixPeak.process (fixShelf.process (x[i]))));
+            x[i] = fixTop.process (fixShelf.process (x[i]));
 }
 
 //==============================================================================
@@ -149,9 +163,14 @@ void TiltProbe::prepare (double sampleRate)
 {
     sr = sampleRate;
     lowBand.set (Biquad::Type::bandpass, sr, 250.0, 0.9);
-    highBand.set (Biquad::Type::bandpass, sr, 3000.0, 0.9);
+    // steep sides: on a dull input the lows are 30 dB stronger than this band,
+    // and a gentle filter would mostly measure what leaks in from them
+    highBand[0].set (Biquad::Type::highpass, sr, 1800.0, 0.5412);
+    highBand[1].set (Biquad::Type::highpass, sr, 1800.0, 1.3066);
+    highBand[2].set (Biquad::Type::lowpass, sr, 3600.0, 0.5412);
+    highBand[3].set (Biquad::Type::lowpass, sr, 3600.0, 1.3066);
     lowBand.reset();
-    highBand.reset();
+    for (auto& b : highBand) b.reset();
 }
 
 void TiltProbe::process (const float* x, int n)
@@ -163,18 +182,20 @@ void TiltProbe::process (const float* x, int n)
         tilt.store (0.0f);
     }
     double sum = 0, lo = 0, hi = 0;
+    float pk = 0.0f;
     for (int i = 0; i < n; ++i)
     {
         const float s = x[i];
-        const float a = lowBand.process (s), b = highBand.process (s);
+        const float a = lowBand.process (s);
+        float b = s;
+        for (auto& f : highBand) b = f.process (b);
         sum += (double) s * s;
         lo += (double) a * a;
         hi += (double) b * b;
+        pk = std::max (pk, std::abs (s));
     }
     // only count blocks where something is being played, and skip clipped ones
     const double rms = std::sqrt (sum / std::max (1, n));
-    float pk = 0.0f;
-    for (int i = 0; i < n; ++i) pk = std::max (pk, std::abs (x[i]));
     if (rms < 0.004 || pk > 0.97f) return; // about -48 dBFS
     lowE += lo;
     highE += hi;
@@ -183,13 +204,31 @@ void TiltProbe::process (const float* x, int n)
         tilt.store ((float) (10.0 * std::log10 (std::max (highE, 1e-20) / lowE)));
 }
 
-float TiltProbe::fixAmountFor (float measuredTiltDb) noexcept
+float TiltProbe::tiltGainOf (float amountDb) noexcept
 {
-    // Small deficits are normal playing variation. Past that, the fix wins
-    // back about 0.8 dB of band level per dB of amount, so scale up to match.
+    // what the fix's curve does to the two bands, less the quarter of it that real
+    // playing does not show (measured: the reading moves 0.7 to 0.85 dB per dB of curve,
+    // because the low edge of the high band, where less is lifted, carries most of it)
+    const double f1 = kFixTopHz / std::pow (10.0, (double) amountDb / 20.0);
+    auto gain = [f1] (double hz) { return 10.0 * std::log10 ((1.0 + (hz / f1) * (hz / f1)) / (1.0 + (hz / kFixTopHz) * (hz / kFixTopHz))); };
+    return (float) (0.75 * (gain (2600.0) - gain (250.0)));
+}
+
+float TiltProbe::fixAmountFor (float measuredTiltDb, float smallestLossDb) noexcept
+{
+    // Guitars differ: a dark neck pickup reads 5 dB under the reference with
+    // nothing wrong with the input. Past the smallest loss worth mending, find
+    // the amount that wins the missing treble back.
     const float deficit = referenceTiltDb - measuredTiltDb;
-    if (deficit < 3.0f) return 0.0f;
-    return std::clamp (std::round (deficit * 1.25f * 2.0f) * 0.5f, 3.0f, 12.0f);
+    if (deficit < smallestLossDb) return 0.0f;
+    float lo = 0.0f, hi = kMostFixDb;
+    if (tiltGainOf (hi) <= deficit) return hi;
+    for (int i = 0; i < 24; ++i)
+    {
+        const float mid = 0.5f * (lo + hi);
+        (tiltGainOf (mid) < deficit ? lo : hi) = mid;
+    }
+    return std::round (hi * 2.0f) * 0.5f;
 }
 
 //==============================================================================
@@ -200,6 +239,10 @@ void NoiseGate::prepare (double sampleRate)
     env.prepare (sr, 0.3f, 25.0f);
     attackCoeff = (float) std::exp (-1.0 / (0.0008 * sr));
     holdSamples = (int) (0.045 * sr);
+    windowLength = std::max (1, (int) (0.1 * sr));
+    floorDb = -120.0f; // as if just built: what an earlier run heard is forgotten
+    windowsHeard = windowAt = windowFill = 0;
+    windowPower = 0.0;
     set (-62.0f, 80.0f);
     reset();
 }
@@ -208,13 +251,50 @@ void NoiseGate::reset() { env.reset(); gain = 0.0f; open = false; holdCounter = 
 
 void NoiseGate::set (float thresholdDb, float releaseMs)
 {
-    thrOpen = dbToGain (thresholdDb);
-    thrClose = dbToGain (thresholdDb - 6.0f); // hysteresis stops chattering
+    userThrDb = thresholdDb;
+    applyThreshold();
     releaseCoeff = (float) std::exp (-1.0 / (0.001 * std::max (5.0f, releaseMs) * sr));
+}
+
+void NoiseGate::applyThreshold()
+{
+    float t = userThrDb;
+    if (follows && floorDb > -119.0f)
+        t = std::max (t, std::min (floorDb + kAboveFloorDb, kHighestFollowDb));
+    thrNowDb = t;
+    thrOpen = dbToGain (t);
+    thrClose = dbToGain (t - 6.0f); // hysteresis stops chattering
+}
+
+void NoiseGate::windowDone (float levelDb)
+{
+    windows[windowAt] = levelDb;
+    windowAt = (windowAt + 1) % kWindows;
+    if (windowsHeard < kWindows) { ++windowsHeard; return; }
+    float lo = windows[0], hi = windows[0], sum = 0.0f;
+    for (float w : windows) { lo = std::min (lo, w); hi = std::max (hi, w); sum += w; }
+    // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do
+    if (hi - lo > 1.5f) return;
+    const float heard = sum / (float) kWindows;
+    if (heard > -40.0f) return;                 // that loud and steady is a sound, not a floor
+    if (heard < floorDb) floorDb = std::max (-120.0f, heard); // quieter now: believed at once
+    else floorDb = std::min (heard, floorDb < -119.0f ? heard : floorDb + 1.0f);
+    applyThreshold();
 }
 
 void NoiseGate::process (float* x, int n)
 {
+    if (follows)
+        for (int i = 0; i < n; ++i)
+        {
+            windowPower += (double) x[i] * x[i];
+            if (++windowFill >= windowLength)
+            {
+                windowDone ((float) (10.0 * std::log10 (windowPower / (double) windowLength + 1.0e-12)));
+                windowFill = 0;
+                windowPower = 0.0;
+            }
+        }
     for (int i = 0; i < n; ++i)
     {
         const float e = env.process (x[i]);
@@ -988,6 +1068,9 @@ void LoFi::prepare (double sampleRate)
     flutter.prepare (sr); flutter.setRate (5.5f);
     hissLp.setCutoff (sr, 6000.0);
     crackleLp.setCutoff (sr, 3000.0);
+    noise = Noise { 0xBEEF };
+    drift = 0.0f;
+    hissLp.reset(); crackleLp.reset();
     reset();
 }
 

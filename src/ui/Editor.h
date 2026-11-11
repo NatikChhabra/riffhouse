@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include "../engine/InputGuard.h"
 #include "../plugin/PluginProcessor.h"
 #include "Modules.h"
 #include "Panels.h"
@@ -32,7 +33,7 @@ public:
     void filesDropped (const juce::StringArray& files, int, int) override;
     void openFile (const juce::File&);
 
-    void showSetupWizard();
+    void showSetupWizard (bool again = false);
     void showToast (const juce::String&);
     void applyLook (ui::Look, bool reopenSettings);
 
@@ -43,11 +44,14 @@ private:
     class Root;
     void timerCallback() override;
     void buildRoot();
+    void watchInputLevel();
 
     RiffhouseProcessor& proc;
     ui::LookAndFeel lnf;
     std::unique_ptr<Root> root;
     juce::TooltipWindow tooltips { this, 600 };
+    InputGuard inputGuard;
+    int guardTick = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RiffhouseEditor)
 };

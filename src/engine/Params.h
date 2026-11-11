@@ -38,6 +38,8 @@ enum class P : int
     lofiOn, lofiBits, lofiRate, lofiWobble, lofiNoise, lofiFilter, lofiMix,
     // Output
     doubler, space, outLevel,
+    // Auto level: tones load at one loudness and switches never change the volume (part of the setup, not the tone)
+    autoLevel,
     count
 };
 

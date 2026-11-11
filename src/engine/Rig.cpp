@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Rig.h"
 
+#include "PhraseCatcher.h"
+
 namespace rh
 {
 namespace
@@ -65,6 +67,8 @@ void Rig::prepare (double sampleRate, int block)
     for (Fade* f : { &fGate, &fComp, &fWah, &fPitch, &fDrive, &fAmp, &fCab, &fEq, &fMod, &fLofi })
         f->prepare (sr);
     inGain.prepare (sr, 20.0f);
+    trimGain.prepare (sr, 30.0f);
+    trimGain.reset (dbToGain (levelTrimDb.load()));
     outGain.prepare (sr, 20.0f);
     dry.assign ((size_t) maxBlock, 0.0f);
     dryR.assign ((size_t) maxBlock, 0.0f);
@@ -84,7 +88,9 @@ void Rig::reset()
 
 int Rig::latencySamples() const
 {
-    return (int) std::lround (amp.latencySamples()) + nam.latencySamples();
+    // one amp is in the path at a time: the modelled one, or the capture
+    const bool neural = choice (p, P::ampModel) == choices::neuralCapture;
+    return neural ? nam.latencySamples() : (int) std::lround (amp.latencySamples());
 }
 
 float Rig::delayTimeMs() const
@@ -94,6 +100,24 @@ float Rig::delayTimeMs() const
     if (s <= 0 || s >= (int) (sizeof (beats) / sizeof (beats[0])))
         return p[(size_t) P::dlyTime];
     return (float) std::min (2000.0, 60000.0 / tempo * beats[s]);
+}
+
+void Rig::snapParams (const ParamValues& v)
+{
+    firstParams = true;
+    setParams (v);
+    finishPendingWork();
+    reset();
+    trimGain.reset (dbToGain (levelTrimDb.load()));
+}
+
+void Rig::startFresh (const ParamValues& v, double sampleRate, int block)
+{
+    p = v;
+    prepare (sampleRate, block);
+    finishPendingWork();
+    prepare (sampleRate, block); // the cabinet's response is built from the settings: once more with it in place
+    finishPendingWork();
 }
 
 void Rig::setParams (const ParamValues& v)
@@ -172,6 +196,7 @@ void Rig::processMono (float* x, int n)
         float pk = 0.0f;
         for (int i = 0; i < n; ++i) pk = std::max (pk, std::abs (x[i]));
         m.gateInPeak.store (pk);
+        if (pk > m.stagePeak.load (std::memory_order_relaxed)) m.stagePeak.store (pk, std::memory_order_relaxed);
     }
     runFaded (fGate, x, n, dry, [&] (float* b, int k) { gate.process (b, k); });
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });
@@ -245,6 +270,7 @@ void Rig::process (const float* in, float* outL, float* outR, int total)
         float* r = outR + offset;
 
         probe.process (in + offset, n); // raw input, before any gain or filtering
+        if (tap != nullptr) tap->push (in + offset, n);
         float inPk = 0.0f;
         for (int i = 0; i < n; ++i)
         {
@@ -257,15 +283,16 @@ void Rig::process (const float* in, float* outL, float* outR, int total)
         processStereo (l, r, n);
 
         float outPk = 0.0f;
+        trimGain.setTarget (dbToGain (levelTrimDb.load()));
         for (int i = 0; i < n; ++i)
         {
-            const float g = outGain.next();
+            const float g = outGain.next() * trimGain.next();
             l[i] *= g;
             r[i] *= g;
             outPk = std::max (outPk, std::max (std::abs (l[i]), std::abs (r[i])));
         }
         if (outPk > 1.0f) m.clipEvents.fetch_add (1);
-        limiter.process (l, r, n);
+        if (! measuring) limiter.process (l, r, n);
 
         // sanity: never let a NaN reach the speakers
         for (int i = 0; i < n; ++i)
@@ -281,6 +308,7 @@ void Rig::process (const float* in, float* outL, float* outR, int total)
         m.outPeak.store (outPk);
         m.compReduction.store (comp.gainReductionDb());
         m.gateOpen.store (gate.isOpen());
+        m.gateThreshNow.store (gate.thresholdNowDb());
         m.mains.store (input.detectedMains());
         offset += n;
     }

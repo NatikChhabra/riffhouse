@@ -1,5 +1,5 @@
 juce_add_console_app(riffhouse_tests PRODUCT_NAME "riffhouse_tests")
-target_sources(riffhouse_tests PRIVATE ${RIFFHOUSE_CORE_SOURCES} ${CMAKE_SOURCE_DIR}/src/plugin/Takes.cpp TestMain.cpp TestSignals.cpp)
+target_sources(riffhouse_tests PRIVATE ${RIFFHOUSE_CORE_SOURCES} ${CMAKE_SOURCE_DIR}/src/plugin/Takes.cpp ${CMAKE_SOURCE_DIR}/src/plugin/LevelMatcher.cpp TestMain.cpp TestSignals.cpp)
 target_include_directories(riffhouse_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(riffhouse_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 RIFFHOUSE_PRESET_DIR="${CMAKE_SOURCE_DIR}/presets")
 target_link_libraries(riffhouse_tests PRIVATE

@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "AutoSetup.h"
 
+#include "../engine/InputGuard.h"
+
 namespace rh
 {
 namespace
@@ -10,7 +12,13 @@ namespace
     constexpr float kSureThreshold = 0.063f;   // -24 dBFS: that is definitely a guitar
     constexpr double kDwellMs = 1100.0;
     constexpr double kTuneMs = 1600.0;
-    constexpr double kGetReadyMs = 1800.0, kQuietMs = 2600.0;
+    constexpr double kQuietMs = 2600.0;
+    constexpr double kPauseMs = 1500.0;        // how long a finished step's result stays up
+    constexpr double kPlayMs = 4500.0;         // hard playing wanted
+    constexpr double kToneMs = 1800.0;         // of which this much to judge the treble, the rest to set the level
+    constexpr double kPlayGiveUpMs = 20000.0;
+    constexpr double kWaitForQuietMs = 9000.0; // then the noise is measured whatever is heard
+    constexpr float kNoisyFixDb = -48.0f;      // hiss peaks over this with Input Fix on: the fix is held back
 
     double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
@@ -76,6 +84,15 @@ void AutoSetup::setPhase (Phase p)
     if (onPhaseChanged) onPhaseChanged();
 }
 
+void AutoSetup::pauseThen (const juce::String& found, std::function<void()> next)
+{
+    foundText = found;
+    phaseProgress = 1.0f;
+    afterPause = std::move (next);
+    pauseUntil = nowMs() + kPauseMs;
+    if (onPhaseChanged) onPhaseChanged();
+}
+
 void AutoSetup::buildCandidates()
 {
     candidates.clear();
@@ -126,6 +143,10 @@ void AutoSetup::start()
     originalType = dm.getCurrentAudioDeviceType();
     result = {};
     best = {};
+    afterPause = nullptr;
+    foundText = {};
+    playPeak = 0.0f;
+    noiseStarted = fixRetried = false;
     pass = 0;
     candidateIndex = 0;
     proc.muteOutput.store (true);
@@ -144,6 +165,7 @@ void AutoSetup::start()
 void AutoSetup::cancel()
 {
     stopTimer();
+    afterPause = nullptr;
     if (currentPhase != Phase::finished && currentPhase != Phase::idle)
     {
         if (originalType.isNotEmpty()) dm.setCurrentAudioDeviceType (originalType, true);
@@ -179,6 +201,18 @@ void AutoSetup::timerCallback()
     const double t = nowMs();
     const float raw = proc.rawInputPeak.exchange (0.0f);
     level = std::max (raw, level * 0.85f);
+    const double sinceTick = lastTick > 0 ? std::min (200.0, t - lastTick) : 40.0;
+    lastTick = t;
+
+    if (afterPause != nullptr)
+    {
+        if (t < pauseUntil) return;
+        auto next = std::move (afterPause);
+        afterPause = nullptr;
+        foundText = {};
+        next();
+        return;
+    }
 
     switch (currentPhase)
     {
@@ -194,7 +228,7 @@ void AutoSetup::timerCallback()
                 {
                     chosen = candidates[0];
                     chosenPeak = dwellPeak;
-                    beginTuning();
+                    pauseThen ("Found your guitar on " + chosen.input, [this] { beginTuning(); });
                 }
                 else if (elapsed > 15000.0)
                 {
@@ -209,7 +243,7 @@ void AutoSetup::timerCallback()
             {
                 chosen = candidates[(size_t) candidateIndex];
                 chosenPeak = dwellPeak;
-                beginTuning();
+                pauseThen ("Found your guitar on " + chosen.input, [this] { beginTuning(); });
                 return;
             }
             if (elapsed < kDwellMs) return;
@@ -223,7 +257,7 @@ void AutoSetup::timerCallback()
                 {
                     chosen = candidates[(size_t) (it - candidatePeak.begin())];
                     chosenPeak = *it;
-                    beginTuning();
+                    pauseThen ("Found your guitar on " + chosen.input, [this] { beginTuning(); });
                     return;
                 }
                 if (pass >= 3)
@@ -287,13 +321,43 @@ void AutoSetup::timerCallback()
             return;
         }
 
-        case Phase::quiet:
+        case Phase::playing:
         {
             const double elapsed = t - phaseStart;
-            phaseProgress = (float) std::min (1.0, elapsed / (kGetReadyMs + kQuietMs));
-            if (elapsed < kGetReadyMs) return;
-            noiseSamples.add (proc.meters().gateInPeak.load());
-            if (elapsed >= kGetReadyMs + kQuietMs) finish();
+            playPeak = std::max (playPeak, raw);
+            // playing counts while it is loud: the ring-out between strums is not what the level is set by
+            if (raw > std::max (2.0f * kHeardThreshold, 0.1f * playPeak)) playedMs += sinceTick;
+            phaseProgress = (float) std::min (1.0, playedMs / kPlayMs);
+            // First the treble: once that is judged Input Fix goes on, and the rest of the
+            // playing is heard through it, because the fix lifts the peaks the level is set by.
+            if (! fixSet && playedMs >= kToneMs)
+            {
+                setFixFromTone();
+                fixSetAt = t;
+            }
+            if (fixSet)
+            {
+                const float stage = proc.meters().stagePeak.exchange (0.0f);
+                if (t - fixSetAt > 250.0) fixedPeak = std::max (fixedPeak, stage); // once the fix has settled in
+            }
+            if (playedMs >= kPlayMs || elapsed > kPlayGiveUpMs) finishPlaying();
+            return;
+        }
+
+        case Phase::quiet:
+        {
+            if (! noiseStarted)
+            {
+                // nothing is measured until the strings have really stopped
+                const float still = std::max (2.0f * kHeardThreshold, 0.05f * std::max (playPeak, strumPeak));
+                if (raw > still) quietSince = t;
+                if (t - quietSince > 700.0 || t - phaseStart > kWaitForQuietMs) startNoise();
+                return;
+            }
+            const double elapsed = t - noiseStart;
+            phaseProgress = (float) std::min (1.0, elapsed / kQuietMs);
+            if (elapsed > 300.0) noiseSamples.add (proc.meters().gateInPeak.load());
+            if (elapsed >= kQuietMs) finish();
             return;
         }
 
@@ -411,61 +475,118 @@ void AutoSetup::finishTuning()
         result.latencyMs = measuredLatencyMs();
         result.exclusive = result.deviceType.contains ("Exclusive");
     }
-    beginQuiet();
+    detailText = {};
+    pauseThen ("About " + juce::String (result.latencyMs, 1) + " ms from string to ear", [this] { beginPlaying(); });
 }
 
-void AutoSetup::beginQuiet()
+void AutoSetup::beginPlaying()
 {
-    // The level is set from the hardest strum heard in the whole test, not just the first one
-    // that got the input noticed: one soft opening strum would leave the rig running too hot.
-    const float peak = std::max (chosenPeak, strumPeak);
-    result.guitarPeakDb = juce::Decibels::gainToDecibels (peak, -100.0f);
-    result.clipping = peak > 0.97f;
-    // aim strummed peaks at about -12 dBFS into the rig
-    float gain = juce::jlimit (-12.0f, 30.0f, -12.0f - result.guitarPeakDb);
-    gain = std::round (gain * 2.0f) * 0.5f;
-    result.inputGainDb = gain;
-    proc.setValue (P::inGain, gain);
-    noiseSamples.clearQuick();
+    proc.tiltProbe().restart(); // the tone is judged on this playing, on the device as it will run
+    proc.rawInputPeak.store (0.0f);
+    playPeak = fixedPeak = 0.0f;
+    playedMs = 0;
+    fixSet = false;
+    proc.setValue (P::inGain, 0.0f); // the level into the pedals is read as it comes, then set
     phaseStart = nowMs();
     detailText = {};
-    setPhase (Phase::quiet);
+    setPhase (Phase::playing);
 }
 
-void AutoSetup::finish()
+void AutoSetup::setFixFromTone()
 {
-    stopTimer();
-    // a high percentile ignores a single accidental bump
-    std::vector<float> v (noiseSamples.begin(), noiseSamples.end());
-    std::sort (v.begin(), v.end());
-    const float noise = v.empty() ? 0.0f : v[(size_t) ((double) (v.size() - 1) * 0.9)];
-    result.noiseDb = juce::Decibels::gainToDecibels (noise, -100.0f);
-    float gate = juce::jlimit (-90.0f, -42.0f, result.noiseDb + 6.0f);
-    gate = std::round (gate);
-    result.gateDb = gate;
-    proc.setValue (P::gateThresh, gate);
-
-    // Input Fix: measure the treble you actually have when there was enough
-    // playing to judge, otherwise go by what kind of input this is.
+    // Input Fix: measure the treble that actually arrives when there was enough playing
+    // to judge, otherwise go by what kind of input this is.
     const bool onboard = looksLikeOnboardInput (result.inputName, result.deviceType);
     result.toneSeconds = proc.tiltProbe().secondsMeasured();
     result.tiltDb = proc.tiltProbe().tiltDb();
     if (result.toneSeconds >= 1.0)
     {
-        result.inputFixDb = TiltProbe::fixAmountFor (result.tiltDb);
-        // through an interface a slightly dark reading is just a dark guitar
-        // or pickup, which is part of its sound: only fix clear treble loss
-        if (! onboard && result.inputFixDb < 7.0f) result.inputFixDb = 0.0f;
-        result.inputFix = result.inputFixDb > 0.0f;
+        // A mic or line jack loads the pickup and every bit of lost treble is worth having
+        // back. Through an interface a darker reading is mostly a dark guitar or pickup,
+        // which is part of its sound: only a clear loss is mended there.
+        result.inputFixDb = TiltProbe::fixAmountFor (result.tiltDb, onboard ? 3.0f : 5.0f);
+        if (! onboard && result.inputFixDb < 9.0f) result.inputFixDb = 0.0f;
     }
     else
-    {
-        result.inputFix = onboard;
-        result.inputFixDb = 6.0f;
-    }
+        result.inputFixDb = onboard ? 12.0f : 0.0f;
+    result.inputFix = result.inputFixDb > 0.0f;
     proc.setValue (P::inputFix, result.inputFix ? 1.0f : 0.0f);
     proc.setValue (P::inputFixAmt, result.inputFix ? result.inputFixDb : 6.0f);
     proc.setValue (P::humFilter, 1.0f); // Auto
+    proc.meters().stagePeak.store (0.0f);
+    fixSet = true;
+}
+
+void AutoSetup::finishPlaying()
+{
+    if (! fixSet) setFixFromTone();
+    // The level is set from the hardest playing, and when the player did play for this
+    // step, from this step alone: the first strums that got the input noticed are careful
+    // ones, and a rig set by them runs far too hot once the playing is for real. The peak
+    // that counts is the one after Input Fix, which is what reaches the pedals.
+    result.playedSeconds = playedMs / 1000.0;
+    float peak = std::max (playPeak, fixedPeak);
+    if (playedMs < 1500.0) peak = std::max (peak, std::max (chosenPeak, strumPeak));
+    result.guitarPeakDb = juce::Decibels::gainToDecibels (peak, -100.0f);
+    result.clipping = playPeak > 0.97f;
+    // aim the hardest peaks at about -12 dBFS into the rig
+    float gain = juce::jlimit (-12.0f, 30.0f, InputGuard::kTargetDb - result.guitarPeakDb);
+    gain = std::round (gain * 2.0f) * 0.5f;
+    result.inputGainDb = gain;
+    proc.setValue (P::inGain, gain);
+    // from here the input guard may turn it down further, for as long as the player leaves it alone
+    proc.uiState.setProperty ("guardGain", gain, nullptr);
+    // these seconds of digging in are what every tone is levelled with from now on
+    proc.levels().learnPhraseNow();
+
+    pauseThen ("Input level set to " + juce::String (gain >= 0 ? "+" : "") + juce::String (gain, 1) + " dB", [this] { beginQuiet(); });
+}
+
+void AutoSetup::beginQuiet()
+{
+    noiseSamples.clearQuick();
+    noiseStarted = false;
+    fixRetried = false;
+    phaseStart = quietSince = nowMs();
+    detailText = {};
+    setPhase (Phase::quiet);
+}
+
+void AutoSetup::startNoise()
+{
+    noiseStarted = true;
+    noiseStart = nowMs();
+    noiseSamples.clearQuick();
+    if (onPhaseChanged) onPhaseChanged();
+}
+
+void AutoSetup::finish()
+{
+    // a high percentile ignores a single accidental bump
+    std::vector<float> v (noiseSamples.begin(), noiseSamples.end());
+    std::sort (v.begin(), v.end());
+    const float noise = v.empty() ? 0.0f : v[(size_t) ((double) (v.size() - 1) * 0.9)];
+    result.noiseDb = juce::Decibels::gainToDecibels (noise, -100.0f);
+
+    // Input Fix brings the input's hiss up with the treble. When that leaves more hiss than
+    // a gate can hide without cutting notes short, some of the fix is given back and the
+    // noise is measured once more.
+    if (result.inputFix && result.inputFixDb > 12.0f && result.noiseDb > kNoisyFixDb && ! fixRetried)
+    {
+        fixRetried = true;
+        result.fixHeldBack = true;
+        result.inputFixDb = std::max (12.0f, std::round ((result.inputFixDb - (result.noiseDb - kNoisyFixDb)) * 2.0f) * 0.5f);
+        proc.setValue (P::inputFixAmt, result.inputFixDb);
+        startNoise();
+        return;
+    }
+
+    stopTimer();
+    float gate = juce::jlimit (-90.0f, -42.0f, result.noiseDb + 6.0f);
+    gate = std::round (gate);
+    result.gateDb = gate;
+    proc.setValue (P::gateThresh, gate);
+    proc.rememberSetup(); // new copies of the plugin in a DAW start from this
     proc.muteOutput.store (false);
     setPhase (Phase::finished);
 }

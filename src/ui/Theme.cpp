@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Theme.h"
 #include "Gear.h"
+#include "GearArt.h"
 
 #if __has_include("AssetData.h")
  #include "AssetData.h"
@@ -451,6 +452,9 @@ void LookAndFeel::drawLinearSlider (juce::Graphics& g, int x, int y, int w, int 
             g.fillRect (r.getCentreX() - 9.0f - tw, ty - 0.5f, tw, 1.0f);
             g.fillRect (r.getCentreX() + 9.0f, ty - 0.5f, tw, 1.0f);
         }
+        // the cap as the 3D renderer photographed it, standing on its shadow: its picture is 128 wide round its foot
+        if (art::draw (g, "fader_cap", juce::Rectangle<float> (128.0f, 128.0f).withCentre ({ r.getCentreX(), pos })))
+            return;
         const auto cap = juce::Rectangle<float> (18.0f, 30.0f).withCentre ({ r.getCentreX(), pos });
         juce::Path cp;
         cp.addRoundedRectangle (cap, 3.0f);
@@ -577,6 +581,15 @@ void LookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
 {
     label.setBounds (8, 1, box.getWidth() - 34, box.getHeight() - 2);
     label.setFont (getComboBoxFont (box));
+}
+
+void LookAndFeel::drawComboBoxTextWhenNothingSelected (juce::Graphics& g, juce::ComboBox& box, juce::Label& label)
+{
+    // where a chosen item's text would sit, in the quieter colour
+    g.setColour (colours::textFaint);
+    g.setFont (getComboBoxFont (box));
+    g.drawFittedText (box.getTextWhenNothingSelected(), label.getBorderSize().subtractedFrom (label.getBounds()),
+                      juce::Justification::centredLeft, 1);
 }
 
 void LookAndFeel::drawPopupMenuBackground (juce::Graphics& g, int w, int h)

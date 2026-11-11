@@ -39,7 +39,23 @@ private:
     bool fix = false;
     float fixAmount = -1.0f;
     void setFixAmount (float db);
-    Biquad fixShelf, fixPeak, fixLow, fixHiss;
+    // (1 + s/w1) / (1 + s/w2): the exact opposite of a pickup loaded by a low input
+    // impedance, which is a first-order low-pass
+    struct Shelf
+    {
+        double b0 = 1, b1 = 0, a1 = 0, z = 0;
+        void set (double sampleRate, double lowHz, double highHz) noexcept;
+        void reset() noexcept { z = 0; }
+        float process (float x) noexcept
+        {
+            const double y = b0 * x + z;
+            z = b1 * x - a1 * y;
+            if (std::abs (z) < 1e-25) z = 0;
+            return (float) y;
+        }
+    };
+    Shelf fixShelf;
+    Biquad fixTop;
 
     // Goertzel accumulators for 50/60 Hz families
     double g50 = 0, g60 = 0, total = 0;
@@ -51,9 +67,9 @@ private:
 };
 
 // Listens to the raw input while you play and measures how much treble it has
-// (3 kHz band against the 250 Hz band). A passive pickup into a low-impedance
-// PC mic jack loses a lot of treble; setup compares this with a normal
-// instrument input to decide how much Input Fix you need.
+// (the 1.8 to 3.6 kHz band against the band around 250 Hz). A passive pickup
+// into a low-impedance PC mic jack loses a lot of treble; setup compares this
+// with a guitar on a proper instrument input to decide how much Input Fix you need.
 // process() runs on the audio thread; restart() and the readers are safe from any thread.
 class TiltProbe
 {
@@ -65,34 +81,59 @@ public:
     // high band minus low band in dB; only meaningful once secondsMeasured() > 1
     float tiltDb() const noexcept { return tilt.load(); }
 
-    // A passive pickup into an instrument (Hi-Z) input reads about this much
-    // (measured on the synthetic DI performance the tests use; 2 s stretches
-    // of it range about 3 dB either side).
-    static constexpr float referenceTiltDb = 4.5f;
-    // Input Fix amount (dB) that brings a measured tilt back to the reference.
-    static float fixAmountFor (float measuredTiltDb) noexcept;
+    // What a real electric guitar reads on an instrument (Hi-Z) input: three minutes
+    // of a clean recorded performance measured -14 dB, and ten-second stretches of it
+    // mostly -12 to -18.
+    static constexpr float referenceTiltDb = -14.0f;
+    static constexpr float kMostFixDb = 24.0f;
+    // Input Fix amount (dB) that brings a measured tilt back to the reference. Nothing
+    // is mended below `smallestLossDb`: 5 dB covers the spread between guitars, an input
+    // known to load a pickup (a PC mic jack) can be held to less.
+    static float fixAmountFor (float measuredTiltDb, float smallestLossDb = 5.0f) noexcept;
+    // How far that amount moves the reading (dB), for a pickup loaded the usual way.
+    static float tiltGainOf (float fixAmountDb) noexcept;
 
 private:
     double sr = 48000.0;
-    Biquad lowBand, highBand;
+    Biquad lowBand, highBand[4];
     double lowE = 0, highE = 0;
     std::atomic<bool> restartRequested { true };
     std::atomic<double> seconds { 0.0 };
     std::atomic<float> tilt { 0.0f };
 };
 
+// The threshold the player (or setup) chose is the least the gate asks for. On top of that
+// it follows the room: when what it hears has been the same steady hiss or hum for a good
+// second and a half, that is the noise floor, and the gate stays a little above it. So a
+// noisier evening, a guitar turned up or more Input Fix do not let hiss through, and
+// nobody has to run setup again for it. A ringing note fades and is never taken for noise.
 class NoiseGate
 {
 public:
+    static constexpr float kAboveFloorDb = 15.0f;   // threshold over the floor's level (its peaks sit about 10 dB up)
+    static constexpr float kHighestFollowDb = -36.0f; // following never asks for more than this: notes must still ring out
+
     void prepare (double sampleRate);
     void reset();
     void set (float thresholdDb, float releaseMs);
+    void setFollowsNoise (bool f) noexcept { follows = f; }
     void process (float* x, int n);
     bool isOpen() const noexcept { return open; }
+    float thresholdNowDb() const noexcept { return thrNowDb; }
+    float noiseFloorDb() const noexcept { return floorDb; } // -120 until one has been heard
 
 private:
+    void windowDone (float levelDb);
+    void applyThreshold();
+
     double sr = 48000.0;
     EnvelopeFollower env;
+    float userThrDb = -62.0f, thrNowDb = -62.0f, floorDb = -120.0f;
+    bool follows = true;
+    static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
+    float windows[kWindows] {};
+    int windowAt = 0, windowsHeard = 0, windowLength = 4800, windowFill = 0;
+    double windowPower = 0.0;
     float thrOpen = 0.001f, thrClose = 0.0005f;
     float gain = 0.0f, attackCoeff = 0.0f, releaseCoeff = 0.0f;
     int holdSamples = 0, holdCounter = 0;

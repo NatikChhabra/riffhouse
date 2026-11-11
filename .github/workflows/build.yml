@@ -45,8 +45,12 @@ jobs:
           if (-not (Test-Path (Join-Path $sdk "common\asio.h"))) { throw "ASIO SDK headers not found at $sdk" }
           "ASIO_SDK=$($sdk -replace '\\','/')" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      # A tag build carries the tag as its version ("0.1.0-rc2"), so a tester can say which copy they run.
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DRIFFHOUSE_ASIO_SDK_DIR="${{ env.ASIO_SDK }}"
+        shell: pwsh
+        run: |
+          $label = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME -replace '^v', '' } else { "" }
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DRIFFHOUSE_ASIO_SDK_DIR="${{ env.ASIO_SDK }}" "-DRIFFHOUSE_VERSION_LABEL=$label"
 
       - name: Build
         run: cmake --build build --config Release --parallel --target Riffhouse_Standalone Riffhouse_VST3 riffhouse_tests

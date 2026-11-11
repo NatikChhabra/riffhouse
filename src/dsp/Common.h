@@ -39,12 +39,18 @@ inline float undenorm (float x) noexcept { return std::abs (x) < 1.0e-20f ? 0.0f
 class Smoother
 {
 public:
+    // After prepare() the first target is where the value starts: there is nothing to glide from.
     void prepare (double sampleRate, float timeMs = 20.0f) noexcept
     {
         coeff = (float) std::exp (-1.0 / (0.001 * timeMs * sampleRate));
+        fresh = true;
     }
-    void reset (float v) noexcept { current = target = v; }
-    void setTarget (float v) noexcept { target = v; }
+    void reset (float v) noexcept { current = target = v; fresh = false; }
+    void setTarget (float v) noexcept
+    {
+        target = v;
+        if (fresh) { current = v; fresh = false; }
+    }
     float next() noexcept
     {
         current = target + (current - target) * coeff;
@@ -56,6 +62,7 @@ public:
 
 private:
     float current = 0.0f, target = 0.0f, coeff = 0.0f;
+    bool fresh = true;
 };
 
 // Topology-preserving one-pole filter (lowpass / highpass outputs).
@@ -269,7 +276,7 @@ private:
 class Lfo
 {
 public:
-    void prepare (double sampleRate) noexcept { sr = sampleRate; }
+    void prepare (double sampleRate) noexcept { sr = sampleRate; phase = 0.0f; }
     void setRate (float hz) noexcept { inc = (float) (hz / sr); }
     void setPhase (float p) noexcept { phase = p - std::floor (p); }
     float phaseValue() const noexcept { return phase; }

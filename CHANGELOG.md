@@ -8,13 +8,54 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+### Sounds right on a mic jack
+
+- Input Fix is rebuilt. A guitar plugged into a computer's mic jack loses most of its treble, over 20 dB at 3 kHz on the PC this was measured on, and heavy tones turned loud and harsh because the amp only got bass. The fix is now the exact opposite of that loss and goes up to 24 dB.
+- Setup has a new step: play as hard as you ever will for a few seconds. The input level is set from that and not from the first careful strums.
+- If you later play harder than you did in setup, the input level turns itself down and tells you.
+- The noise gate follows the room. When the hiss or hum gets louder, the gate moves up with it. A ringing note is never taken for noise.
+
+### Every tone equally loud
+
+- Auto level: a tone you load comes up as loud as the one before it, clean or heavy. Another amp or cabinet keeps the volume. A pedal you kick on may lift it a little, never a lot. A knob you turn still does what a knob does.
+- It measures with your own playing once it has heard you, and until then with a guitar phrase of its own. Switch it off under the output meter if you want the raw levels.
+
+### Setup that takes its time
+
+- Four steps instead of three, each with one clear instruction. After each step it stops for a moment and shows what it found.
+- The noise is measured only once the strings have really stopped.
+- Installs from an earlier version are offered one new run of setup.
+
+### Audio drivers
+
+- Fixed: switching the driver in the audio settings (to ASIO, for example) was undone a moment later, and the app went silent.
+- The audio settings are our own now. A driver you pick is tried first. If no sound comes through it, the last working choice comes back and the screen says why.
+- With no ASIO driver installed the screen says so, and says what to use.
+
+### In a DAW
+
+- New copies of the plugin start from the input settings the app's setup found.
+- A project that had a capture loaded but another amp selected came back with the capture selected. Fixed.
+- The keyboard stays with the DAW while the plugin window is open.
+- A host that sends bigger blocks than it announced no longer gets silence.
+- The delay reported to the host stays right when a capture is loaded or the amp changes.
+- Several copies in one project share their level measurements and do not all measure at once.
+- A short guide: [Riffhouse in your recording software](docs/DAW.md).
+
+### Also
+
+- The 29 pedals are modelled in 3D now, with real metal, paint and shadows. Knobs and lights still move live.
+- The exact version is shown in Settings and in the window title of test builds.
+- Settings has "Save a report for help": a text file with your audio settings and what setup measured, written into your recordings folder. Nothing is sent anywhere.
+- A saved tone no longer carries the name of your Windows account.
+
 ## 0.1.0
 
 The first version.
 
 ### What is in it
 
-- 11 amps, 9 speaker cabinets with a movable mic, and 29 pedals. Each one is its own piece of gear, drawn by the app.
+- 11 amps, 9 speaker cabinets with a movable mic, and 29 pedals. Each one is its own piece of gear.
 - 177 tones sorted by genre, with "Inspired by" tones for well-known players and songs.
 - Neural captures: any `.nam` file loads as the amp. Your own impulse response loads as the cabinet.
 - Setup by itself: it finds the input your guitar is on, picks the lowest delay your computer can hold, sets the level and the noise gate, and removes mains hum.

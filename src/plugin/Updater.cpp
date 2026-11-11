@@ -7,6 +7,7 @@ namespace rh
 namespace
 {
     const char* const kLatestRelease = "https://api.github.com/repos/NatikChhabra/riffhouse/releases/latest";
+    const char* const kAllReleases = "https://api.github.com/repos/NatikChhabra/riffhouse/releases?per_page=20";
     constexpr juce::int64 kMaxInstallerBytes = 400LL * 1024 * 1024;
     constexpr int kFirstCheckMs = 10000;
     constexpr int kRecheckMs = 6 * 60 * 60 * 1000;
@@ -157,7 +158,9 @@ void Updater::run()
     const bool asked = userAsked.load();
     set (State::checking);
     int status = 0;
-    const auto json = fetch (kLatestRelease, status);
+    // a test build follows the test releases too; a full release only ever follows full releases
+    const bool tester = isPreRelease (current);
+    const auto json = fetch (tester ? kAllReleases : kLatestRelease, status);
     if (threadShouldExit()) return;
     const auto answer = readCheckAnswer (status, json);
     if (answer == CheckAnswer::unreachable)
@@ -176,7 +179,7 @@ void Updater::run()
         return;
     }
 
-    const auto latest = parseRelease (json, kInstallerSuffix);
+    const auto latest = tester ? newestRelease (json, kInstallerSuffix) : parseRelease (json, kInstallerSuffix);
     { const juce::ScopedLock sl (lock); info = latest; }
     if (latest.version.isEmpty() || compareVersions (latest.version, current) <= 0)
     {
