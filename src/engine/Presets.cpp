@@ -6,8 +6,34 @@ namespace rh
 {
 juce::String Preset::searchText() const
 {
-    return (name + " " + category + " " + inspiredBy + " " + description + " " + genres.joinIntoString (" ") + " "
-            + tags.joinIntoString (" ")).toLowerCase();
+    return (name + " " + category + " " + inspiredBy + " " + band + " " + song + " " + description + " "
+            + genres.joinIntoString (" ") + " " + tags.joinIntoString (" ")).toLowerCase();
+}
+
+juce::String Preset::title() const
+{
+    if (inspiredBy.isNotEmpty() && name.startsWith ("Inspired by ") && name.contains (": "))
+        return name.fromFirstOccurrenceOf (": ", false, false);
+    return name;
+}
+
+juce::String Preset::part() const
+{
+    const auto whole = title();
+    if (song.isEmpty() || ! whole.startsWithIgnoreCase (song)) return whole;
+    return whole.substring (song.length()).trim();
+}
+
+juce::String Preset::credit() const
+{
+    // the band stands in front of the title already: what is left to say is the player, when that is
+    // someone else, and the song, when the title does not start with it
+    if (inspiredBy.isEmpty()) return {};
+    const auto who = inspiredBy != artist() ? inspiredBy : juce::String();
+    const bool namesSong = song.isNotEmpty() && ! title().startsWithIgnoreCase (song);
+    const auto quoted = juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x9c")) + song + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x9d"));
+    if (who.isNotEmpty()) return "Inspired by " + who + (namesSong ? " on " + quoted + ". " : juce::String (". "));
+    return namesSong ? "After " + quoted + ". " : juce::String();
 }
 
 bool presetFromJson (const juce::String& json, Preset& out, juce::String& error)
@@ -24,6 +50,8 @@ bool presetFromJson (const juce::String& json, Preset& out, juce::String& error)
     p.name = root.getProperty ("name", "Untitled").toString();
     p.category = root.getProperty ("category", "User").toString();
     p.inspiredBy = root.getProperty ("inspiredBy", "").toString();
+    p.band = root.getProperty ("band", "").toString();
+    p.song = root.getProperty ("song", "").toString();
     p.description = root.getProperty ("description", "").toString();
     p.author = root.getProperty ("author", "").toString();
     if (auto* g = root.getProperty ("genres", {}).getArray())
@@ -79,6 +107,8 @@ juce::String presetToJson (const Preset& p)
     obj->setProperty ("name", p.name);
     obj->setProperty ("category", p.category);
     if (p.inspiredBy.isNotEmpty()) obj->setProperty ("inspiredBy", p.inspiredBy);
+    if (p.band.isNotEmpty()) obj->setProperty ("band", p.band);
+    if (p.song.isNotEmpty()) obj->setProperty ("song", p.song);
     if (p.description.isNotEmpty()) obj->setProperty ("description", p.description);
     if (p.author.isNotEmpty()) obj->setProperty ("author", p.author);
     juce::Array<juce::var> genres;

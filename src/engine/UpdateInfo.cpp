@@ -70,6 +70,9 @@ bool isTrustedDownloadUrl (const juce::String& url)
         && ! url.containsAnyOf (" \r\n\"'<>\\");
 }
 
+// the one file every release carries once it is finished
+static const char* const kReleaseInstallerSuffix = "-windows-setup.exe";
+
 static ReleaseInfo readRelease (const juce::var& root, const juce::String& installerSuffix, bool allowPreRelease);
 
 ReleaseInfo parseRelease (const juce::String& json, const juce::String& installerSuffix, bool allowPreRelease)
@@ -99,6 +102,15 @@ static ReleaseInfo readRelease (const juce::var& root, const juce::String& insta
     if ((bool) obj->getProperty ("draft") || (! allowPreRelease && (bool) obj->getProperty ("prerelease"))) return info;
     const auto tag = obj->getProperty ("tag_name").toString().trim();
     if (tag.isEmpty() || ! tag.containsAnyOf ("0123456789")) return info;
+
+    // A release is published before its installer is built and attached. Until the installer is there
+    // the release is not out: offering it would send people to a page with nothing to download.
+    bool installerAttached = false;
+    if (auto* assets = obj->getProperty ("assets").getArray())
+        for (auto& a : *assets)
+            installerAttached = installerAttached || a["name"].toString().endsWithIgnoreCase (kReleaseInstallerSuffix);
+    if (! installerAttached) return info;
+
     info.version = tag.startsWithIgnoreCase ("v") ? tag.substring (1) : tag;
     info.pageUrl = obj->getProperty ("html_url").toString();
     info.notes = obj->getProperty ("body").toString();

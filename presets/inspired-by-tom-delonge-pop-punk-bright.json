@@ -5,6 +5,7 @@
     "Pop Punk"
   ],
   "inspiredBy": "Tom DeLonge",
+  "band": "blink-182",
   "description": "Bright, tight, doubled pop punk.",
   "params": {
     "amp_on": true,
@@ -28,6 +29,6 @@
     "gate_release": 80,
     "rev_on": false,
     "doubler": 7,
-    "out_level": -1.6
+    "out_level": -1.7
   }
 }

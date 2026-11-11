@@ -6,6 +6,7 @@
     "Grunge"
   ],
   "inspiredBy": "Billy Corgan",
+  "band": "The Smashing Pumpkins",
   "description": "Massive, saturated fuzz wall.",
   "params": {
     "amp_on": true,

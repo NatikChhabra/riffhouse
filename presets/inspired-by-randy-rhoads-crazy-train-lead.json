@@ -6,6 +6,8 @@
     "Neo-Classical"
   ],
   "inspiredBy": "Randy Rhoads",
+  "band": "Ozzy Osbourne",
+  "song": "Crazy Train",
   "description": "Boosted British lead with a hint of chorus.",
   "params": {
     "amp_on": true,

@@ -6,6 +6,7 @@
     "Pop"
   ],
   "inspiredBy": "Prince",
+  "song": "Purple Rain",
   "description": "Screaming, chorused lead with big reverb.",
   "params": {
     "amp_on": true,
@@ -50,6 +51,6 @@
     "gate_on": true,
     "gate_thresh": -60,
     "gate_release": 80,
-    "out_level": -1.6
+    "out_level": -1.7
   }
 }

@@ -190,6 +190,23 @@ jobs:
           $made = @(Get-ChildItem $screens -Recurse -Filter *.png | Where-Object { $_.Length -gt 2000 })
           "The app drew $($made.Count) pictures"
           if ($made.Count -lt 60) { throw "Expected at least 60 screens and gear pictures, got $($made.Count)" }
+          if (-not (Test-Path (Join-Path $screens 'rehearsed.txt'))) { throw "The end of a real setup was not gone through" }
+
+          # A real start with the clock running. The window has to keep answering, close when it
+          # is asked to, and leave its diary of what it did with the sound card.
+          $p = Start-Process $app -PassThru
+          $null = $p.Handle
+          Start-Sleep -Seconds 25
+          $p.Refresh()
+          if ($p.HasExited) { throw "The app closed by itself within 25 seconds, code $($p.ExitCode)" }
+          if (-not $p.Responding) { throw "The app's window does not answer 25 seconds after starting" }
+          $null = $p.CloseMainWindow()
+          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "The app did not close within 30 seconds of being asked" }
+          if ($p.ExitCode -ne 0) { throw "The app ended with code $($p.ExitCode)" }
+          $log = Join-Path $env:APPDATA 'Riffhouse\Riffhouse log.txt'
+          if (-not (Test-Path $log)) { throw "The app kept no log of its start" }
+          Get-Content $log -Tail 60
+          if (Select-String -Path $log -Pattern 'stopped answering|ended in a crash' -Quiet) { throw "The log says the window froze or the app crashed" }
 
           $remove = Join-Path (Split-Path $app) 'unins000.exe'
           if (-not (Test-Path $remove)) { throw "No uninstaller next to the app" }
@@ -214,11 +231,22 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      # The runner fetches packages from a mirror inside its own cloud first. When that mirror cannot be
+      # reached, apt waits on it for every single package (33 minutes on 11 November 2026, and a release
+      # waited with it). So: a short first try, then the same again from Ubuntu's own servers only.
       - name: Install build tools
+        timeout-minutes: 20
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build libasound2-dev libjack-jackd2-dev libfreetype-dev libfontconfig1-dev \
-            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libgl1-mesa-dev
+          packages="ninja-build libasound2-dev libjack-jackd2-dev libfreetype-dev libfontconfig1-dev
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev libgl1-mesa-dev"
+          apt="apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=120"
+          install() { sudo timeout "$1" $apt update && sudo timeout "$1" $apt install -y $packages; }
+          if ! install 180; then
+            echo "::warning::The runner's package mirror did not answer in 3 minutes. Using archive.ubuntu.com."
+            printf 'http://archive.ubuntu.com/ubuntu/\tpriority:1\nhttp://security.ubuntu.com/ubuntu/\tpriority:2\n' | sudo tee /etc/apt/apt-mirrors.txt
+            sudo dpkg --configure -a || true
+            install 600
+          fi
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build

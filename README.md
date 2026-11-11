@@ -2,24 +2,24 @@
 
 # Riffhouse
 
-**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 29 pedals, 9 speaker cabinets and 177 tones. All of it is free, with no account, no ads and no paid version.
+**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 29 pedals, 9 speaker cabinets and 188 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
 
 ### [Download for Windows](https://github.com/NatikChhabra/riffhouse/releases/latest)
 
-Version 0.1.1 is the first public release. More on the [website](https://natikchhabra.github.io/riffhouse/), or go straight to [help and fixes](docs/TROUBLESHOOTING.md) and [what changed](CHANGELOG.md).
+More on the [website](https://natikchhabra.github.io/riffhouse/), or go straight to [help and fixes](docs/TROUBLESHOOTING.md) and [what changed](CHANGELOG.md).
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
-## New in 0.1.1
+## New in 0.1.2
 
-- **You pick the input.** Setup opens with a list of every input on the computer. Choose the one your guitar is on, or leave it on "Find it for me" and strum.
-- **A choice you make stays.** A driver, input or buffer you pick by hand is tried, kept and remembered. If no sound comes through, the last working choice comes back and the screen says why.
-- **Sound follows your interface.** With the guitar on an audio interface, the sound comes out of the interface too, through its own ASIO driver when it has one.
-- **Heavy tones on a mic jack.** Input Fix measures the treble a mic jack takes away and puts it back, and Auto level brings every tone up as loud as the one before it.
-- **Help inside the app.** Settings has **Help and fixes**, and **Report a problem**, which gathers your audio settings and device names for whoever is helping you.
-- **It moves like hardware.** Switches slide, lamps warm up and die down, and the rig powers on piece by piece when setup is done. **Less motion** in Settings turns it down.
+- **Setup no longer closes the app.** 0.1.1 could close at the very end of setup and could stop answering when a sound card was slow. Both are fixed, and every build now runs the end of a real setup before it ships.
+- **Setup runs once.** It no longer opens at every start, and it no longer stutters while it listens.
+- **No driver to pick.** Choose where the guitar comes in and where the sound goes out. Riffhouse tries the fastest way that input has and moves to the next by itself if one will not start.
+- **Reports that explain themselves.** Riffhouse keeps a short diary of what it did with the sound card. **Report a problem** and **Save a report** in Settings include it, so a problem on your computer can be found without you knowing any of the words.
+- **Eleven new tones, 188 in all,** ten of them made after songs the first players asked for. Search finds tones by band and by song.
+- **Recordings explain themselves.** The folder with the bare guitar is now called "Clean guitar (for Change the tone)".
 
 The full list is in the [changelog](CHANGELOG.md).
 
@@ -63,7 +63,7 @@ Every amp, pedal and cabinet is its own piece of gear, with its own face and its
 - **11 amps**, from glassy cleans to tight metal, plus a bass amp and a direct channel.
 - **9 speaker cabinets** with a mic you can move across the cone, and a slot for your own impulse response.
 - **29 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
-- **177 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
+- **188 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
 - **Neural captures:** load any `.nam` file as the amp.
 - **Tuner** for any tuning, and a **metronome**.
 - **Undo and redo** for the whole tone, with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.
@@ -99,7 +99,7 @@ Every change runs more than 5,900 automatic checks on the sound engine before it
 | Amp oversampling | 8x below 64 kHz, 4x above |
 | Aliasing on a hot amp | 42.9 dB below the wanted harmonics |
 | Everything switched on | about 8x faster than real time on one core of a build server |
-| Loudness across all 177 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
+| Loudness across all 188 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
 
 ## What comes next
 

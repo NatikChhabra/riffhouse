@@ -15,19 +15,30 @@ namespace rh
 //   "name": "Sparkle Clean",
 //   "category": "Clean",
 //   "genres": ["Funk", "Neo-Soul"],
-//   "inspiredBy": "",
+//   "inspiredBy": "",            // a player or a band
+//   "band": "", "song": "",      // optional: the player's band, and the one song the tone is made after
 //   "description": "Glassy and bright.",
 //   "params": { "amp_model": "Glass Clean", "amp_gain": 3.5, "rev_on": true }
 // }
 struct Preset
 {
-    juce::String name, category, inspiredBy, description, author, file;
+    juce::String name, category, inspiredBy, band, song, description, author, file;
     juce::StringArray genres, tags;
     ParamValues values {};
     bool factory = false;
     bool favourite = false;
 
     juce::String searchText() const;
+    // Whose sound it is after, as a player looks for it: the band when there is one, else the player.
+    juce::String artist() const { return band.isNotEmpty() ? band : inspiredBy; }
+    // The name without "Inspired by <someone>: " in front, for places that show the artist beside it.
+    juce::String title() const;
+    // What is left of the title after the song it starts with ("Interlude", or nothing). The whole title when it
+    // does not start with the tone's song.
+    juce::String part() const;
+    // "Inspired by James Hetfield. ", "Inspired by David Gilmour on "Comfortably Numb". " or "":
+    // starts the line under the title, where the artist already stands in front of the title
+    juce::String credit() const;
 };
 
 // Parses a preset. Choice parameters accept either an index or the choice's name.

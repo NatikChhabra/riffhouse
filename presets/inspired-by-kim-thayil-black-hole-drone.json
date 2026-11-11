@@ -5,6 +5,8 @@
     "Grunge"
   ],
   "inspiredBy": "Kim Thayil",
+  "band": "Soundgarden",
+  "song": "Black Hole Sun",
   "description": "Fuzzy, droney, heavy grunge.",
   "params": {
     "amp_on": true,

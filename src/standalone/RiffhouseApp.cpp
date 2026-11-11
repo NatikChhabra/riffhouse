@@ -14,6 +14,7 @@
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 #include "../plugin/DeviceGuard.h"
+#include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
 #include "../plugin/Version.h"
@@ -127,6 +128,10 @@ public:
     void initialise (const juce::String& commandLine) override
     {
         auto* s = properties.getUserSettings();
+        // A diary of what happens with the sound card, kept beside the settings. Pictures of the
+        // app (--snapshots, --motion) leave no trace.
+        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+            devlog::start (s->getFile().getParentDirectory(), versionLabel());
         // The guitar must be heard. JUCE's default mutes the input to avoid
         // feedback; Riffhouse instead asks for headphones in the setup.
         s->setValue ("shouldMuteInput", false);
@@ -139,7 +144,8 @@ public:
         instance = this;
 
         // Keep the guitar connected through unplugging, sleep and device swaps.
-        guard = std::make_unique<DeviceGuard> (holder->deviceManager, *dynamic_cast<RiffhouseProcessor*> (holder->processor.get()));
+        auto& rig = *dynamic_cast<RiffhouseProcessor*> (holder->processor.get());
+        guard = std::make_unique<DeviceGuard> (holder->deviceManager, rig.blockCounter, rig.muteOutput);
         guard->onMessage = [this] (const juce::String& m) { if (auto* ed = editor()) ed->showToast (m); };
         guard->onNeedSetup = [this] { if (auto* ed = editor()) ed->showSetupWizard(); };
         startTimer (30000); // autosave: a crash or a power cut never costs more than half a minute of tweaking
@@ -158,6 +164,15 @@ public:
 
         // the window comes last: its settings screen asks for the guard and the updater
         window = std::make_unique<MainWindow> (*holder, *s);
+
+        // A run that crashed or froze says so once, and where to send what it wrote down.
+        if (const auto last = devlog::lastRun(); last == devlog::LastRun::crashed || last == devlog::LastRun::froze)
+            juce::Timer::callAfterDelay (5500, [this, last]
+            {
+                if (auto* ed = editor())
+                    ed->showToast (juce::String (last == devlog::LastRun::crashed ? "Riffhouse closed by itself last time. " : "Riffhouse froze last time. ")
+                                   + "Settings, Report a problem tells us why.");
+            });
 
         // riffhouse --snapshots <folder> [scale]: render every screen to PNG and quit
         auto args = juce::StringArray::fromTokens (commandLine, true);
@@ -180,7 +195,11 @@ public:
             juce::Timer::callAfterDelay (1500, [this, folder, scale]
             {
                 if (auto* ed = dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()))
+                {
                     ed->saveSnapshots (folder, scale > 0.0f ? scale : 1.0f);
+                    ed->rehearseSetup();
+                    folder.getChildFile ("rehearsed.txt").replaceWithText ("The end of a real setup ran through.\n");
+                }
                 systemRequestedQuit();
             });
         }
@@ -201,6 +220,7 @@ public:
             updates->launchInstaller (false);
         updates.reset();
         runLock.exit();
+        devlog::stop();
     }
 
     void systemRequestedQuit() override
@@ -230,6 +250,7 @@ public:
     {
         if (guard == nullptr) return;
         if (guard->state() == DeviceGuard::State::healthy) guard->dismissNotice();
+        else if (guard->state() == DeviceGuard::State::stalled || guard->gaveUp()) guard->retry();
         else if (auto* ed = editor()) ed->showSetupWizard();
     }
     void setupRunning (bool running) override

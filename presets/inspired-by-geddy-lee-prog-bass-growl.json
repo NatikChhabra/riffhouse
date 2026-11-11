@@ -6,6 +6,7 @@
     "Progressive Rock"
   ],
   "inspiredBy": "Geddy Lee",
+  "band": "Rush",
   "description": "Bright, growly, midrange-y bass.",
   "params": {
     "amp_on": true,

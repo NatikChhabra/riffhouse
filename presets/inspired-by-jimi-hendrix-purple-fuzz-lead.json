@@ -6,6 +6,7 @@
     "Classic Rock"
   ],
   "inspiredBy": "Jimi Hendrix",
+  "song": "Purple Haze",
   "description": "Fuzz into a cranked British stack with a swirling vibe.",
   "params": {
     "amp_on": true,

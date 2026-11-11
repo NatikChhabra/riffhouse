@@ -6,6 +6,8 @@
     "Post-Punk"
   ],
   "inspiredBy": "The Edge",
+  "band": "U2",
+  "song": "Where the Streets Have No Name",
   "description": "Chiming amp with dotted-eighth delay.",
   "params": {
     "amp_on": true,

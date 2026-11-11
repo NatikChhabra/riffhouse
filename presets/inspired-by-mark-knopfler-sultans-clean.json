@@ -6,6 +6,8 @@
     "Roots"
   ],
   "inspiredBy": "Mark Knopfler",
+  "band": "Dire Straits",
+  "song": "Sultans of Swing",
   "description": "Out-of-phase sparkle, compressed, a touch of delay.",
   "params": {
     "amp_on": true,
@@ -54,6 +56,6 @@
     "gate_on": true,
     "gate_thresh": -68,
     "gate_release": 80,
-    "out_level": -6.3
+    "out_level": -6.4
   }
 }

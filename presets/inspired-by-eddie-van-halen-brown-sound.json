@@ -6,6 +6,7 @@
     "80s"
   ],
   "inspiredBy": "Eddie Van Halen",
+  "band": "Van Halen",
   "description": "Hot, saggy British stack with a phaser.",
   "params": {
     "amp_on": true,

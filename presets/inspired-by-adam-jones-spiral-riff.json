@@ -6,6 +6,7 @@
     "Alternative Metal"
   ],
   "inspiredBy": "Adam Jones",
+  "band": "Tool",
   "description": "Thick, mid-heavy high gain with a phaser option.",
   "params": {
     "amp_on": true,

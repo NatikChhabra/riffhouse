@@ -6,6 +6,7 @@
     "Desert Rock"
   ],
   "inspiredBy": "Josh Homme",
+  "band": "Queens of the Stone Age",
   "description": "Midrangey, fuzzy, dry desert rock.",
   "params": {
     "amp_on": true,
@@ -37,6 +38,6 @@
     "gate_thresh": -58,
     "gate_release": 80,
     "rev_on": false,
-    "out_level": -5.3
+    "out_level": -5.4
   }
 }

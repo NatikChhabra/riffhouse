@@ -111,7 +111,11 @@ public:
             if (idx >= 0)
             {
                 const auto& pr = proc.presets().all()[(size_t) idx];
-                if (sub.isEmpty()) sub = pr.inspiredBy.isNotEmpty() ? "Inspired by " + pr.inspiredBy : pr.category;
+                // under the title: who it is after, with the band when the tone is named after a player
+                if (pr.inspiredBy.isNotEmpty())
+                    sub = "Inspired by " + pr.inspiredBy + (pr.band.isNotEmpty() && pr.band != pr.inspiredBy ? " (" + pr.band + ")" : juce::String());
+                else if (sub.isEmpty())
+                    sub = pr.category;
                 if (! pr.genres.isEmpty()) sub << ", " << pr.genres.joinIntoString (", ").toLowerCase();
             }
             else if (sub.isEmpty())
@@ -964,13 +968,13 @@ RiffhouseEditor::RiffhouseEditor (RiffhouseProcessor& p) : AudioProcessorEditor 
 
     if (auto* host = StandaloneHost::get())
     {
-        auto* dev = host->deviceManager().getCurrentAudioDevice();
-        const bool noInput = dev == nullptr || dev->getActiveInputChannels().isZero();
+        // Setup opens by itself once, on the first start. After that it is a button in Settings,
+        // and a missing input is a line at the bottom of the window, never a setup that comes back.
         const bool done = host->settings().getBoolValue ("setupDone", false);
         // a setup made by an older version is offered a new run, once
         const bool old = done && host->settings().getIntValue ("setupVersion", 1) < AutoSetup::kSetupVersion;
-        if (! done || noInput || old)
-            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this), again = done && ! noInput]
+        if (! done || old)
+            juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this), again = done]
                                              { if (safe != nullptr) safe->showSetupWizard (again); });
     }
     startTimerHz (30);
@@ -1048,7 +1052,14 @@ void RiffhouseEditor::watchInputLevel()
 
 void RiffhouseEditor::showSetupWizard (bool again)
 {
-    if (StandaloneHost::get() == nullptr || root->wizard != nullptr) return;
+    auto* host = StandaloneHost::get();
+    if (host == nullptr || root->wizard != nullptr) return;
+    if (again)
+    {
+        // offered once means once, whatever happens next
+        host->settings().setValue ("setupVersion", AutoSetup::kSetupVersion);
+        host->settings().saveIfNeeded();
+    }
     root->closeOverlays();
     root->wizard = std::make_unique<SetupWizard> (proc);
     root->addAndMakeVisible (*root->wizard);
@@ -1057,21 +1068,50 @@ void RiffhouseEditor::showSetupWizard (bool again)
     root->wizard->onFinished = [this]
     {
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this)]
-        {
-            if (safe == nullptr) return;
-            bool ranToTheEnd = false;
-            if (safe->root->wizard != nullptr)
-            {
-                ranToTheEnd = safe->root->wizard->ranToTheEnd;
-                motion::ghost (*safe->root->wizard, motion::ui);
-            }
-            safe->root->wizard.reset();
-            // the one staged moment in the app: setup is done, and the rig powers on
-            if (ranToTheEnd) safe->root->powerOn();
-            safe->root->repaint();
-        });
+                                         { if (safe != nullptr) safe->closeSetupWizard(); });
     };
     root->wizard->begin (again);
+}
+
+void RiffhouseEditor::closeSetupWizard()
+{
+    bool ranToTheEnd = false;
+    if (root->wizard != nullptr)
+    {
+        ranToTheEnd = root->wizard->ranToTheEnd;
+        motion::ghost (*root->wizard, motion::ui);
+    }
+    root->wizard.reset();
+    // the one staged moment in the app: setup is done, and the rig powers on
+    if (ranToTheEnd) root->powerOn();
+    root->repaint();
+}
+
+void RiffhouseEditor::rehearseSetup()
+{
+    if (StandaloneHost::get() == nullptr) return;
+    const bool wasFrozen = motion::still();
+    motion::freeze (false);
+    motion::freeClock();
+    for (const bool onInterface : { false, true })
+    {
+        showSetupWizard (false);
+        if (root->wizard == nullptr) break;
+        AutoSetup::Summary s;
+        s.deviceType = onInterface ? "ASIO" : "Windows Audio (Exclusive Mode)";
+        s.inputName = onInterface ? "Focusrite USB ASIO" : "Microphone (High Definition Audio)";
+        s.outputName = onInterface ? s.inputName : juce::String ("Speakers (High Definition Audio)");
+        s.bufferSize = 144; s.sampleRate = 48000.0; s.latencyMs = 9.3; s.exclusive = ! onInterface;
+        s.inputGainDb = 1.5f; s.inputFix = ! onInterface; s.inputFixDb = 21.0f; s.gateDb = -52.0f;
+        root->wizard->finishedWith (s);
+        (void) root->createComponentSnapshot (root->getLocalBounds(), true, 0.5f);
+        root->wizard->startPlaying(); // the setup behind the summary is gone from here on
+        (void) root->createComponentSnapshot (root->getLocalBounds(), true, 0.5f);
+        closeSetupWizard();           // which draws the card once more, to let it fade
+        motion::step();
+        (void) root->createComponentSnapshot (root->getLocalBounds(), true, 0.5f);
+    }
+    motion::freeze (wasFrozen);
 }
 
 namespace
@@ -1421,6 +1461,11 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     }
     r.toggleOverlay (r.browser);
     shoot ("browser");
+    r.browser.show ("Inspired By", {});
+    shoot ("browser-inspired");
+    r.browser.show ("All", "metallica");
+    shoot ("browser-band");
+    r.browser.show ("All", {});
     r.closeOverlays();
     r.toggleOverlay (r.tuner);
     shoot ("tuner-idle");
@@ -1505,12 +1550,12 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         r.removeChildComponent (&w);
     }
     {
-        // the audio settings on a PC with no ASIO driver, which is where people get lost
+        // the audio settings by hand: an input, an output, a delay and one switch
         AudioPicker a (proc);
         a.showExample();
         r.addAndMakeVisible (a);
         a.setCentrePosition (r.getLocalBounds().getCentre());
-        shoot ("audio-asio");
+        shoot ("audio-by-hand");
         r.removeChildComponent (&a);
     }
 

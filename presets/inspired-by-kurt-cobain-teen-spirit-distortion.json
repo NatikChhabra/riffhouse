@@ -5,6 +5,8 @@
     "Grunge"
   ],
   "inspiredBy": "Kurt Cobain",
+  "band": "Nirvana",
+  "song": "Smells Like Teen Spirit",
   "description": "Raw distortion pedal into a clean-ish amp.",
   "params": {
     "amp_on": true,

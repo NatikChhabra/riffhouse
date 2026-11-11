@@ -6,6 +6,7 @@
     "Arena Rock"
   ],
   "inspiredBy": "Matt Bellamy",
+  "band": "Muse",
   "description": "Synthy octave fuzz riff tone.",
   "params": {
     "amp_on": true,
@@ -37,6 +38,6 @@
     "gate_thresh": -56,
     "gate_release": 80,
     "rev_on": false,
-    "out_level": -3.1
+    "out_level": -3.2
   }
 }

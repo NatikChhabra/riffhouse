@@ -6,6 +6,7 @@
     "Progressive Metal"
   ],
   "inspiredBy": "Misha Mansoor",
+  "band": "Periphery",
   "description": "Boosted, tight and articulate down to drop G.",
   "params": {
     "amp_on": true,
@@ -34,6 +35,6 @@
     "gate_release": 35,
     "rev_on": false,
     "doubler": 7,
-    "out_level": -0.5
+    "out_level": -0.6
   }
 }

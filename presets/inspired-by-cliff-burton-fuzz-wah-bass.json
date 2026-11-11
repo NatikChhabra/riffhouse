@@ -6,6 +6,7 @@
     "Thrash"
   ],
   "inspiredBy": "Cliff Burton",
+  "band": "Metallica",
   "description": "Fuzzed bass with a wah, for lead bass lines.",
   "params": {
     "amp_on": true,

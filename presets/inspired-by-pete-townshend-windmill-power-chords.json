@@ -6,6 +6,7 @@
     "Mod"
   ],
   "inspiredBy": "Pete Townshend",
+  "band": "The Who",
   "description": "Loud, open British power chords.",
   "params": {
     "amp_on": true,

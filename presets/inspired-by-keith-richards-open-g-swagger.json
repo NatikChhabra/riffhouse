@@ -6,6 +6,7 @@
     "Classic Rock"
   ],
   "inspiredBy": "Keith Richards",
+  "band": "The Rolling Stones",
   "description": "Loose, raw tweed breakup.",
   "params": {
     "amp_on": true,

@@ -5,6 +5,7 @@
     "Hard Rock"
   ],
   "inspiredBy": "Slash",
+  "band": "Guns N' Roses",
   "description": "Hot-rod crunch with a cocked wah.",
   "params": {
     "amp_on": true,

@@ -6,6 +6,7 @@
     "Arena Rock"
   ],
   "inspiredBy": "Brian May",
+  "band": "Queen",
   "description": "Treble-boosted chime amp at full tilt.",
   "params": {
     "amp_on": true,
@@ -45,6 +46,6 @@
     "gate_on": true,
     "gate_thresh": -62,
     "gate_release": 80,
-    "out_level": -5.9
+    "out_level": -6.0
   }
 }

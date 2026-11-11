@@ -5,6 +5,7 @@
     "Indie Rock"
   ],
   "inspiredBy": "Alex Turner",
+  "band": "Arctic Monkeys",
   "description": "Gritty fuzz riffs, a little lo-fi.",
   "params": {
     "amp_on": true,

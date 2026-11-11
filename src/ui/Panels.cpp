@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "AudioPicker.h"
 #include "Panels.h"
+#include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
 #include "../plugin/Version.h"
@@ -665,7 +666,8 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
         juce::SystemClipboard::copyTextToClipboard (reportText());
         juce::URL ("https://github.com/NatikChhabra/riffhouse/issues/new")
             .withParameter ("title", "Problem: ")
-            .withParameter ("body", "What happened:\n\n\nWhat I expected:\n\n\nReport (press Ctrl+V here, Riffhouse put it on your clipboard):\n\n")
+            .withParameter ("body", "What happened:\n\n\nWhat I expected:\n\n\nReport (press Ctrl+V here, Riffhouse put it on your clipboard):\n\n\n\nRiffhouse "
+                                        + versionLabel() + " on " + juce::SystemStats::getOperatingSystemName())
             .launchInDefaultBrowser();
         if (onMessage) onMessage ("The report is on your clipboard. Paste it into the page that just opened.");
     };
@@ -876,6 +878,8 @@ juce::String SettingsView::reportText() const
     line ("Auto level", proc.value (P::autoLevel) > 0.5f ? db (proc.levels().trimDb()) + (proc.levels().hasPlayersPhrase() ? " (matched to your playing)" : " (house phrase)") : juce::String ("off"));
     for (const auto& s : paramSpecs())
         t << "  " << s.key << " = " << juce::String (proc.value (s.id), 2) << "\n";
+    // what the app did with the sound card lately, and how long each thing took
+    t << "\nWhat happened\n" << devlog::tail (120) << "\n";
     return t;
 }
 

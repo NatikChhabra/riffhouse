@@ -85,7 +85,7 @@ PresetBrowser::PresetBrowser (RiffhouseProcessor& p) : proc (p)
     categories = std::make_unique<Categories> (*this);
     addAndMakeVisible (*categories);
 
-    search.setTextToShowWhenEmpty ("Search tones, artists, genres", colours::textFaint);
+    search.setTextToShowWhenEmpty ("Search tones, bands, songs, genres", colours::textFaint);
     search.setFont (font (16.0f));
     search.setIndents (40, 0);
     search.setJustification (juce::Justification::centredLeft); // on the field's middle line, like the magnifier
@@ -131,14 +131,42 @@ void PresetBrowser::visibilityChanged()
     }
 }
 
+void PresetBrowser::show (const juce::String& group, const juce::String& words)
+{
+    category = group;
+    search.setText (words, false);
+    categories->update();
+    categories->repaint();
+    refreshList();
+}
+
 void PresetBrowser::refreshList()
 {
     results = proc.presets().search (search.getText(), category);
     if (category == "Inspired By")
     {
         const auto& all = proc.presets().all();
+        // by band, then by title: everything made after one band stands together
         std::stable_sort (results.begin(), results.end(), [&] (int a, int b)
-                          { return all[(size_t) a].inspiredBy.compareNatural (all[(size_t) b].inspiredBy) < 0; });
+                          {
+                              const auto& x = all[(size_t) a];
+                              const auto& y = all[(size_t) b];
+                              const int byArtist = x.artist().compareNatural (y.artist());
+                              return byArtist != 0 ? byArtist < 0 : x.title().compareNatural (y.title()) < 0;
+                          });
+    }
+    else if (search.getText().trim().isNotEmpty())
+    {
+        // words typed: the tones made after a song come first, since a song is what people type
+        const auto& all = proc.presets().all();
+        const auto rest = std::stable_partition (results.begin(), results.end(), [&] (int i) { return all[(size_t) i].song.isNotEmpty() && all[(size_t) i].part() != all[(size_t) i].title(); });
+        std::stable_sort (results.begin(), rest, [&] (int a, int b)
+                          {
+                              const auto& x = all[(size_t) a];
+                              const auto& y = all[(size_t) b];
+                              const int byArtist = x.artist().compareNatural (y.artist());
+                              return byArtist != 0 ? byArtist < 0 : x.title().compareNatural (y.title()) < 0;
+                          });
     }
     list.updateContent();
     ignoreSelection = true;
@@ -150,7 +178,11 @@ void PresetBrowser::refreshList()
         list.scrollToEnsureRowIsOnscreen (row);
     }
     else
+    {
+        // another group or other words: a new list starts at its top, not where the last one was left
         list.deselectAllRows();
+        list.getViewport()->setViewPosition (0, 0);
+    }
     ignoreSelection = false;
     list.repaint();
     repaint();
@@ -201,7 +233,7 @@ void PresetBrowser::paint (juce::Graphics& g)
         g.setFont (font (16.0f));
         g.setColour (colours::textDim);
         g.drawFittedText (category == "Favourites" ? "No favourites yet. Click the star next to a tone to keep it here."
-                                                   : "Nothing matches. Try fewer words, an artist, or a genre.",
+                                                   : "Nothing matches. Try fewer words, a band, a song or a genre.",
                           lr.withHeight (120), juce::Justification::centred, 2, 1.0f);
     }
 }
@@ -228,21 +260,44 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, 
     else strokeIcon (g, icons::star (false), starArea, colours::textFaint, 1.5f);
     content.removeFromRight (10);
 
-    // category tag
-    const int tw = (int) capsWidth (p.category, 11.0f, 0.12f) + 8;
-    drawCaps (g, p.category, content.removeFromRight (tw).toFloat(), 11.0f, colours::textDim, juce::Justification::centredRight, 0.12f);
+    // A tone made after someone says who in front of its title: the band, or the player when there is no band.
+    const auto artist = p.artist();
+
+    // the tag on the right: the category, or the genre for a tone made after someone (every one of those is "Inspired By")
+    const auto tag = artist.isNotEmpty() && ! p.genres.isEmpty() ? p.genres[0] : p.category;
+    const int tw = (int) capsWidth (tag, 11.0f, 0.12f) + 8;
+    drawCaps (g, tag, content.removeFromRight (tw).toFloat(), 11.0f, colours::textDim, juce::Justification::centredRight, 0.12f);
     content.removeFromRight (14);
 
-    g.setFont (font (16.0f, Weight::semibold));
+    auto top = content.removeFromTop (22);
     g.setColour (selected ? colours::accentHi : colours::text);
-    g.drawText (p.name, content.removeFromTop (22), juce::Justification::centredLeft, true);
-    juce::String sub;
-    if (p.inspiredBy.isNotEmpty()) sub << "Inspired by " << p.inspiredBy;
-    if (p.description.isNotEmpty()) sub << (sub.isEmpty() ? juce::String() : juce::String (". ")) << p.description;
+    if (artist.isNotEmpty())
+    {
+        // the artist carries the weight, the title follows in the plain cut: one glance says whose sound it is
+        const auto heavy = font (16.0f, Weight::semibold);
+        const int aw = std::min (top.getWidth(), (int) std::ceil (juce::GlyphArrangement::getStringWidth (heavy, artist)));
+        g.setFont (heavy);
+        g.drawText (artist, top.removeFromLeft (aw), juce::Justification::centredLeft, true);
+        top.removeFromLeft (10);
+        g.setFont (font (16.0f));
+        g.setColour ((selected ? colours::accentHi : colours::text).withAlpha (0.86f));
+        // a tone named after a song carries the song in quotation marks, the way song titles are written
+        const auto part = p.part();
+        const auto title = part != p.title() ? juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x9c")) + p.song + juce::String (juce::CharPointer_UTF8 ("\xe2\x80\x9d"))
+                                                   + (part.isNotEmpty() ? " " + part : juce::String())
+                                             : p.title();
+        g.drawText (title, top, juce::Justification::centredLeft, true);
+    }
+    else
+    {
+        g.setFont (font (16.0f, Weight::semibold));
+        g.drawText (p.name, top, juce::Justification::centredLeft, true);
+    }
+    juce::String sub = p.credit() + p.description;
     if (sub.isEmpty() && ! p.genres.isEmpty()) sub = p.genres.joinIntoString (", ");
-    if (! p.factory && p.author.isNotEmpty()) sub << ". By " << p.author;
+    if (! p.factory && p.author.isNotEmpty()) sub << (sub.endsWithChar ('.') ? " By " : ". By ") << p.author;
     g.setFont (font (13.5f));
-    g.setColour (p.inspiredBy.isNotEmpty() ? colours::accentHi.withAlpha (0.85f) : colours::textDim);
+    g.setColour (colours::textDim);
     g.drawText (sub, content, juce::Justification::centredLeft, true);
 }
 

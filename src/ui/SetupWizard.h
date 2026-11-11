@@ -29,6 +29,9 @@ public:
     // 0-3 the four steps, 4 the pause after the first, 5 the summary.
     // `moving`: get there from the example shown before, the way the real thing would.
     void showExample (int which, bool moving = false);
+    // For the checks: a setup that ran for real has just finished with this result.
+    void finishedWith (const AutoSetup::Summary&);
+    void startPlaying() { complete (true); } // what the summary's button does
     std::function<void()> onFinished;
     bool ranToTheEnd = false; // closed from the summary: setup really did its work
 
@@ -61,7 +64,9 @@ private:
     float pulse = 0.0f, shownProgress = 0.0f;
     bool offeredAgain = false, example = false;
     View exampleView;
-    AutoSetup::Summary exampleSummary;
+    // What the summary step shows. A copy: the setup that measured it is gone the moment
+    // "Start playing" is pressed, and the card is still drawn while it fades.
+    AutoSetup::Summary shownSummary;
     juce::String found[4]; // what each finished step found
     juce::StringArray inputsAtFailure; // what was plugged in when nothing was heard
     int ticksSinceScan = 0;

@@ -6,6 +6,7 @@
     "Garage Rock"
   ],
   "inspiredBy": "Dan Auerbach",
+  "band": "The Black Keys",
   "description": "Fuzzy, dirty blues rock.",
   "params": {
     "amp_on": true,
@@ -38,6 +39,6 @@
     "gate_on": true,
     "gate_thresh": -60,
     "gate_release": 80,
-    "out_level": -4.2
+    "out_level": -4.3
   }
 }

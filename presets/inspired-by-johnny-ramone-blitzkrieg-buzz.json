@@ -5,6 +5,8 @@
     "Punk"
   ],
   "inspiredBy": "Johnny Ramone",
+  "band": "Ramones",
+  "song": "Blitzkrieg Bop",
   "description": "Pure downstroke buzzsaw.",
   "params": {
     "amp_on": true,

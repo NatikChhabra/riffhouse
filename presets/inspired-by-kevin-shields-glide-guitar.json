@@ -5,6 +5,7 @@
     "Shoegaze"
   ],
   "inspiredBy": "Kevin Shields",
+  "band": "My Bloody Valentine",
   "description": "Fuzz, vibrato and a giant reverb wash.",
   "params": {
     "amp_on": true,

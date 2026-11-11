@@ -6,6 +6,7 @@
     "Hard Rock"
   ],
   "inspiredBy": "Jimmy Page",
+  "band": "Led Zeppelin",
   "description": "Treble-boosted British crunch.",
   "params": {
     "amp_on": true,

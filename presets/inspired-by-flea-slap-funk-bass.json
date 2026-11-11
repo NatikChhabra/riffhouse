@@ -6,6 +6,7 @@
     "Funk Rock"
   ],
   "inspiredBy": "Flea",
+  "band": "Red Hot Chili Peppers",
   "description": "Punchy, bright slap bass.",
   "params": {
     "amp_on": true,

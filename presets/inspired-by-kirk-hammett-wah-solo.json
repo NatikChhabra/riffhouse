@@ -6,6 +6,7 @@
     "Heavy Metal"
   ],
   "inspiredBy": "Kirk Hammett",
+  "band": "Metallica",
   "description": "Scooped high gain with an auto-wah for solos.",
   "params": {
     "amp_on": true,

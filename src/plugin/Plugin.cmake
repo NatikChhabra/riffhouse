@@ -53,7 +53,9 @@ target_sources(Riffhouse PRIVATE
     plugin/Tuner.cpp
     plugin/AutoSetup.cpp
     plugin/DeviceGuard.cpp
+    plugin/DeviceLog.cpp
     plugin/AudioSwitch.cpp
+    plugin/AudioOpen.cpp
     plugin/Updater.cpp
     plugin/LevelMatcher.cpp
     plugin/Version.cpp

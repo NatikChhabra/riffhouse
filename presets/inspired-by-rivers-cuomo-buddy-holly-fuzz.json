@@ -6,6 +6,8 @@
     "Power Pop"
   ],
   "inspiredBy": "Rivers Cuomo",
+  "band": "Weezer",
+  "song": "Buddy Holly",
   "description": "Thick, saturated power-pop fuzz.",
   "params": {
     "amp_on": true,

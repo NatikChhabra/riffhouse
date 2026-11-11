@@ -3,6 +3,7 @@
 #include "AudioSwitch.h"
 
 #include "AutoSetup.h"
+#include "DeviceLog.h"
 #include "../engine/DeviceNames.h"
 
 namespace rh
@@ -17,13 +18,39 @@ AudioSwitch::AudioSwitch (juce::AudioDeviceManager& d, RiffhouseProcessor& p) : 
 
 AudioSwitch::~AudioSwitch()
 {
-    if (isTimerRunning())
+    if (working)
     {
         // closed in the middle of a try: leave what worked, and let whoever is waiting know
         stopTimer();
         goBack();
         finish (false, {});
     }
+}
+
+bool AudioSwitch::isShared (const juce::String& type)
+{
+    return type != "ASIO" && type != "Windows Audio (Exclusive Mode)";
+}
+
+juce::StringArray AudioSwitch::modesFor (juce::AudioDeviceManager& dm, const juce::String& type, const juce::String& input, bool shared)
+{
+    juce::StringArray modes;
+    auto has = [&] (const juce::String& t)
+    {
+        for (auto* dt : dm.getAvailableDeviceTypes())
+            if (dt->getTypeName() == t) return dt->getDeviceNames (true).contains (input);
+        return false;
+    };
+    if (type == "ASIO") { modes.add ("ASIO"); return modes; }
+    if (type.startsWith ("Windows Audio") || type == "DirectSound")
+    {
+        // DirectSound comes last: it is the slowest, and the one that starts when nothing else does
+        for (auto* m : { "Windows Audio (Exclusive Mode)", "Windows Audio (Low Latency Mode)", "Windows Audio", "DirectSound" })
+            if ((! shared || isShared (m)) && has (m)) modes.add (m);
+        return modes;
+    }
+    modes.add (type); // other systems have one way in
+    return modes;
 }
 
 juce::String AudioSwitch::friendlyType (const juce::String& t)
@@ -57,41 +84,55 @@ juce::String AudioSwitch::running (juce::AudioDeviceManager& dm, const Riffhouse
 
 void AudioSwitch::apply (const AudioChoice& c, std::function<void (Result)> done)
 {
-    if (isTimerRunning()) return;
+    if (working) return;
+    working = true;
     want = c;
     onDone = std::move (done);
-    before = dm.createStateXml();
-    typeBefore = dm.getCurrentAudioDeviceType();
+    before = AudioOpen::running (dm);
+    tryIndex = 0;
+    sawNoInput = false;
+    tryNext();
+}
 
-    if (dm.getCurrentAudioDeviceType() != c.type)
-        dm.setCurrentAudioDeviceType (c.type, true);
-    juce::AudioDeviceManager::AudioDeviceSetup s;
-    dm.getAudioDeviceSetup (s);
-    s.inputDeviceName = c.input;
-    s.outputDeviceName = c.type == "ASIO" ? c.input : c.output;
-    s.useDefaultInputChannels = false;
-    s.inputChannels.clear();
-    s.inputChannels.setRange (0, 2, true);
-    s.useDefaultOutputChannels = true;
-    s.bufferSize = c.bufferSize;
-    const auto err = dm.setAudioDeviceSetup (s, true);
-    auto* dev = dm.getCurrentAudioDevice();
-    if (err.isNotEmpty() || dev == nullptr)
+void AudioSwitch::tryNext()
+{
+    while (tryIndex < want.types.size())
     {
-        goBack();
-        finish (false, c.input + " would not start" + (err.isNotEmpty() ? " (" + err.trim().upToFirstOccurrenceOf ("\n", false, false) + ")" : juce::String())
-                           + ". Riffhouse went back to " + friendlyType (typeBefore) + ".");
-        return;
+        const auto type = want.types[tryIndex];
+        juce::String output = type == "ASIO" ? want.input : want.output;
+        if (type != "ASIO")
+            for (auto* dt : dm.getAvailableDeviceTypes())
+                if (dt->getTypeName() == type)
+                {
+                    // the same output goes by another name under another kind of driver
+                    const auto outs = dt->getDeviceNames (false);
+                    if (! outs.contains (output))
+                    {
+                        const int idx = dt->getDefaultDeviceIndex (false);
+                        output = juce::isPositiveAndBelow (idx, outs.size()) ? outs[idx] : outs[0];
+                    }
+                }
+        // the buffer asked for belongs to the first mode; one tried in its place picks its own
+        const auto err = openExactly (dm, { type, want.input, output, tryIndex == 0 ? want.bufferSize : 0,
+                                            before.sampleRate > 0 ? before.sampleRate : 48000.0 });
+        auto* dev = dm.getCurrentAudioDevice();
+        if (err.isEmpty() && dev != nullptr && ! dev->getActiveInputChannels().isZero())
+        {
+            beatAtOpen = proc.blockCounter.load();
+            openedAt = juce::Time::getMillisecondCounterHiRes();
+            startTimer (100);
+            return;
+        }
+        if (err.isEmpty() && dev != nullptr) sawNoInput = true;
+        ++tryIndex;
     }
-    if (dev->getActiveInputChannels().isZero())
-    {
-        goBack();
-        finish (false, c.input + " has no input to plug a guitar into. Riffhouse went back to " + friendlyType (typeBefore) + ".");
-        return;
-    }
-    beatAtOpen = proc.blockCounter.load();
-    openedAt = juce::Time::getMillisecondCounterHiRes();
-    startTimer (100);
+    goBack();
+    finish (false, want.input + (sawNoInput ? " has no input to plug a guitar into. " : " would not start. ") + wentBackTo());
+}
+
+juce::String AudioSwitch::wentBackTo() const
+{
+    return before.valid() ? "Riffhouse went back to " + before.input + "." : juce::String ("Pick another input, or run the automatic setup.");
 }
 
 void AudioSwitch::timerCallback()
@@ -104,25 +145,25 @@ void AudioSwitch::timerCallback()
     }
     if (juce::Time::getMillisecondCounterHiRes() - openedAt < kProveMs) return;
     stopTimer();
+    devlog::note (want.input + " opened as " + want.types[tryIndex] + " but delivered no sound in " + juce::String ((int) kProveMs) + " ms");
+    ++tryIndex;
+    if (tryIndex < want.types.size()) { tryNext(); return; }
     goBack();
-    juce::String why = want.input + " opened but no sound came through it, so Riffhouse went back to " + friendlyType (typeBefore) + ".";
-    if (want.type == "ASIO" && AutoSetup::isAsioWrapper (want.input))
-        why << " It is a stand-in driver, not an audio interface's own. Exclusive mode is as fast and steadier.";
-    finish (false, why);
+    finish (false, want.input + " opened but no sound came through it. " + wentBackTo());
 }
 
 void AudioSwitch::goBack()
 {
-    dm.closeAudioDevice();
-    if (typeBefore.isNotEmpty() && dm.getCurrentAudioDeviceType() != typeBefore)
-        dm.setCurrentAudioDeviceType (typeBefore, true);
-    dm.initialise (2, 2, before.get(), true);
+    // what was running comes back; when nothing was, nothing is left half open
+    if (before.valid()) openExactly (dm, before);
+    else dm.closeAudioDevice();
 }
 
 void AudioSwitch::finish (bool ok, const juce::String& message)
 {
+    working = false;
     auto done = std::move (onDone);
     onDone = nullptr;
-    if (done) done ({ ok, message });
+    if (done) done ({ ok, message, tryIndex == 0 });
 }
 } // namespace rh

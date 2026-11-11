@@ -34,6 +34,11 @@ public:
     void openFile (const juce::File&);
 
     void showSetupWizard (bool again = false);
+    void closeSetupWizard();
+    // Goes through the end of a real setup with the clock running: the summary of a setup that
+    // measured something, "Start playing", the card fading while the rig powers on. The pictures
+    // of the app only ever showed a made-up summary, and the real one crashed in 0.1.1.
+    void rehearseSetup();
     void showToast (const juce::String&);
     void applyLook (ui::Look, bool reopenSettings);
 

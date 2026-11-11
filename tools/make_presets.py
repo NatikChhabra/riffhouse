@@ -70,19 +70,79 @@ def EQ(b100=0, b200=0, b400=0, b800=0, b1k6=0, b3k2=0, b6k4=0, level=0):
 def FIX(**kw):
     return dict(kw)
 
+# The band a player is known for, so a tone made after the player is also found under the band's name.
+BANDS = {
+    "Adam Jones": "Tool", "Alex Turner": "Arctic Monkeys", "Angus Young": "AC/DC", "Billie Joe Armstrong": "Green Day",
+    "Billy Corgan": "The Smashing Pumpkins", "Brian May": "Queen", "Chuck Schuldiner": "Death", "Cliff Burton": "Metallica",
+    "Dan Auerbach": "The Black Keys", "David Gilmour": "Pink Floyd", "Dimebag Darrell": "Pantera",
+    "Eddie Van Halen": "Van Halen", "Flea": "Red Hot Chili Peppers", "Geddy Lee": "Rush", "Jack White": "The White Stripes",
+    "James Hetfield": "Metallica", "Jerry Cantrell": "Alice in Chains", "Jimmy Page": "Led Zeppelin",
+    "Joe Duplantier": "Gojira", "John Frusciante": "Red Hot Chili Peppers", "Johnny Marr": "The Smiths",
+    "Johnny Ramone": "Ramones", "Jonny Greenwood": "Radiohead", "Josh Homme": "Queens of the Stone Age",
+    "Keith Richards": "The Rolling Stones", "Kerry King": "Slayer", "Kevin Parker": "Tame Impala",
+    "Kevin Shields": "My Bloody Valentine", "Kim Thayil": "Soundgarden", "Kirk Hammett": "Metallica",
+    "Kurt Cobain": "Nirvana", "Mark Knopfler": "Dire Straits", "Mark Speer": "Khruangbin", "Mark Tremonti": "Alter Bridge",
+    "Matt Bellamy": "Muse", "Max Cavalera": "Sepultura", "Mikael Akerfeldt": "Opeth", "Misha Mansoor": "Periphery",
+    "Nile Rodgers": "Chic", "Pete Townshend": "The Who", "Rahul Ram": "Indian Ocean", "Randy Rhoads": "Ozzy Osbourne",
+    "Rivers Cuomo": "Weezer", "Robert Smith": "The Cure", "Slash": "Guns N' Roses", "Steve Jones": "Sex Pistols",
+    "Synyster Gates": "Avenged Sevenfold", "The Edge": "U2", "Tim Henson": "Polyphia", "Tom DeLonge": "blink-182",
+    "Tom Morello": "Rage Against the Machine", "Tony Iommi": "Black Sabbath", "Tosin Abasi": "Animals as Leaders",
+    "Zakk Wylde": "Black Label Society",
+}
+
+# Tones made after one song say which song.
+SONGS = {
+    ("B.B. King", "Thrill Lead"): "The Thrill Is Gone",
+    ("Billie Joe Armstrong", "Basket Crunch"): "Basket Case",
+    ("David Gilmour", "Comfortably Lead"): "Comfortably Numb",
+    ("David Gilmour", "Shine On Clean"): "Shine On You Crazy Diamond",
+    ("Dimebag Darrell", "Cowboys Groove"): "Cowboys from Hell",
+    ("Jack White", "Seven Nation Fuzz"): "Seven Nation Army",
+    ("Jerry Cantrell", "Rooster Grind"): "Rooster",
+    ("Jimi Hendrix", "Little Wing Clean"): "Little Wing",
+    ("Jimi Hendrix", "Purple Fuzz Lead"): "Purple Haze",
+    ("John Mayer", "Gravity Clean"): "Gravity",
+    ("John Mayer", "Slow Dancing Clean"): "Slow Dancing in a Burning Room",
+    ("Johnny Ramone", "Blitzkrieg Buzz"): "Blitzkrieg Bop",
+    ("Kim Thayil", "Black Hole Drone"): "Black Hole Sun",
+    ("Kurt Cobain", "Come As You Are Clean"): "Come As You Are",
+    ("Kurt Cobain", "Teen Spirit Distortion"): "Smells Like Teen Spirit",
+    ("Mac DeMarco", "Salad Days Wobble"): "Salad Days",
+    ("Mark Knopfler", "Sultans Clean"): "Sultans of Swing",
+    ("Max Cavalera", "Roots Groove"): "Roots Bloody Roots",
+    ("Prince", "Purple Lead"): "Purple Rain",
+    ("Randy Rhoads", "Crazy Train Lead"): "Crazy Train",
+    ("Rivers Cuomo", "Buddy Holly Fuzz"): "Buddy Holly",
+    ("Slash", "Paradise Lead"): "Paradise City",
+    ("Stevie Ray Vaughan", "Texas Flood"): "Texas Flood",
+    ("The Edge", "Streets Delay"): "Where the Streets Have No Name",
+    ("The Local Train", "Aaoge Tum Kabhi Rock"): "Aaoge Tum Kabhi",
+    ("Tom Morello", "Killing Riff"): "Killing in the Name",
+}
+
 PRESETS = []
 
-def P(name, category, genres, desc, *parts, inspired="", out=0.0, double=0):
+def P(name, category, genres, desc, *parts, inspired="", band="", song="", out=0.0, double=0):
     params = {}
     for part in parts:
         params.update(part)
     if double:
         params["doubler"] = double
     params["out_level"] = out
-    PRESETS.append(dict(name=name, category=category, genres=genres, inspiredBy=inspired, description=desc, params=params))
+    preset = dict(name=name, category=category, genres=genres, inspiredBy=inspired)
+    if band: preset["band"] = band
+    if song: preset["song"] = song
+    preset.update(description=desc, params=params)
+    PRESETS.append(preset)
 
-def I(artist, title, category, genres, desc, *parts, **kw):
-    P(f"Inspired by {artist}: {title}", category, genres, desc, *parts, inspired=artist, **kw)
+def I(artist, title, category, genres, desc, *parts, band="", song="", **kw):
+    P(f"Inspired by {artist}: {title}", category, genres, desc, *parts, inspired=artist,
+      band=band or BANDS.get(artist, ""), song=song or SONGS.get((artist, title), ""), **kw)
+
+# A tone made after one song of a band. The song is the tone's title, with the part it is for when there are several.
+def S(band, song, part, genres, desc, *parts, **kw):
+    P(f"Inspired by {band}: {song}" + (f" {part}" if part else ""), "Inspired By", genres, desc, *parts,
+      inspired=band, band=band, song=song, **kw)
 
 # ---------------------------------------------------------------- Essentials
 P("First Light Clean", "Essentials", ["Pop", "Indie", "Worship"], "A clean, polished starting point. Strum and go.",
@@ -476,6 +536,31 @@ I("Rahul Ram", "Earthy Fusion Bass", "Inspired By", ["Bass", "Indian Fusion"], "
   A("Bass Station", 4, 6.5, 5.5, 4), C("1x15 Bass", 4, 2.5, 30, 6000), COMP(4, 5), NOREV(), G(-70))
 I("James Jamerson", "Motown Thump", "Inspired By", ["Bass", "Motown", "Soul"], "Deep, dark, thumpy old-school bass.",
   A("Bass Station", 3.5, 7, 5, 2.5), C("1x15 Bass", 4.5, 2.5, 30, 4500), COMP(4, 5), NOREV(), G(-72))
+
+
+# ---------------------------------------------------------------- Songs players asked for
+S("Metallica", "Master of Puppets", "", ["Thrash", "Heavy Metal"], "Fast, dry, scooped rhythm for downpicked eighths.",
+  A("Tight Metal", 7, 4.5, 4, 6.5, 6, 5.5), C("4x12 Modern", 2.5, 1.5), EQ(3, 0, -2, -5, -2, 2, 3), G(-54, 50), NOREV(), double=7)
+S("Metallica", "Master of Puppets", "Interlude", ["Thrash", "Heavy Metal"], "Clean arpeggios with chorus for the slow middle part.",
+  A("Glass Clean", 3.5, 5, 4.5, 6, 5.5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 3, 5, 5), REV("Hall", 5, 20, 5, 2.5), G(-70))
+S("Def Leppard", "Pour Some Sugar on Me", "", ["Hard Rock", "80s", "Arena Rock"], "Compressed, chorused, layered arena crunch.",
+  A("Brit 800", 6, 4.5, 6.5, 6.5, 6), C("4x12 Vintage", 2.5, 2, 90, 9000), COMP(6, 4), MOD("Chorus", 2.5, 4, 4), REV("Plate", 4, 20, 6, 2), G(-60), double=8)
+S("Iron Maiden", "Fear of the Dark", "", ["Heavy Metal", "NWOBHM"], "Mid-forward British gallop that also carries the twin leads.",
+  A("Brit 800", 7, 5, 7, 6, 5.5), C("4x12 Vintage", 3, 2), REV("Room", 3.5, 10, 5, 1.4), G(-60))
+S("Iron Maiden", "Fear of the Dark", "Intro", ["Heavy Metal", "NWOBHM"], "The quiet opening: clean, chorus and a long hall.",
+  A("Glass Clean", 3, 5, 5, 5.5, 5), C("2x12 American", 3.5, 2.5), MOD("Chorus", 2.5, 5, 5), DLY("Digital", 400, "Off", 2, 5, 1.5), REV("Hall", 5.5, 25, 5, 2.8), G(-70))
+S("Dream Theater", "Wither", "Lead", ["Progressive Metal", "Progressive Rock"], "Smooth, sustaining solo tone with delay and a hall.",
+  A("Hot Rod Lead", 7, 5, 6.5, 5.5, 5), C("4x12 Modern", 3.5, 2), D("Green Drive", 1, 5.5, 7), DLY("Digital", 440, "Off", 3, 5.5, 2.5), REV("Hall", 5, 25, 5, 2.2), G(-60))
+S("Dream Theater", "Wither", "Verse", ["Progressive Metal", "Progressive Rock"], "Glassy, chorused clean with a soft delay.",
+  A("Glass Clean", 3.5, 5, 5, 6, 5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 2, 4, 4.5), DLY("Digital", 440, "Off", 2.5, 5.5, 2), REV("Hall", 5, 25, 5.5, 2.6), G(-70))
+S("Guns N' Roses", "Sweet Child O' Mine", "", ["Hard Rock", "Classic Rock"], "Warm, round crunch for the opening riff. Use the neck pickup.",
+  A("Brit 800", 5.5, 5.5, 7, 5, 4.5), C("4x12 Vintage", 3.5, 2), DLY("Analog", 380, "Off", 2, 4.5, 1.2), REV("Room", 3.5, 10, 5, 1.6), G(-62))
+S("Guns N' Roses", "Sweet Child O' Mine", "Solo", ["Hard Rock", "Classic Rock"], "Singing neck-pickup lead. Switch the wah on for the second half of the solo.",
+  A("Hot Rod Lead", 7, 5.5, 7, 5.5, 5), C("4x12 Vintage", 3.5, 2), WAH("Auto", 5, 6.5, 5.5), FIX(wah_on=False), DLY("Analog", 400, "Off", 2.5, 4.5, 1.8), REV("Room", 3.5, 10, 5, 1.5), G(-60))
+S("Avenged Sevenfold", "Nightmare", "", ["Heavy Metal", "Metalcore"], "Thick, tight rhythm. The song is in drop D.",
+  A("Modern High Gain", 7, 6, 4.5, 6.5, 6.5, 6.5), C("4x12 Modern", 2.5, 1.5), D("Green Drive", 1, 6, 7), G(-54, 50), NOREV(), double=7)
+P("Big Fuzz Wall", "Rock", ["Alternative", "Shoegaze", "Stoner Rock"], "The Big Fuzz pedal into a loud, nearly clean stack. Thick and endless.",
+  A("Brit Plexi", 3.5, 5.5, 5.5, 5, 4.5), C("4x12 Vintage", 3.5, 2), D("Big Fuzz", 7.5, 5, 5), REV("Room", 3, 8, 5, 1.2), G(-58))
 
 
 def slug(name):

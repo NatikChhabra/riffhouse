@@ -6,6 +6,8 @@
     "Alternative Metal"
   ],
   "inspiredBy": "Jerry Cantrell",
+  "band": "Alice in Chains",
+  "song": "Rooster",
   "description": "Thick, sludgy, mid-heavy grunge.",
   "params": {
     "amp_on": true,

@@ -4,6 +4,7 @@
 
 #include "../engine/InputGuard.h"
 #include "AudioSwitch.h"
+#include "DeviceLog.h"
 
 namespace rh
 {
@@ -101,8 +102,10 @@ void AutoSetup::pauseThen (const juce::String& found, std::function<void()> next
 std::vector<AutoSetup::Candidate> AutoSetup::findCandidates (juce::AudioDeviceManager& dm)
 {
     std::vector<Candidate> candidates;
+    // Windows Audio hears about plugging and unplugging by itself, and asking it again takes
+    // long on a computer with many sound devices. The others are quick to ask.
     for (auto* t : dm.getAvailableDeviceTypes())
-        t->scanForDevices();
+        if (! t->getTypeName().startsWith ("Windows Audio")) t->scanForDevices();
 
    #if JUCE_WINDOWS
     if (auto* asio = findType (dm, "ASIO"))
@@ -152,8 +155,8 @@ void AutoSetup::buildCandidates()
 void AutoSetup::start (const Input* only)
 {
     stopTimer();
-    originalState = dm.createStateXml();
-    originalType = dm.getCurrentAudioDeviceType();
+    original = AudioOpen::running (dm);
+    devlog::note ("Setup started" + (only != nullptr ? " on " + only->type + " / " + only->name : juce::String (", finding the input")));
     result = {};
     best = {};
     afterPause = nullptr;
@@ -191,8 +194,10 @@ void AutoSetup::cancel()
     afterPause = nullptr;
     if (currentPhase != Phase::finished && currentPhase != Phase::idle)
     {
-        if (originalType.isNotEmpty()) dm.setCurrentAudioDeviceType (originalType, true);
-        dm.initialise (2, 2, originalState.get(), true);
+        // what was running before setup comes back; when nothing was, nothing is left half open
+        devlog::note ("Setup cancelled");
+        if (original.valid()) openExactly (dm, original);
+        else dm.closeAudioDevice();
     }
     proc.muteOutput.store (false);
     currentPhase = Phase::idle;
@@ -210,17 +215,9 @@ juce::String AutoSetup::outputFor (const Candidate& c, juce::AudioIODeviceType* 
 bool AutoSetup::openCandidate (const Candidate& c)
 {
     proc.tiltProbe().restart(); // a new input: measure its tone from scratch
-    if (dm.getCurrentAudioDeviceType() != c.type)
-        dm.setCurrentAudioDeviceType (c.type, true);
     juce::AudioDeviceManager::AudioDeviceSetup s;
     dm.getAudioDeviceSetup (s);
-    s.inputDeviceName = c.name;
-    s.outputDeviceName = outputFor (c, findType (dm, c.type), s.outputDeviceName);
-    s.useDefaultInputChannels = false;
-    s.inputChannels.clear();
-    s.inputChannels.setRange (0, 2, true);
-    s.useDefaultOutputChannels = true;
-    const auto err = dm.setAudioDeviceSetup (s, true);
+    const auto err = openExactly (dm, { c.type, c.name, outputFor (c, findType (dm, c.type), s.outputDeviceName), 0, 0.0 });
     detailText = "Listening on " + c.name;
     dwellStart = nowMs();
     dwellPeak = 0.0f;
@@ -429,34 +426,20 @@ void AutoSetup::beginTuning()
 
 bool AutoSetup::openMode (const juce::String& type, int bufferSize)
 {
-    if (dm.getCurrentAudioDeviceType() != type)
-        dm.setCurrentAudioDeviceType (type, true);
     auto* t = findType (dm, type);
     if (t == nullptr) return false;
     juce::AudioDeviceManager::AudioDeviceSetup s;
     dm.getAudioDeviceSetup (s);
-    s.inputDeviceName = chosen.name;
-    s.outputDeviceName = outputFor ({ type, chosen.name }, t, s.outputDeviceName);
-    s.useDefaultInputChannels = false;
-    s.inputChannels.clear();
-    s.inputChannels.setRange (0, 2, true);
-    s.useDefaultOutputChannels = true;
-    s.bufferSize = bufferSize;
-    s.sampleRate = 0;
-    if (auto* dev = dm.getCurrentAudioDevice())
-    {
-        const auto rates = dev->getAvailableSampleRates();
-        if (rates.contains (48000.0)) s.sampleRate = 48000.0;
-        else if (rates.contains (44100.0)) s.sampleRate = 44100.0;
-    }
-    auto err = dm.setAudioDeviceSetup (s, true);
+    // 48 kHz when the device has it, otherwise the rate it already runs at
+    AudioOpen o { type, chosen.name, outputFor ({ type, chosen.name }, t, s.outputDeviceName), bufferSize, 48000.0 };
+    auto err = openExactly (dm, o);
     auto* dev = dm.getCurrentAudioDevice();
     if ((err.isNotEmpty() || dev == nullptr) && bufferSize == 0 && followOutput.isNotEmpty() && type != "ASIO")
     {
         // the interface's output would not open alongside its input: stay on the output that was playing
         followOutput = {};
-        s.outputDeviceName = defaultOutputFor (t);
-        err = dm.setAudioDeviceSetup (s, true);
+        o.output = defaultOutputFor (t);
+        err = openExactly (dm, o);
         dev = dm.getCurrentAudioDevice();
     }
     lastOpenFailed = err.isNotEmpty() || dev == nullptr;
@@ -630,6 +613,10 @@ void AutoSetup::finish()
     proc.setValue (P::gateThresh, gate);
     proc.rememberSetup(); // new copies of the plugin in a DAW start from this
     proc.muteOutput.store (false);
+    devlog::note ("Setup finished: " + result.deviceType + " / " + result.inputName + " -> " + result.outputName + ", "
+                  + juce::String (result.bufferSize) + " samples at " + juce::String (result.sampleRate, 0) + " Hz, "
+                  + juce::String (result.latencyMs, 1) + " ms, input " + juce::String (result.inputGainDb, 1) + " dB, fix "
+                  + juce::String (result.inputFix ? result.inputFixDb : 0.0f, 1) + " dB, gate " + juce::String (result.gateDb, 0) + " dB");
     setPhase (Phase::finished);
 }
 } // namespace rh

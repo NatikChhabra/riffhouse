@@ -6,6 +6,7 @@
     "Instrumental"
   ],
   "inspiredBy": "Tim Henson",
+  "band": "Polyphia",
   "description": "Bright, squashed, chorused clean.",
   "params": {
     "amp_on": true,
@@ -44,6 +45,6 @@
     "gate_thresh": -70,
     "gate_release": 80,
     "doubler": 4,
-    "out_level": -1.0
+    "out_level": -1.1
   }
 }

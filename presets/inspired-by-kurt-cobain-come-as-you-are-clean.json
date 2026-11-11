@@ -5,6 +5,8 @@
     "Grunge"
   ],
   "inspiredBy": "Kurt Cobain",
+  "band": "Nirvana",
+  "song": "Come As You Are",
   "description": "Watery chorus clean.",
   "params": {
     "amp_on": true,

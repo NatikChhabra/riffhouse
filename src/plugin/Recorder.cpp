@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Recorder.h"
+#include "Takes.h"
 
 namespace rh
 {
@@ -47,8 +48,9 @@ bool Recorder::start (const juce::File& folder, double sampleRate, bool alsoSave
     if (alsoSaveDi)
     {
         // the clean guitar goes in a subfolder so the main folder stays tidy
-        folder.getChildFile ("DI").createDirectory();
-        d = makeWriter (folder.getChildFile ("DI").getChildFile (base + " (DI).wav"), 1);
+        const auto clean = cleanGuitarFile (folder, base);
+        clean.getParentDirectory().createDirectory();
+        d = makeWriter (clean, 1);
     }
 
     {

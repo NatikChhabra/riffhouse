@@ -6,6 +6,8 @@
     "Punk"
   ],
   "inspiredBy": "Billie Joe Armstrong",
+  "band": "Green Day",
+  "song": "Basket Case",
   "description": "Hot, crunchy British punk rhythm.",
   "params": {
     "amp_on": true,

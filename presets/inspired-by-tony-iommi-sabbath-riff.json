@@ -6,6 +6,7 @@
     "Doom"
   ],
   "inspiredBy": "Tony Iommi",
+  "band": "Black Sabbath",
   "description": "Treble booster into a cranked British head. Tune down.",
   "params": {
     "amp_on": true,

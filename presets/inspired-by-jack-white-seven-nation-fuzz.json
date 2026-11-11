@@ -6,6 +6,8 @@
     "Blues Rock"
   ],
   "inspiredBy": "Jack White",
+  "band": "The White Stripes",
+  "song": "Seven Nation Army",
   "description": "Gnarly fuzz plus an octave down for the riff.",
   "params": {
     "amp_on": true,

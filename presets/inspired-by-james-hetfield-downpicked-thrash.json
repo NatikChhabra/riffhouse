@@ -6,6 +6,7 @@
     "Heavy Metal"
   ],
   "inspiredBy": "James Hetfield",
+  "band": "Metallica",
   "description": "Scooped, tight, crushing rhythm.",
   "params": {
     "amp_on": true,
@@ -34,6 +35,6 @@
     "gate_release": 50,
     "rev_on": false,
     "doubler": 7,
-    "out_level": 0.9
+    "out_level": 0.8
   }
 }

@@ -6,6 +6,7 @@
     "Funk"
   ],
   "inspiredBy": "Nile Rodgers",
+  "band": "Chic",
   "description": "Bright, compressed, ultra-clean rhythm.",
   "params": {
     "amp_on": true,
@@ -38,6 +39,6 @@
     "gate_on": true,
     "gate_thresh": -70,
     "gate_release": 80,
-    "out_level": -3.5
+    "out_level": -3.4
   }
 }

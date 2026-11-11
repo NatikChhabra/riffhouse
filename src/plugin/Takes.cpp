@@ -17,6 +17,19 @@ juce::String originalBase (const juce::String& base)
 }
 } // namespace
 
+juce::File cleanGuitarFile (const juce::File& folder, const juce::String& base)
+{
+    return folder.getChildFile ("Clean guitar (for Change the tone)").getChildFile (base + " (clean guitar).wav");
+}
+
+juce::File findCleanGuitar (const juce::File& folder, const juce::String& base)
+{
+    const auto now = cleanGuitarFile (folder, base);
+    if (now.existsAsFile()) return now;
+    const auto old = folder.getChildFile ("DI").getChildFile (base + " (DI).wav");
+    return old.existsAsFile() ? old : now;
+}
+
 std::vector<Take> listTakes (const juce::File& folder)
 {
     std::vector<Take> takes;
@@ -28,7 +41,7 @@ std::vector<Take> listTakes (const juce::File& folder)
         t.sound = f;
         const auto base = f.getFileNameWithoutExtension();
         const auto first = originalBase (base);
-        t.clean = folder.getChildFile ("DI").getChildFile (first + " (DI).wav");
+        t.clean = findCleanGuitar (folder, first);
         // "2026-11-11 21-04-33 Tone name": the stamp is 19 characters
         const bool stamped = first.length() > 19 && first[4] == '-' && first[10] == ' ' && first[13] == '-';
         t.name = base.contains (reampMark) ? base.fromFirstOccurrenceOf (reampMark, false, false)

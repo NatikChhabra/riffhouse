@@ -28,7 +28,9 @@ juce::StringArray SetupWizard::scanInputs() const
     if (auto* h = StandaloneHost::get())
         for (auto* t : h->deviceManager().getAvailableDeviceTypes())
         {
-            t->scanForDevices();
+            // Windows Audio hears about a new input by itself; asking it again and again only
+            // keeps the window waiting. The others are quick to ask.
+            if (! t->getTypeName().startsWith ("Windows Audio")) t->scanForDevices();
             for (auto& n : t->getDeviceNames (true)) names.addIfNotAlreadyThere (n);
         }
     return names;
@@ -65,6 +67,7 @@ void SetupWizard::startSetup()
         shownProgress = setup->pausing() ? 1.0f : 0.0f;
         if (setup->phase() == AutoSetup::Phase::finished)
         {
+            shownSummary = setup->summary();
             go (Step::done);
             if (auto* h = StandaloneHost::get())
             {
@@ -139,9 +142,9 @@ void SetupWizard::showExample (int which, bool moving)
     const juce::String input = "Microphone (High Definition Audio)";
     if (which >= 5)
     {
-        exampleSummary.inputName = input;
-        exampleSummary.latencyMs = 9.3; exampleSummary.bufferSize = 144; exampleSummary.exclusive = true;
-        exampleSummary.inputGainDb = 1.5f; exampleSummary.inputFix = true; exampleSummary.inputFixDb = 21.0f; exampleSummary.gateDb = -52.0f;
+        shownSummary.inputName = input;
+        shownSummary.latencyMs = 9.3; shownSummary.bufferSize = 144; shownSummary.exclusive = true;
+        shownSummary.inputGainDb = 1.5f; shownSummary.inputFix = true; shownSummary.inputFixDb = 21.0f; shownSummary.gateDb = -52.0f;
         if (moving) go (Step::done); else step = Step::done;
     }
     else
@@ -167,6 +170,14 @@ void SetupWizard::showExample (int which, bool moving)
         lastTitle = {};
         doneAt = -1.0e12;
     }
+    layoutButtons();
+    repaint();
+}
+
+void SetupWizard::finishedWith (const AutoSetup::Summary& s)
+{
+    shownSummary = s;
+    go (Step::done);
     layoutButtons();
     repaint();
 }
@@ -359,7 +370,10 @@ void SetupWizard::timerCallback()
         inputsAtFailure = now;
         if (fresh) { startSetup(); return; }
     }
-    repaint();
+    // Only what moves by itself is drawn again: the bar, the line under it and the four steps.
+    // Drawing the whole window thirty times a second made setup stutter on big screens.
+    if (step == Step::running)
+        repaint (cardBounds().reduced (48, 40).withTrimmedTop (146).withHeight (204));
 }
 
 void SetupWizard::paint (juce::Graphics& g)
@@ -592,7 +606,7 @@ void SetupWizard::paint (juce::Graphics& g)
         }
         case Step::done:
         {
-            const auto& s = example ? exampleSummary : setup->summary();
+            const auto& s = shownSummary;
             title ("You're all set");
             body ("Here's what Riffhouse set up. You can change any of it later in Settings.", 30);
             r.removeFromTop (10);
@@ -615,6 +629,8 @@ void SetupWizard::paint (juce::Graphics& g)
                 bullet (false, "This input hisses, so a little of the Input Fix was held back.");
             else if (s.latencyMs >= 15.0)
                 bullet (false, "Delay is a bit high. Closing other audio apps can help.");
+            else if (! AutoSetup::looksLikeOnboardInput (s.inputName, s.deviceType))
+                bullet (false, "Hearing the guitar twice? Switch off Direct Monitor on your interface.");
             else if (s.exclusive)
                 bullet (false, "Other apps' sound pauses while Riffhouse is open. Use Play along for songs.");
             break;

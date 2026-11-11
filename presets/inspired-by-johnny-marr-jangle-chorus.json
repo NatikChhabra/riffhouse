@@ -6,6 +6,7 @@
     "Post-Punk"
   ],
   "inspiredBy": "Johnny Marr",
+  "band": "The Smiths",
   "description": "Sparkling, chorused arpeggios.",
   "params": {
     "amp_on": true,
@@ -44,6 +45,6 @@
     "gate_thresh": -68,
     "gate_release": 80,
     "doubler": 4,
-    "out_level": -3.2
+    "out_level": -3.1
   }
 }

@@ -6,6 +6,7 @@
     "Alternative"
   ],
   "inspiredBy": "The Local Train",
+  "song": "Aaoge Tum Kabhi",
   "description": "Warm Hindi alt-rock crunch with delay.",
   "params": {
     "amp_on": true,
@@ -40,6 +41,6 @@
     "gate_on": true,
     "gate_thresh": -62,
     "gate_release": 80,
-    "out_level": -2.1
+    "out_level": -2.2
   }
 }

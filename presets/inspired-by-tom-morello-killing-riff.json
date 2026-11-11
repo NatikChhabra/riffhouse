@@ -6,6 +6,8 @@
     "Alternative"
   ],
   "inspiredBy": "Tom Morello",
+  "band": "Rage Against the Machine",
+  "song": "Killing in the Name",
   "description": "Tight British crunch plus an octave-up pitch effect.",
   "params": {
     "amp_on": true,

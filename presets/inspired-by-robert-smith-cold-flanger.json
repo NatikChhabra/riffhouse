@@ -7,6 +7,7 @@
     "New Wave"
   ],
   "inspiredBy": "Robert Smith",
+  "band": "The Cure",
   "description": "Icy chorus-flange clean with a hall.",
   "params": {
     "amp_on": true,
@@ -39,6 +40,6 @@
     "gate_on": true,
     "gate_thresh": -68,
     "gate_release": 80,
-    "out_level": -1.7
+    "out_level": -1.8
   }
 }

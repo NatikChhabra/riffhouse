@@ -6,6 +6,7 @@
     "Fusion"
   ],
   "inspiredBy": "Tosin Abasi",
+  "band": "Animals as Leaders",
   "description": "Pristine, compressed clean with delay for tapping.",
   "params": {
     "amp_on": true,
@@ -45,6 +46,6 @@
     "gate_on": true,
     "gate_thresh": -70,
     "gate_release": 80,
-    "out_level": -2.4
+    "out_level": -2.5
   }
 }

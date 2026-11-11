@@ -5,6 +5,8 @@
     "Hard Rock"
   ],
   "inspiredBy": "Slash",
+  "band": "Guns N' Roses",
+  "song": "Paradise City",
   "description": "Warm, mid-heavy hot-rod lead.",
   "params": {
     "amp_on": true,

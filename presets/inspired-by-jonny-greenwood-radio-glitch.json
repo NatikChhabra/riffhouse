@@ -6,6 +6,7 @@
     "Art Rock"
   ],
   "inspiredBy": "Jonny Greenwood",
+  "band": "Radiohead",
   "description": "Spiky, glitchy, lo-fi attack.",
   "params": {
     "amp_on": true,

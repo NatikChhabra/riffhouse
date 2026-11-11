@@ -6,6 +6,7 @@
     "Alternative"
   ],
   "inspiredBy": "John Frusciante",
+  "band": "Red Hot Chili Peppers",
   "description": "Big fuzz lead with tape echo.",
   "params": {
     "amp_on": true,

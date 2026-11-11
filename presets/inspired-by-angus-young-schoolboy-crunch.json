@@ -5,6 +5,7 @@
     "Hard Rock"
   ],
   "inspiredBy": "Angus Young",
+  "band": "AC/DC",
   "description": "Less gain than you think, all attitude.",
   "params": {
     "amp_on": true,

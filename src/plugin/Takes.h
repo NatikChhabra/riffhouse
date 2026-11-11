@@ -24,6 +24,12 @@ struct Take
 // Newest first.
 std::vector<Take> listTakes (const juce::File& folder);
 
+// Where a take's clean guitar is written: a folder whose name says what it is for, so nobody
+// takes it for a second copy of the take. `base` is the take's file name without ".wav".
+juce::File cleanGuitarFile (const juce::File& folder, const juce::String& base);
+// The same, for reading: takes made before 0.1.2 keep theirs in a folder called "DI".
+juce::File findCleanGuitar (const juce::File& folder, const juce::String& base);
+
 // Plays a take back inside the app. Two ways: the sound as recorded, or the
 // clean guitar fed into the rig in place of the live input, so the tone can be
 // changed after the fact while it plays.

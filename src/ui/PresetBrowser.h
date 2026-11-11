@@ -21,6 +21,8 @@ public:
     void visibilityChanged() override;
     bool keyPressed (const juce::KeyPress&) override;
     void refreshList();
+    // opens on one group with words already in the search field (the pictures of the browser use it)
+    void show (const juce::String& group, const juce::String& words);
     std::function<void()> onClose, onLoaded;
     std::function<void (juce::String)> onMessage;
 

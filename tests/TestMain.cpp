@@ -33,6 +33,8 @@
 
 using namespace rh;
 
+namespace rh::test { void runDeviceChecks (int& checks, int& failures); } // TestDevices.cpp
+
 namespace
 {
 int failures = 0, checks = 0;
@@ -1145,6 +1147,55 @@ int renderAll (const juce::File& dir, double sr)
     }
     return 0;
 }
+// A tone made after someone says whose sound it is: the band in front, then the title, and it is found by band and by song.
+void testToneNames()
+{
+    std::printf ("tone names\n");
+    Preset p; juce::String err;
+    CHECK (presetFromJson (R"({"name":"Inspired by James Hetfield: Downpicked Thrash","category":"Inspired By","inspiredBy":"James Hetfield","band":"Metallica","description":"Tight."})", p, err), "a tone with a band is read");
+    CHECK (p.artist() == "Metallica" && p.title() == "Downpicked Thrash", "the band stands in front, the title follows: '%s' '%s'", p.artist().toRawUTF8(), p.title().toRawUTF8());
+    CHECK (p.credit() == "Inspired by James Hetfield. ", "the player is named under it: '%s'", p.credit().toRawUTF8());
+    CHECK (p.searchText().contains ("metallica") && p.searchText().contains ("hetfield"), "found by band and by player");
+    Preset back;
+    CHECK (presetFromJson (presetToJson (p), back, err) && back.band == "Metallica" && back.song.isEmpty(), "the band survives saving");
+
+    CHECK (presetFromJson (R"({"name":"Inspired by Metallica: Master of Puppets Interlude","category":"Inspired By","inspiredBy":"Metallica","band":"Metallica","song":"Master of Puppets"})", p, err), "a tone after a song is read");
+    CHECK (p.artist() == "Metallica" && p.title() == "Master of Puppets Interlude" && p.credit().isEmpty(), "a song tone needs no second credit: '%s'", p.credit().toRawUTF8());
+    CHECK (p.searchText().contains ("master of puppets"), "found by song");
+    CHECK (p.part() == "Interlude", "the part of the song it is for: '%s'", p.part().toRawUTF8());
+    CHECK (presetFromJson (presetToJson (p), back, err) && back.song == "Master of Puppets", "the song survives saving");
+
+    CHECK (presetFromJson (R"({"name":"Inspired by David Gilmour: Comfortably Lead","category":"Inspired By","inspiredBy":"David Gilmour","band":"Pink Floyd","song":"Comfortably Numb"})", p, err), "a player tone after a song is read");
+    CHECK (p.credit() == juce::String (juce::CharPointer_UTF8 ("Inspired by David Gilmour on \xe2\x80\x9c" "Comfortably Numb\xe2\x80\x9d. ")), "player and song: '%s'", p.credit().toRawUTF8());
+    CHECK (p.part() == "Comfortably Lead", "a title that is not the song is left whole");
+    CHECK (presetFromJson (R"({"name":"Inspired by B.B. King: Thrill Lead","category":"Inspired By","inspiredBy":"B.B. King","song":"The Thrill Is Gone"})", p, err), "a solo artist's song tone is read");
+    CHECK (p.artist() == "B.B. King" && p.credit() == juce::String (juce::CharPointer_UTF8 ("After \xe2\x80\x9cThe Thrill Is Gone\xe2\x80\x9d. ")), "no band: the player stands in front and the song is named: '%s'", p.credit().toRawUTF8());
+    CHECK (presetFromJson (R"({"name":"Warm Crunch","category":"Essentials"})", p, err) && p.artist().isEmpty() && p.title() == "Warm Crunch" && p.credit().isEmpty(), "a plain tone is only its name");
+    CHECK (presetFromJson (R"({"name":"My take: louder","category":"User"})", p, err) && p.title() == "My take: louder", "a colon in your own tone's name is left alone");
+
+    PresetLibrary lib;
+    lib.scanFolder (juce::File (RIFFHOUSE_PRESET_DIR), true);
+    for (const auto& q : lib.all())
+    {
+        if (q.category != "Inspired By") continue;
+        CHECK (q.inspiredBy.isNotEmpty() && q.name.startsWith ("Inspired by " + q.inspiredBy + ": "), "%s says who it is after", q.name.toRawUTF8());
+        CHECK (q.title().isNotEmpty() && ! q.title().startsWith ("Inspired by"), "%s has a title of its own", q.name.toRawUTF8());
+        if (q.song.isNotEmpty() && q.inspiredBy == q.band)
+            CHECK (q.title().startsWith (q.song), "%s is named after its song", q.name.toRawUTF8());
+    }
+    // what the first players asked for is found the way they would type it
+    auto found = [&] (const char* words) { return (int) lib.search (words, "All").size(); };
+    CHECK (found ("metallica") >= 5, "Metallica: %d tones", found ("metallica"));
+    CHECK (found ("master of puppets") == 2, "Master of Puppets: %d tones", found ("master of puppets"));
+    CHECK (found ("pour some sugar") == 1 && found ("def leppard") == 1, "Pour Some Sugar on Me");
+    CHECK (found ("fear of the dark") == 2 && found ("iron maiden") == 2, "Fear of the Dark");
+    CHECK (found ("wither") == 2 && found ("dream theater") == 2, "Wither");
+    CHECK (found ("sweet child") == 2 && found ("guns n' roses") >= 4, "Sweet Child O' Mine: %d, Guns N' Roses: %d", found ("sweet child"), found ("guns n' roses"));
+    CHECK (found ("nightmare") == 1 && found ("avenged sevenfold") >= 2, "Nightmare");
+    CHECK (found ("big fuzz") >= 2, "the Big Fuzz pedal: %d tones", found ("big fuzz"));
+    CHECK (found ("pink floyd comfortably numb") == 1, "a player's tone is found by band and song together");
+}
+
 void testUpdates()
 {
     std::printf ("updates\n");
@@ -1162,10 +1213,11 @@ void testUpdates()
     CHECK (isPreRelease ("0.1.0-rc1") && isPreRelease ("v0.2.0-dev.abc") && ! isPreRelease ("0.1.0") && ! isPreRelease ("0.1.0+build-7"), "telling a test build from a release");
     {
         // someone on a test build is offered the next test build, then the release
-        auto entry = [] (const char* tag, bool pre, bool draft)
+        auto entry = [] (const char* tag, bool pre, bool draft, bool built = true)
         {
             return juce::String ("{\"tag_name\":\"") + tag + "\",\"prerelease\":" + (pre ? "true" : "false") + ",\"draft\":" + (draft ? "true" : "false")
-                 + ",\"html_url\":\"https://github.com/NatikChhabra/riffhouse/releases/tag/" + tag + "\",\"body\":\"\",\"assets\":[]}";
+                 + ",\"html_url\":\"https://github.com/NatikChhabra/riffhouse/releases/tag/" + tag + "\",\"body\":\"\",\"assets\":["
+                 + (built ? "{\"name\":\"Riffhouse-windows-setup.exe\"}" : "") + "]}";
         };
         const auto tests = "[" + entry ("v0.1.0-rc1", true, false) + "," + entry ("v0.1.0-rc3", true, false) + "," + entry ("v0.1.0-rc2", true, false) + "," + entry ("v0.1.0-rc9", true, true) + "]";
         CHECK (newestRelease (tests, "").version == "0.1.0-rc3", "newest test release: got '%s'", newestRelease (tests, "").version.toRawUTF8());
@@ -1174,6 +1226,11 @@ void testUpdates()
         CHECK (newestRelease ("[]", "").version.isEmpty() && newestRelease ("not json", "").version.isEmpty(), "an empty or broken list offers nothing");
         CHECK (parseRelease (entry ("v0.1.0-rc3", true, false), "").version.isEmpty(), "a full release never follows test releases");
         CHECK (parseRelease (entry ("v0.1.0-rc3", true, false), "", true).version == "0.1.0-rc3", "a test release is read when asked for");
+        // publishing comes first and the installer is attached minutes later: until then the release is not out
+        CHECK (parseRelease (entry ("v0.1.1", false, false, false), "-windows-setup.exe").version.isEmpty(), "a release with no installer attached yet is not offered");
+        CHECK (parseRelease (entry ("v0.1.1", false, false), "-windows-setup.exe").version == "0.1.1", "and is offered once the installer is there");
+        const auto building = "[" + entry ("v0.1.0-rc3", true, false) + "," + entry ("v0.1.0", false, false, false) + "]";
+        CHECK (newestRelease (building, "").version == "0.1.0-rc3", "a test build waits for the release's installer too");
     }
 
     {
@@ -1586,7 +1643,6 @@ void testTakes()
     const double sr = 48000.0;
     const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-takes-test");
     dir.deleteRecursively();
-    dir.getChildFile ("DI").createDirectory();
     const auto di = test::guitarDi (sr, 3.0);
 
     auto v1 = bare();
@@ -1596,7 +1652,8 @@ void testTakes()
     v2[(size_t) P::dlyOn] = 1;
 
     const juce::String base = "2026-01-02 03-04-05 Test Tone";
-    const auto wetFile = dir.getChildFile (base + ".wav"), cleanFile = dir.getChildFile ("DI").getChildFile (base + " (DI).wav");
+    const auto wetFile = dir.getChildFile (base + ".wav"), cleanFile = cleanGuitarFile (dir, base);
+    cleanFile.getParentDirectory().createDirectory();
     writeWav (wetFile, renderWith (v1, di, sr, 512), sr);
     {
         Render mono; mono.l = di; mono.r = di;
@@ -1919,6 +1976,9 @@ int main (int argc, char** argv)
     }
     const bool quick = args.contains ("--quick");
     testUpdates();
+    testToneNames();
+    test::runDeviceChecks (checks, failures);
+    if (args.contains ("--devices")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testHistory();
     testLooper();
     testSong();

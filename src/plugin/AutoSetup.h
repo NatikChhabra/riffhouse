@@ -3,6 +3,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "AudioSwitch.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 
 namespace rh
@@ -96,8 +97,7 @@ private:
     double pauseUntil = 0;
     Summary result;
 
-    std::unique_ptr<juce::XmlElement> originalState;
-    juce::String originalType;
+    AudioOpen original; // what was running before setup, to return to on Cancel
 
     // listening
     std::vector<Candidate> candidates;

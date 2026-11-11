@@ -6,7 +6,56 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
-## Unreleased
+## 0.1.2
+
+0.1.1 broke for the first people who installed it: it could close at the end of setup, stop answering, and open setup again at every start. This version fixes those, and changes how every build is checked so they do not come back.
+
+### It stays open
+
+- Fixed: the app closed by itself at the very end of setup, the moment "You're all set" went away.
+- Fixed: the window stopped answering ("Not Responding") when a sound card was slow to start or would not start at all. Riffhouse kept asking it again and again with no pause. It now waits longer between tries, stops after five, and says what is wrong with a button to try again.
+- Fixed: setup opened again at every start when the guitar's input was not there at that moment. Setup runs once. After that it opens only when you ask for it in Settings.
+- Fixed: setup stuttered while it listened. It redrew the whole window thirty times a second, and now only the part that moves.
+- A change in the audio settings opens the sound card once. It used to open it up to three times, which is where much of the waiting came from.
+- When the sound card is changed, Windows is no longer asked for the whole list of devices each time.
+
+### No driver to pick
+
+- The audio settings have three things now: where the guitar comes in, where the sound goes out, and the delay. The driver list is gone.
+- Riffhouse tries the fastest way your input has. If that will not start, it moves to the next by itself and tells you. If nothing gives sound, the last working choice comes back.
+- ASIO is only offered where it works: an audio interface with its maker's driver shows up in the list of inputs, marked "(ASIO driver)". Stand-in drivers that stay silent on most computers are not listed.
+- "Let other apps play sound at the same time" is one switch. It costs a few milliseconds of delay.
+- If the fast mode stops working one day, after a Windows update or because another app holds the card, Riffhouse carries on in the shared mode and says so. It no longer stays silent.
+- A microphone that Windows swaps in for your guitar's input is still never played through the amp.
+
+### Reports that explain themselves
+
+- Riffhouse keeps a short diary of what it did with the sound card: what it opened, how long that took, what failed. It stays on your computer, in "Riffhouse log.txt" beside the settings.
+- If the window stops answering for more than a second, the diary says what it was waiting for. If the app closes by itself, the next start writes down where.
+- "Report a problem" and "Save a report" in Settings include the last lines of the diary. Nothing is sent by itself.
+- After a run that froze or closed by itself, the next start says so once and points to "Report a problem".
+
+### Small things
+
+- With your guitar on an audio interface, the end of setup reminds you to switch off Direct Monitor. That is the reason for hearing the guitar twice.
+- The folder with the bare guitar of each take is now called "Clean guitar (for Change the tone)", not "DI". Takes recorded before still work.
+
+### How builds are checked now
+
+- Every build runs the end of a real setup twice, then starts the app the way you do, checks that the window answers, and closes it. A build that fails any of that is not released.
+- The part that keeps the guitar connected is tested against a pretend sound card: one that goes silent, one that will not open, one that is unplugged and plugged back in, and one that sends hundreds of change messages. In an hour of a healthy card it must not touch the card once.
+
+### Tones for the songs you asked for
+
+- Eleven new tones, 188 in all. Ten are made after songs the first players asked for: Metallica "Master of Puppets" (the rhythm and the clean interlude), Def Leppard "Pour Some Sugar on Me", Iron Maiden "Fear of the Dark" (the gallop and the quiet intro), Dream Theater "Wither" (the lead and the verse), Guns N' Roses "Sweet Child O' Mine" (the opening riff and the solo) and Avenged Sevenfold "Nightmare". The eleventh is Big Fuzz Wall, the Big Fuzz pedal into a loud stack.
+- Every tone made after someone now says whose sound it is, in front of its title: the band first, then the song in quotation marks or the tone's own name. The line under it names the player.
+- Search finds tones by band and by song. Type "metallica" and you get all five, the two song tones first. 58 of the older tones learned their band, 26 their song.
+- A new list in the tone browser starts at its top.
+
+### Releases
+
+- A new version is offered only once its installer is on the release page. In the minutes between a release being published and its installer being attached, "Get version" used to open a page with nothing to download.
+- A release is complete about a minute after it is published, when the same commit was already built and tested on main. It used to take about twenty.
 
 ## 0.1.1
 

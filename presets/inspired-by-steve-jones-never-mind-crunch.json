@@ -5,6 +5,7 @@
     "Punk"
   ],
   "inspiredBy": "Steve Jones",
+  "band": "Sex Pistols",
   "description": "Thick, cranked British punk rhythm.",
   "params": {
     "amp_on": true,
