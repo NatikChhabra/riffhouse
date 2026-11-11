@@ -48,13 +48,17 @@
 
 <section class="hero" aria-labelledby="h-hero">
   <h1 id="h-hero"><span class="line"><span>Music should</span></span> <span class="line"><span>be free</span></span></h1>
-  <img class="hero-pedal" src="img/gear/drive-5.webp" width="758" height="840" alt="The Big Fuzz pedal from Riffhouse, cream with a brown band, three knobs and a footswitch" fetchpriority="high">
+  <button class="hero-pedal" type="button" data-stomp aria-pressed="false">
+    <img src="img/gear/drive-5.webp" width="758" height="840" alt="The Big Fuzz pedal from Riffhouse. Press it to switch the fuzz on." fetchpriority="high">
+  </button>
+  <svg class="defs" width="0" height="0" aria-hidden="true" focusable="false"><filter id="fuzz" x="-4%" y="-12%" width="108%" height="124%"><feImage href="img/noise.webp" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
   <div class="hero-say">
     <p class="lead">Riffhouse is a free guitar amp and pedalboard for Windows. Plug into the mic jack, strum for twenty seconds, and play.</p>
     <p class="actions">
       <a class="btn" data-download href="https://github.com/NatikChhabra/riffhouse/releases/latest">Download for Windows</a>
       <a class="more" href="#tones">Browse the 177 tones</a>
     </p>
+    <p class="stomp-say" data-stomp-say role="status">Press the pedal for fuzz.</p>
   </div>
 </section>
 
@@ -64,7 +68,7 @@
       <h2 id="h-jack">No interface needed</h2>
       <p class="lead">A computer’s mic jack eats a guitar’s treble. Riffhouse measures the loss while you strum and puts it back.</p>
     </div>
-    <p class="figure" data-reveal="rise"><span class="num">24 dB</span> <span class="unit">of treble put back, at most</span></p>
+    <p class="figure" data-reveal="rise"><span class="num" data-count="24"><span aria-hidden="true" data-count-out>24 dB</span><span class="vh">24 dB</span></span> <span class="unit">of treble put back, at most</span></p>
     <figure class="shot jack-shot" data-reveal="open">
       <img src="img/app/setup-done-1200.webp" width="1200" height="1050" loading="lazy" decoding="async" alt="The end of setup in Riffhouse: guitar found on the microphone input, about 9 ms from string to ear, Input Fix bringing back 21 dB of treble, gate, auto level and hum filter set.">
       <figcaption>What setup found on a laptop mic jack.</figcaption>
@@ -88,7 +92,7 @@
 
 <section class="tones band-stage" id="tones" aria-labelledby="h-tones">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head" data-reveal="rise">
       <h2 id="h-tones">177 tones</h2>
       <p class="lead">Sorted by genre, 97 of them inspired by well-known players. Pick one to see the rig behind it.</p>
     </div>
@@ -124,12 +128,12 @@
 </section>
 
 <section class="gear band-bone" id="gear" aria-labelledby="h-gear">
-  <div class="wrap sec-head">
+  <div class="wrap sec-head" data-reveal="rise">
     <h2 id="h-gear">29 pedals, 11 amps</h2>
     <p class="lead">Every pedal, amp and cabinet is an original design with its own sound.</p>
   </div>
   <div class="rail wrap">
-    <ul class="rail-row">
+    <ul class="rail-row" data-reveal="pop">
       <li><img src="img/gear/gate-0.webp" width="660" height="835" loading="lazy" decoding="async" alt="Silencer, noise gate pedal"><b>Silencer</b></li>
       <li><img src="img/gear/comp-0.webp" width="681" height="834" loading="lazy" decoding="async" alt="Squeeze, compressor pedal"><b>Squeeze</b></li>
       <li><img src="img/gear/wah-0.webp" width="575" height="836" loading="lazy" decoding="async" alt="Funk Filter, wah and envelope filter pedal"><b>Funk Filter</b></li>
@@ -163,7 +167,7 @@
     </ul>
   </div>
   <div class="wrap amps">
-    <ul class="amp-row">
+    <ul class="amp-row" data-reveal="pop">
       <li><img src="img/gear/amp-0-s.webp" width="520" height="209" loading="lazy" decoding="async" alt="Glass Clean amp"><b>Glass Clean</b></li>
       <li><img src="img/gear/amp-1-s.webp" width="520" height="315" loading="lazy" decoding="async" alt="Tweed Edge amp"><b>Tweed Edge</b></li>
       <li><img src="img/gear/amp-2-s.webp" width="520" height="222" loading="lazy" decoding="async" alt="Chime Top amp"><b>Chime Top</b></li>
@@ -182,7 +186,7 @@
 
 <section class="demos band-dark" id="hear" aria-labelledby="h-hear" hidden data-demos>
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head" data-reveal="rise">
       <h2 id="h-hear">Hear it</h2>
       <p class="lead" data-demos-lead>One guitar part, recorded once through a mic jack, played back through different tones.</p>
     </div>
@@ -192,7 +196,7 @@
 
 <section class="record band-dark" id="record" aria-labelledby="h-record">
   <div class="wrap">
-    <div class="sec-head">
+    <div class="sec-head" data-reveal="rise">
       <h2 id="h-record">Record first, tone later</h2>
       <p class="lead">Every take is saved twice: once the way you heard it, once as the clean guitar. Pick another tone later and your own playing runs through it.</p>
     </div>
@@ -205,27 +209,27 @@
       </div>
       <div class="pan" role="tabpanel" id="pan-takes" aria-labelledby="tab-takes">
         <p>Press L for your takes. Change the tone while a take loops, turn the knobs, and save the result as a new take.</p>
-        <figure class="shot"><img src="img/app/take-tone-1200.webp" srcset="img/app/take-tone-1200.webp 1200w, img/app/take-tone-1800.webp 1800w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="A recorded take playing through a new tone in Riffhouse, with the amp panel open and the take's waveform along the top."></figure>
+        <figure class="shot"><a href="img/app/take-tone-1800.webp" aria-label="Open this picture full size"><img src="img/app/take-tone-1200.webp" srcset="img/app/take-tone-1200.webp 1200w, img/app/take-tone-1800.webp 1800w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="A recorded take playing through a new tone in Riffhouse, with the amp panel open and the take's waveform along the top."></a></figure>
       </div>
       <div class="pan" role="tabpanel" id="pan-along" aria-labelledby="tab-along" hidden>
         <p>Load a song. Slow it to 50 percent and the pitch stays. Move the key and the speed stays. Mark the hard part and it goes round until you have it.</p>
-        <figure class="shot"><img src="img/app/play-along-1200.webp" srcset="img/app/play-along-1200.webp 1200w, img/app/play-along-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The play along panel: a song slowed to 80 percent with one part marked to repeat."></figure>
+        <figure class="shot"><a href="img/app/play-along-2400.webp" aria-label="Open this picture full size"><img src="img/app/play-along-1200.webp" srcset="img/app/play-along-1200.webp 1200w, img/app/play-along-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The play along panel: a song slowed to 80 percent with one part marked to repeat."></a></figure>
       </div>
       <div class="pan" role="tabpanel" id="pan-looper" aria-labelledby="tab-looper" hidden>
         <p>Press O to record a part, O again to let it go round, and once more to add a layer. Solo over your own rhythm.</p>
-        <figure class="shot"><img src="img/app/looper-1200.webp" srcset="img/app/looper-1200.webp 1200w, img/app/looper-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The looper panel in Riffhouse with its record, stop and clear buttons."></figure>
+        <figure class="shot"><a href="img/app/looper-2400.webp" aria-label="Open this picture full size"><img src="img/app/looper-1200.webp" srcset="img/app/looper-1200.webp 1200w, img/app/looper-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The looper panel in Riffhouse with its record, stop and clear buttons."></a></figure>
       </div>
       <div class="pan" role="tabpanel" id="pan-tuner" aria-labelledby="tab-tuner" hidden>
         <p>Standard, drop, open or tuned down: it shows the nearest note and how far off you are. No tuning to choose first.</p>
-        <figure class="shot"><img src="img/app/tuner-1200.webp" srcset="img/app/tuner-1200.webp 1200w, img/app/tuner-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The tuner showing the note A, a little sharp, at 110.4 hertz."></figure>
+        <figure class="shot"><a href="img/app/tuner-2400.webp" aria-label="Open this picture full size"><img src="img/app/tuner-1200.webp" srcset="img/app/tuner-1200.webp 1200w, img/app/tuner-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The tuner showing the note A, a little sharp, at 110.4 hertz."></a></figure>
       </div>
     </div>
   </div>
 </section>
 
-<section class="measure band-stage" id="measured" aria-labelledby="h-measure">
+<section class="measure band-bone" id="measured" aria-labelledby="h-measure">
   <div class="wrap measure-grid">
-    <div class="sec-head">
+    <div class="sec-head" data-reveal="rise">
       <h2 id="h-measure">What we measure</h2>
       <p class="lead">Every change runs 5,900 automatic checks on the sound engine before it ships.</p>
     </div>
@@ -233,8 +237,8 @@
       <li data-reveal="rise"><b>5 samples</b><p><strong>Delay added by the rig.</strong> About 0.1 ms.</p></li>
       <li data-reveal="rise"><b>8x</b><p><strong>Amp oversampling.</strong> </p></li>
       <li data-reveal="rise"><b>42.9 dB</b><p><strong>Aliasing on a hot amp.</strong> Below the harmonics you want.</p></li>
-      <li data-reveal="rise"><b>About 8x</b><p><strong>Everything switched on.</strong> Faster than real time on one core.</p></li>
-      <li data-reveal="rise"><b>Equal</b><p><strong>Loudness across all 177 tones.</strong> With Auto level on. Nine in ten within about 5 dB on other playing.</p></li>
+      <li data-reveal="rise"><b>1/8 of a core</b><p><strong>Everything switched on.</strong> About eight times faster than real time.</p></li>
+      <li data-reveal="rise"><b>About 5 dB</b><p><strong>Loudness spread across 177 tones.</strong> With Auto level on, nine tones in ten land inside it.</p></li>
     </ul>
   </div>
 </section>
