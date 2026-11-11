@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Free guitar amp and pedalboard for Windows | Riffhouse</title>
+<meta name="description" content="Riffhouse is a free, open-source guitar amp and pedalboard for Windows. Plug into the mic jack, strum for twenty seconds and play. 11 amps, 29 pedals, 177 tones.">
+<link rel="canonical" href="https://natikchhabra.github.io/riffhouse/">
+<meta name="theme-color" content="#f08a1c">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Riffhouse: music should be free">
+<meta property="og:description" content="A free guitar amp and pedalboard for Windows. Plug into the mic jack and play. 11 amps, 29 pedals, 177 tones.">
+<meta property="og:url" content="https://natikchhabra.github.io/riffhouse/">
+<meta property="og:image" content="https://natikchhabra.github.io/riffhouse/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preload" href="fonts/BigShoulders-ExtraBold.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/InstrumentSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" as="image" href="img/gear/drive-5.webp" fetchpriority="high">
+<script>document.documentElement.classList.add('js')</script>
+<link rel="stylesheet" href="styles.css">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Riffhouse","applicationCategory":"MultimediaApplication","operatingSystem":"Windows 10, Windows 11","description":"A free, open-source guitar amp and pedalboard.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://www.gnu.org/licenses/agpl-3.0.html","author":{"@type":"Person","name":"Natik Chhabra","url":"https://github.com/NatikChhabra"},"url":"https://natikchhabra.github.io/riffhouse/"}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the page</a>
+
+<header class="top">
+  <a class="wordmark" href="./" aria-label="Riffhouse, home">
+    <svg viewBox="0 0 100 100" width="30" height="30" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M50 5C74 5 95 14 95 36 95 58 60 96 50 96 40 96 5 58 5 36 5 14 26 5 50 5ZM50 21 79 45H67.5L50 30.5 32.5 45H21ZM34.5 51h7v10h17V51h7v27h-7V68h-17v10h-7Z"/><circle class="lamp" cx="50" cy="42.2" r="4.4"/></svg>
+    <span>Riffhouse</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="#tones">Tones</a>
+    <a href="#gear">Gear</a>
+    <a href="#questions">Help</a>
+    <a href="https://github.com/NatikChhabra/riffhouse">GitHub</a>
+  </nav>
+</header>
+
+<main id="main">
+
+<section class="hero" aria-labelledby="h-hero">
+  <h1 id="h-hero"><span class="line"><span>Music should</span></span> <span class="line"><span>be free</span></span></h1>
+  <img class="hero-pedal" src="img/gear/drive-5.webp" width="758" height="840" alt="The Big Fuzz pedal from Riffhouse, cream with a brown band, three knobs and a footswitch" fetchpriority="high">
+  <div class="hero-say">
+    <p class="lead">Riffhouse is a free guitar amp and pedalboard for Windows. Plug into the mic jack, strum for twenty seconds, and play.</p>
+    <p class="actions">
+      <a class="btn" data-download href="https://github.com/NatikChhabra/riffhouse/releases/latest">Download for Windows</a>
+      <a class="more" href="#tones">Browse the 177 tones</a>
+    </p>
+  </div>
+</section>
+
+<section class="jack band-dark" id="setup" aria-labelledby="h-jack">
+  <div class="wrap jack-grid">
+    <div class="jack-head">
+      <h2 id="h-jack">No interface needed</h2>
+      <p class="lead">A computer’s mic jack eats a guitar’s treble. Riffhouse measures the loss while you strum and puts it back.</p>
+    </div>
+    <p class="figure" data-reveal="rise"><span class="num">24 dB</span> <span class="unit">of treble put back, at most</span></p>
+    <figure class="shot jack-shot" data-reveal="open">
+      <img src="img/app/setup-done-1200.webp" width="1200" height="1050" loading="lazy" decoding="async" alt="The end of setup in Riffhouse: guitar found on the microphone input, about 9 ms from string to ear, Input Fix bringing back 21 dB of treble, gate, auto level and hum filter set.">
+      <figcaption>What setup found on a laptop mic jack.</figcaption>
+    </figure>
+    <ul class="found">
+      <li>Guitar on Microphone</li>
+      <li>About 9.3 ms from string to ear</li>
+      <li>Input Fix on: 21 dB of treble back</li>
+      <li>Gate at -52 dB, following the room</li>
+      <li>Auto level on</li>
+      <li>Hum filter on automatic</li>
+    </ul>
+    <ol class="steps">
+      <li data-reveal="rise"><h3>It finds your guitar</h3><p>Strum, and it picks the input your guitar is on.</p></li>
+      <li data-reveal="rise"><h3>It picks the lowest delay</h3><p>It keeps the fastest audio mode that runs without crackles.</p></li>
+      <li data-reveal="rise"><h3>It sets your level</h3><p>Play your hardest for four seconds.</p></li>
+      <li data-reveal="rise"><h3>It measures the room</h3><p>The gate sits above your noise, and mains hum is removed.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="tones band-stage" id="tones" aria-labelledby="h-tones">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="h-tones">177 tones</h2>
+      <p class="lead">Sorted by genre, 97 of them inspired by well-known players. Pick one to see the rig behind it.</p>
+    </div>
+    <div class="finder" data-ui data-finder>
+      <div class="rig" data-rig aria-live="polite">
+        <div class="rig-say">
+          <h3 class="rig-name" data-rig-name>First Light Clean</h3>
+          <p class="rig-desc" data-rig-desc>A clean, polished starting point. Strum and go.</p>
+          <p class="rig-kind" data-rig-kind>Essentials, Pop, Indie, Worship</p>
+        </div>
+        <ol class="chain" data-chain aria-label="The rig, from guitar to speakers">
+          <li style="--w:1"><img src="img/gear/gate-0-s.webp" width="286" height="360" alt="" loading="lazy"><span>Silencer</span></li>
+          <li style="--w:1"><img src="img/gear/comp-0-s.webp" width="321" height="360" alt="" loading="lazy"><span>Squeeze</span></li>
+          <li style="--w:2.5"><img src="img/gear/amp-0-s.webp" width="520" height="210" alt="" loading="lazy"><span>Glass Clean</span></li>
+          <li style="--w:1.7"><img src="img/gear/cab-4-s.webp" width="520" height="315" alt="" loading="lazy"><span>2x12 American</span></li>
+          <li style="--w:1"><img src="img/gear/reverb-2-s.webp" width="333" height="360" alt="" loading="lazy"><span>Plate</span></li>
+        </ol>
+      </div>
+      <div class="finder-pick">
+        <div class="finder-bar">
+          <label class="search"><span class="vh">Search tones, artists, genres</span>
+            <input type="search" placeholder="Search tones, artists, genres" autocomplete="off" spellcheck="false" data-search>
+          </label>
+          <div class="cats" role="group" aria-label="Kind of tone" data-cats></div>
+        </div>
+        <ul class="tone-list" data-list aria-label="Tones">
+          <li><button type="button" class="tone is-on" aria-pressed="true"><span class="tone-n">First Light Clean</span><span class="tone-d">A clean, polished starting point. Strum and go.</span></button></li>
+        </ul>
+        <p class="finder-foot"><span class="count" data-count-line role="status">Turn on JavaScript to search all 177 tones.</span> <button class="more" type="button" data-more hidden>Show all 177</button></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="gear band-bone" id="gear" aria-labelledby="h-gear">
+  <div class="wrap sec-head">
+    <h2 id="h-gear">29 pedals, 11 amps</h2>
+    <p class="lead">Every pedal, amp and cabinet is an original design with its own sound.</p>
+  </div>
+  <div class="rail wrap">
+    <ul class="rail-row">
+      <li><img src="img/gear/gate-0.webp" width="660" height="835" loading="lazy" decoding="async" alt="Silencer, noise gate pedal"><b>Silencer</b></li>
+      <li><img src="img/gear/comp-0.webp" width="681" height="834" loading="lazy" decoding="async" alt="Squeeze, compressor pedal"><b>Squeeze</b></li>
+      <li><img src="img/gear/wah-0.webp" width="575" height="836" loading="lazy" decoding="async" alt="Funk Filter, wah and envelope filter pedal"><b>Funk Filter</b></li>
+      <li><img src="img/gear/pitch-0.webp" width="600" height="834" loading="lazy" decoding="async" alt="Deep Octave, octave and pitch pedal"><b>Deep Octave</b></li>
+      <li><img src="img/gear/drive-0.webp" width="554" height="841" loading="lazy" decoding="async" alt="Clean Boost, boost pedal"><b>Clean Boost</b></li>
+      <li><img src="img/gear/drive-1.webp" width="613" height="834" loading="lazy" decoding="async" alt="Treble Booster, boost pedal"><b>Treble Booster</b></li>
+      <li><img src="img/gear/drive-2.webp" width="650" height="834" loading="lazy" decoding="async" alt="Green Drive, overdrive pedal"><b>Green Drive</b></li>
+      <li><img src="img/gear/drive-3.webp" width="623" height="841" loading="lazy" decoding="async" alt="Blues Drive, overdrive pedal"><b>Blues Drive</b></li>
+      <li><img src="img/gear/drive-4.webp" width="670" height="834" loading="lazy" decoding="async" alt="Rodent, distortion pedal"><b>Rodent</b></li>
+      <li><img src="img/gear/drive-5.webp" width="758" height="840" loading="lazy" decoding="async" alt="Big Fuzz, fuzz pedal"><b>Big Fuzz</b></li>
+      <li><img src="img/gear/drive-6.webp" width="666" height="834" loading="lazy" decoding="async" alt="Metal Box, distortion pedal"><b>Metal Box</b></li>
+      <li><img src="img/gear/eq-0.webp" width="893" height="839" loading="lazy" decoding="async" alt="Graphic EQ, equaliser pedal"><b>Graphic EQ</b></li>
+      <li><img src="img/gear/mod-0.webp" width="623" height="841" loading="lazy" decoding="async" alt="Liquid Chorus, chorus pedal"><b>Liquid Chorus</b></li>
+      <li><img src="img/gear/mod-1.webp" width="619" height="840" loading="lazy" decoding="async" alt="Jet Flanger, flanger pedal"><b>Jet Flanger</b></li>
+      <li><img src="img/gear/mod-2.webp" width="593" height="834" loading="lazy" decoding="async" alt="Phase Four, phaser pedal"><b>Phase Four</b></li>
+      <li><img src="img/gear/mod-3.webp" width="625" height="835" loading="lazy" decoding="async" alt="Tremble, tremolo pedal"><b>Tremble</b></li>
+      <li><img src="img/gear/mod-4.webp" width="629" height="842" loading="lazy" decoding="async" alt="Warble, vibrato pedal"><b>Warble</b></li>
+      <li><img src="img/gear/mod-5.webp" width="768" height="840" loading="lazy" decoding="async" alt="Rotary Vibe, vibe pedal"><b>Rotary Vibe</b></li>
+      <li><img src="img/gear/delay-0.webp" width="711" height="840" loading="lazy" decoding="async" alt="Digital Echo, delay pedal"><b>Digital Echo</b></li>
+      <li><img src="img/gear/delay-1.webp" width="758" height="835" loading="lazy" decoding="async" alt="Bucket Delay, delay pedal"><b>Bucket Delay</b></li>
+      <li><img src="img/gear/delay-2.webp" width="807" height="852" loading="lazy" decoding="async" alt="Tape Echo, delay pedal"><b>Tape Echo</b></li>
+      <li><img src="img/gear/delay-3.webp" width="714" height="834" loading="lazy" decoding="async" alt="Ping Pong, delay pedal"><b>Ping Pong</b></li>
+      <li><img src="img/gear/reverb-0.webp" width="711" height="835" loading="lazy" decoding="async" alt="Small Room, reverb pedal"><b>Small Room</b></li>
+      <li><img src="img/gear/reverb-1.webp" width="807" height="852" loading="lazy" decoding="async" alt="Concert Hall, reverb pedal"><b>Concert Hall</b></li>
+      <li><img src="img/gear/reverb-2.webp" width="704" height="840" loading="lazy" decoding="async" alt="Plate, reverb pedal"><b>Plate</b></li>
+      <li><img src="img/gear/reverb-3.webp" width="807" height="852" loading="lazy" decoding="async" alt="Spring Tank, reverb pedal"><b>Spring Tank</b></li>
+      <li><img src="img/gear/reverb-4.webp" width="703" height="841" loading="lazy" decoding="async" alt="Shimmer, reverb pedal"><b>Shimmer</b></li>
+      <li><img src="img/gear/reverb-5.webp" width="709" height="834" loading="lazy" decoding="async" alt="Cloud, reverb pedal"><b>Cloud</b></li>
+      <li><img src="img/gear/lofi-0.webp" width="823" height="852" loading="lazy" decoding="async" alt="Dusty Tape, lo-fi pedal"><b>Dusty Tape</b></li>
+      <li class="rail-own"><b>Your own</b><p>Drop a <code>.nam</code> capture on the window and it becomes the amp.</p></li>
+    </ul>
+  </div>
+  <div class="wrap amps">
+    <ul class="amp-row">
+      <li><img src="img/gear/amp-0-s.webp" width="520" height="209" loading="lazy" decoding="async" alt="Glass Clean amp"><b>Glass Clean</b></li>
+      <li><img src="img/gear/amp-1-s.webp" width="520" height="315" loading="lazy" decoding="async" alt="Tweed Edge amp"><b>Tweed Edge</b></li>
+      <li><img src="img/gear/amp-2-s.webp" width="520" height="222" loading="lazy" decoding="async" alt="Chime Top amp"><b>Chime Top</b></li>
+      <li><img src="img/gear/amp-3-s.webp" width="520" height="209" loading="lazy" decoding="async" alt="Brit Plexi amp"><b>Brit Plexi</b></li>
+      <li><img src="img/gear/amp-4-s.webp" width="520" height="209" loading="lazy" decoding="async" alt="Brit 800 amp"><b>Brit 800</b></li>
+      <li><img src="img/gear/amp-5-s.webp" width="520" height="248" loading="lazy" decoding="async" alt="Hot Rod Lead amp"><b>Hot Rod Lead</b></li>
+      <li><img src="img/gear/amp-6-s.webp" width="520" height="209" loading="lazy" decoding="async" alt="Modern High Gain amp"><b>Modern High Gain</b></li>
+      <li><img src="img/gear/amp-7-s.webp" width="520" height="200" loading="lazy" decoding="async" alt="Tight Metal amp"><b>Tight Metal</b></li>
+      <li><img src="img/gear/amp-8-s.webp" width="520" height="267" loading="lazy" decoding="async" alt="Bass Station amp"><b>Bass Station</b></li>
+      <li><img src="img/gear/amp-9-s.webp" width="520" height="202" loading="lazy" decoding="async" alt="Studio Direct amp"><b>Studio Direct</b></li>
+      <li><img src="img/gear/amp-10-s.webp" width="520" height="202" loading="lazy" decoding="async" alt="Neural Capture amp"><b>Neural Capture</b></li>
+      <li class="rail-own"><b>Nine cabinets</b><p>Each with a microphone you can move across the cone.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="demos band-dark" id="hear" aria-labelledby="h-hear" hidden data-demos>
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="h-hear">Hear it</h2>
+      <p class="lead" data-demos-lead>One guitar part, recorded once through a mic jack, played back through different tones.</p>
+    </div>
+    <ul class="demo-list" data-demo-list></ul>
+  </div>
+</section>
+
+<section class="record band-dark" id="record" aria-labelledby="h-record">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="h-record">Record first, tone later</h2>
+      <p class="lead">Every take is saved twice: once the way you heard it, once as the clean guitar. Pick another tone later and your own playing runs through it.</p>
+    </div>
+    <div class="switch" data-switch>
+      <div class="switch-tabs" role="tablist" aria-label="Recording and practice tools">
+        <button type="button" role="tab" id="tab-takes" aria-controls="pan-takes" aria-selected="true">Takes</button>
+        <button type="button" role="tab" id="tab-along" aria-controls="pan-along" aria-selected="false" tabindex="-1">Play along</button>
+        <button type="button" role="tab" id="tab-looper" aria-controls="pan-looper" aria-selected="false" tabindex="-1">Looper</button>
+        <button type="button" role="tab" id="tab-tuner" aria-controls="pan-tuner" aria-selected="false" tabindex="-1">Tuner</button>
+      </div>
+      <div class="pan" role="tabpanel" id="pan-takes" aria-labelledby="tab-takes">
+        <p>Press L for your takes. Change the tone while a take loops, turn the knobs, and save the result as a new take.</p>
+        <figure class="shot"><img src="img/app/take-tone-1200.webp" srcset="img/app/take-tone-1200.webp 1200w, img/app/take-tone-1800.webp 1800w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="A recorded take playing through a new tone in Riffhouse, with the amp panel open and the take's waveform along the top."></figure>
+      </div>
+      <div class="pan" role="tabpanel" id="pan-along" aria-labelledby="tab-along" hidden>
+        <p>Load a song. Slow it to 50 percent and the pitch stays. Move the key and the speed stays. Mark the hard part and it goes round until you have it.</p>
+        <figure class="shot"><img src="img/app/play-along-1200.webp" srcset="img/app/play-along-1200.webp 1200w, img/app/play-along-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The play along panel: a song slowed to 80 percent with one part marked to repeat."></figure>
+      </div>
+      <div class="pan" role="tabpanel" id="pan-looper" aria-labelledby="tab-looper" hidden>
+        <p>Press O to record a part, O again to let it go round, and once more to add a layer. Solo over your own rhythm.</p>
+        <figure class="shot"><img src="img/app/looper-1200.webp" srcset="img/app/looper-1200.webp 1200w, img/app/looper-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The looper panel in Riffhouse with its record, stop and clear buttons."></figure>
+      </div>
+      <div class="pan" role="tabpanel" id="pan-tuner" aria-labelledby="tab-tuner" hidden>
+        <p>Standard, drop, open or tuned down: it shows the nearest note and how far off you are. No tuning to choose first.</p>
+        <figure class="shot"><img src="img/app/tuner-1200.webp" srcset="img/app/tuner-1200.webp 1200w, img/app/tuner-2400.webp 2400w" sizes="(min-width: 1440px) 1344px, 94vw" width="1200" height="780" loading="lazy" decoding="async" alt="The tuner showing the note A, a little sharp, at 110.4 hertz."></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="measure band-stage" id="measured" aria-labelledby="h-measure">
+  <div class="wrap measure-grid">
+    <div class="sec-head">
+      <h2 id="h-measure">What we measure</h2>
+      <p class="lead">Every change runs 5,900 automatic checks on the sound engine before it ships.</p>
+    </div>
+    <ul class="facts">
+      <li data-reveal="rise"><b>5 samples</b><p><strong>Delay added by the rig.</strong> About 0.1 ms.</p></li>
+      <li data-reveal="rise"><b>8x</b><p><strong>Amp oversampling.</strong> </p></li>
+      <li data-reveal="rise"><b>42.9 dB</b><p><strong>Aliasing on a hot amp.</strong> Below the harmonics you want.</p></li>
+      <li data-reveal="rise"><b>About 8x</b><p><strong>Everything switched on.</strong> Faster than real time on one core.</p></li>
+      <li data-reveal="rise"><b>Equal</b><p><strong>Loudness across all 177 tones.</strong> With Auto level on. Nine in ten within about 5 dB on other playing.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="get band-dark" id="download" aria-labelledby="h-get">
+  <div class="wrap get-grid">
+    <div class="get-main">
+      <h2 id="h-get">Get Riffhouse</h2>
+      <p class="lead">One installer for Windows 10 and 11, <span class="nb">64-bit</span>. No admin rights needed.</p>
+      <p class="actions">
+        <a class="btn" data-download href="https://github.com/NatikChhabra/riffhouse/releases/latest">Download the installer</a>
+        <a class="more" href="https://github.com/NatikChhabra/riffhouse/releases">Every version</a>
+      </p>
+      <p class="release" data-release role="status">The file ending in windows-setup.exe.</p>
+    </div>
+    <div class="get-notes">
+      <div>
+        <h3>Windows will warn you once</h3>
+        <p>The installer has no paid certificate. Press <b>More info</b>, then <b>Run anyway</b>. After that it updates itself.</p>
+      </div>
+      <div>
+        <h3>In your recording software</h3>
+        <p>A VST3 plugin of the same rig comes with it. <a href="https://github.com/NatikChhabra/riffhouse/blob/main/docs/DAW.md">The DAW guide</a> covers setup.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="faq band-stage" id="questions" aria-labelledby="h-faq">
+  <div class="wrap faq-grid">
+    <div class="faq-head">
+      <h2 id="h-faq">Questions</h2>
+      <p class="lead">Anything else, <a href="https://github.com/NatikChhabra/riffhouse/issues/new">ask on GitHub</a>.</p>
+    </div>
+    <div class="faq-list">
+      <details name="faq"><summary>Is it really free?</summary><p>Yes. No price, no account, no ads in the app and no paid tier, now or later. The code is open under the AGPL-3.0 licence.</p></details>
+      <details name="faq"><summary>Do I need an audio interface?</summary><p>No. A cable from your guitar to the computer’s mic jack is enough. If you own an interface, Riffhouse uses it, ASIO included.</p></details>
+      <details name="faq"><summary>Will I hear myself late?</summary><p>The rig adds about 0.1 ms. The rest is your computer’s audio buffer, and setup picks the shortest one that runs clean.</p></details>
+      <details name="faq"><summary>Can I use my own captures?</summary><p>Yes. Any <code>.nam</code> file loads as the amp and any impulse response as the cabinet. Drop the file on the window.</p></details>
+      <details name="faq"><summary>Are the artist tones official?</summary><p>No. “Inspired by” names a style. Riffhouse has no tie to any artist, band or equipment maker.</p></details>
+      <details name="faq"><summary>Is there a Mac or Linux version?</summary><p>No installer yet. You can <a href="https://github.com/NatikChhabra/riffhouse#build-it-yourself">build it from source</a> today.</p></details>
+      <details name="faq"><summary>Something is broken. Where do I say so?</summary><p>Start with <a href="https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md">Help and fixes</a>. Still stuck? In Settings, press <b>Report a problem</b>. It copies a report and opens the GitHub page to paste it into. Tone requests go there too.</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<section class="support band-dark" id="support" aria-labelledby="h-support">
+  <div class="wrap support-grid">
+    <div class="support-say">
+      <h2 id="h-support">Support Riffhouse</h2>
+      <p class="lead">A donation buys nothing extra, because every part is already yours. To say thanks, scan the code with any UPI app.</p>
+      <p class="support-note">It goes to Natik Chhabra, who builds Riffhouse. UPI works from Indian bank accounts. Elsewhere, a star on GitHub helps as much.</p>
+    </div>
+    <div class="upi">
+      <img src="img/upi-qr.svg" width="360" height="360" alt="UPI payment code for natik.chhabra@ptaxis" loading="lazy" decoding="async">
+      <div class="upi-id">
+        <span>UPI ID</span>
+        <b data-upi>natik.chhabra@ptaxis</b>
+        <p class="actions">
+          <button class="btn" type="button" data-copy hidden>Copy the ID</button>
+          <a class="more upi-open" href="upi://pay?pa=natik.chhabra@ptaxis&amp;pn=Mr%20NATIK%20%20CHHABRA">Open your UPI app</a>
+        </p>
+        <p class="upi-said" data-copied role="status"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="close" aria-labelledby="h-close">
+  <p class="monument" aria-hidden="true"><span data-push>Riffhouse</span></p>
+  <div class="wrap close-grid">
+    <div class="close-say">
+      <h2 id="h-close">Music should be free</h2>
+      <p>Riffhouse costs nothing and never will. If it got you playing, send it to another guitarist.</p>
+      <p class="actions">
+        <a class="btn" href="#download">Get the installer</a>
+        <a class="more" href="https://github.com/NatikChhabra/riffhouse">Star it on GitHub</a>
+        <a class="more" data-sponsor hidden href="https://github.com/NatikChhabra/riffhouse">Support the project</a>
+      </p>
+    </div>
+    <div class="close-facts" data-credits>
+      <p>Made by <a href="https://github.com/NatikChhabra">Natik Chhabra</a>. Free software under the <a href="https://github.com/NatikChhabra/riffhouse/blob/main/LICENSE">GNU AGPL, version 3 or later</a>.</p>
+      <p>Built with JUCE, Neural Amp Modeler Core and Signalsmith Stretch. Every amp, pedal and cabinet is an original design. Riffhouse is not affiliated with or endorsed by any artist, band or equipment maker. All trademarks belong to their owners.</p>
+      <p class="close-links"><a href="https://github.com/NatikChhabra/riffhouse/blob/main/CHANGELOG.md">Changelog</a> <a href="https://github.com/NatikChhabra/riffhouse/blob/main/docs/DAW.md">DAW guide</a> <a href="https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md">Help and fixes</a> <a href="https://github.com/NatikChhabra/riffhouse/issues/new">Report a problem</a> <a href="https://github.com/NatikChhabra/riffhouse/blob/main/CONTRIBUTING.md">Contribute</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js" defer></script>
+</body>
+</html>

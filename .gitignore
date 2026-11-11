@@ -6,3 +6,7 @@ out/
 __pycache__/
 renders/
 .DS_Store
+
+# website checker output
+site/.hallmark/
+site/.design-check/
