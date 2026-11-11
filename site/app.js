@@ -289,6 +289,24 @@
       });
       word.addEventListener('pointerleave', () => letters.forEach((l) => l.style.setProperty('--lift', '0%')));
     }
+    /* Pedals and amps turn their face toward the pointer */
+    $$('.rail-row, .amp-row').forEach((row) => {
+      let on = null, wait = false;
+      const rest = () => { if (on) { on.style.removeProperty('--gx'); on.style.removeProperty('--gy'); on = null; } };
+      row.addEventListener('pointermove', (e) => {
+        const li = e.target.closest('li:not(.rail-own)');
+        if (li !== on) rest();
+        if (!li || wait) return;
+        on = li; wait = true;
+        requestAnimationFrame(() => {
+          wait = false;
+          const r = li.getBoundingClientRect();
+          li.style.setProperty('--gx', (((e.clientX - r.left) / r.width - 0.5) * 2).toFixed(2));
+          li.style.setProperty('--gy', (((e.clientY - r.top) / r.height - 0.5) * 2).toFixed(2));
+        });
+      });
+      row.addEventListener('pointerleave', rest);
+    });
     $$('.hero .btn, .get .btn').forEach((btn) => {
       btn.addEventListener('pointermove', (e) => {
         const r = btn.getBoundingClientRect();

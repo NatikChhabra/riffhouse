@@ -322,6 +322,7 @@ details:not([open]) > p { display: none; }
 @keyframes pedal-drop { from { transform: translate3d(8%, -46%, 380px) rotateX(58deg) rotateY(-64deg) rotateZ(16deg); } }
 @keyframes ground-in { from { opacity: 0; scale: 1.5; } }
 @keyframes sway { from { rotate: y -5deg; translate: 0 1%; } to { rotate: y 6deg; translate: 0 -1%; } }
+@keyframes stand { from { transform: perspective(1400px) rotateX(34deg) scale(.86); } to { transform: perspective(1400px) rotateX(0deg) scale(1); } }
 @keyframes turn { to { transform: rotateX(50deg) rotateY(-30deg) translateZ(-90px); } }
 @keyframes say-in { from { opacity: 0; transform: translateY(16px); } }
 @keyframes push { from { transform: translateX(5%); } }
@@ -341,9 +342,11 @@ details:not([open]) > p { display: none; }
 
   html.js [data-reveal] { transition: opacity 700ms var(--ease), transform 700ms var(--ease), clip-path 900ms var(--ease); }
   html.js [data-reveal="rise"]:not(.is-in) { opacity: 0; transform: translateY(24px); }
+  html.js [data-reveal="rise"] h2 { transform-origin: 50% 100%; transition: transform 820ms var(--ease); }
+  html.js [data-reveal="rise"]:not(.is-in) h2 { transform: perspective(900px) translateY(40%) rotateX(-72deg); }
   html.js [data-reveal="pop"] > li { transition: transform 620ms var(--ease); transition-delay: calc(var(--i, 0) * 45ms); }
   html.js [data-reveal="pop"]:not(.is-in) > li { transform: translateY(36px) scale(.93); }
-  .rail-row img, .amp-row img { transition: transform 220ms var(--ease); }
+  .rail-row img, .amp-row img { transition: transform 240ms var(--ease); transform: perspective(700px) rotateX(calc(var(--gy, 0) * -16deg)) rotateY(calc(var(--gx, 0) * 20deg)) translateY(var(--up, 0px)) scale(var(--big, 1)); }
   .pan:not([hidden]) { animation: pan-in 380ms var(--ease) both; }
   .rail-row li.is-hit img, .amp-row li.is-hit img { animation: hit 260ms var(--ease); }
   .rail-row li:not(.rail-own), .amp-row li:not(.rail-own) { cursor: pointer; }
@@ -359,11 +362,11 @@ details:not([open]) > p { display: none; }
 
   @media (hover: hover) and (pointer: fine) {
     .hero h1 { translate: calc(var(--tx, 0) * -12px) calc(var(--ty, 0) * -7px); transition: translate 420ms var(--ease); }
-    .rail-row li:hover img { transform: translateY(-10px) rotate(-3deg); }
-    .amp-row li:hover img { transform: translateY(-8px); }
+    .rail-row li:not(.rail-own):hover, .amp-row li:not(.rail-own):hover { --up: -10px; --big: 1.07; }
   }
   @supports (animation-timeline: view()) {
     .hero-pedal { animation: pedal-in 320ms var(--ease) 200ms both, drift linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 100svh; }
+    .pan .shot img, .jack-shot img { transform-origin: 50% 100%; animation: stand linear both; animation-timeline: view(); animation-range: entry 0% cover 42%; }
     .pedal-turn { animation: turn linear both; animation-timeline: scroll(root); animation-range: 0 100svh; }
     .monument span { animation: push linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
   }
