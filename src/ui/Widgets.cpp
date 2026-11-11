@@ -321,22 +321,22 @@ void IconButton::paintButton (juce::Graphics& g, bool over, bool down)
         g.fillRect (r.withSizeKeepingCentre (18.0f, 2.0f).withY (r.getBottom() - 4.0f));
     }
     const auto c = ! isEnabled() ? colours::textFaint : (on ? activeColour : (over ? colours::text : iconColour));
-    const auto text = getButtonText();
-    if (text.isEmpty())
+    const auto caption = getButtonText();
+    if (caption.isEmpty())
     {
         const auto ir = r.withSizeKeepingCentre (iconSize, iconSize);
         if (filled_) fillIcon (g, icon, ir, c); else strokeIcon (g, icon, ir, c);
         return;
     }
     g.setFont (font (14.0f, Weight::medium));
-    const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text);
+    const float tw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), caption);
     const float total = iconSize + 8.0f + tw;
     auto content = r.withSizeKeepingCentre (total, r.getHeight());
     const auto ir = content.removeFromLeft (iconSize).withSizeKeepingCentre (iconSize, iconSize);
     if (filled_) fillIcon (g, icon, ir, c); else strokeIcon (g, icon, ir, c);
     content.removeFromLeft (8.0f);
     g.setColour (on ? activeColour : (isEnabled() ? colours::text : colours::textFaint));
-    g.drawText (text, content, juce::Justification::centredLeft);
+    g.drawText (caption, content, juce::Justification::centredLeft);
 }
 
 //==============================================================================

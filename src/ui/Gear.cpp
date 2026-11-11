@@ -337,19 +337,19 @@ const PedalDesign* pedalDesignFor (int module, int type)
 
 const AmpDesign& ampDesign (int m)
 {
-    // badge, tolex, tolex colour, panel, ink, weave, piping, knob, cap, jewel, face, plate, upper, display
+    // badge, tolex, tolex colour, panel, ink, weave, piping, knob, cap, jewel, face, plate, upper, display, form, groups, lamp, width
     static const AmpDesign d[] = {
-        { "glass",     Tolex::levant, 0xff151617, Panel::black,    0xffeeeeea, Weave::silver,     0xffc9ccd0, KnobStyle::skirted, 0xff141516, 0xff6fb7ff, Face::instrumentSemi, false, false },
-        { "tweed",     Tolex::tweed,  0xffc9a66b, Panel::chrome,   0xff1b1a18, Weave::wheat,      0,          KnobStyle::pedal,   0xfff1ead8, 0xffffb547, Face::instrumentSemi, false, false },
-        { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffcbb48a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false },
-        { "PLEXI",     Tolex::levant, 0xff131313, Panel::gold,     0xff17130c, Weave::saltPepper, 0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffffb547, Face::shoulders,      true,  true  },
-        { "EIGHT HUNDRED", Tolex::levant, 0xff121212, Panel::gold, 0xff17130c, Weave::black,      0xffd8b04a, KnobStyle::hat,     0xffd8b04a, 0xffffb547, Face::shoulders,      true,  true  },
-        { "hot rod",   Tolex::levant, 0xff141414, Panel::chrome,   0xff111214, Weave::black,      0xffb9bdc2, KnobStyle::dome,    0xff1b1d20, 0xff6fb7ff, Face::instrumentSemi, false, false },
-        { "MODERN",    Tolex::levant, 0xff101010, Panel::plate,    0xffe9e7e2, Weave::mesh,       0,          KnobStyle::skirted, 0xff101112, 0xff7dffa0, Face::shoulders,      true,  true  },
-        { "TIGHT",     Tolex::smooth, 0xff0d0d0e, Panel::anodised, 0xfff4a524, Weave::mesh,       0,          KnobStyle::pedal,   0xfff4a524, 0xfff4a524, Face::shoulders,      false, true  },
-        { "bass station", Tolex::levant, 0xff1d2530, Panel::brushed, 0xff141618, Weave::grid,     0xff8fa3b8, KnobStyle::skirted, 0xff141618, 0xff6fb7ff, Face::instrumentSemi, true,  false },
-        { "studio direct", Tolex::smooth, 0xff1a1b1d, Panel::brushed, 0xff141618, Weave::none,    0,          KnobStyle::dome,    0xff141618, 0xff7dffa0, Face::instrumentSemi, false, false, true },
-        { "capture",   Tolex::smooth, 0xff141518, Panel::anodised, 0xffe9e7e2, Weave::none,       0,          KnobStyle::modern,  0xffe9e7e2, 0xffff9f1c, Face::instrumentSemi, false, false, true },
+        { "glass",     Tolex::levant, 0xff151617, Panel::black,    0xffeeeeea, Weave::silver,     0xffc9ccd0, KnobStyle::skirted, 0xff141516, 0xffff5a4a, Face::shoulders,      false, false, false, 0, 1, 0, 1.0f },
+        { "tweed",     Tolex::tweed,  0xffc9a66b, Panel::chrome,   0xff1b1a18, Weave::wheat,      0,          KnobStyle::chicken, 0xff1d1a17, 0xffff5a4a, Face::instrumentSemi, true,  false, false, 2, 0, 1, 0.66f },
+        { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffcbb48a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false, false, 0, 3, 1, 0.94f },
+        { "PLEXI",     Tolex::levant, 0xff131313, Panel::gold,     0xff17130c, Weave::none,       0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffff4a3a, Face::shoulders,      false, true,  false, 1, 0, 2, 1.0f },
+        { "EIGHT HUNDRED", Tolex::levant, 0xff121212, Panel::gold, 0xff17130c, Weave::black,      0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffff4a3a, Face::shoulders,      true,  true,  false, 1, 2, 2, 1.0f },
+        { "hot rod",   Tolex::levant, 0xff141414, Panel::chrome,   0xff111214, Weave::black,      0xffb9bdc2, KnobStyle::chicken, 0xff17181a, 0xffff5a4a, Face::shoulders,      false, false, false, 2, 0, 0, 0.84f },
+        { "MODERN",    Tolex::levant, 0xff101010, Panel::plate,    0xffe9e7e2, Weave::mesh,       0,          KnobStyle::skirted, 0xff101112, 0xff7dffa0, Face::shoulders,      true,  true,  false, 1, 2, 1, 1.0f },
+        { "TIGHT",     Tolex::smooth, 0xff0d0d0e, Panel::anodised, 0xfff4a524, Weave::mesh,       0,          KnobStyle::pedal,   0xfff4a524, 0xfff4a524, Face::shoulders,      false, true,  false, 3, 1, 2, 0.84f },
+        { "bass station", Tolex::levant, 0xff1d2530, Panel::brushed, 0xff141618, Weave::grid,     0xff8fa3b8, KnobStyle::skirted, 0xff141618, 0xff6fb7ff, Face::shoulders,      true,  true,  false, 4, 0, 0, 0.78f },
+        { "studio direct", Tolex::smooth, 0xff1a1b1d, Panel::brushed, 0xff141618, Weave::none,    0,          KnobStyle::dome,    0xff141618, 0xff7dffa0, Face::instrumentSemi, false, false, true,  5, 2, 2, 1.0f },
+        { "capture",   Tolex::smooth, 0xff141518, Panel::anodised, 0xffe9e7e2, Weave::none,       0,          KnobStyle::modern,  0xffe9e7e2, 0xffff9f1c, Face::instrumentSemi, false, false, true,  5, 0, 1, 1.0f },
     };
     return d[juce::jlimit (0, (int) std::size (d) - 1, m)];
 }
@@ -391,7 +391,7 @@ void drawGearKnob (juce::Graphics& g, R area, float angle, float start, float en
         g.fillEllipse (body.expanded (1.2f).translated (0.4f, 1.0f));
     }
     auto rot = juce::AffineTransform::rotation (angle).translated (c);
-    const float alpha = enabled ? 1.0f : 0.5f;
+    const float alpha = 1.0f; // a control that does nothing right now is still a solid part: it sits in shade instead
     const C cream (0xfff1ead8);
 
     // turned plastic: one broad highlight toward the light and a faint bounce opposite it
@@ -553,6 +553,11 @@ void drawGearKnob (juce::Graphics& g, R area, float angle, float start, float en
     {
         g.setColour (juce::Colours::white.withAlpha (0.05f));
         g.fillEllipse (body);
+    }
+    if (! enabled)
+    {
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.fillEllipse (body.expanded (1.0f));
     }
 }
 
@@ -753,18 +758,123 @@ void drawPedalLed (juce::Graphics& g, const PedalLayout& l, const PedalDesign& d
 }
 
 //==============================================================================
-AmpLayout ampLayout (R area)
+namespace
+{
+    constexpr float ampLabelH = 22.0f;
+
+    // Eight controls, spaced the way the panel groups them, or stacked in two rows of four.
+    void placeControls (AmpLayout& l, R strip, const AmpDesign& d, int rows)
+    {
+        static const int patterns[4][4] = { { 8, 0, 0, 0 }, { 1, 3, 2, 2 }, { 4, 4, 0, 0 }, { 1, 3, 4, 0 } };
+        l.knobs = strip;
+        l.cells.clear();
+        if (rows == 2)
+        {
+            const float rowH = strip.getHeight() * 0.5f, cell = strip.getWidth() / 4.0f;
+            l.knobSize = std::min (cell - 16.0f, rowH - ampLabelH - 6.0f);
+            for (int i = 0; i < 8; ++i)
+                l.cells.push_back (R (strip.getX() + cell * (float) (i % 4), strip.getY() + rowH * (float) (i / 4), cell, rowH)
+                                       .withSizeKeepingCentre (l.knobSize, l.knobSize + ampLabelH));
+            return;
+        }
+        const int* p = patterns[juce::jlimit (0, 3, d.groups)];
+        int gaps = 0;
+        for (int i = 1; i < 4; ++i) if (p[i] > 0) ++gaps;
+        const float gapShare = 0.4f;
+        const float cell = strip.getWidth() / (8.0f + gapShare * (float) gaps);
+        l.knobSize = std::min (cell - 6.0f, strip.getHeight() - ampLabelH);
+        float x = strip.getX();
+        for (int gi = 0; gi < 4 && p[gi] > 0; ++gi)
+        {
+            if (gi > 0) x += cell * gapShare;
+            for (int j = 0; j < p[gi]; ++j, x += cell)
+                l.cells.push_back (R (x, strip.getY(), cell, strip.getHeight()).withSizeKeepingCentre (l.knobSize, l.knobSize + ampLabelH));
+        }
+    }
+}
+
+AmpLayout ampLayout (R area, const AmpDesign& d)
 {
     AmpLayout l;
-    l.handle = R (200.0f, 18.0f).withCentre ({ area.getCentreX(), area.getY() + 9.0f });
-    l.head = area.withTrimmedTop (13.0f).withTrimmedBottom (10.0f); // room for the handle above and the feet below
-    const auto h = l.head;
-    l.panel = R (h.getX() + 24.0f, h.getY() + 20.0f, h.getWidth() - 48.0f, std::max (128.0f, h.getHeight() * 0.42f));
-    // the input jack sits left of the knobs, the pilot light right of them
-    l.knobs = l.panel.reduced (18.0f, 8.0f).withTrimmedLeft (66.0f).withTrimmedRight (62.0f);
-    l.jewel = R (24.0f, 24.0f).withCentre ({ l.panel.getRight() - 42.0f, l.knobs.getCentreY() - 11.0f });
-    l.grille = R (h.getX() + 24.0f, l.panel.getBottom() + 16.0f, h.getWidth() - 48.0f, h.getBottom() - 22.0f - (l.panel.getBottom() + 16.0f));
-    l.badge = R (l.grille.getX() + 34.0f, l.grille.getY() + 22.0f, 300.0f, std::min (70.0f, l.grille.getHeight() * 0.45f));
+    l.form = d.form;
+    const float w = area.getWidth() * juce::jlimit (0.4f, 1.0f, d.width);
+    // every amp stands on the same floor: the handle sits above the cabinet, the feet below it
+    const auto full = R (w, area.getHeight() - 23.0f).withCentre ({ area.getCentreX(), area.getY() + 13.0f + (area.getHeight() - 23.0f) * 0.5f });
+    auto controlCentre = [&l] { return l.cells.empty() ? l.knobs.getCentreY() : l.cells.front().getY() + l.knobSize * 0.5f; };
+    const bool grouped = d.groups != 0;
+
+    switch (d.form)
+    {
+        default:
+        case 0: // head: controls across the top, cloth below
+        {
+            l.head = full;
+            const auto h = l.head;
+            l.panel = R (h.getX() + 24.0f, h.getY() + 20.0f, h.getWidth() - 48.0f, std::max (128.0f, h.getHeight() * (d.groups == 3 ? 0.38f : 0.42f)));
+            placeControls (l, l.panel.reduced (18.0f, 8.0f).withTrimmedLeft (66.0f).withTrimmedRight (62.0f).withTrimmedTop (grouped ? 12.0f : 0.0f), d, 1);
+            l.grille = R (h.getX() + 24.0f, l.panel.getBottom() + 16.0f, h.getWidth() - 48.0f, h.getBottom() - 22.0f - (l.panel.getBottom() + 16.0f));
+            l.badge = R (l.grille.getX() + 34.0f, l.grille.getY() + 22.0f, 300.0f, std::min (70.0f, l.grille.getHeight() * 0.45f));
+            break;
+        }
+        case 1: // head: a tall face with the name on it, controls along the bottom
+        {
+            l.head = full;
+            const auto h = l.head;
+            l.grille = R (h.getX() + 24.0f, h.getY() + 22.0f, h.getWidth() - 48.0f, h.getHeight() * 0.44f);
+            l.panel = R (h.getX() + 24.0f, l.grille.getBottom() + 14.0f, h.getWidth() - 48.0f, h.getBottom() - 22.0f - (l.grille.getBottom() + 14.0f));
+            placeControls (l, l.panel.reduced (18.0f, 8.0f).withTrimmedLeft (66.0f).withTrimmedRight (62.0f).withTrimmedTop (grouped ? 12.0f : 0.0f), d, 1);
+            l.badge = R (l.grille.getX() + 44.0f, l.grille.getCentreY() - 38.0f, 380.0f, 76.0f);
+            break;
+        }
+        case 2: // combo: a narrow control strip on top, the speaker behind a big cloth
+        {
+            l.head = full;
+            const auto h = l.head;
+            l.panel = R (h.getX() + 22.0f, h.getY() + 18.0f, h.getWidth() - 44.0f, 108.0f);
+            placeControls (l, l.panel.reduced (14.0f, 6.0f).withTrimmedLeft (58.0f).withTrimmedRight (56.0f), d, 1);
+            l.grille = R (h.getX() + 22.0f, l.panel.getBottom() + 14.0f, h.getWidth() - 44.0f, h.getBottom() - 22.0f - (l.panel.getBottom() + 14.0f));
+            l.badge = R (l.grille.getX() + 26.0f, l.grille.getY() + 18.0f, 240.0f, 52.0f);
+            break;
+        }
+        case 3: // small metal head: vents over the valves, controls below
+        {
+            l.head = full.withTrimmedTop (full.getHeight() * 0.24f);
+            const auto h = l.head;
+            l.grille = R (h.getX() + 26.0f, h.getY() + 22.0f, h.getWidth() - 52.0f, h.getHeight() * 0.36f);
+            l.panel = R (h.getX() + 20.0f, l.grille.getBottom() + 12.0f, h.getWidth() - 40.0f, h.getBottom() - 16.0f - (l.grille.getBottom() + 12.0f));
+            placeControls (l, l.panel.reduced (16.0f, 6.0f).withTrimmedLeft (64.0f).withTrimmedRight (60.0f).withTrimmedTop (grouped ? 12.0f : 0.0f), d, 1);
+            l.badge = R (l.grille.getX() + 18.0f, l.grille.getY() + 8.0f, 250.0f, l.grille.getHeight() - 16.0f);
+            break;
+        }
+        case 4: // two rows of four big controls under a strip of cloth
+        {
+            l.head = full;
+            const auto h = l.head;
+            l.grille = R (h.getX() + 24.0f, h.getY() + 22.0f, h.getWidth() - 48.0f, h.getHeight() * 0.22f);
+            l.panel = R (h.getX() + 24.0f, l.grille.getBottom() + 14.0f, h.getWidth() - 48.0f, h.getBottom() - 22.0f - (l.grille.getBottom() + 14.0f));
+            placeControls (l, l.panel.reduced (18.0f, 10.0f).withTrimmedLeft (84.0f).withTrimmedRight (80.0f), d, 2);
+            l.badge = R (l.grille.getX() + 28.0f, l.grille.getY() + 14.0f, 320.0f, l.grille.getHeight() - 28.0f);
+            break;
+        }
+        case 5: // rack unit: one steel face with ears, a display, one row of controls
+        {
+            const float hh = full.getHeight() * (d.groups == 0 ? 0.52f : 0.62f);
+            l.head = R (full.getWidth(), hh).withCentre ({ full.getCentreX(), full.getCentreY() + 6.0f });
+            l.panel = l.head;
+            const auto in = l.head.reduced (46.0f, 0.0f); // between the ears
+            const float dw = in.getWidth() * 0.25f;
+            l.grille = R (in.getX() + 74.0f, in.getY() + 26.0f, dw, in.getHeight() - 74.0f); // the display window
+            placeControls (l, R (l.grille.getRight() + 26.0f, in.getY() + 8.0f, in.getRight() - 62.0f - (l.grille.getRight() + 26.0f), in.getHeight() - 16.0f)
+                                  .withTrimmedTop (grouped ? 12.0f : 0.0f), d, 1);
+            l.badge = R (l.grille.getX(), l.grille.getBottom() + 10.0f, dw, 18.0f);
+            break;
+        }
+    }
+
+    const float cy = d.form == 4 ? l.panel.getCentreY() - 11.0f : controlCentre();
+    l.jack = { l.panel.getX() + (d.form == 5 ? 84.0f : d.form == 4 ? 60.0f : 52.0f), cy };
+    l.jewel = R (24.0f, 24.0f).withCentre ({ l.panel.getRight() - (d.form == 4 ? 58.0f : d.form == 5 ? 82.0f : 42.0f), cy });
+    l.handle = d.form == 5 ? R() : R (d.form == 3 ? 280.0f : 200.0f, 18.0f).withCentre ({ l.head.getCentreX(), l.head.getY() - 4.0f });
     return l;
 }
 namespace
@@ -985,23 +1095,12 @@ namespace
     }
 } // namespace
 
-juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float scale, const juce::String& displayText)
+namespace
 {
-    juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
-                     juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
-    juce::Graphics g (img);
-    g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
-    const auto h = l.head;
-
+    // A leather strap seen edge on, bowed up between two metal end caps.
+    void strapHandle (juce::Graphics& g, R s, float cabinetTop)
     {
-        juce::Path p;
-        p.addRoundedRectangle (h.translated (0.0f, 8.0f), 10.0f);
-        juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 30, { 0, 12 }).drawForPath (g, p);
-    }
-    // handle: a leather strap seen edge on, bowed up between two metal end caps
-    {
-        const auto s = l.handle;
-        const float base = h.getY() + 1.0f, peak = s.getY() + 3.0f;
+        const float base = cabinetTop + 1.0f, peak = s.getY() + 3.0f;
         juce::Path strap;
         strap.startNewSubPath (s.getX() + 6.0f, base - 3.0f);
         strap.quadraticTo (s.getCentreX(), 2.0f * peak - base + 3.0f, s.getRight() - 6.0f, base - 3.0f);
@@ -1020,54 +1119,277 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
             screw (g, capR.getCentre(), 4.5f, 0.4f);
         }
     }
-    juce::Path shell;
-    shell.addRoundedRectangle (h, 10.0f);
-    {
-        juce::Graphics::ScopedSaveState s (g);
-        g.reduceClipRegion (shell);
-        tolexTexture (g, h, d);
-        // the cabinet's rounded edges catch the light
-        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.12f), 0, h.getY(), juce::Colours::white.withAlpha (0.0f), 0, h.getY() + 14.0f, false));
-        g.fillRect (h.withHeight (14.0f));
-        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.0f), 0, h.getBottom() - 16.0f, juce::Colours::black.withAlpha (0.45f), 0, h.getBottom(), false));
-        g.fillRect (h.withTop (h.getBottom() - 16.0f));
-    }
-    // rubber feet, then the metal corners
-    for (auto x : { h.getX() + 64.0f, h.getRight() - 64.0f - 54.0f })
-    {
-        g.setGradientFill (juce::ColourGradient (C (0xff1c1c1c), 0, h.getBottom(), C (0xff070707), 0, h.getBottom() + 9.0f, false));
-        g.fillRoundedRectangle (x, h.getBottom() - 2.0f, 54.0f, 10.0f, 3.0f);
-    }
-    for (int i = 0; i < 4; ++i)
-        cabinetCorner (g, h, i % 2 == 1, i >= 2, 34.0f);
 
-    panelFinish (g, l.panel, d);
-    for (auto x : { l.panel.getX() + 10.0f, l.panel.getRight() - 10.0f })
-        screw (g, { x, l.panel.getY() + 12.0f }, 6.0f, 0.6f);
-    // what is printed and fitted on the panel beside the knobs: the input jack and the pilot light
+    // A steel tube handle on two posts, the kind bolted to a small metal amp.
+    void barHandle (juce::Graphics& g, R s, float cabinetTop)
     {
-        const float cell = l.knobs.getWidth() / 8.0f;
-        const float size = std::min (cell - 6.0f, l.knobs.getHeight() - 22.0f);
-        const float labelY = l.knobs.getCentreY() + size * 0.5f - 11.0f;
-        const auto f = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.face == Face::shoulders ? 12.0f : 11.4f);
-        auto label = [&] (const char* t, float cx)
+        const float top = cabinetTop - 24.0f;
+        for (auto x : { s.getX() + 10.0f, s.getRight() - 22.0f })
         {
-            const juce::String text = d.upper ? juce::String (t).toUpperCase() : juce::String (t);
-            letter (g, text, R (80.0f, 16.0f).withCentre ({ cx, labelY + 8.0f }), f, C (d.ink), juce::Justification::centred);
-        };
-        const juce::Point<float> jack (l.panel.getX() + 52.0f, l.knobs.getCentreY() - 11.0f);
-        jackSocket (g, jack, 15.0f);
-        label ("input", jack.x);
+            juce::ColourGradient post (C (0xff3c3f42), x, 0, C (0xff111213), x + 12.0f, 0, false);
+            post.addColour (0.35, C (0xffa9adb1));
+            g.setGradientFill (post);
+            g.fillRect (x, top + 5.0f, 12.0f, cabinetTop - top - 3.0f);
+            fillMetal (g, R (x - 5.0f, cabinetTop - 5.0f, 22.0f, 6.0f), C (0xff6d7175), 2.0f);
+        }
+        const R bar (s.getX(), top, s.getWidth(), 11.0f);
+        juce::ColourGradient tube (C (0xff8f9498), 0, bar.getY(), C (0xff101112), 0, bar.getBottom(), false);
+        tube.addColour (0.25, C (0xffe6e8ea));
+        tube.addColour (0.55, C (0xff4a4d50));
+        g.setGradientFill (tube);
+        g.fillRoundedRectangle (bar, 5.5f);
+        // a rubber grip in the middle
+        const auto grip = bar.withSizeKeepingCentre (bar.getWidth() * 0.46f, 13.0f);
+        g.setGradientFill (juce::ColourGradient (C (0xff2c2c2c), 0, grip.getY(), C (0xff070707), 0, grip.getBottom(), false));
+        g.fillRoundedRectangle (grip, 6.0f);
+        g.setColour (juce::Colours::white.withAlpha (0.07f));
+        for (float x = grip.getX() + 8.0f; x < grip.getRight() - 6.0f; x += 7.0f)
+            g.fillRect (x, grip.getY() + 2.0f, 1.2f, grip.getHeight() - 4.0f);
+    }
+
+    // The maker's name on the front: an engraved plate, or cast letters leaning forward over a flourish.
+    void ampBadge (juce::Graphics& g, const AmpDesign& d, R area)
+    {
+        const juce::String text = d.upper ? juce::String (d.badge).toUpperCase() : juce::String (d.badge);
+        if (d.badgePlate)
+        {
+            const bool oval = d.tolex == Tolex::tweed;
+            auto f = faceFont (Face::shoulders, area.getHeight() * (oval ? 0.5f : 0.6f));
+            f.setExtraKerningFactor (0.06f);
+            const float tw = juce::GlyphArrangement::getStringWidth (f, text);
+            const auto plate = R (std::min (area.getWidth(), tw + (oval ? 70.0f : 44.0f)), area.getHeight()).withPosition (area.getPosition());
+            const float rad = oval ? plate.getHeight() * 0.5f : 5.0f;
+            const C metal = oval ? C (0xffc9a550) : d.panel == Panel::gold ? C (0xffe7e1d2) : d.panel == Panel::brushed && d.tolex == Tolex::cream ? C (0xffd4b66a) : C (0xffd9dcde);
+            juce::Path pp;
+            pp.addRoundedRectangle (plate, rad);
+            juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 6, { 1, 3 }).drawForPath (g, pp);
+            fillMetal (g, plate, metal, rad);
+            g.setColour (juce::Colours::white.withAlpha (0.55f));
+            g.drawRoundedRectangle (plate.reduced (0.6f), rad, 1.0f);
+            // an engraved border, then the name cut into the metal
+            g.setColour (juce::Colours::black.withAlpha (0.55f));
+            g.drawRoundedRectangle (plate.reduced (5.0f), std::max (2.0f, rad - 5.0f), 1.0f);
+            for (auto x : { plate.getX() + 12.0f, plate.getRight() - 12.0f })
+                if (! oval) screw (g, { x, plate.getCentreY() }, 4.0f, x * 0.3f);
+            const auto ta = plate.reduced (oval ? 22.0f : 22.0f, 6.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.5f));
+            g.setFont (f);
+            g.drawText (text, ta.translated (0.0f, 1.0f), juce::Justification::centred, false);
+            letter (g, text, ta, f, C (0xff15130f), juce::Justification::centred);
+            return;
+        }
+        // cast letters: the name as one leaning shape in bright metal, underlined by a tapering stroke
+        auto f = faceFont (Face::shoulders, area.getHeight() * 0.92f);
+        juce::GlyphArrangement ga;
+        ga.addLineOfText (f, text, 0.0f, 0.0f);
+        juce::Path logo;
+        ga.createPath (logo);
+        logo.applyTransform (juce::AffineTransform::shear (-0.2f, 0.0f));
+        const auto lb = logo.getBounds();
+        const float k = std::min (1.0f, std::min (area.getWidth() / std::max (1.0f, lb.getWidth()), area.getHeight() * 0.8f / std::max (1.0f, lb.getHeight())));
+        logo.applyTransform (juce::AffineTransform::translation (-lb.getX(), -lb.getY()).scaled (k).translated (area.getX(), area.getY()));
+        const auto b2 = logo.getBounds();
+        juce::Path flourish;
+        const float fy = b2.getBottom() + area.getHeight() * 0.1f;
+        flourish.startNewSubPath (b2.getX() - 8.0f, fy + 5.0f);
+        flourish.quadraticTo (b2.getCentreX(), fy - 3.0f, b2.getRight() + 26.0f, fy + 0.5f);
+        flourish.quadraticTo (b2.getCentreX(), fy + 3.0f, b2.getX() - 8.0f, fy + 5.0f);
+        flourish.closeSubPath();
+        logo.addPath (flourish);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.8f), 5, { 1, 3 }).drawForPath (g, logo);
+        const C metal = d.piping != 0 ? C (d.piping) : C (0xffdcd6c6);
+        const auto all = logo.getBounds();
+        juce::ColourGradient chrome (metal.brighter (0.9f), 0, all.getY(), metal.darker (0.7f), 0, all.getBottom(), false);
+        chrome.addColour (0.46, metal.brighter (0.3f));
+        chrome.addColour (0.52, metal.darker (0.35f));
+        g.setGradientFill (chrome);
+        g.fillPath (logo);
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (logo, juce::PathStrokeType (0.8f));
+    }
+
+    // Slots punched in a steel case, with the dark of the chassis behind them.
+    void vents (juce::Graphics& g, R area)
+    {
+        const float slotW = 30.0f, slotH = 6.0f, gapX = 12.0f, gapY = 9.0f;
+        const int cols = std::max (1, (int) ((area.getWidth() + gapX) / (slotW + gapX)));
+        const int rows = std::max (1, (int) ((area.getHeight() + gapY) / (slotH + gapY)));
+        const float x0 = area.getCentreX() - ((float) cols * (slotW + gapX) - gapX) * 0.5f;
+        const float y0 = area.getCentreY() - ((float) rows * (slotH + gapY) - gapY) * 0.5f;
+        for (int r = 0; r < rows; ++r)
+            for (int c = 0; c < cols; ++c)
+            {
+                const R slot (x0 + (float) c * (slotW + gapX) + (r % 2 == 1 ? (slotW + gapX) * 0.5f - (c == cols - 1 ? 1.0e4f : 0.0f) : 0.0f),
+                              y0 + (float) r * (slotH + gapY), slotW, slotH);
+                if (slot.getRight() > area.getRight() + 1.0f) continue;
+                g.setColour (juce::Colours::white.withAlpha (0.10f));
+                g.fillRoundedRectangle (slot.translated (0.0f, 1.0f), 3.0f);
+                g.setGradientFill (juce::ColourGradient (C (0xff000000), 0, slot.getY(), C (0xff17181a), 0, slot.getBottom(), false));
+                g.fillRoundedRectangle (slot, 3.0f);
+            }
+    }
+
+    // The fixed part of the power control: what stays put whether the amp is on or off.
+    void lampHousing (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d)
+    {
         const auto jc = l.jewel.getCentre();
+        if (d.lamp == 1)
+        {
+            hexNut (g, jc, 13.0f);
+            g.setColour (C (0xff0a0a0a));
+            g.fillEllipse (R (11.0f, 11.0f).withCentre (jc));
+            const auto lamp = R (11.0f, 11.0f).withCentre ({ jc.x, jc.y - 30.0f });
+            conic (g, lamp.getCentre(), 8.0f, 0.0f, [] (float a) { return metalAt (C (0xffb9bdc0), a); }, 48);
+            g.setColour (C (0xff0a0a0a));
+            g.fillEllipse (lamp.expanded (0.5f));
+            return;
+        }
+        if (d.lamp == 2)
+        {
+            const auto bezel = R (30.0f, 42.0f).withCentre (jc);
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.fillRoundedRectangle (bezel.translated (0.8f, 1.6f), 4.0f);
+            g.setGradientFill (juce::ColourGradient (C (0xff3a3b3d), bezel.getX(), bezel.getY(), C (0xff0c0c0d), bezel.getRight(), bezel.getBottom(), false));
+            g.fillRoundedRectangle (bezel, 4.0f);
+            g.setColour (C (0xff050505));
+            g.fillRoundedRectangle (bezel.reduced (3.0f), 2.5f);
+            return;
+        }
         g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.fillEllipse (l.jewel.expanded (6.5f).translated (0.6f, 1.4f));
         conic (g, jc, l.jewel.getWidth() * 0.5f + 5.5f, 0.0f, [] (float a) { return metalAt (C (0xffb9bdc0), a); }, 64);
         g.setColour (C (0xff0a0a0a));
         g.fillEllipse (l.jewel.expanded (1.0f));
-        label ("power", jc.x);
     }
 
-    if (d.weave != Weave::none)
+    // Thin printed lines that bracket each group of controls, with the group's name in the gap.
+    void groupSilk (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d)
+    {
+        if (d.groups == 0 || l.cells.size() < 8 || l.form == 4) return;
+        static const int patterns[4][4] = { { 8, 0, 0, 0 }, { 1, 3, 2, 2 }, { 4, 4, 0, 0 }, { 1, 3, 4, 0 } };
+        static const char* const names[4][4] = { { "", "", "", "" }, { "drive", "equaliser", "power amp", "output" },
+                                                 { "preamp", "power amp", "", "" }, { "drive", "tone", "power amp", "" } };
+        const C ink = C (d.ink).withAlpha (0.8f);
+        auto f = faceFont (Face::instrumentSemi, 9.2f);
+        f.setExtraKerningFactor (0.12f);
+        const float y = l.knobs.getY() - 5.0f;
+        int k = 0;
+        for (int gi = 0; gi < 4 && patterns[d.groups][gi] > 0; ++gi)
+        {
+            const int n = patterns[d.groups][gi];
+            const float x0 = l.cells[(size_t) k].getX() - 2.0f, x1 = l.cells[(size_t) (k + n - 1)].getRight() + 2.0f;
+            const juce::String name = juce::String (names[d.groups][gi]).toUpperCase();
+            const float tw = juce::GlyphArrangement::getStringWidth (f, name) + 12.0f;
+            const float mid = (x0 + x1) * 0.5f;
+            g.setColour (ink);
+            if (x1 - x0 > tw + 16.0f)
+            {
+                g.fillRect (x0, y, mid - tw * 0.5f - x0, 1.0f);
+                g.fillRect (mid + tw * 0.5f, y, x1 - (mid + tw * 0.5f), 1.0f);
+                g.fillRect (x0, y, 1.0f, 5.0f);
+                g.fillRect (x1 - 1.0f, y, 1.0f, 5.0f);
+            }
+            g.setFont (f);
+            g.drawText (name, R (tw + 30.0f, 12.0f).withCentre ({ mid, y + 0.5f }), juce::Justification::centred, false);
+            k += n;
+        }
+    }
+}
+
+juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float scale, const juce::String& displayText)
+{
+    juce::Image img (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
+                     juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
+    juce::Graphics g (img);
+    g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+    const auto h = l.head;
+    const bool cabinet = d.form != 3 && d.form != 5;
+    const float corner = cabinet ? 10.0f : d.form == 3 ? 12.0f : 3.0f;
+
+    {
+        juce::Path p;
+        p.addRoundedRectangle (h.translated (0.0f, 8.0f), corner);
+        juce::DropShadow (juce::Colours::black.withAlpha (0.7f), 30, { 0, 12 }).drawForPath (g, p);
+    }
+    if (d.form == 3) barHandle (g, l.handle, h.getY());
+    else if (d.form != 5) strapHandle (g, l.handle, h.getY());
+
+    juce::Path shell;
+    shell.addRoundedRectangle (h, corner);
+    {
+        juce::Graphics::ScopedSaveState s (g);
+        g.reduceClipRegion (shell);
+        if (cabinet)
+            tolexTexture (g, h, d);
+        else
+        {
+            // a folded steel case in black wrinkle paint
+            g.setGradientFill (juce::ColourGradient (C (0xff2a2c2e), 0, h.getY(), C (0xff0d0e0f), 0, h.getBottom(), false));
+            g.fillRect (h);
+            finishTexture (g, h, Finish::crinkle, C (0xff1c1d1f), 31);
+        }
+        // the rounded edges catch the light
+        g.setGradientFill (juce::ColourGradient (juce::Colours::white.withAlpha (0.12f), 0, h.getY(), juce::Colours::white.withAlpha (0.0f), 0, h.getY() + 14.0f, false));
+        g.fillRect (h.withHeight (14.0f));
+        g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.0f), 0, h.getBottom() - 16.0f, juce::Colours::black.withAlpha (0.45f), 0, h.getBottom(), false));
+        g.fillRect (h.withTop (h.getBottom() - 16.0f));
+    }
+    // rubber feet, then whatever protects the corners
+    for (auto x : { h.getX() + 64.0f, h.getRight() - 64.0f - 54.0f })
+    {
+        g.setGradientFill (juce::ColourGradient (C (0xff1c1c1c), 0, h.getBottom(), C (0xff070707), 0, h.getBottom() + 9.0f, false));
+        g.fillRoundedRectangle (x, h.getBottom() - 2.0f, 54.0f, 10.0f, 3.0f);
+    }
+    if (cabinet)
+        for (int i = 0; i < 4; ++i)
+            cabinetCorner (g, h, i % 2 == 1, i >= 2, 34.0f);
+    if (d.form == 3)
+        for (int i = 0; i < 4; ++i) // the case is held together by a bolt at each corner
+            screw (g, { i % 2 == 0 ? h.getX() + 11.0f : h.getRight() - 11.0f, i < 2 ? h.getY() + 11.0f : h.getBottom() - 11.0f }, 6.5f, 0.7f * (float) i);
+    panelFinish (g, l.panel, d);
+    if (d.form != 5)
+        for (auto x : { l.panel.getX() + 10.0f, l.panel.getRight() - 10.0f })
+            screw (g, { x, l.panel.getY() + 12.0f }, 6.0f, 0.6f);
+    else
+        for (int side = 0; side < 2; ++side)
+        {
+            // rack ears: the ends of the same plate, each with two slots and bolts, set off by a pressed line
+            const R ear (side == 0 ? h.getX() : h.getRight() - 46.0f, h.getY(), 46.0f, h.getHeight());
+            const float edge = side == 0 ? ear.getRight() : ear.getX();
+            g.setColour (juce::Colours::black.withAlpha (0.4f));
+            g.fillRect (edge - 0.5f, ear.getY() + 3.0f, 1.0f, ear.getHeight() - 6.0f);
+            g.setColour (juce::Colours::white.withAlpha (0.14f));
+            g.fillRect (edge + 0.6f, ear.getY() + 3.0f, 1.0f, ear.getHeight() - 6.0f);
+            for (float fy : { 0.2f, 0.8f })
+            {
+                const juce::Point<float> c (ear.getCentreX(), ear.getY() + ear.getHeight() * fy);
+                g.setColour (C (0xff050505));
+                g.fillRoundedRectangle (R (24.0f, 12.0f).withCentre (c), 6.0f);
+                screw (g, c, 10.0f, fy * 3.0f + (float) side);
+            }
+        }
+    // what is printed and fitted on the panel beside the controls: the input socket and the power switch
+    {
+        const float labelCy = d.form == 4 ? l.jack.y + 36.0f : (l.cells.empty() ? l.jack.y + 36.0f : l.cells.front().getBottom() - ampLabelH * 0.5f);
+        const auto f = faceFont (d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.face == Face::shoulders ? 12.0f : 11.4f);
+        auto label = [&] (const char* t, float cx)
+        {
+            const juce::String text = d.upper ? juce::String (t).toUpperCase() : juce::String (t);
+            letter (g, text, R (80.0f, 16.0f).withCentre ({ cx, labelCy }), f, C (d.ink), juce::Justification::centred);
+        };
+        jackSocket (g, l.jack, l.knobSize < 62.0f ? 13.0f : 15.0f);
+        label ("input", l.jack.x);
+        lampHousing (g, l, d);
+        label ("power", l.jewel.getCentreX());
+        groupSilk (g, l, d);
+    }
+
+    // the face above or below the controls
+    if (d.form == 3)
+        vents (g, l.grille.withTrimmedLeft (l.badge.getWidth() + 40.0f));
+    else if (d.form == 5)
+        drawWell (g, l.grille, 8.0f);
+    else if (d.weave != Weave::none)
     {
         juce::Path cloth;
         cloth.addRoundedRectangle (l.grille, 6.0f);
@@ -1075,6 +1397,23 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
             juce::Graphics::ScopedSaveState s (g);
             g.reduceClipRegion (cloth);
             weave (g, l.grille, d);
+            if (d.form == 2)
+            {
+                // the speaker behind the cloth shows as a darker round
+                const int n = l.grille.getWidth() > l.grille.getHeight() * 3.0f ? 2 : 1;
+                const float r = std::min (l.grille.getHeight() * 0.44f, l.grille.getWidth() / (float) (2 * n) * 0.86f);
+                for (int i = 0; i < n; ++i)
+                {
+                    const juce::Point<float> c (l.grille.getX() + l.grille.getWidth() * ((float) i + 0.5f) / (float) n, l.grille.getCentreY() + 8.0f);
+                    juce::ColourGradient shade (juce::Colours::black.withAlpha (0.42f), c.x, c.y, juce::Colours::black.withAlpha (0.0f), c.x + r, c.y, true);
+                    shade.addColour (0.86, juce::Colours::black.withAlpha (0.34f));
+                    g.setGradientFill (shade);
+                    g.fillEllipse (R (r * 2.0f, r * 2.0f).withCentre (c));
+                }
+            }
+            // the cabinet's edge shades the top of the cloth
+            g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.4f), 0, l.grille.getY(), juce::Colours::black.withAlpha (0.0f), 0, l.grille.getY() + 18.0f, false));
+            g.fillRect (l.grille.withHeight (18.0f));
         }
         if (d.piping != 0)
         {
@@ -1082,14 +1421,16 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
             g.strokePath (cloth, juce::PathStrokeType (2.2f));
         }
     }
-    else
+    else if (d.piping != 0)
     {
-        // a front face instead of cloth, with a display window
-        const auto face = l.grille;
-        panelFinish (g, face, d);
+        // no cloth: the covering runs across the front, framed by a cord of piping
+        g.setColour (C (d.piping));
+        g.drawRoundedRectangle (l.grille.reduced (2.0f), 6.0f, 2.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.drawRoundedRectangle (l.grille.reduced (3.6f), 5.0f, 0.8f);
     }
 
-    // one soft light over the whole head
+    // one soft light over the whole thing
     {
         juce::Graphics::ScopedSaveState s (g);
         g.reduceClipRegion (shell);
@@ -1097,77 +1438,103 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
                                                  juce::Colours::black.withAlpha (0.18f), h.getX(), h.getBottom(), true));
         g.fillRect (h);
     }
-    // badge
-    if (d.display)
+    if (d.form == 5)
     {
-        const auto win = l.grille.withSizeKeepingCentre (l.grille.getWidth() * 0.56f, l.grille.getHeight() * 0.62f);
-        drawWell (g, win, 10.0f);
         const auto ink = C (d.jewel);
-        letter (g, displayText.isNotEmpty() ? displayText : juce::String (d.badge), win.reduced (24.0f, 0.0f),
-                faceFont (Face::doto, std::min (40.0f, win.getHeight() * 0.42f)), ink, juce::Justification::centred);
-        letter (g, juce::String (d.badge).toUpperCase(), R (win.getX(), win.getBottom() + 6.0f, win.getWidth(), 18.0f),
-                faceFont (Face::instrumentSemi, 12.0f), C (d.ink).withAlpha (0.8f), juce::Justification::centred);
+        letter (g, displayText.isNotEmpty() ? displayText : juce::String (d.badge), l.grille.reduced (14.0f, 0.0f),
+                faceFont (Face::doto, std::min (30.0f, l.grille.getHeight() * 0.36f)), ink, juce::Justification::centred);
+        auto f = faceFont (Face::instrumentSemi, 10.5f);
+        f.setExtraKerningFactor (0.14f);
+        letter (g, juce::String (d.badge).toUpperCase(), l.badge, f, C (d.ink).withAlpha (0.85f), juce::Justification::centredLeft);
     }
     else
-    {
-        const juce::String text = d.upper ? juce::String (d.badge).toUpperCase() : juce::String (d.badge);
-        if (d.badgePlate)
-        {
-            auto f = faceFont (d.face, l.badge.getHeight() * 0.62f);
-            const float tw = juce::GlyphArrangement::getStringWidth (f, text);
-            const auto plate = R (std::min (l.badge.getWidth(), tw + 40.0f), l.badge.getHeight()).withPosition (l.badge.getPosition());
-            const C plateColour = d.panel == Panel::gold ? C (0xffe7e1d2) : C (0xffd9dcde);
-            juce::Path pp;
-            pp.addRoundedRectangle (plate, 5.0f);
-            juce::DropShadow (juce::Colours::black.withAlpha (0.6f), 6, { 0, 3 }).drawForPath (g, pp);
-            fillMetal (g, plate, plateColour, 5.0f);
-            letter (g, text, plate.reduced (16.0f, 6.0f), f, C (0xff15130f), juce::Justification::centred);
-        }
-        else
-        {
-            // a cast metal logo: the letters as a shape, chrome filled, with an edge and a shadow
-            auto f = faceFont (d.face, l.badge.getHeight() * 0.8f);
-            juce::GlyphArrangement ga;
-            ga.addLineOfText (f, text, 0.0f, 0.0f);
-            juce::Path logo;
-            ga.createPath (logo);
-            const auto lb = logo.getBounds();
-            const float k = std::min (1.0f, l.badge.getWidth() / std::max (1.0f, lb.getWidth()));
-            logo.applyTransform (juce::AffineTransform::translation (-lb.getX(), -lb.getY()).scaled (k)
-                                     .translated (l.badge.getX(), l.badge.getCentreY() - lb.getHeight() * k * 0.5f));
-            const auto b2 = logo.getBounds();
-            juce::DropShadow (juce::Colours::black.withAlpha (0.8f), 5, { 0, 3 }).drawForPath (g, logo);
-            const C metal = d.piping != 0 ? C (d.piping) : C (0xffdcd6c6);
-            juce::ColourGradient chrome (metal.brighter (0.9f), 0, b2.getY(), metal.darker (0.7f), 0, b2.getBottom(), false);
-            chrome.addColour (0.48, metal.brighter (0.3f));
-            chrome.addColour (0.52, metal.darker (0.35f));
-            g.setGradientFill (chrome);
-            g.fillPath (logo);
-            g.setColour (juce::Colours::black.withAlpha (0.45f));
-            g.strokePath (logo, juce::PathStrokeType (0.8f));
-        }
-    }
+        ampBadge (g, d, l.badge);
     return img;
 }
 
 void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bool on)
 {
     const C jewel (d.jewel);
-    const auto r = l.jewel;
+    auto r = l.jewel;
+    // valves glowing behind steel mesh or vents
+    if (on && l.form != 5 && l.form != 2 && (d.weave == Weave::mesh || l.form == 3))
+    {
+        juce::Graphics::ScopedSaveState s (g);
+        const auto win = l.form == 3 ? l.grille.withTrimmedLeft (l.badge.getWidth() + 40.0f) : l.grille;
+        g.reduceClipRegion (win.toNearestInt());
+        const int n = 4;
+        const float gr = win.getHeight() * 0.62f;
+        for (int i = 0; i < n; ++i)
+        {
+            const juce::Point<float> c (win.getX() + win.getWidth() * (0.2f + 0.2f * (float) i), win.getBottom() - win.getHeight() * 0.28f);
+            g.setGradientFill (juce::ColourGradient (C (0xffff9a3c).withAlpha (0.20f), c.x, c.y, C (0xffff7a1c).withAlpha (0.0f), c.x + gr, c.y, true));
+            g.fillEllipse (R (gr * 2.0f, gr * 2.0f).withCentre (c));
+        }
+    }
+    if (d.lamp == 1)
+    {
+        // a bat-handle toggle: up is on. Its little lamp sits above it.
+        const auto c = r.getCentre();
+        const juce::Point<float> tip (c.x + 1.0f, c.y + (on ? -13.0f : 13.0f));
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.drawLine ({ c.translated (2.0f, 3.0f), tip.translated (3.0f, 4.0f) }, 7.0f);
+        juce::ColourGradient lever (C (0xfff4f5f5), c.x - 4.0f, 0, C (0xff6d7175), c.x + 4.0f, 0, false);
+        lever.addColour (0.4, C (0xffd0d3d5));
+        g.setGradientFill (lever);
+        juce::Path bat;
+        bat.startNewSubPath (c.x - 2.6f, c.y);
+        bat.lineTo (tip.x - 4.2f, tip.y);
+        bat.lineTo (tip.x + 4.2f, tip.y);
+        bat.lineTo (c.x + 2.6f, c.y);
+        bat.closeSubPath();
+        g.fillPath (bat);
+        g.fillEllipse (R (8.4f, 8.4f).withCentre (tip));
+        g.setColour (juce::Colours::white.withAlpha (0.7f));
+        g.fillEllipse (R (2.6f, 2.6f).withCentre (tip.translated (-1.4f, -1.4f)));
+        r = R (9.0f, 9.0f).withCentre ({ c.x, c.y - 30.0f });
+    }
+    else if (d.lamp == 2)
+    {
+        // a rocker: the pressed half sinks, and the whole paddle lights when on
+        const auto face = R (24.0f, 36.0f).withCentre (r.getCentre()).reduced (1.0f);
+        const C lit = on ? jewel : jewel.darker (2.6f).withMultipliedSaturation (0.6f);
+        if (on)
+        {
+            g.setGradientFill (juce::ColourGradient (jewel.withAlpha (0.35f), face.getCentreX(), face.getCentreY(), jewel.withAlpha (0.0f), face.getCentreX() + 40.0f, face.getCentreY(), true));
+            g.fillEllipse (face.expanded (30.0f));
+        }
+        juce::ColourGradient paddle (on ? lit.darker (0.35f) : lit.brighter (0.25f), 0, face.getY(), on ? lit.brighter (0.5f) : lit.darker (0.5f), 0, face.getBottom(), false);
+        paddle.addColour (0.5, lit);
+        g.setGradientFill (paddle);
+        g.fillRoundedRectangle (face, 2.0f);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.fillRect (face.getX(), face.getCentreY() - 0.5f, face.getWidth(), 1.0f);
+        g.setColour (juce::Colours::white.withAlpha (on ? 0.5f : 0.18f));
+        g.fillRect (face.getX() + 2.0f, on ? face.getBottom() - 3.0f : face.getY() + 1.5f, face.getWidth() - 4.0f, 1.2f);
+        // the I and O moulded into it
+        g.setColour (juce::Colours::white.withAlpha (on ? 0.85f : 0.3f));
+        g.fillRect (face.getCentreX() - 0.8f, face.getY() + 6.0f, 1.6f, 6.0f);
+        g.drawEllipse (R (6.0f, 6.0f).withCentre ({ face.getCentreX(), face.getBottom() - 9.0f }), 1.2f);
+        return;
+    }
     if (on)
     {
-        g.setGradientFill (juce::ColourGradient (jewel.withAlpha (0.5f), r.getCentreX(), r.getCentreY(), jewel.withAlpha (0.0f), r.getCentreX() + 34.0f, r.getCentreY(), true));
-        g.fillEllipse (r.expanded (34.0f));
+        const float halo = r.getWidth() * 1.4f;
+        g.setGradientFill (juce::ColourGradient (jewel.withAlpha (0.5f), r.getCentreX(), r.getCentreY(), jewel.withAlpha (0.0f), r.getCentreX() + halo, r.getCentreY(), true));
+        g.fillEllipse (r.expanded (halo));
     }
-    g.setGradientFill (juce::ColourGradient (on ? juce::Colours::white : jewel.darker (2.0f), r.getCentreX() - 3.0f, r.getCentreY() - 3.0f,
+    g.setGradientFill (juce::ColourGradient (on ? juce::Colours::white : jewel.darker (2.0f), r.getCentreX() - r.getWidth() * 0.12f, r.getCentreY() - r.getWidth() * 0.12f,
                                              on ? jewel : jewel.darker (3.5f), r.getRight(), r.getBottom(), true));
     g.fillEllipse (r);
-    // cut facets catch the light
-    g.setColour (juce::Colours::white.withAlpha (on ? 0.5f : 0.15f));
-    for (int i = 0; i < 6; ++i)
+    if (r.getWidth() > 16.0f)
     {
-        const float a = juce::MathConstants<float>::twoPi * (float) i / 6.0f;
-        g.drawLine (juce::Line<float> (r.getCentre(), r.getCentre().getPointOnCircumference (r.getWidth() * 0.45f, a)), 0.6f);
+        // cut facets catch the light
+        g.setColour (juce::Colours::white.withAlpha (on ? 0.5f : 0.15f));
+        for (int i = 0; i < 6; ++i)
+        {
+            const float a = juce::MathConstants<float>::twoPi * (float) i / 6.0f;
+            g.drawLine (juce::Line<float> (r.getCentre(), r.getCentre().getPointOnCircumference (r.getWidth() * 0.45f, a)), 0.6f);
+        }
     }
     g.setColour (juce::Colours::white.withAlpha (on ? 0.8f : 0.3f));
     g.fillEllipse (R (r.getWidth() * 0.24f, r.getWidth() * 0.18f).withCentre (r.getCentre().translated (-r.getWidth() * 0.17f, -r.getWidth() * 0.2f)));
@@ -1614,19 +1981,13 @@ GearThumb ampThumb (const AmpDesign& d, const juce::String& displayText, float s
 {
     GearThumb t;
     t.area = R (0.0f, 0.0f, 1000.0f, 400.0f);
-    t.amp = ampLayout (t.area);
-    t.box = t.amp.head.getUnion (t.amp.handle);
+    t.amp = ampLayout (t.area, d);
+    t.box = t.amp.handle.isEmpty() ? t.amp.head : t.amp.head.getUnion (t.amp.handle.withY (t.amp.handle.getY() - (d.form == 3 ? 18.0f : 0.0f)));
     t.image = renderAmp (d, t.amp, t.area, scale, displayText);
     juce::Graphics g (t.image);
     g.addTransform (juce::AffineTransform::scale (scale));
-    const auto kr = t.amp.knobs;
-    const float cell = kr.getWidth() / 8.0f;
-    const float size = std::min (cell - 6.0f, kr.getHeight() - 22.0f);
-    for (int i = 0; i < 8; ++i)
-    {
-        const auto k = R (kr.getX() + cell * (float) i, kr.getY(), cell, kr.getHeight()).withSizeKeepingCentre (size, size + 22.0f).removeFromTop (size);
-        drawGearKnob (g, k, thumbAngle (i), thumbStart, thumbEnd, d.knob, C (d.knobCap), C (d.ink), true, false, true);
-    }
+    for (size_t i = 0; i < t.amp.cells.size(); ++i)
+        drawGearKnob (g, t.amp.cells[i].withHeight (t.amp.knobSize), thumbAngle ((int) i), thumbStart, thumbEnd, d.knob, C (d.knobCap), C (d.ink), true, false, false);
     return t;
 }
 

@@ -99,7 +99,7 @@ juce::String Updater::fetch (const juce::String& url)
     char buffer[8192];
     while (! in->isExhausted() && ! threadShouldExit() && out.getDataSize() < 2 * 1024 * 1024)
     {
-        const int n = in->read (buffer, sizeof (buffer));
+        const int n = in->read (buffer, (int) sizeof (buffer));
         if (n <= 0) break;
         out.write (buffer, (size_t) n);
     }

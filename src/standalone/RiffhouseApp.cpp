@@ -67,9 +67,9 @@ public:
         else
         {
             // fit comfortably on small laptop screens too
-            const float s = std::min ({ 1.0f, 0.95f * (float) area.getWidth() / RiffhouseEditor::baseWidth,
+            const float fit = std::min ({ 1.0f, 0.95f * (float) area.getWidth() / RiffhouseEditor::baseWidth,
                                         0.88f * (float) area.getHeight() / RiffhouseEditor::baseHeight });
-            centreWithSize (juce::roundToInt (RiffhouseEditor::baseWidth * s), juce::roundToInt (RiffhouseEditor::baseHeight * s));
+            centreWithSize (juce::roundToInt (RiffhouseEditor::baseWidth * fit), juce::roundToInt (RiffhouseEditor::baseHeight * fit));
         }
         setVisible (true);
         if (editor != nullptr) editor->grabKeyboardFocus();

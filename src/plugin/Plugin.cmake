@@ -61,13 +61,17 @@ target_compile_definitions(Riffhouse PUBLIC
     JUCE_VST3_CAN_REPLACE_VST2=0
     JUCE_DISPLAY_SPLASH_SCREEN=0
     JUCE_USE_CUSTOM_PLUGIN_STANDALONE_APP=1
-    JUCE_WASAPI=1
-    JUCE_DIRECTSOUND=1
     JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_USE_FLAC=1
-    JUCE_USE_OGGVORBIS=1
-    JUCE_JACK=1
-    JUCE_ALSA=1)
+    JUCE_USE_OGGVORBIS=1)
+
+# Each system gets only its own audio back ends: asking for JACK or ALSA on
+# Windows makes JUCE look for headers that do not exist there.
+if (WIN32)
+    target_compile_definitions(Riffhouse PUBLIC JUCE_WASAPI=1 JUCE_DIRECTSOUND=1)
+elseif (UNIX AND NOT APPLE)
+    target_compile_definitions(Riffhouse PUBLIC JUCE_JACK=1 JUCE_ALSA=1)
+endif()
 
 if (WIN32 AND RIFFHOUSE_ASIO_SDK_DIR)
     target_compile_definitions(Riffhouse PUBLIC JUCE_ASIO=1)

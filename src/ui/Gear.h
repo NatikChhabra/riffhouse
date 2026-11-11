@@ -53,6 +53,13 @@ struct AmpDesign
     bool badgePlate;       // lettering on a metal plate, or straight on the cloth
     bool upper;
     bool display = false;  // a display window instead of a badge (direct and capture)
+    // What makes one amp a different object from the next, not a repaint of it:
+    // 0 head, controls above the cloth; 1 head, controls along the bottom; 2 combo with a control strip on top;
+    // 3 small metal head with vents; 4 head with two rows of big controls; 5 rack unit with a display
+    int form = 0;
+    int groups = 0;        // how the eight controls are spaced: 0 evenly, 1 as 1+3+2+2, 2 as 4+4, 3 as 1+3+4
+    int lamp = 0;          // 0 jewel pilot light; 1 toggle switch under a small lamp; 2 lit rocker switch
+    float width = 1.0f;    // share of the available width the cabinet takes
 };
 
 const PedalDesign& drivePedalDesign (int driveType);
@@ -82,8 +89,12 @@ void drawPedalLed (juce::Graphics&, const PedalLayout&, const PedalDesign&, bool
 struct AmpLayout
 {
     juce::Rectangle<float> head, panel, knobs, grille, badge, jewel, handle;
+    std::vector<juce::Rectangle<float>> cells; // where each of the eight controls sits: the knob with its label under it
+    juce::Point<float> jack;                   // the input socket
+    float knobSize = 0.0f;
+    int form = 0;
 };
-AmpLayout ampLayout (juce::Rectangle<float> area);
+AmpLayout ampLayout (juce::Rectangle<float> area, const AmpDesign&);
 juce::Image renderAmp (const AmpDesign&, const AmpLayout&, juce::Rectangle<float> area, float scale,
                        const juce::String& displayText);
 void drawAmpJewel (juce::Graphics&, const AmpLayout&, const AmpDesign&, bool on);

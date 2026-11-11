@@ -757,26 +757,22 @@ void AmpPage::resized()
     // the amp itself fills the rest of the page
     const auto gear = getLocalBounds().withTrimmedTop (gearTop).toFloat();
     ampArea = gear.withSizeKeepingCentre (std::min (gear.getWidth(), 1080.0f), std::min (gear.getHeight() - 8.0f, 420.0f));
-    layout = ampLayout (ampArea);
     const auto& d = ampDesign (current);
+    layout = ampLayout (ampArea, d);
     const juce::String display = current == choices::neuralCapture ? (proc.captureName().isNotEmpty() ? proc.captureName() : juce::String ("no capture"))
                                                                     : juce::String (spec (P::ampModel).choices[(size_t) current]).toLowerCase();
     ampImage = renderAmp (d, layout, ampArea, 2.0f, display);
-    jewel.setBounds (layout.jewel.expanded (8.0f).toNearestInt());
+    // the whole switch is the target: the lamp, and the lever or rocker under it
+    jewel.setBounds ((d.lamp == 1 ? layout.jewel.expanded (10.0f, 22.0f).translated (0.0f, -10.0f) : layout.jewel.expanded (d.lamp == 2 ? 6.0f : 8.0f, d.lamp == 2 ? 12.0f : 8.0f)).toNearestInt());
 
-    const int n = knobs.size();
-    const auto kr = layout.knobs;
-    const float cell = kr.getWidth() / (float) n;
     const int labelH = 22;
-    const int size = (int) std::min (cell - 6.0f, kr.getHeight() - (float) labelH);
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < knobs.size() && i < (int) layout.cells.size(); ++i)
     {
         auto* k = knobs[i];
         k->setGear (d.knob, juce::Colour (d.knobCap), juce::Colour (d.ink), d.face == Face::shoulders ? Face::shoulders : Face::instrument, d.upper);
-        k->setNumbers (true);
+        k->setNumbers (layout.knobSize >= 64.0f);
         k->setLabelHeight (labelH);
-        k->setBounds (juce::Rectangle<float> (kr.getX() + cell * (float) i, kr.getY(), cell, kr.getHeight())
-                          .withSizeKeepingCentre ((float) size, (float) (size + labelH)).toNearestInt());
+        k->setBounds (layout.cells[(size_t) i].toNearestInt());
     }
 }
 
