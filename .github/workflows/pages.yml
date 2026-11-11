@@ -1,6 +1,6 @@
 name: Website
 
-# Publishes the site/ folder to GitHub Pages. Nothing is built: the folder is served as it is.
+# Publishes the site/ folder to GitHub Pages. Nothing is built: the folder is served as it is, with one version stamp added.
 on:
   push:
     branches: [main]
@@ -27,6 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Browsers keep the stylesheet and script for a while. A new address on every publish makes them fetch the new ones.
+      - name: Stamp the stylesheet and script with this version
+        run: |
+          sed -i "s/href=\"styles\.css\"/href=\"styles.css?v=${GITHUB_SHA::8}\"/; s/src=\"app\.js\"/src=\"app.js?v=${GITHUB_SHA::8}\"/" site/index.html
+          grep -c "?v=${GITHUB_SHA::8}" site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
