@@ -85,9 +85,10 @@ PresetBrowser::PresetBrowser (RiffhouseProcessor& p) : proc (p)
     categories = std::make_unique<Categories> (*this);
     addAndMakeVisible (*categories);
 
-    search.setTextToShowWhenEmpty ("Search tones, artists, genres  (try \"metal\", \"Hendrix\", \"lofi\")", colours::textFaint);
+    search.setTextToShowWhenEmpty ("Search tones, artists, genres", colours::textFaint);
     search.setFont (font (16.0f));
-    search.setIndents (40, 10);
+    search.setIndents (40, 0);
+    search.setJustification (juce::Justification::centredLeft); // on the field's middle line, like the magnifier
     search.addListener (this);
     search.setColour (juce::TextEditor::backgroundColourId, colours::raised);
     search.setTitle ("Search tones");
@@ -210,19 +211,15 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, 
     if (! juce::isPositiveAndBelow (row, (int) results.size())) return;
     const auto& p = proc.presets().all()[(size_t) results[(size_t) row]];
     auto r = juce::Rectangle<int> (w, h).reduced (2, 3);
+    // the tone you are on is a lit band exactly as wide as the rules between the others
     if (selected)
     {
-        g.setColour (colours::accent.withAlpha (0.13f));
-        g.fillRoundedRectangle (r.toFloat(), 10.0f);
-        g.setColour (colours::accent.withAlpha (0.6f));
-        g.drawRoundedRectangle (r.toFloat().reduced (0.5f), 10.0f, 1.0f);
+        g.setColour (colours::accent.withAlpha (0.10f));
+        g.fillRect (18.0f, 0.0f, (float) w - 36.0f, (float) h - 1.0f);
     }
-    else
-    {
-        // one quiet rule between tones: the names carry the list, not the boxes
-        g.setColour (juce::Colours::white.withAlpha (0.055f));
-        g.fillRect (18.0f, (float) h - 1.0f, (float) w - 36.0f, 1.0f);
-    }
+    // one quiet rule between tones: the names carry the list, not the boxes
+    g.setColour (selected ? colours::accent.withAlpha (0.5f) : juce::Colours::white.withAlpha (0.055f));
+    g.fillRect (18.0f, (float) h - 1.0f, (float) w - 36.0f, 1.0f);
 
     auto content = r.reduced (16, 8);
     // star
@@ -237,7 +234,7 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, 
     content.removeFromRight (14);
 
     g.setFont (font (16.0f, Weight::semibold));
-    g.setColour (colours::text);
+    g.setColour (selected ? colours::accentHi : colours::text);
     g.drawText (p.name, content.removeFromTop (22), juce::Justification::centredLeft, true);
     juce::String sub;
     if (p.inspiredBy.isNotEmpty()) sub << "Inspired by " << p.inspiredBy;

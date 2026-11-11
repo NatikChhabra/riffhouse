@@ -58,7 +58,7 @@ juce::Font capsFont (float height, float tracking = 0.09f);
 float capsWidth (const juce::String&, float height, float tracking = 0.09f);
 // The Riffhouse mark: a roof over the letter H, with the amp's pilot light in the gable.
 // Drawn in `ink` inside the largest square that fits `area`.
-void drawBrandMark (juce::Graphics&, juce::Rectangle<float> area, juce::Colour ink, bool glow = true);
+void drawBrandMark (juce::Graphics&, juce::Rectangle<float> area, juce::Colour ink, bool simple = false);
 // The app icon: the mark on a dark tile. `simple` is the version for very small sizes.
 juce::Image renderAppIcon (int size, bool simple);
 

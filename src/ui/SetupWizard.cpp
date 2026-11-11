@@ -141,7 +141,7 @@ void SetupWizard::layoutButtons()
 
 juce::Rectangle<int> SetupWizard::cardBounds() const
 {
-    const int h = step == Step::welcome ? 440 : step == Step::running ? 470 : step == Step::failed ? 470 : 520;
+    const int h = step == Step::welcome ? 372 : step == Step::running ? 470 : step == Step::failed ? 470 : 520;
     return getLocalBounds().withSizeKeepingCentre (640, h);
 }
 
@@ -211,9 +211,9 @@ void SetupWizard::paint (juce::Graphics& g)
         {
             title ("Let's get your guitar sounding right");
             body ("This takes about 20 seconds. Riffhouse finds your guitar, picks the fastest audio settings your "
-                  "computer can handle without crackles, and sets the input level and noise gate for you.", 80);
-            r.removeFromTop (12);
-            auto box = r.removeFromTop (110).toFloat();
+                  "computer can handle without crackles, and sets the input level and noise gate for you.", 48);
+            r.removeFromTop (16);
+            auto box = r.removeFromTop (104).toFloat();
             // one thing to do before starting, set off by a rule above and below instead of a box in a box
             g.setColour (juce::Colours::white.withAlpha (0.10f));
             g.fillRect (box.getX(), box.getY(), box.getWidth(), 1.0f);

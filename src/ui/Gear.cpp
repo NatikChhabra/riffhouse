@@ -2638,7 +2638,7 @@ namespace
     float thumbAngle (int i) { return thumbStart + (thumbEnd - thumbStart) * (0.38f + 0.08f * (float) ((i * 37) % 5)); }
 }
 
-GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale)
+GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale, const juce::StringArray* labels)
 {
     GearThumb t;
     const R nominal (0.0f, 0.0f, 300.0f, 250.0f);
@@ -2646,7 +2646,7 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale)
     t.pedal = pedalLayout (nominal, d, n, faders);
     t.box = t.pedal.box;
     t.area = nominal.withTrimmedTop (-12.0f).withTrimmedBottom (-30.0f);
-    t.image = renderPedal (d, t.pedal, t.area, scale, false); // print this small would only be specks
+    t.image = renderPedal (d, t.pedal, t.area, scale, labels != nullptr); // print in a small thumbnail would only be specks
     juce::Graphics g (t.image);
     g.addTransform (juce::AffineTransform::translation (-t.area.getX(), -t.area.getY()).scaled (scale));
     if (faders)
@@ -2674,6 +2674,15 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale)
             const float size = std::min (cell.getWidth() - 6.0f, std::min (cell.getHeight() - 20.0f, 96.0f));
             const auto k = cell.withSizeKeepingCentre (size, size + 20.0f).removeFromTop (size);
             drawGearKnob (g, k, thumbAngle (i), thumbStart, thumbEnd, d.knob, C (d.knobCap), C (d.ink), true, false);
+            const int li = i + (d.form == 5 ? 1 : 0); // a treadle is the first control and carries no label
+            if (labels != nullptr && li < labels->size())
+            {
+                const bool wide = d.face == Face::shoulders;
+                g.setFont (faceFont (wide ? Face::shoulders : Face::instrument, wide ? 12.6f : 11.4f));
+                g.setColour (C (d.ink));
+                const auto name = (*labels)[li];
+                g.drawText (d.upper ? name.toUpperCase() : name.toLowerCase(), R (k.getCentreX() - 50.0f, k.getBottom() + 1.0f, 100.0f, 18.0f), juce::Justification::centredTop);
+            }
         }
     }
     if (t.pedal.form == 5)
@@ -2683,7 +2692,7 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale)
     return t;
 }
 
-GearThumb ampThumb (const AmpDesign& d, const juce::String& displayText, float scale)
+GearThumb ampThumb (const AmpDesign& d, const juce::String& displayText, float scale, const juce::StringArray* labels)
 {
     GearThumb t;
     t.area = R (0.0f, 0.0f, 1000.0f, 400.0f);
@@ -2693,7 +2702,19 @@ GearThumb ampThumb (const AmpDesign& d, const juce::String& displayText, float s
     juce::Graphics g (t.image);
     g.addTransform (juce::AffineTransform::scale (scale));
     for (size_t i = 0; i < t.amp.cells.size(); ++i)
-        drawGearKnob (g, t.amp.cells[i].withHeight (t.amp.cells[i].getWidth()), thumbAngle ((int) i), thumbStart, thumbEnd, d.knob, C (d.knobCap), C (d.ink), true, false, false);
+    {
+        const auto cell = t.amp.cells[i];
+        drawGearKnob (g, cell.withHeight (cell.getWidth()), thumbAngle ((int) i), thumbStart, thumbEnd, d.knob, C (d.knobCap), C (d.ink), true, false,
+                      labels != nullptr && cell.getWidth() >= 64.0f);
+        if (labels != nullptr && (int) i < labels->size())
+        {
+            const bool wide = d.face == Face::shoulders;
+            g.setFont (faceFont (wide ? Face::shoulders : Face::instrument, wide ? 12.6f : 11.4f));
+            g.setColour (C (d.ink));
+            const juce::String name = d.labels[i] != nullptr ? juce::String (d.labels[i]) : (*labels)[(int) i];
+            g.drawText (d.upper ? name.toUpperCase() : name.toLowerCase(), R (cell.getCentreX() - 50.0f, cell.getBottom() - ampLabelH + 1.0f, 100.0f, 18.0f), juce::Justification::centredTop);
+        }
+    }
     return t;
 }
 

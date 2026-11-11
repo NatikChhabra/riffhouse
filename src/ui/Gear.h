@@ -146,8 +146,9 @@ struct GearThumb
     PedalLayout pedal;
     AmpLayout amp;
 };
-GearThumb pedalThumb (const PedalDesign&, int numKnobs, bool faders, float scale);
-GearThumb ampThumb (const AmpDesign&, const juce::String& displayText, float scale);
+// With `labels`, the picture is a full portrait: every control is lettered and the small print is on it.
+GearThumb pedalThumb (const PedalDesign&, int numKnobs, bool faders, float scale, const juce::StringArray* labels = nullptr);
+GearThumb ampThumb (const AmpDesign&, const juce::String& displayText, float scale, const juce::StringArray* labels = nullptr);
 GearThumb cabThumb (int cabModel, float scale);
 
 // The switch itself, for thumbnails as well as the live control.

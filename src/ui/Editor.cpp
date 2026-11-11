@@ -329,15 +329,15 @@ public:
         favourite.setTooltip ("Add to favourites");
         favourite.onClick = [this] { proc.toggleFavourite (proc.currentPresetIndex()); refreshTop(); };
         saveButton.setTooltip ("Save this tone (Ctrl+S)");
-        saveButton.onClick = [this] { showPopover (saveDialog, saveButton.getBounds(), 360, 230); };
+        saveButton.onClick = [this] { showPopover (saveDialog, saveButton.getBounds(), 360, 206); };
         tunerButton.setTooltip ("Tuner (T)");
         tunerButton.onClick = [this] { toggleOverlay (tuner); };
         metroButton.setTooltip ("Metronome");
-        metroButton.onClick = [this] { showPopover (metroPanel, metroButton.getBounds(), 300, 300); };
+        metroButton.onClick = [this] { showPopover (metroPanel, metroButton.getBounds(), 300, 274); };
         settingsButton.setTooltip ("Settings");
         settingsButton.onClick = [this] { toggleOverlay (settings); };
         recordOptions.setTooltip ("Recording options and play-along");
-        recordOptions.onClick = [this] { showPopover (recordPanel, recordOptions.getBounds(), 380, 470); };
+        recordOptions.onClick = [this] { showPopover (recordPanel, recordOptions.getBounds(), 380, 392); };
         record.onClick = [this] { toggleRecording(); };
         for (auto* b : { &favourite, &saveButton, &tunerButton, &metroButton, &settingsButton, &recordOptions })
         {
@@ -1091,13 +1091,13 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     r.toggleOverlay (r.settings);
     shoot ("settings");
     r.closeOverlays();
-    r.showPopover (r.recordPanel, r.recordOptions.getBounds(), 380, 470);
+    r.showPopover (r.recordPanel, r.recordOptions.getBounds(), 380, 392);
     shoot ("record");
     r.closePopovers();
-    r.showPopover (r.metroPanel, r.metroButton.getBounds(), 300, 300);
+    r.showPopover (r.metroPanel, r.metroButton.getBounds(), 300, 274);
     shoot ("metronome");
     r.closePopovers();
-    r.showPopover (r.saveDialog, r.saveButton.getBounds(), 360, 230);
+    r.showPopover (r.saveDialog, r.saveButton.getBounds(), 360, 206);
     shoot ("save");
     r.closePopovers();
     {
@@ -1183,7 +1183,9 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
             {
                 const auto& d = *pedalDesignFor (fam.module, t);
                 const bool faders = fam.module == mEq;
-                auto thumb = pedalThumb (d, faders ? 8 : (int) modules()[(size_t) fam.module].knobs.size(), faders, big);
+                juce::StringArray names;
+                for (auto k : modules()[(size_t) fam.module].knobs) names.add (spec (k).name);
+                auto thumb = pedalThumb (d, faders ? 8 : names.size(), faders, big, faders ? nullptr : &names);
                 juce::Graphics tg (thumb.image);
                 tg.addTransform (juce::AffineTransform::translation (-thumb.area.getX(), -thumb.area.getY()).scaled (big));
                 drawPedalLed (tg, thumb.pedal, d, true);
@@ -1192,7 +1194,11 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         for (int m = 0; m < choices::numAmpModels; ++m)
         {
             const auto& d = ampDesign (m);
-            auto thumb = ampThumb (d, m == choices::neuralCapture ? juce::String ("your capture") : juce::String (spec (P::ampModel).choices[(size_t) m]).toLowerCase(), 1.6f);
+            juce::StringArray names;
+            for (auto k : { P::ampGain, P::ampBass, P::ampMid, P::ampTreble, P::ampPresence, P::ampDepth, P::ampMaster })
+                names.add (spec (k).name);
+            names.add ("Volume");
+            auto thumb = ampThumb (d, m == choices::neuralCapture ? juce::String ("your capture") : juce::String (spec (P::ampModel).choices[(size_t) m]).toLowerCase(), 1.6f, &names);
             juce::Graphics tg (thumb.image);
             tg.addTransform (juce::AffineTransform::scale (1.6f));
             drawAmpJewel (tg, thumb.amp, d, true);
@@ -1219,7 +1225,7 @@ bool RiffhouseEditor::keyPressed (const juce::KeyPress& k)
     }
     if (k == juce::KeyPress ('s', juce::ModifierKeys::commandModifier, 0))
     {
-        root->showPopover (root->saveDialog, root->saveButton.getBounds(), 360, 230);
+        root->showPopover (root->saveDialog, root->saveButton.getBounds(), 360, 206);
         return true;
     }
     if (root->openOverlay == &root->browser || root->anyPopoverOpen()) return false;

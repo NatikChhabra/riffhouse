@@ -17,19 +17,34 @@ FONTS = ROOT / "resources" / "fonts"
 INK, DIM, BG, AMBER = (236, 233, 227), (165, 161, 153), (14, 14, 14), (255, 163, 26)
 LINE = "Free guitar amp and pedalboard"
 
-ROOF = [(50, 10), (91.2, 45), (74.9, 45), (50, 23.8), (25.1, 45), (8.8, 45)]
-H = [(25, 52), (35.5, 52), (35.5, 66), (64.5, 66), (64.5, 52), (75, 52), (75, 92), (64.5, 92), (64.5, 76), (35.5, 76), (35.5, 92), (25, 92)]
+# The mark on a 100 unit square, the same numbers as src/ui/Theme.cpp and resources/brand/mark.svg:
+# a guitar pick with a roof over the letter H cut out of it, and the pilot light under the roof.
+PICK = [((50, 5), (74, 5), (95, 14), (95, 36)), ((95, 36), (95, 58), (60, 96), (50, 96)),
+        ((50, 96), (40, 96), (5, 58), (5, 36)), ((5, 36), (5, 14), (26, 5), (50, 5))]
+ROOF = [(50, 21), (79, 45), (67.5, 45), (50, 30.5), (32.5, 45), (21, 45)]
+H = [(34.5, 51), (41.5, 51), (41.5, 61), (58.5, 61), (58.5, 51), (65.5, 51), (65.5, 78), (58.5, 78), (58.5, 68), (41.5, 68), (41.5, 78), (34.5, 78)]
+LAMP = (240, 138, 28)
+
+
+def curve(p0, p1, p2, p3, steps=48):
+    for i in range(steps):
+        t = i / steps
+        a, b, c, d = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t ** 3
+        yield (a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1])
 
 
 def mark(size, ink=INK):
     """The mark alone on a clear background, drawn four times too big and scaled down."""
     k = 4
-    im = Image.new("RGBA", (size * k, size * k), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
     u = size * k / 100
-    for shape in (ROOF, H):
-        d.polygon([(x * u, y * u) for x, y in shape], fill=ink + (255,))
-    d.ellipse([(50 - 6) * u, (43 - 6) * u, (50 + 6) * u, (43 + 6) * u], fill=AMBER + (255,))
+    mask = Image.new("L", (size * k, size * k), 0)
+    d = ImageDraw.Draw(mask)
+    d.polygon([(x * u, y * u) for seg in PICK for x, y in curve(*seg)], fill=255)
+    for hole in (ROOF, H):
+        d.polygon([(x * u, y * u) for x, y in hole], fill=0)
+    im = Image.new("RGBA", mask.size, ink + (0,))
+    im.putalpha(mask)
+    ImageDraw.Draw(im).ellipse([(50 - 4.4) * u, (42.2 - 4.4) * u, (50 + 4.4) * u, (42.2 + 4.4) * u], fill=LAMP + (255,))
     return im.resize((size, size), Image.LANCZOS)
 
 
@@ -72,12 +87,29 @@ def gear(name, height=None, width=None):
 
 
 def stand(canvas, piece, x, floor):
-    """Puts a piece on the floor line with the soft shadow it would throw there."""
+    """Puts a piece on the floor with the shadow it throws there and a faint reflection in the floor's polish."""
     w, h = piece.size
     sh = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     ImageDraw.Draw(sh).ellipse([x - w * 0.04, floor - h * 0.035, x + w * 1.10, floor + h * 0.06], fill=(0, 0, 0, 215))
     canvas.alpha_composite(sh.filter(ImageFilter.GaussianBlur(max(4, h // 22))))
+    depth = min(h, max(24, h // 4))
+    mirror = piece.transpose(Image.FLIP_TOP_BOTTOM).crop((0, 0, w, depth))
+    fade = Image.linear_gradient("L").resize((w, depth)).point(lambda v: int((255 - v) * 0.16))
+    mirror.putalpha(Image.composite(fade, Image.new("L", (w, depth), 0), mirror.split()[3]))
+    canvas.alpha_composite(mirror.filter(ImageFilter.GaussianBlur(1.2)), (round(x), round(floor)))
     canvas.alpha_composite(piece, (round(x), round(floor - h)))
+
+
+def floorboards(canvas, horizon):
+    """A floor to stand on: it starts at a soft edge and catches a little of the room's light."""
+    w, h = canvas.size
+    band = Image.new("RGBA", (w, h - horizon), (0, 0, 0, 0))
+    d = ImageDraw.Draw(band)
+    for y in range(band.height):
+        t = y / band.height
+        d.line([(0, y), (w, y)], fill=(255, 244, 226, int(16 * (1 - t) ** 2)))
+    d.line([(0, 0), (w, 0)], fill=(255, 244, 226, 30))
+    canvas.alpha_composite(band, (0, horizon))
 
 
 def row(canvas, names, left, right, floor, height):
@@ -94,8 +126,10 @@ def row(canvas, names, left, right, floor, height):
         x += p.width + gap
 
 
-def cover(size, name, light, cap, text_xy, line_px, amp, pedals):
+def cover(size, name, light, cap, text_xy, line_px, amp, pedals, horizon=None):
     im = stage(size, light)
+    if horizon:
+        floorboards(im, horizon)
     if amp:
         piece, x, floor = amp
         stand(im, piece, x, floor)
@@ -140,10 +174,11 @@ def installer_art():
 
 if __name__ == "__main__":
     installer_art()
-    board = ["wah-0", "drive-2", "drive-5", "mod-0", "delay-2", "pitch-0", "mod-2", "reverb-3"]
-    # the share picture: name and one line, the amp behind, the board across the floor
-    cover((1280, 640), "social-preview.png", (880, 250), 64, (64, 176), 36,
-          (gear("amp-03", width=470), 746, 296), (board[:7], 64, 1216, 596, 250))
+    # pieces that differ in outline, so the row does not read as one box seven times
+    board = ["wah-0", "drive-5", "eq-0", "delay-2", "delay-1", "mod-5", "drive-2"]
+    # the share picture: name and one line, the amp at the back of the room, the board in front
+    cover((1280, 640), "social-preview.png", (900, 240), 56, (64, 250), 36,
+          (gear("amp-03", width=560), 672, 404), (board, 64, 1216, 604, 176), horizon=392)
     # the strip on top of the README: shorter, so the board carries it alone
     cover((1280, 440), "banner.png", (860, 200), 54, (64, 198), 30,
-          None, ([board[1], board[2], board[3], board[5]], 636, 1216, 362, 270))
+          None, ([board[1], board[0], board[3], board[4]], 600, 1216, 372, 250), horizon=300)

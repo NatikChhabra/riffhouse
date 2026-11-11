@@ -95,7 +95,7 @@ A tone is a small JSON file. In the tone browser, **Copy tone code** puts the cu
 
 ## Licence and names
 
-Riffhouse is free software under the GNU Affero General Public License, version 3 or later.
+Riffhouse is made by [Natik Chhabra](https://github.com/NatikChhabra). It is free software under the GNU Affero General Public License, version 3 or later.
 
 It is built with [JUCE](https://juce.com) (AGPLv3) and [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT). Fonts: Instrument Sans, Inter, Doto and Big Shoulders, all under the SIL Open Font License.
 

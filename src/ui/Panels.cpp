@@ -20,7 +20,7 @@ TunerView::TunerView (RiffhouseProcessor& p) : proc (p)
 void TunerView::resized()
 {
     close.setBounds (getWidth() - 70, 20, 46, 46);
-    mute.setBounds (getLocalBounds().removeFromBottom (70).withSizeKeepingCentre (290, 28));
+    mute.setBounds (juce::Rectangle<int> (290, 28).withCentre ({ getWidth() / 2, 600 })); // with the rest of the tuner, not at the far edge
 }
 
 void TunerView::refresh()
@@ -79,11 +79,11 @@ void TunerView::paint (juce::Graphics& g)
         const float h = cents == 0 ? 44.0f : (major ? 26.0f : 14.0f);
         g.setColour (cents == 0 ? colours::good.withAlpha (0.9f) : colours::line.brighter (major ? 0.35f : 0.1f));
         g.fillRoundedRectangle (x - (cents == 0 ? 1.5f : 1.0f), y - h * 0.5f, cents == 0 ? 3.0f : 2.0f, h, 1.0f);
-        if (major && cents != 0)
+        if (major)
         {
-            g.setFont (font (12.5f, Weight::medium));
-            g.setColour (colours::textFaint);
-            g.drawText ((cents > 0 ? "+" : "") + juce::String (cents), juce::Rectangle<float> (50.0f, 18.0f).withCentre ({ x, y + 34.0f }), juce::Justification::centred);
+            g.setFont (font (14.0f, Weight::medium));
+            g.setColour (cents == 0 ? colours::good : colours::textDim);
+            g.drawText ((cents > 0 ? "+" : "") + juce::String (cents), juce::Rectangle<float> (50.0f, 18.0f).withCentre ({ x, y + 40.0f }), juce::Justification::centred);
         }
     }
     g.setFont (font (13.0f, Weight::semibold));
@@ -94,25 +94,26 @@ void TunerView::paint (juce::Graphics& g)
     if (live)
     {
         const float x = x0 + (juce::jlimit (-50.0f, 50.0f, shownCents) + 50.0f) / 100.0f * w;
-        const auto pill = juce::Rectangle<float> (14.0f, 56.0f).withCentre ({ x, y });
-        g.setColour (c.withAlpha (0.25f));
-        g.fillRoundedRectangle (pill.expanded (6.0f, 4.0f), 10.0f);
+        // a needle: one thin line through the scale, with a small head above it to find it by
         g.setColour (c);
-        g.fillRoundedRectangle (pill, 7.0f);
+        g.fillRect (x - 1.25f, y - 34.0f, 2.5f, 68.0f);
+        juce::Path head;
+        head.addTriangle (x - 7.0f, y - 46.0f, x + 7.0f, y - 46.0f, x, y - 34.0f);
+        g.fillPath (head);
     }
 
     g.setFont (font (22.0f, Weight::semibold));
     g.setColour (c);
     const juce::String status = ! live ? "Play one string" : (inTune ? "In tune" : (reading.cents < 0 ? "A little flat, tune up" : "A little sharp, tune down"));
-    g.drawText (status, juce::Rectangle<float> (600.0f, 30.0f).withCentre ({ cx, y + 78.0f }), juce::Justification::centred);
+    g.drawText (status, juce::Rectangle<float> (600.0f, 30.0f).withCentre ({ cx, y + 86.0f }), juce::Justification::centred);
     g.setFont (font (14.5f));
     g.setColour (colours::textDim);
     if (live)
         g.drawText (juce::String (reading.hz, 1) + juce::String (" Hz, ") + (reading.cents > 0 ? "+" : "") + juce::String (juce::roundToInt (reading.cents)) + " cents",
-                    juce::Rectangle<float> (500.0f, 24.0f).withCentre ({ cx, y + 108.0f }), juce::Justification::centred);
+                    juce::Rectangle<float> (500.0f, 24.0f).withCentre ({ cx, y + 116.0f }), juce::Justification::centred);
     g.setColour (colours::textFaint);
     g.drawText ("Any tuning works: standard, drop, open or down-tuned. It always shows the nearest note.",
-                juce::Rectangle<float> (760.0f, 24.0f).withCentre ({ cx, y + 140.0f }), juce::Justification::centred);
+                juce::Rectangle<float> (760.0f, 24.0f).withCentre ({ cx, y + 146.0f }), juce::Justification::centred);
 }
 
 //==============================================================================
@@ -394,7 +395,7 @@ SettingsView::~SettingsView() = default;
 
 void SettingsView::visibilityChanged()
 {
-    if (isVisible()) { summary = deviceSummary(); startTimerHz (30); }
+    if (isVisible()) { summary = deviceSummary(); resized(); startTimerHz (30); }
     else stopTimer();
 }
 
@@ -421,7 +422,7 @@ void SettingsView::timerCallback()
     refreshUpdate();
     inMeter.setLevel (proc.meters().gateInPeak.load());
     const auto s = deviceSummary();
-    if (s != summary) { summary = s; repaint(); }
+    if (s != summary) { summary = s; resized(); repaint(); }
     static int tick = 0;
     if (++tick % 10 == 0) repaint (getLocalBounds().withTrimmedTop (getHeight() / 2));
 }
@@ -450,6 +451,12 @@ juce::String SettingsView::deviceSummary() const
     const int xr = dev->getXRunCount();
     if (xr > 0) s << ", " << xr << " dropouts";
     return s;
+}
+
+int SettingsView::summaryHeight() const
+{
+    const int lines = summary.containsChar ('\n') ? juce::StringArray::fromLines (summary).size() : (summary.length() > 68 ? 2 : 1);
+    return lines * 20 + 14;
 }
 
 void SettingsView::showAdvancedAudio()
@@ -481,22 +488,22 @@ void SettingsView::resized()
 
     // left: audio
     left.removeFromTop (36);
-    left.removeFromTop (96); // summary text
+    left.removeFromTop (summaryHeight()); // summary text
     auto row = left.removeFromTop (40);
-    runSetup.setBounds (row.removeFromLeft (250));
+    runSetup.setBounds (row.removeFromLeft (230));
     row.removeFromLeft (10);
-    advanced.setBounds (row.removeFromLeft (220));
-    left.removeFromTop (40);
+    advanced.setBounds (row.removeFromLeft (230));
+    left.removeFromTop (32);
     left.removeFromTop (36);
-    left.removeFromTop (110); // about text
-    website.setBounds (left.removeFromTop (36).removeFromLeft (220));
-    left.removeFromTop (28);
+    left.removeFromTop (aboutH); // about text
+    website.setBounds (left.removeFromTop (36).removeFromLeft (230));
+    left.removeFromTop (24);
     updateHeading = left.removeFromTop (36);
     updateStatus = left.removeFromTop (24);
     left.removeFromTop (8);
     autoUpdate.setBounds (left.removeFromTop (30));
     left.removeFromTop (12);
-    updateButton.setBounds (left.removeFromTop (36).removeFromLeft (250));
+    updateButton.setBounds (left.removeFromTop (36).removeFromLeft (230));
 
     // right: input
     right.removeFromTop (36);
@@ -538,16 +545,21 @@ void SettingsView::paint (juce::Graphics& g)
     heading (left.removeFromTop (36), "Audio");
     g.setColour (colours::text);
     g.setFont (font (15.0f));
-    g.drawFittedText (summary, left.removeFromTop (96), juce::Justification::topLeft, 5, 1.0f);
-    left.removeFromTop (40 + 40);
+    g.drawFittedText (summary, left.removeFromTop (summaryHeight()), juce::Justification::topLeft, 5, 1.0f);
+    left.removeFromTop (40 + 32);
     heading (left.removeFromTop (36), "About");
-    g.setColour (colours::textDim);
-    g.setFont (font (13.5f));
-    g.drawFittedText ("Riffhouse " JucePlugin_VersionString ". Free and open source under the AGPL-3.0 license.\n"
-                      "Tone names saying \"Inspired by\" describe a style. Riffhouse has no affiliation with, and is not endorsed by, "
-                      "any artist, band or equipment maker. All trademarks belong to their owners.\n"
+    {
+        // one paragraph with air between its lines
+        juce::AttributedString about;
+        about.setLineSpacing (4.0f);
+        about.setWordWrap (juce::AttributedString::byWord);
+        about.append ("Riffhouse " JucePlugin_VersionString ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
+                      "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
+                      "any artist, band or equipment maker, and all trademarks belong to their owners. "
                       "Built with JUCE and Neural Amp Modeler Core. Fonts: Inter, Instrument Sans, Doto and Big Shoulders (SIL Open Font License).",
-                      left.removeFromTop (110), juce::Justification::topLeft, 7, 1.0f);
+                      font (13.5f), colours::textDim);
+        about.draw (g, left.removeFromTop (aboutH).toFloat());
+    }
     if (updateButton.isVisible())
     {
         heading (updateHeading, "Updates");

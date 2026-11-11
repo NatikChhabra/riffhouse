@@ -53,6 +53,7 @@ public:
     void resized() override;
     void paint (juce::Graphics&) override;
     void setGear (juce::Colour ink); // a slide pot in a slot, lettering printed in `ink`
+    juce::Slider& getSlider() noexcept { return slider; }
 
 private:
     juce::Slider slider;

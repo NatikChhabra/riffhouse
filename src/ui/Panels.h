@@ -107,6 +107,8 @@ private:
     Meter inMeter;
     juce::Rectangle<int> meterCaption;
     juce::String summary;
+    int summaryHeight() const; // the device summary is one line or four: what follows sits right under it
+    static constexpr int aboutH = 100;
 };
 
 // Ask for a name and save the current tone.

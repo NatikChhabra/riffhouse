@@ -401,7 +401,9 @@ void ChainStrip::paint (juce::Graphics& g)
         const float sag = juce::jlimit (5.0f, 13.0f, span * 0.42f);
         juce::Path p;
         p.startNewSubPath (from);
-        p.cubicTo ({ from.x + span * 0.3f, from.y + sag }, { to.x - span * 0.3f, to.y + sag }, to);
+        // it hangs from both ends: when one socket is higher, the lead still drops below the lower one
+        const float low = std::max (from.y, to.y) + sag;
+        p.cubicTo ({ from.x + span * 0.3f, low }, { to.x - span * 0.3f, low }, to);
         const juce::PathStrokeType stroke (3.2f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded);
         g.setColour (juce::Colours::black.withAlpha (0.5f));
         g.strokePath (p, stroke, juce::AffineTransform::translation (0.8f, 2.2f));
@@ -410,10 +412,16 @@ void ChainStrip::paint (juce::Graphics& g)
         g.setColour (juce::Colours::white.withAlpha (0.16f));
         g.strokePath (p, juce::PathStrokeType (0.8f), juce::AffineTransform::translation (-0.3f, -0.9f));
         // the plugs' metal sleeves, where each lead goes into a box
-        for (auto end : { from, to })
+        for (int i = 0; i < 2; ++i)
         {
-            g.setColour (juce::Colour (0xff9da1a5));
-            g.fillRoundedRectangle (juce::Rectangle<float> (4.0f, 5.0f).withCentre (end), 1.0f);
+            const auto end = i == 0 ? from : to;
+            const float dir = i == 0 ? 1.0f : -1.0f; // which way the lead leaves the box
+            // a moulded boot on the lead, then the plug's metal sleeve against the box
+            g.setColour (juce::Colour (0xff0b0b0b));
+            g.fillRoundedRectangle (juce::Rectangle<float> (6.0f, 5.6f).withCentre ({ end.x + dir * 4.5f, end.y + 0.6f }), 2.0f);
+            const auto sleeve = juce::Rectangle<float> (4.4f, 6.4f).withCentre (end);
+            g.setGradientFill (juce::ColourGradient (juce::Colour (0xffe4e6e8), 0.0f, sleeve.getY(), juce::Colour (0xff6c7074), 0.0f, sleeve.getBottom(), false));
+            g.fillRoundedRectangle (sleeve, 1.0f);
         }
     };
     juce::Point<float> from (x0 + 7.0f, y);
@@ -427,11 +435,22 @@ void ChainStrip::paint (juce::Graphics& g)
     for (auto [x, label] : { std::pair<float, const char*> { x0, "In" }, { x1, "Out" } })
     {
         // a quarter-inch jack plate
-        const auto plate = juce::Rectangle<float> (18.0f, 18.0f).withCentre ({ x, y });
-        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffb9b7b2), plate.getX(), plate.getY(), juce::Colour (0xff4a4946), plate.getRight(), plate.getBottom(), false));
+        // a quarter-inch socket: a hex nut on a washer, round the hole
+        const auto plate = juce::Rectangle<float> (20.0f, 20.0f).withCentre ({ x, y });
+        g.setColour (juce::Colours::black.withAlpha (0.5f));
+        g.fillEllipse (plate.translated (0.6f, 1.6f));
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xff8e9195), plate.getX(), plate.getY(), juce::Colour (0xff3d3f42), plate.getRight(), plate.getBottom(), false));
         g.fillEllipse (plate);
-        g.setColour (juce::Colour (0xff0b0b0b));
-        g.fillEllipse (plate.reduced (5.0f));
+        juce::Path nut;
+        nut.addPolygon ({ x, y }, 6, 8.6f, 0.0f);
+        g.setGradientFill (juce::ColourGradient (juce::Colour (0xffeceeef), plate.getX(), plate.getY(), juce::Colour (0xff6a6e72), plate.getRight(), plate.getBottom(), false));
+        g.fillPath (nut);
+        g.setColour (juce::Colours::black.withAlpha (0.35f));
+        g.strokePath (nut, juce::PathStrokeType (0.6f));
+        g.setColour (juce::Colour (0xff060606));
+        g.fillEllipse (plate.reduced (5.6f));
+        g.setColour (juce::Colours::white.withAlpha (0.35f));
+        g.drawEllipse (plate.reduced (5.2f), 0.7f);
         drawCaps (g, label, juce::Rectangle<float> (x - 20.0f, y + 12.0f, 40.0f, 14.0f), 10.5f, colours::textDim, juce::Justification::centred, 0.14f);
     }
 }
@@ -892,6 +911,22 @@ void ModulePage::paint (juce::Graphics& g)
     if (pedalImage.isValid())
         g.drawImage (pedalImage, pedalDraw);
     drawPedalLed (g, pedal, design(), on);
+    if (! faders.isEmpty())
+    {
+        // the scale the sliders are read against, printed beside the first one
+        auto& s = faders[0]->getSlider();
+        const float x = (float) faders[0]->getX() - 4.0f, top = (float) (faders[0]->getY() + s.getY());
+        const double hi = s.getMaximum(), lo = s.getMinimum();
+        g.setFont (faceFont (Face::shoulders, 12.0f));
+        g.setColour (juce::Colour (design().ink).withAlpha (on ? 0.85f : 0.5f));
+        for (const double v : { hi, 0.0, lo })
+        {
+            const float y = top + s.getPositionOfValue (v);
+            const juce::String t = (v > 0.0 ? "+" : "") + juce::String (juce::roundToInt (v));
+            g.drawText (t, juce::Rectangle<float> (x - 30.0f, y - 8.0f, 30.0f, 16.0f), juce::Justification::centredRight);
+        }
+        g.drawText ("dB", juce::Rectangle<float> (x - 30.0f, top + s.getPositionOfValue (lo) + 12.0f, 30.0f, 16.0f), juce::Justification::centredRight);
+    }
 }
 
 //==============================================================================
@@ -1035,7 +1070,13 @@ void AmpPage::paint (juce::Graphics& g)
     const bool on = power.isOn();
     drawCaps (g, "Amp", titleArea.toFloat(), 12.0f, colours::textDim);
     if (current != choices::neuralCapture)
-        drawCaps (g, ampTags (current), tagArea.toFloat(), 11.5f, colours::textDim, juce::Justification::centredRight, 0.08f);
+    {
+        // what the amp is good for, said as that
+        const auto tags = ampTags (current);
+        const float tw = capsWidth (tags, 11.5f, 0.08f);
+        drawCaps (g, tags, tagArea.toFloat(), 11.5f, colours::textDim, juce::Justification::centredRight, 0.08f);
+        drawCaps (g, "Good for", tagArea.toFloat().withTrimmedRight (tw + 10.0f), 11.5f, colours::textFaint, juce::Justification::centredRight, 0.08f);
+    }
     g.setColour (colours::textDim);
     g.setFont (font (13.5f));
     g.drawText (status.isNotEmpty() ? status : describeChoice (P::ampModel, current), descArea, juce::Justification::centred, true);
