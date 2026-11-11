@@ -212,7 +212,7 @@
       page.classList.add('is-fuzz');
       if (say) say.textContent = on ? 'Fuzz on. Press again for clean.' : 'Press the pedal for fuzz.';
       pedal.classList.add('is-down');
-      setTimeout(() => pedal.classList.remove('is-down'), 150);
+      setTimeout(() => pedal.classList.remove('is-down'), 170);
       settle(on ? Math.max(3, parseFloat(getComputedStyle($('h1', hero)).fontSize) * 0.045) : 0);
       if (!on) setTimeout(() => { if (!on) page.classList.remove('is-fuzz'); }, calm ? 0 : 560);
     });
@@ -225,11 +225,11 @@
         queued = false;
         const r = pedal.getBoundingClientRect();
         const x = (e.clientX - (r.left + r.width / 2)) / innerWidth, y = (e.clientY - (r.top + r.height / 2)) / innerHeight;
-        pedal.style.setProperty('--ry', `${(x * 16).toFixed(2)}deg`);
-        pedal.style.setProperty('--rx', `${(-y * 12).toFixed(2)}deg`);
+        hero.style.setProperty('--tx', Math.max(-1, Math.min(1, x * 2.4)).toFixed(3));
+        hero.style.setProperty('--ty', Math.max(-1, Math.min(1, y * 2.4)).toFixed(3));
       });
     });
-    hero.addEventListener('pointerleave', () => { pedal.style.setProperty('--ry', '0deg'); pedal.style.setProperty('--rx', '0deg'); });
+    hero.addEventListener('pointerleave', () => { hero.style.setProperty('--tx', 0); hero.style.setProperty('--ty', 0); });
   }
 
   /* Numbers that count up when they are first seen, and grids whose pieces land one after another */
