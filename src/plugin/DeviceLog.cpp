@@ -23,6 +23,8 @@ namespace
     constexpr juce::int64 kFileMax = 200 * 1024; // the file starts over past this
     constexpr double kFrozenMs = 1200.0;       // the window not answering for this long is written down
     constexpr double kSlowStartMs = 15000.0;   // a start that has not finished by then is written down
+    constexpr double kSteadyGapMs = 600.0;     // beats closer than this are the window keeping up
+    constexpr int kSteadyBeats = 4;            // this many in a row and the start is over
 
     double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
@@ -95,10 +97,23 @@ namespace
         void timerCallback() override
         {
             const double now = nowMs();
+            const double gap = now - beat.load();
             beat.store (now);
-            // the first beat comes when everything is built and the window can be used
-            if (! ready.exchange (true))
-                write ("The window was ready " + juce::String (juce::roundToInt (now - startedAt)) + " ms after starting");
+            if (ready.load()) return;
+            // The first beat comes when everything is built, but the first picture is still to
+            // be drawn and a first setup still to be opened, and the window waits through both.
+            // The start is over when the beats come without a pause; the time written down is
+            // the moment that began, which is when the window could be used.
+            if (steady == 0 || gap > kSteadyGapMs)
+            {
+                steady = 1;
+                steadySince = now;
+            }
+            else if (++steady >= kSteadyBeats)
+            {
+                ready.store (true);
+                write ("The window was ready " + juce::String (juce::roundToInt (steadySince - startedAt)) + " ms after starting");
+            }
         }
         juce::String doingNow() const
         {
@@ -141,7 +156,8 @@ namespace
         }
         std::atomic<double> beat { 0.0 };
         std::atomic<bool> ready { false };
-        double startedAt = 0.0;
+        double startedAt = 0.0, steadySince = 0.0; // steadySince and steady: the window's thread only
+        int steady = 0;
     };
 
     std::unique_ptr<FreezeWatch> watch;

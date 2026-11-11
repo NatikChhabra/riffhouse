@@ -3,6 +3,7 @@
 #include "AudioPicker.h"
 #include "Editor.h"
 #include "Motion.h"
+#include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
 #include "TakesView.h"
 
@@ -990,7 +991,20 @@ RiffhouseEditor::~RiffhouseEditor()
     juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
 }
 
-void RiffhouseEditor::paint (juce::Graphics& g) { g.fillAll (colours::bg); }
+void RiffhouseEditor::paint (juce::Graphics& g)
+{
+    if (! firstPaintDone && firstPaintBegan == 0.0) firstPaintBegan = juce::Time::getMillisecondCounterHiRes();
+    g.fillAll (colours::bg);
+}
+
+void RiffhouseEditor::paintOverChildren (juce::Graphics&)
+{
+    // The first picture is the slowest one: every piece of gear is drawn for the first time.
+    // How long it took goes into the diary, so a slow start can be told from a slow sound card.
+    if (firstPaintDone) return;
+    firstPaintDone = true;
+    devlog::note ("The window's first picture took " + juce::String (juce::roundToInt (juce::Time::getMillisecondCounterHiRes() - firstPaintBegan)) + " ms to draw");
+}
 
 void RiffhouseEditor::buildRoot()
 {
@@ -1070,6 +1084,8 @@ void RiffhouseEditor::showSetupWizard (bool again)
         juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<RiffhouseEditor> (this)]
                                          { if (safe != nullptr) safe->closeSetupWizard(); });
     };
+    // listing the inputs asks every kind of driver what it has
+    devlog::Timed listing ("Opening setup: listing the inputs");
     root->wizard->begin (again);
 }
 

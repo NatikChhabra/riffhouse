@@ -32,7 +32,7 @@ Each release on GitHub carries the notes of its version from this file.
 
 - Riffhouse keeps a short diary of what it did with the sound card: what it opened, how long that took, what failed. It stays on your computer, in "Riffhouse log.txt" beside the settings.
 - If the window stops answering for more than a second, the diary says what it was waiting for. If the app closes by itself, the next start writes down where.
-- The diary notes how long the app took to start, and what it was opening if a start takes more than fifteen seconds.
+- The diary notes how long the app took to start, how long the window took to draw the first time, and what it was opening if a start takes more than fifteen seconds.
 - "Report a problem" and "Save a report" in Settings include the last lines of the diary. Nothing is sent by itself.
 - After a run that froze or closed by itself, the next start says so once and points to "Report a problem".
 

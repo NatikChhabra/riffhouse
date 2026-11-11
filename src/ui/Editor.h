@@ -21,6 +21,7 @@ public:
     ~RiffhouseEditor() override;
     void resized() override;
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     bool keyPressed (const juce::KeyPress&) override;
 
     static constexpr int baseWidth = 1200, baseHeight = 780;
@@ -59,6 +60,8 @@ private:
     juce::TooltipWindow tooltips { this, 600 };
     InputGuard inputGuard;
     int guardTick = 0;
+    double firstPaintBegan = 0.0; // the first picture is timed for the diary
+    bool firstPaintDone = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RiffhouseEditor)
 };
