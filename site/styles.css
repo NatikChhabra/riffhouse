@@ -116,6 +116,12 @@ button.btn { border: 0; cursor: pointer; }
 .hero h1 .line > span { display: block; white-space: nowrap; }
 .hero-say { position: relative; z-index: 1; margin-top: auto; padding-top: 32px; max-width: 30em; display: grid; gap: 28px; }
 .hero-say .lead { font-weight: 500; max-width: 26em; }
+.defs { position: absolute; }
+.hero-pedal { border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; display: block; }
+.hero-pedal img { width: 100%; height: auto; transition: transform 140ms var(--ease); transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+.hero-pedal:active img, .hero-pedal.is-down img { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateY(1.2%) scale(.97); }
+.stomp-say { font-size: var(--t-small); font-weight: 500; }
+.hero.is-fuzz h1 { filter: url(#fuzz); }
 .hero-pedal { position: absolute; z-index: 0; width: min(calc((100% - 2 * var(--g)) * .4), 62svh, 640px); right: calc(var(--g) + 40px); top: calc(var(--top) + var(--h1) * .92 + 24px); rotate: -6deg; transform-origin: 50% 60%; }
 
 /* The mic jack */
@@ -273,7 +279,7 @@ details:not([open]) > p { display: none; }
 }
 @media (max-width: 699px) {
   :root { --top: 64px; --t-body: 17px; }
-  .top nav { gap: 14px; }
+  .top nav { gap: 16px; }
   .top nav a:last-child { display: none; }
   .wordmark { font-size: 18px; gap: 8px; letter-spacing: .1em; }
   .pan .shot { margin-inline: calc(var(--g) * -1); }
@@ -299,6 +305,8 @@ details:not([open]) > p { display: none; }
 @keyframes pedal-in { from { opacity: 0; transform: translateY(14%) rotate(5deg); } }
 @keyframes say-in { from { opacity: 0; transform: translateY(16px); } }
 @keyframes push { from { transform: translateX(5%); } }
+@keyframes drift { to { translate: 0 22vh; rotate: -15deg; } }
+@keyframes pan-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes chain-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -310,13 +318,22 @@ details:not([open]) > p { display: none; }
 
   html.js [data-reveal] { transition: opacity 700ms var(--ease), transform 700ms var(--ease), clip-path 900ms var(--ease); }
   html.js [data-reveal="rise"]:not(.is-in) { opacity: 0; transform: translateY(24px); }
+  html.js [data-reveal="pop"] > li { transition: transform 620ms var(--ease); transition-delay: calc(var(--i, 0) * 45ms); }
+  html.js [data-reveal="pop"]:not(.is-in) > li { transform: translateY(36px) scale(.93); }
+  .rail-row img, .amp-row img { transition: transform 220ms var(--ease); }
+  .pan:not([hidden]) { animation: pan-in 380ms var(--ease) both; }
   html.js [data-reveal="open"] img { clip-path: inset(0); transition: clip-path 900ms var(--ease); }
   html.js [data-reveal="open"]:not(.is-in) img { clip-path: inset(0 0 100% 0); }
   .steps li:nth-child(2), .facts > li:nth-child(2) { transition-delay: 70ms; }
   .steps li:nth-child(3), .facts > li:nth-child(3) { transition-delay: 140ms; }
   .steps li:nth-child(4), .facts > li:nth-child(4) { transition-delay: 210ms; }
 
+  @media (hover: hover) and (pointer: fine) {
+    .rail-row li:hover img { transform: translateY(-10px) rotate(-3deg); }
+    .amp-row li:hover img { transform: translateY(-8px); }
+  }
   @supports (animation-timeline: view()) {
+    .hero-pedal { animation: pedal-in 900ms var(--ease) 160ms both, drift linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 100svh; }
     .monument span { animation: push linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
   }
 }

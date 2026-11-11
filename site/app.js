@@ -181,9 +181,78 @@
     });
   }
 
+  /* The pedal in the first screen: it leans toward the pointer, and pressing it puts fuzz on the headline */
+  function stomp() {
+    const pedal = $('[data-stomp]'), hero = pedal && pedal.closest('.hero');
+    if (!pedal) return;
+    const say = $('[data-stomp-say]'), map = $('#fuzz feDisplacementMap');
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let on = false, raf = 0;
+    const settle = (to) => {
+      cancelAnimationFrame(raf);
+      if (calm) { map.setAttribute('scale', to); return; }
+      const t0 = performance.now(), peak = on ? to * 3.6 : 0, from = Number(map.getAttribute('scale'));
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / 520);
+        const kick = on ? Math.sin(k * Math.PI) * peak * (1 - k) : 0;
+        map.setAttribute('scale', (from + (to - from) * k + kick).toFixed(1));
+        if (k < 1) raf = requestAnimationFrame(step);
+      };
+      raf = requestAnimationFrame(step);
+    };
+    pedal.addEventListener('click', () => {
+      on = !on;
+      pedal.setAttribute('aria-pressed', on);
+      hero.classList.add('is-fuzz');
+      if (say) say.textContent = on ? 'Fuzz on. Press again for clean.' : 'Press the pedal for fuzz.';
+      pedal.classList.add('is-down');
+      setTimeout(() => pedal.classList.remove('is-down'), 150);
+      settle(on ? Math.max(3, parseFloat(getComputedStyle($('h1', hero)).fontSize) * 0.045) : 0);
+      if (!on) setTimeout(() => { if (!on) hero.classList.remove('is-fuzz'); }, calm ? 0 : 560);
+    });
+    if (calm || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    let queued = false;
+    hero.addEventListener('pointermove', (e) => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        const r = pedal.getBoundingClientRect();
+        const x = (e.clientX - (r.left + r.width / 2)) / innerWidth, y = (e.clientY - (r.top + r.height / 2)) / innerHeight;
+        pedal.style.setProperty('--ry', `${(x * 16).toFixed(2)}deg`);
+        pedal.style.setProperty('--rx', `${(-y * 12).toFixed(2)}deg`);
+      });
+    });
+    hero.addEventListener('pointerleave', () => { pedal.style.setProperty('--ry', '0deg'); pedal.style.setProperty('--rx', '0deg'); });
+  }
+
+  /* Numbers that count up when they are first seen, and grids whose pieces land one after another */
+  function counts() {
+    $$('[data-reveal="pop"]').forEach((list) => {
+      const cols = getComputedStyle(list).gridTemplateColumns.split(' ').length || 1;
+      [...list.children].forEach((li, i) => li.style.setProperty('--i', i % cols));
+    });
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
+    $$('[data-count]').forEach((el) => {
+      const out = $('[data-count-out]', el), end = Number(el.dataset.count), unit = out.textContent.replace(/^[0-9.]+/, '');
+      const io = new IntersectionObserver((seen) => {
+        if (!seen[0].isIntersecting) return;
+        io.disconnect();
+        const t0 = performance.now();
+        const step = (now) => {
+          const k = Math.min(1, (now - t0) / 900), eased = 1 - Math.pow(1 - k, 3);
+          out.textContent = Math.round(end * eased) + unit;
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }, { threshold: 0.6 });
+      io.observe(el);
+    });
+  }
+
   const SPONSOR_URL = '';
   const sponsor = $('[data-sponsor]');
   if (sponsor && SPONSOR_URL) { sponsor.href = SPONSOR_URL; sponsor.hidden = false; }
 
-  tabs(); reveals(); download(); finder(); demos(); copyId();
+  tabs(); reveals(); download(); finder(); demos(); copyId(); stomp(); counts();
 })();
