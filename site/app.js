@@ -45,7 +45,7 @@
 
     const show = (t, fresh) => {
       current = t;
-      $('[data-rig-name]', root).textContent = t.n;
+      $('[data-rig-name]', root).textContent = t.w ? `${t.w}: ${t.t}` : t.n;
       $('[data-rig-desc]', root).textContent = t.d;
       $('[data-rig-kind]', root).textContent = [t.c, ...t.g].join(', ');
       chain.replaceChildren(...t.r.map(([slot, i, name], n) => {
@@ -66,17 +66,19 @@
     };
 
     const more = $('[data-more]', root);
+    /* A tone made after someone shows who first, the way the app lists it: the band, then the title */
+    const label = (t) => (t.w ? [el('b', { textContent: t.w }), ` ${t.t}`] : [t.n]);
     const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
     let peek = 0;
-    const few = () => (matchMedia('(max-width: 699px)').matches ? 6 : 12);
+    const few = () => (matchMedia('(max-width: 699px)').matches ? 5 : 12);
     let all = false;
     const draw = () => {
       const q = search.value.trim().toLowerCase();
       const hits = tones.filter((t) => (kind === 'All' || t.c === kind || t.g.includes(kind))
-        && (!q || `${t.n} ${t.a} ${t.g.join(' ')} ${t.d} ${t.c}`.toLowerCase().includes(q)));
+        && (!q || `${t.n} ${t.a} ${t.b || ''} ${t.s || ''} ${t.g.join(' ')} ${t.d} ${t.c}`.toLowerCase().includes(q)));
       list.replaceChildren(...(all ? hits : hits.slice(0, few())).map((t) => {
         const b = el('button', { type: 'button', className: 'tone' }, [
-          el('span', { className: 'tone-n', textContent: t.n }), el('span', { className: 'tone-d', textContent: t.d })]);
+          el('span', { className: 'tone-n' }, label(t)), el('span', { className: 'tone-d', textContent: (t.x || '') + t.d })]);
         b.dataset.n = t.n;
         b.setAttribute('aria-pressed', t.n === current.n);
         b.classList.toggle('is-on', t.n === current.n);
