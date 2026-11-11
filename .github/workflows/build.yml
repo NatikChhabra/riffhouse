@@ -216,8 +216,13 @@ jobs:
           if ($left) { throw "Riffhouse.exe is still there after the uninstaller ran" }
           "Installed $installed, started, drew its screens, removed."
 
+      # The pictures are only there to look at when something went wrong. A build that passed
+      # every check is not failed because GitHub could not store them (11 November 2026: this
+      # step hung for ten minutes and failed a build that was green).
       - uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
+        timeout-minutes: 5
         with:
           name: riffhouse-windows-screens
           path: smoke
