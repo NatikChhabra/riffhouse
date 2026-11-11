@@ -222,6 +222,9 @@ void Cabinet::prepare (double sampleRate, int maxBlock)
     rebuildNow();
     conv.prepare (spec);
     prepared = true;
+    // A fresh start is silent: the two filters after the speaker would otherwise ring on with
+    // whatever played before, and the next tone began on top of the last one's final samples.
+    reset();
     lowHz = highHz = 0;
     set (model.load(), mic.load(), distance.load(), 60.0f, 12000.0f);
     if (! offline) startThread (juce::Thread::Priority::low);

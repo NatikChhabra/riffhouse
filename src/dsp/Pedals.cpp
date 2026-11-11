@@ -924,6 +924,7 @@ void Reverb::reset()
     std::fill (std::begin (springAp), std::end (springAp), 0.0f);
     std::fill (std::begin (lastOut), std::end (lastOut), 0.0f);
     bandwidth.reset(); springLp.reset(); springHp.reset();
+    shimPhase = 0.0f; // the shimmer's octave shifter starts each time from the same place
 }
 
 void Reverb::set (int t, float d, float p, float tn, float m)

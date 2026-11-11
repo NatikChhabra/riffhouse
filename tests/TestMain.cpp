@@ -771,7 +771,8 @@ void testLevelMatch (double sr)
             // something else in between, then the same tone again: it must read the same
             measureLoudnessDb (meter, toneForMeasuring (presets[((size_t) count * 7 + 3) % presets.size()].values), phrase);
             const float again = measureLoudnessDb (meter, tone, phrase);
-            CHECK (std::abs (again - loud) < 0.005f, "%s: the same tone reads %.4f then %.4f", p.name.toRawUTF8(), loud, again);
+            // nothing of the tone before may be left in the rig: not a tail, not a filter still ringing
+            CHECK (std::abs (again - loud) < 0.001f, "%s: the same tone reads %.4f then %.4f", p.name.toRawUTF8(), loud, again);
         }
         LevelKeeper k;
         const float trim = k.reading (loud, ToneChange::none);

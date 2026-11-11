@@ -206,7 +206,7 @@ jobs:
           $log = Join-Path $env:APPDATA 'Riffhouse\Riffhouse log.txt'
           if (-not (Test-Path $log)) { throw "The app kept no log of its start" }
           Get-Content $log -Tail 60
-          if (Select-String -Path $log -Pattern 'stopped answering|ended in a crash' -Quiet) { throw "The log says the window froze or the app crashed" }
+          if (Select-String -Path $log -Pattern 'stopped answering|Starting is taking more|ended in a crash' -Quiet) { throw "The log says the window froze or the app crashed" }
 
           $remove = Join-Path (Split-Path $app) 'unins000.exe'
           if (-not (Test-Path $remove)) { throw "No uninstaller next to the app" }

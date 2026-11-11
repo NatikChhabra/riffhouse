@@ -388,6 +388,9 @@ void runDeviceChecks (int& checks, int& failures)
         devlog::note ("The window answers again");
         devlog::start (folder, "test");
         CHECK (devlog::lastRun() == LastRun::cutShort, "a freeze that passed is not blamed for a run that was cut short");
+        devlog::note ("Starting is taking more than 15 seconds while: Start: opening the sound card");
+        devlog::start (folder, "test");
+        CHECK (devlog::lastRun() == LastRun::froze, "a start that never finished counts as frozen");
         folder.getChildFile ("last-crash.txt").replaceWithText ("code c0000005 at 1234");
         devlog::start (folder, "test");
         CHECK (devlog::lastRun() == LastRun::crashed && devlog::tail (4).contains ("c0000005"), "a crash note from the last run is read into the diary");

@@ -22,6 +22,7 @@ namespace
     constexpr int kKept = 400;                 // lines in memory
     constexpr juce::int64 kFileMax = 200 * 1024; // the file starts over past this
     constexpr double kFrozenMs = 1200.0;       // the window not answering for this long is written down
+    constexpr double kSlowStartMs = 15000.0;   // a start that has not finished by then is written down
 
     double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
@@ -48,8 +49,8 @@ namespace
             if (l.contains ("---- closed")) return LastRun::fine;
             if (l.contains ("---- Riffhouse ")) return frozen ? LastRun::froze : LastRun::cutShort;
             if (sawFreezeLine) continue;
-            if (l.contains ("The window answers again")) sawFreezeLine = true;
-            else if (l.contains ("The window stopped answering")) sawFreezeLine = frozen = true;
+            if (l.contains ("The window answers again") || l.contains ("The window was ready")) sawFreezeLine = true;
+            else if (l.contains ("The window stopped answering") || l.contains ("Starting is taking more than")) sawFreezeLine = frozen = true;
         }
         return LastRun::fine; // nothing written yet
     }
@@ -77,7 +78,8 @@ namespace
     public:
         FreezeWatch() : juce::Thread ("Riffhouse freeze watch")
         {
-            beat.store (nowMs());
+            startedAt = nowMs();
+            beat.store (startedAt);
             startTimer (250);
             startThread (juce::Thread::Priority::low);
         }
@@ -90,23 +92,44 @@ namespace
         }
 
     private:
-        void timerCallback() override { beat.store (nowMs()); }
+        void timerCallback() override
+        {
+            const double now = nowMs();
+            beat.store (now);
+            // the first beat comes when everything is built and the window can be used
+            if (! ready.exchange (true))
+                write ("The window was ready " + juce::String (juce::roundToInt (now - startedAt)) + " ms after starting");
+        }
+        juce::String doingNow() const
+        {
+            auto& s = state();
+            const juce::ScopedLock l (s.lock);
+            return s.doing;
+        }
         void run() override
         {
-            bool frozen = false;
+            bool frozen = false, slowStart = false;
             while (! threadShouldExit())
             {
                 wait (400);
+                if (! ready.load())
+                {
+                    // Starting is one long piece of work for the window, so it gets more time
+                    // before anything is written down.
+                    if (! slowStart && nowMs() - startedAt > kSlowStartMs)
+                    {
+                        slowStart = true;
+                        const auto doing = doingNow();
+                        write ("Starting is taking more than " + juce::String ((int) (kSlowStartMs / 1000.0)) + " seconds"
+                               + (doing.isNotEmpty() ? " while: " + doing : juce::String()));
+                    }
+                    continue;
+                }
                 const double quiet = nowMs() - beat.load();
                 if (! frozen && quiet > kFrozenMs)
                 {
                     frozen = true;
-                    juce::String doing;
-                    {
-                        auto& s = state();
-                        const juce::ScopedLock l (s.lock);
-                        doing = s.doing;
-                    }
+                    const auto doing = doingNow();
                     write ("The window stopped answering" + (doing.isNotEmpty() ? " while: " + doing : juce::String (" (no sound card work in progress)")));
                 }
                 else if (frozen && quiet < 600.0)
@@ -117,6 +140,8 @@ namespace
             }
         }
         std::atomic<double> beat { 0.0 };
+        std::atomic<bool> ready { false };
+        double startedAt = 0.0;
     };
 
     std::unique_ptr<FreezeWatch> watch;

@@ -139,7 +139,16 @@ public:
         juce::Array<juce::StandalonePluginHolder::PluginInOuts> channels;
         channels.add ({ 2, 2 });
         // the last argument: every MIDI input is opened as it appears, so a foot controller works the moment it is plugged in
-        holder = std::make_unique<juce::StandalonePluginHolder> (s, false, juce::String(), nullptr, channels, true);
+        {
+            // the sound card that was saved is opened in here; if the start hangs, the diary says where
+            devlog::Timed opening ("Start: opening the sound card that was in use last time");
+            holder = std::make_unique<juce::StandalonePluginHolder> (s, false, juce::String(), nullptr, channels, true);
+            if (auto* dev = holder->deviceManager.getCurrentAudioDevice())
+                opening.result (holder->deviceManager.getCurrentAudioDeviceType() + ", " + dev->getName() + ", "
+                                + juce::String (dev->getCurrentBufferSizeSamples()) + " samples");
+            else
+                opening.result ("nothing opened");
+        }
         holder->getMuteInputValue().setValue (false);
         instance = this;
 

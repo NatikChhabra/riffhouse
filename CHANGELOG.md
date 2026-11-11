@@ -32,12 +32,14 @@ Each release on GitHub carries the notes of its version from this file.
 
 - Riffhouse keeps a short diary of what it did with the sound card: what it opened, how long that took, what failed. It stays on your computer, in "Riffhouse log.txt" beside the settings.
 - If the window stops answering for more than a second, the diary says what it was waiting for. If the app closes by itself, the next start writes down where.
+- The diary notes how long the app took to start, and what it was opening if a start takes more than fifteen seconds.
 - "Report a problem" and "Save a report" in Settings include the last lines of the diary. Nothing is sent by itself.
 - After a run that froze or closed by itself, the next start says so once and points to "Report a problem".
 
 ### Small things
 
 - With your guitar on an audio interface, the end of setup reminds you to switch off Direct Monitor. That is the reason for hearing the guitar twice.
+- The speaker cabinet starts silent every time. Its two filters used to carry the last samples of whatever played before into the next start. It was far too quiet to hear, but it made two measurements of the same tone differ.
 - The folder with the bare guitar of each take is now called "Clean guitar (for Change the tone)", not "DI". Takes recorded before still work.
 
 ### How builds are checked now
