@@ -19,7 +19,7 @@ SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] != "--tones" else
 # Cutout file, name on the box, what it does, in the order of the signal chain.
 PEDALS = [
     ("gate-0", "Silencer", "Noise gate"), ("comp-0", "Squeeze", "Compressor"),
-    ("wah-0", "Funk Filter", "Wah and envelope filter"), ("pitch-0", "Deep Octave", "Octave and pitch"),
+    ("wah-0", "Funk Filter", "Wah and envelope filter"), ("wah-2", "Throat", "Classic 60s wah"), ("pitch-0", "Deep Octave", "Octave and pitch"),
     ("drive-0", "Clean Boost", "Boost"), ("drive-1", "Treble Booster", "Boost"),
     ("drive-2", "Green Drive", "Overdrive"), ("drive-3", "Blues Drive", "Overdrive"),
     ("drive-4", "Rodent", "Distortion"), ("drive-5", "Big Fuzz", "Fuzz"), ("drive-6", "Metal Box", "Distortion"),

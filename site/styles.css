@@ -274,6 +274,7 @@ button.more { border: 0; padding: 0; background: none; cursor: pointer; text-dec
 .rail-row b { font-size: var(--t-small); font-weight: 600; }
 .rail-own { align-self: stretch; align-content: end; padding: 16px; border-radius: var(--r-m); background: var(--bone-2); }
 .rail-own p { font-size: var(--t-small); color: var(--soft); }
+.rail-row .rail-own { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 20px 24px; }
 .amps { margin-top: clamp(48px, 6vw, 88px); }
 .amp-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(36px, 4vw, 56px) var(--gap); align-items: end; }
 .amp-row li { display: grid; gap: 2px; min-width: 0; }
@@ -473,7 +474,6 @@ details:not([open]) > p { display: none; }
   .found { grid-column: 1 / -1; display: grid; gap: 12px; padding: 24px; border-radius: var(--r-m); background: var(--well); font-weight: 500; }
   .found li { display: grid; grid-template-columns: 12px 1fr; gap: 12px; align-items: center; }
   .found li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
-  .rail-row .rail-own { grid-column: 1 / -1; }
   .amp-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 16px; }
   .rail-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px 16px; }
   .upi { grid-template-columns: minmax(0, 1fr); padding: 20px; }
