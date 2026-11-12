@@ -725,6 +725,32 @@ namespace icons
         return p;
     }
 
+    juce::Path chordBox()
+    {
+        // a chord box: the nut, four strings, three frets and one finger on them
+        juce::Path p;
+        p.startNewSubPath (5, 4); p.lineTo (19, 4);
+        for (float x : { 5.0f, 9.67f, 14.33f, 19.0f }) { p.startNewSubPath (x, 4); p.lineTo (x, 21); }
+        for (float y : { 9.67f, 15.33f }) { p.startNewSubPath (5, y); p.lineTo (19, y); }
+        p.addEllipse (10.6f, 11.1f, 2.8f, 2.8f);
+        return p;
+    }
+
+    juce::Path plus()
+    {
+        juce::Path p;
+        p.startNewSubPath (12, 6); p.lineTo (12, 18);
+        p.startNewSubPath (6, 12); p.lineTo (18, 12);
+        return p;
+    }
+
+    juce::Path minus()
+    {
+        juce::Path p;
+        p.startNewSubPath (6, 12); p.lineTo (18, 12);
+        return p;
+    }
+
     juce::Path star (bool)
     {
         juce::Path p;

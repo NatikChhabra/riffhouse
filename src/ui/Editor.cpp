@@ -6,6 +6,7 @@
 #include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
 #include "TakesView.h"
+#include "SongSheet.h"
 
 namespace rh
 {
@@ -349,6 +350,8 @@ public:
         redoButton.onClick = [this] { stepHistory (true); };
         loopButton.setTooltip ("Looper (O records, plays and layers)");
         loopButton.onClick = [this] { showPopover (looperPanel, loopButton.getBounds(), 320, 286); };
+        sheetButton.setTooltip ("Chords and tabs: paste a song to play along");
+        sheetButton.onClick = [this] { toggleOverlay (sheetView); };
         tunerButton.setTooltip ("Tuner (T)");
         tunerButton.onClick = [this] { toggleOverlay (tuner); };
         metroButton.setTooltip ("Metronome");
@@ -358,7 +361,7 @@ public:
         recordOptions.setTooltip ("Recording options and play-along");
         recordOptions.onClick = [this] { showPopover (recordPanel, recordOptions.getBounds(), 380, 522); };
         record.onClick = [this] { toggleRecording(); };
-        for (auto* b : { &favourite, &saveButton, &undoButton, &redoButton, &loopButton, &tunerButton, &metroButton, &settingsButton, &recordOptions })
+        for (auto* b : { &favourite, &saveButton, &undoButton, &redoButton, &loopButton, &sheetButton, &tunerButton, &metroButton, &settingsButton, &recordOptions })
         {
             b->drawBackground = false;
             b->iconSize = 18.0f;
@@ -411,6 +414,8 @@ public:
         browser.onLoaded = [this] { refreshTop(); };
         browser.onMessage = [this] (juce::String m) { editor.showToast (m); };
         tuner.onClose = [this] { closeOverlays(); };
+        sheetView.onClose = [this] { closeOverlays(); };
+        sheetView.onMessage = [this] (juce::String m) { editor.showToast (m); };
         settings.onClose = [this] { closeOverlays(); };
         settings.onRunSetup = [this] { closeOverlays(); editor.showSetupWizard(); };
         settings.onMessage = [this] (const juce::String& m) { editor.showToast (m); };
@@ -440,7 +445,7 @@ public:
         metroPanel.onChange = [this] { refreshTop(); };
         scrim.onClick = [this] { closePopovers(); };
         for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings,
-                                    (juce::Component*) &takesView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel, (juce::Component*) &looperPanel,
+                                    (juce::Component*) &takesView, (juce::Component*) &sheetView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel, (juce::Component*) &looperPanel,
                                     (juce::Component*) &saveDialog })
             addChildComponent (c);
         addChildComponent (dropHint);
@@ -564,6 +569,7 @@ public:
         proc.tunerOpen.store (&c == &tuner);
         tunerButton.setToggleState (&c == &tuner, juce::dontSendNotification);
         settingsButton.setToggleState (&c == &settings, juce::dontSendNotification);
+        sheetButton.setToggleState (&c == &sheetView, juce::dontSendNotification);
         placeBars();
         takeBar.toFront (false);
         toast.toFront (false);
@@ -575,14 +581,15 @@ public:
     {
         const int bottom = takeBar.isActive() ? bottomY() - 48 : getHeight();
         const auto overlay = juce::Rectangle<int> (0, topH + 1, getWidth(), bottom - topH - 1);
-        for (auto* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings, (juce::Component*) &takesView })
+        for (auto* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings, (juce::Component*) &takesView,
+                         (juce::Component*) &sheetView })
             c->setBounds (overlay);
     }
 
     // The strip for a playing take and the audio notice share one place above the bottom bar.
     void placeBars()
     {
-        const bool pageOpen = browser.isVisible() || tuner.isVisible() || settings.isVisible() || takesView.isVisible();
+        const bool pageOpen = browser.isVisible() || tuner.isVisible() || settings.isVisible() || takesView.isVisible() || sheetView.isVisible();
         takeBacking.setVisible (takeBar.isActive() && pageOpen);
         if (takeBacking.isVisible())
         {
@@ -607,12 +614,14 @@ public:
     void closeOverlays()
     {
         closePopovers();
-        for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings, (juce::Component*) &takesView })
+        for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings, (juce::Component*) &takesView,
+                                    (juce::Component*) &sheetView })
             c->setVisible (false);
         openOverlay = nullptr;
         proc.tunerOpen.store (false);
         tunerButton.setToggleState (false, juce::dontSendNotification);
         settingsButton.setToggleState (false, juce::dontSendNotification);
+        sheetButton.setToggleState (false, juce::dontSendNotification);
         takeBacking.setVisible (false);
     }
 
@@ -787,6 +796,7 @@ public:
         metroButton.setBounds (top.removeFromRight (66));
         tunerButton.setBounds (top.removeFromRight (34));
         loopButton.setBounds (top.removeFromRight (34));
+        sheetButton.setBounds (top.removeFromRight (34));
 
         // the tone's name sits dead centre between its two arrows; star and save follow on the right
         auto centre = juce::Rectangle<int> (0, 0, 380, topH).withCentre ({ getWidth() / 2, topH / 2 }).reduced (0, 8);
@@ -926,6 +936,7 @@ public:
     IconButton favourite { icons::star (false) }, saveButton { icons::save() };
     IconButton undoButton { icons::undo() }, redoButton { icons::redo() }, loopButton { icons::loop() };
     int historyTicks = 0;
+    IconButton sheetButton { icons::chordBox() };
     IconButton tunerButton { icons::tuningFork() }, metroButton { icons::metronome(), "100" }, settingsButton { icons::gear() };
     RecordButton record;
     IconButton recordOptions { icons::chevronDown() };
@@ -941,6 +952,7 @@ public:
     PresetBrowser browser;
     TunerView tuner;
     SettingsView settings;
+    SongSheetView sheetView;
     Scrim scrim;
     RecordPanel recordPanel;
     MetronomePanel metroPanel;
@@ -1159,13 +1171,14 @@ void RiffhouseEditor::rehearseSetup()
 
 namespace
 {
-enum class Dropped { none, capture, tone, sound };
+enum class Dropped { none, capture, tone, sound, song };
 
 Dropped kindOf (const juce::File& f)
 {
     const auto ext = f.getFileExtension().toLowerCase();
     if (ext == ".nam") return Dropped::capture;
     if (ext == ".json") return Dropped::tone;
+    if (SongSheetView::isSongFile (f)) return Dropped::song;
     if (juce::StringArray { ".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg", ".m4a" }.contains (ext)) return Dropped::sound;
     return Dropped::none;
 }
@@ -1254,6 +1267,12 @@ void RiffhouseEditor::openFile (const juce::File& f)
             root->closeOverlays();
             root->refreshTop();
             showToast ("Loaded \"" + p.name + "\". Save it to keep it.");
+            break;
+        }
+        case Dropped::song:
+        {
+            if (root->openOverlay != &root->sheetView) root->toggleOverlay (root->sheetView);
+            root->sheetView.importFile (f);
             break;
         }
         case Dropped::sound:
@@ -1546,6 +1565,17 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         for (const auto& [section, name] : each) { r.settings.show (section); shoot (name); }
         r.settings.show (S::sound);
     }
+    r.closeOverlays();
+    r.toggleOverlay (r.sheetView);
+    shoot ("sheet-empty");
+    r.sheetView.showExample (0, false);
+    shoot ("sheet");
+    r.sheetView.showExample (2, false);
+    shoot ("sheet-key");
+    r.sheetView.showExample (0, false, 1.0f);
+    shoot ("sheet-tab");
+    r.sheetView.showExample (0, true);
+    shoot ("sheet-edit");
     r.closeOverlays();
     r.showPopover (r.recordPanel, r.recordOptions.getBounds(), 380, 522);
     shoot ("record");
@@ -1903,6 +1933,31 @@ bool RiffhouseEditor::keyPressed (const juce::KeyPress& k)
     if (k == juce::KeyPress ('z', juce::ModifierKeys::commandModifier, 0)) { root->stepHistory (false); return true; }
     if (k == juce::KeyPress ('y', juce::ModifierKeys::commandModifier, 0)
         || k == juce::KeyPress ('z', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0)) { root->stepHistory (true); return true; }
+    if (k == juce::KeyPress ('v', juce::ModifierKeys::commandModifier, 0))
+    {
+        // a tone a friend sent: the whole message from the chat, pasted anywhere in the app
+        const auto text = juce::SystemClipboard::getTextFromClipboard();
+        if (! text.contains ("riffhouse:"))
+        {
+            // chords or tab copied from a website: they open on the song sheet
+            if (! SongSheetView::looksLikeSong (text)) return false;
+            if (root->openOverlay != &root->sheetView) root->toggleOverlay (root->sheetView);
+            root->sheetView.pasteSong (text);
+            return true;
+        }
+        Preset p;
+        juce::String err;
+        if (! presetFromShareCode (text, p, err))
+        {
+            showToast ("That tone code is cut short. Ask for it again and copy the whole message.");
+            return true;
+        }
+        proc.applySharedPreset (p);
+        root->closeOverlays();
+        root->refreshTop();
+        showToast ("Loaded \"" + p.name + "\" from your clipboard. Save it to keep it.");
+        return true;
+    }
     if (root->openOverlay == &root->browser || root->anyPopoverOpen()) return false;
     if (k == juce::KeyPress::leftKey) { root->stepPreset (-1); return true; }
     if (k == juce::KeyPress::rightKey) { root->stepPreset (1); return true; }

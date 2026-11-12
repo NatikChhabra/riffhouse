@@ -144,6 +144,9 @@ namespace icons
     juce::Path undo();
     juce::Path redo();
     juce::Path loop();
+    juce::Path chordBox();
+    juce::Path plus();
+    juce::Path minus();
 } // namespace icons
 
 // Surfaces

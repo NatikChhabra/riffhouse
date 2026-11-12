@@ -20,6 +20,7 @@
 #include "engine/Rig.h"
 #include "engine/UpdateInfo.h"
 #include "engine/DeviceNames.h"
+#include "engine/ChordSheet.h"
 #include "plugin/LevelMatcher.h"
 #include "plugin/Takes.h"
 #include "plugin/Export.h"
@@ -633,6 +634,22 @@ void testPresets (double sr)
         bool same = true;
         for (int i = 0; i < kNumParams; ++i) same &= std::abs (back.values[(size_t) i] - p.values[(size_t) i]) < 0.006f;
         CHECK (same, "share code changed %s", p.name.toRawUTF8());
+        if (levels.size() == 1)
+        {
+            // the code as it travels: the whole share message, wrapped by a chat app, words after it
+            const auto code = presetToShareCode (p);
+            const auto message = presetToShareMessage (p);
+            CHECK (message.contains ("Ctrl+V") && message.contains ("https://") && ! message.containsChar (0x2014),
+                   "share message: %s", message.toRawUTF8());
+            Preset viaMessage, wrapped, trailing, fake; juce::String e1, e2, e3, e4;
+            CHECK (presetFromShareCode ("Bro try this\n" + message + "\n", viaMessage, e1) && viaMessage.name == p.name,
+                   "code inside a message: %s", e1.toRawUTF8());
+            const auto body = code.fromFirstOccurrenceOf ("riffhouse:", false, false);
+            CHECK (presetFromShareCode ("riffhouse:" + body.substring (0, 20) + "\r\n" + body.substring (20), wrapped, e2),
+                   "code wrapped over two lines: %s", e2.toRawUTF8());
+            CHECK (presetFromShareCode (code + " sounds sick right", trailing, e3), "code with words after it: %s", e3.toRawUTF8());
+            CHECK (! presetFromShareCode ("visit riffhouse: nothing here", fake, e4) && e4.isNotEmpty(), "junk after the tag must fail");
+        }
     }
     if (! levels.empty())
     {
@@ -1933,6 +1950,101 @@ void testTakes()
     dir.deleteRecursively();
 }
 
+void testChordSheet()
+{
+    std::printf ("chords and tabs\n");
+    using namespace rh::sheet;
+    Chord c;
+    CHECK (parseChord ("F#m7", c) && c.root == 6 && c.quality == "m7" && c.bass < 0, "F#m7");
+    CHECK (parseChord ("Bb/D", c) && c.root == 10 && c.bass == 2, "Bb/D");
+    CHECK (parseChord ("C6/9", c) && c.root == 0 && c.bass < 0, "C6/9");
+    for (const char* yes : { "A", "Am", "Esus4", "Cadd9", "G7sus4", "Dmaj7", "Bm7b5", "E5", "Ab", "C#dim7", "F+", "Gm(add9)" })
+        CHECK (parseChord (yes, c), "%s is a chord", yes);
+    for (const char* no : { "And", "Bad", "man", "I", "Ammm", "N.C.", "Echo", "Dad", "Be", "" })
+        CHECK (! parseChord (no, c), "%s is not a chord", no);
+
+    // a page copied from a chords website: [ch] tags, a hard space, a tab block, headings
+    const juce::String page = juce::String ("Kitchen Light Chords by Riffhouse\n\n[Intro]\n[ch]Am[/ch]  [ch]F[/ch]  [ch]C[/ch]  [ch]G[/ch]\n\n[Verse 1]\n")
+        + "Am              F\nKettle on the stove" + juce::String::charToString ((juce::juce_wchar) 0x00a0) + "again\n"
+        + "C                 G\nnobody sleeps before ten\n\nChorus:\nF        G         Am\nleave the kitchen light on\n"
+        + "A man walks in\nFill it up\n\n"
+        + "e|-----------------|\nB|-----1-----3-----|\nG|---2-----2-------|\nD|-2-----------0---|\nA|-----------------|\nE|-----------------|\n"
+        + "-------------------------\n";
+    const auto sh = parse (page);
+    CHECK (sh.title == "Kitchen Light by Riffhouse", "title: %s", sh.title.toRawUTF8());
+    juce::String kinds;
+    for (const auto& l : sh.lines) kinds << "_SCTL"[(int) l.kind];
+    CHECK (kinds == "SC_SCLCL_SCLLL_TTTTTT", "line kinds %s", kinds.toRawUTF8());
+    CHECK (sh.chords.joinIntoString (" ") == "Am F C G", "chords used: %s", sh.chords.joinIntoString (" ").toRawUTF8());
+    CHECK (sh.lines[5].text.contains ("stove again"), "a hard space reads as a space");
+    CHECK (! sh.flats, "sharps sheet");
+
+    // a new key keeps every chord over its word
+    const juce::String verse ("Am              F");
+    CHECK (transposeLine (verse, 2, false).indexOf ("G") == verse.indexOf ("F") && transposeLine (verse, 2, false).startsWith ("Bm"),
+           "transposed verse: %s", transposeLine (verse, 2, false).toRawUTF8());
+    CHECK (transposeLine ("C  G/B  Am", 1, true) == "Db Ab/C Bbm", "flats: %s", transposeLine ("C  G/B  Am", 1, true).toRawUTF8());
+    CHECK (transposeLine ("A B", 1, true) == "Bb C", "a longer name pushes the next chord: %s", transposeLine ("A B", 1, true).toRawUTF8());
+    CHECK (transposeLine ("Intro: Am  (x2)", 3, false) == "Intro: Cm  (x2)", "labels stay: %s", transposeLine ("Intro: Am  (x2)", 3, false).toRawUTF8());
+    CHECK (transposeLine (verse, 12, false) == verse, "an octave is the same sheet");
+    CHECK (flatsAfter (sh, 5), "Am up 5 is Dm: written with flats");
+    CHECK (! flatsAfter (sh, 2), "Am up 2 is Bm: written with sharps");
+
+    // ChordPro, the format songbook apps share
+    const auto pro = parse ("{title: Small Hours}\n{soc}\n[G]Morning comes [D/F#]slow\n{eoc}\n");
+    CHECK (pro.title == "Small Hours" && pro.lines.size() == 3, "chordpro: %s, %d lines", pro.title.toRawUTF8(), (int) pro.lines.size());
+    if (pro.lines.size() == 3)
+    {
+        CHECK (pro.lines[0].kind == LineKind::section && pro.lines[1].kind == LineKind::chords && pro.lines[2].kind == LineKind::lyric, "chordpro kinds");
+        CHECK (pro.lines[1].text.indexOf ("D/F#") == pro.lines[2].text.indexOf ("slow"), "inline chord over its word: '%s' / '%s'",
+               pro.lines[1].text.toRawUTF8(), pro.lines[2].text.toRawUTF8());
+    }
+
+    // kept on disk and read back, with the reader's settings
+    auto kept = sh;
+    kept.shift = 3; kept.size = 2; kept.speed = 4;
+    const auto back = parse (toText (kept, 0, true));
+    CHECK (back.title == sh.title && back.lines.size() == sh.lines.size() && back.shift == 3 && back.size == 2 && back.speed == 4,
+           "sheet round trip: %d vs %d lines, shift %d", (int) back.lines.size(), (int) sh.lines.size(), back.shift);
+    CHECK (toText (kept, 2, false).contains ("Bm") && ! toText (kept, 2, false).contains ("x_riffhouse"), "shared text is in the new key, no settings");
+
+    // every chord shape plays only that chord's notes, its root among them, and fits a hand
+    const int open[] = { 4, 9, 2, 7, 11, 4 };
+    struct Q { const char* q; std::vector<int> tones; };
+    const Q qualities[] = { { "", { 0, 4, 7 } }, { "m", { 0, 3, 7 } }, { "7", { 0, 4, 7, 10 } }, { "m7", { 0, 3, 7, 10 } },
+                            { "maj7", { 0, 4, 7, 11 } }, { "sus2", { 0, 2, 7 } }, { "sus4", { 0, 5, 7 } }, { "5", { 0, 7 } },
+                            { "dim", { 0, 3, 6 } }, { "dim7", { 0, 3, 6, 9 } }, { "aug", { 0, 4, 8 } }, { "m7b5", { 0, 3, 6, 10 } } };
+    int shapes = 0;
+    for (int root = 0; root < 12; ++root)
+        for (const auto& q : qualities)
+        {
+            const auto name = noteName (root, root == 10 || root == 3) + q.q;
+            Shape shape;
+            if (! shapeFor (name, shape)) { CHECK (false, "no shape for %s", name.toRawUTF8()); continue; }
+            ++shapes;
+            int played = 0, lo = 99, hi = 0;
+            bool rootIn = false, inChord = true;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int f = shape.frets[(size_t) s];
+                if (f < 0) continue;
+                ++played;
+                if (f > 0) { lo = std::min (lo, f); hi = std::max (hi, f); }
+                const int note = (open[s] + f) % 12;
+                const int rel = ((note - root) % 12 + 12) % 12;
+                rootIn |= rel == 0;
+                inChord &= std::find (q.tones.begin(), q.tones.end(), rel) != q.tones.end();
+            }
+            CHECK (inChord && rootIn, "%s plays a wrong note", name.toRawUTF8());
+            CHECK (played >= (q.tones.size() == 2 ? 2 : 3), "%s plays %d strings", name.toRawUTF8(), played);
+            CHECK (hi <= 15 && (lo == 99 || hi - lo <= 3), "%s stretches frets %d..%d", name.toRawUTF8(), lo, hi);
+        }
+    Shape f, cadd9;
+    CHECK (shapeFor ("F", f) && f.barre == 1 && f.frets[0] == 1, "F is a barre on the first fret");
+    CHECK (shapeFor ("Cadd9", cadd9) && cadd9.frets[1] == 3 && cadd9.frets[5] == 3, "Cadd9 is the open shape");
+    std::printf ("  %d chord shapes checked\n", shapes);
+}
+
 int main (int argc, char** argv)
 {
     juce::ConsoleApplication* unused = nullptr; (void) unused;
@@ -2150,6 +2262,8 @@ int main (int argc, char** argv)
     testToneNames();
     test::runDeviceChecks (checks, failures);
     if (args.contains ("--devices")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    testChordSheet();
+    if (args.contains ("--sheet")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testHistory();
     testLooper();
     testSong();

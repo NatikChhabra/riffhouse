@@ -71,6 +71,7 @@ target_sources(Riffhouse PRIVATE
     ui/PresetBrowser.cpp
     ui/SetupWizard.cpp
     ui/TakesView.cpp
+    ui/SongSheet.cpp
     ui/Editor.cpp
     standalone/RiffhouseApp.cpp)
 

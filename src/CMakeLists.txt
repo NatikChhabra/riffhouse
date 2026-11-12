@@ -14,6 +14,7 @@ set(RIFFHOUSE_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/History.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Looper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Song.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/engine/ChordSheet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/FootControl.cpp)
 set(RIFFHOUSE_CORE_SOURCES ${RIFFHOUSE_CORE_SOURCES} PARENT_SCOPE)
 
