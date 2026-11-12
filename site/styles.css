@@ -108,8 +108,9 @@ button.btn { border: 0; cursor: pointer; }
 
 /* Top */
 .top { position: absolute; inset: 0 0 auto 0; z-index: 2; height: var(--top); display: flex; align-items: center; justify-content: space-between; padding-inline: var(--g); color: var(--coal); --ring: var(--coal); }
-.wordmark { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; text-decoration: none; font: 800 22px/1 var(--font-display); letter-spacing: .14em; text-transform: uppercase; }
-.wordmark .lamp { fill: var(--amber); }
+.wordmark { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; text-decoration: none; font: 600 25px/1 var(--font-text); letter-spacing: -.02em; }
+.wordmark svg { width: 32px; height: 32px; }
+.wordmark .lamp { fill: currentColor; }
 .top nav { display: flex; gap: clamp(16px, 2.6vw, 36px); font-weight: 500; font-size: var(--t-small); }
 .top nav a { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
 
@@ -384,7 +385,8 @@ details:not([open]) > p { display: none; }
   :root { --top: 64px; --t-body: 17px; }
   .top nav { gap: 16px; }
   .top nav a:last-child { display: none; }
-  .wordmark { font-size: 18px; gap: 8px; letter-spacing: .1em; }
+  .wordmark { font-size: 21px; gap: 8px; }
+  .wordmark svg { width: 28px; height: 28px; }
   .pan .shot { margin-inline: calc(var(--g) * -1); }
   .pan .shot img { border-radius: 0; }
   .get-notes { grid-template-columns: minmax(0, 1fr); }
