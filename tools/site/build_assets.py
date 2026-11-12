@@ -60,6 +60,13 @@ CROPS = {
 # Rows taken out of a screen before it is cropped: (top, bottom, end of the list). What sits between
 # bottom and end moves up to close the gap. The setup card's delay figure describes one PC, not yours.
 CUTS = {"setup-done": (602, 666, 1100)}
+# What a phone shows instead of the whole window: the part of each screen the words beside it are about.
+PHONE = {
+    "take-tone": ("take-tone.png", (240, 880, 1100, 1490)),
+    "play-along": ("record-song.png", (1560, 84, 2380, 1191)),
+    "looper": ("looper.png", (1440, 84, 2260, 1191)),
+    "tuner": ("tuner.png", (690, 330, 1710, 1420)),
+}
 
 
 def save(im, path, quality=86, **kw):
@@ -167,6 +174,9 @@ def screens():
         save(im, SITE / "img" / "app" / f"{name}-{im.width}.webp", 82)
         small = im.resize((1200, round(im.height * 1200 / im.width)), Image.LANCZOS)
         save(small, SITE / "img" / "app" / f"{name}-1200.webp", 82)
+    for name, (src, box) in PHONE.items():
+        if (SHOTS / src).is_file():
+            save(Image.open(SHOTS / src).convert("RGB").crop(box), SITE / "img" / "app" / f"{name}-phone.webp", 80)
 
 
 def icons():
