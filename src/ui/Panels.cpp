@@ -696,7 +696,14 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
             hasUpdater = true;
             page.addAndMakeVisible (updateButton);
             page.addAndMakeVisible (autoUpdate);
+            page.addAndMakeVisible (earlyVersions);
             autoUpdate.setToggleState (up->automatic(), juce::dontSendNotification);
+            earlyVersions.setToggleState (up->early(), juce::dontSendNotification);
+            earlyVersions.onClick = [this]
+            {
+                if (auto* h = StandaloneHost::get())
+                    if (auto* u = h->updater()) u->setEarly (earlyVersions.getToggleState());
+            };
             autoUpdate.onClick = [this]
             {
                 if (auto* h = StandaloneHost::get())
@@ -959,6 +966,7 @@ void SettingsView::show (Section s)
         c->setVisible (in (Section::foot));
     updateButton.setVisible (hasUpdater && in (Section::app));
     autoUpdate.setVisible (hasUpdater && in (Section::app));
+    earlyVersions.setVisible (hasUpdater && in (Section::app));
     lessMotion.setVisible (in (Section::app));
     for (auto* c : { (juce::Component*) &website, (juce::Component*) &problem, (juce::Component*) &report })
         c->setVisible (in (Section::help));
@@ -1013,7 +1021,7 @@ void SettingsView::layoutPage()
     int y = 104; // under the section's name and its one line
     auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
     auto gap = [&] (int g) { y += g; };
-    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = motionHead = helpText = aboutHead = aboutArea = {};
+    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = earlyText = motionHead = helpText = aboutHead = aboutArea = {};
 
     switch (current)
     {
@@ -1074,6 +1082,9 @@ void SettingsView::layoutPage()
                 updateStatus = at (26);
                 gap (14);
                 autoUpdate.setBounds (at (30));
+                gap (8);
+                earlyVersions.setBounds (at (30));
+                earlyText = at (22).withTrimmedLeft (44);
                 gap (16);
                 updateButton.setBounds (at (40).withWidth (250));
                 gap (40);
@@ -1288,6 +1299,7 @@ void SettingsView::paintPage (juce::Graphics& g)
                 g.setColour (colours::text);
                 g.setFont (font (16.0f, Weight::medium));
                 g.drawText (lastUpdateText, updateStatus, juce::Justification::centredLeft);
+                small ("Test versions come out a few days before everyone gets them. They can have rough edges.", earlyText, 1);
             }
             subhead ("Motion", motionHead);
             break;

@@ -153,6 +153,7 @@ private:
     juce::String reportText() const;
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
+    juce::ToggleButton earlyVersions { "Get new versions early, as a tester" };
     juce::ToggleButton lessMotion { "Less motion: nothing slides, fades are short" };
     void refreshUpdate();
     juce::String lastUpdateText;
@@ -169,7 +170,7 @@ private:
     juce::Viewport footView;
     std::unique_ptr<FootList> footList;
     // the words on the page, painted where the layout put them
-    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, motionHead, helpText, aboutHead, aboutArea;
+    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, earlyText, motionHead, helpText, aboutHead, aboutArea;
 };
 
 // Ask for a name and save the current tone.

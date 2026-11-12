@@ -18,6 +18,7 @@ struct AudioChoice
     juce::String input, output; // for ASIO the driver is both input and output
     int bufferSize = 0;         // 0: whatever the driver likes. Only asked of the first mode.
     int outputPair = -1;        // ASIO: which pair of the interface's outputs, -1 for its first two
+    int inputPair = -1;         // which pair of inputs the guitar is on, -1 for the first two
 };
 
 // Changes the input, output or buffer the careful way. Each driver mode in the choice is opened

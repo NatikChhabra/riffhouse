@@ -43,6 +43,15 @@ void Updater::setAutomatic (bool on)
     if (on && state() == State::available) checkNow(); // fetch what was only being announced
 }
 
+bool Updater::early() const { return settings.getBoolValue ("earlyVersions", false); }
+
+void Updater::setEarly (bool on)
+{
+    settings.setValue ("earlyVersions", on);
+    settings.saveIfNeeded();
+    if (on) checkNow(); // a tester wants to know straight away whether one is waiting
+}
+
 Updater::State Updater::state() const { const juce::ScopedLock sl (lock); return current_state; }
 ReleaseInfo Updater::release() const { const juce::ScopedLock sl (lock); return info; }
 bool Updater::canInstall() const { const juce::ScopedLock sl (lock); return current_state == State::ready && readyFile.existsAsFile(); }
@@ -159,7 +168,7 @@ void Updater::run()
     set (State::checking);
     int status = 0;
     // a test build follows the test releases too; a full release only ever follows full releases
-    const bool tester = isPreRelease (current);
+    const bool tester = isPreRelease (current) || early();
     const auto json = fetch (tester ? kAllReleases : kLatestRelease, status);
     if (threadShouldExit()) return;
     const auto answer = readCheckAnswer (status, json);

@@ -19,6 +19,9 @@ struct AudioOpen
     // ASIO only: which pair of the interface's outputs the sound goes to, 0 for the first two.
     // -1 leaves it to the driver (its first two).
     int outputPair = -1;
+    // Which pair of inputs the guitar comes in on, 0 for the first two (sockets 1 and 2). An
+    // interface with four or more sockets can have the guitar in socket 3 or 4.
+    int inputPair = -1;
     bool valid() const noexcept { return type.isNotEmpty() && (input.isNotEmpty() || output.isNotEmpty()); }
     static AudioOpen running (juce::AudioDeviceManager&); // what is open now; not valid() when nothing is
 };

@@ -35,6 +35,9 @@ public:
 
     bool automatic() const;
     void setAutomatic (bool);
+    // Testers get each test version as soon as it is out, before everyone else.
+    bool early() const;
+    void setEarly (bool);
 
     bool canInstall() const;                 // a checked installer is waiting
     bool launchInstaller (bool relaunch);    // true once the installer is running: quit now

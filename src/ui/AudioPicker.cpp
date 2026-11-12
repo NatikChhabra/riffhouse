@@ -34,6 +34,8 @@ AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
 {
     if (auto* host = StandaloneHost::get()) forced = host->settings().getValue ("audioDriver");
     addAndMakeVisible (driver);
+    addChildComponent (socket);
+    socket.setTooltip ("The pair of sockets on your interface the guitar is plugged into");
     driver.onChange = [this]
     {
         if (filling) return;
@@ -72,6 +74,7 @@ AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
         else apply (Change::output);
     };
     buffer.onChange = [this] { if (! filling) apply (Change::buffer); };
+    socket.onChange = [this] { if (! filling) apply (Change::socket); };
     sharing.onClick = [this] { if (! filling) apply (Change::sharing); };
     addChildComponent (sharing);
     addChildComponent (panel);
@@ -179,6 +182,17 @@ void AudioPicker::refresh()
         if (! outs.isEmpty()) output.setSelectedItemIndex (juce::jlimit (0, outs.size() - 1, out), juce::dontSendNotification);
     }
 
+    // an interface with more than two sockets: which pair the guitar is plugged into
+    socket.clear (juce::dontSendNotification);
+    if (dev != nullptr && sel >= 0)
+    {
+        const auto ins = dev->getInputChannelNames();
+        for (int i = 0; 2 * i < ins.size(); ++i)
+            socket.addItem (2 * i + 1 < ins.size() ? outputPairName (ins[2 * i], ins[2 * i + 1]) : ins[2 * i], i + 1);
+        socket.setSelectedId (std::max (0, now.inputPair) + 1, juce::dontSendNotification);
+    }
+    socket.setVisible (socket.getNumItems() > 1);
+
     buffer.clear (juce::dontSendNotification);
     bufferSizes.clear();
     if (dev != nullptr && sel >= 0)
@@ -216,6 +230,7 @@ void AudioPicker::refresh()
     // driver keeps the delay to itself and that window is the one place to change it.
     panel.setVisible (dev != nullptr && dev->hasControlPanel() && bufferSizes.size() <= 1);
     if (status.isEmpty()) status = AudioSwitch::running (dm, proc);
+    setSize (580, socket.isVisible() && sharing.isVisible() ? 452 + kRow + kGap : 452);
     resized();
     repaint();
 }
@@ -239,7 +254,8 @@ void AudioPicker::apply (Change what)
         c.outputPair = output.getSelectedId() - 1;
     c.types = forced.isNotEmpty() ? juce::StringArray { forced } // the driver the player chose, and only that
                                   : AudioSwitch::modesFor (dm, in->type, in->name, sharing.getToggleState());
-    if (sameInput && (what == Change::output || what == Change::buffer) && c.types.contains (now.type))
+    if (sameInput) c.inputPair = what == Change::socket ? socket.getSelectedId() - 1 : now.inputPair;
+    if (sameInput && (what == Change::output || what == Change::buffer || what == Change::socket) && c.types.contains (now.type))
     {
         // only the output or the buffer changes: stay with the mode that runs
         c.types.removeString (now.type);
@@ -316,13 +332,17 @@ void AudioPicker::showExample (bool asio)
 {
     example = true;
     filling = true;
-    for (auto* b : { &driver, &input, &output, &buffer }) b->clear (juce::dontSendNotification);
+    for (auto* b : { &driver, &input, &socket, &output, &buffer }) b->clear (juce::dontSendNotification);
+    socket.setVisible (asio);
     driver.addItem (driverLabel (asio ? juce::String ("ASIO") : juce::String()), 1);
     driver.setSelectedItemIndex (0, juce::dontSendNotification);
     isAsio = asio;
     if (asio)
     {
         input.addItem ("Focusrite USB ASIO  (ASIO driver)", 1);
+        socket.addItem (outputPairName ("Input 1", "Input 2"), 1);
+        socket.addItem (outputPairName ("Input 3", "Input 4"), 2);
+        socket.setSelectedId (1, juce::dontSendNotification);
         // the channel names an interface's driver gives, paired the way the list pairs them
         pairs = 2;
         output.addItem (outputPairName ("Output 1", "Output 2"), 1);
@@ -360,7 +380,7 @@ void AudioPicker::resized()
 {
     auto r = getLocalBounds().reduced (28, 24);
     r.removeFromTop (58); // heading and a line under it
-    for (auto* b : { &driver, &input, &output, &buffer })
+    for (auto* b : { &driver, &input, &socket, &output, &buffer })
     {
         if (! b->isVisible()) continue;
         b->setBounds (r.removeFromTop (kRow).withTrimmedLeft (kLabel));
@@ -382,10 +402,10 @@ void AudioPicker::paint (juce::Graphics& g)
     g.drawText ("Every change is tried first. If no sound comes through, the last working choice comes back.", r.removeFromTop (22), juce::Justification::centredLeft, true);
     r.removeFromTop (8);
 
-    const char* labels[] = { "Driver", "Guitar in", "Sound out", "Delay" };
-    juce::ComboBox* boxes[] = { &driver, &input, &output, &buffer };
+    const char* labels[] = { "Driver", "Guitar in", "Socket", "Sound out", "Delay" };
+    juce::ComboBox* boxes[] = { &driver, &input, &socket, &output, &buffer };
     g.setFont (font (14.0f));
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         if (! boxes[i]->isVisible()) continue;
         g.setColour (colours::textDim);
