@@ -126,7 +126,9 @@ From anywhere else, a star on this page helps as much.
 
 ## Talk guitar
 
-Come hang out in the [Guitar Discord](https://discord.gg/guitar-music), a server of 56,000 guitar players: gear, playing, theory and your own recordings.
+Join the [Riff House Discord](https://discord.gg/my4Mgg8uTq) to share tones, get setup help, take the weekly riff challenge and try beta builds before they ship.
+
+Also come hang out in the [Guitar Discord](https://discord.gg/guitar-music), a server of 56,000 guitar players: gear, playing, theory and your own recordings.
 
 ## Share tones
 
