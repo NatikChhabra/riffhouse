@@ -6,6 +6,10 @@ name: Discord bot
 on:
   schedule:
     - cron: '*/10 * * * *'
+  # a new reel posts right away instead of waiting for the next 10 minutes
+  push:
+    branches: [main]
+    paths: ['community/reels.json']
   workflow_dispatch:
 
 permissions:
@@ -22,7 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: tools/community
+          sparse-checkout: |
+            tools/community
+            community
       - name: Run the bot
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}

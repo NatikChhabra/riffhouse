@@ -7,6 +7,8 @@ Each run it:
        beta    -> #beta-lab (pings Beta tester)
        devlog  -> #dev-log  (all new changes in one message)
        tone    -> #tone-of-the-week
+  1b. Posts each new reel or trailer listed in community/reels.json to #announcements
+     (see community/reels/README.md for how to add one).
   2. Answers common questions in the #help and #bug-reports forums when a new post
      clearly matches one (sound, delay, crackles, ASIO, install warning, ...), with the fix
      and a link to the full help page. Posts it can't match are left for a person.
@@ -54,6 +56,7 @@ CH = {
     "beta-feedback": "1570507034372219052",
     "tone-lab": "1570506784672710766",
     "bot-log": "1570506931154591755",
+    "announcements": "1570506487632232538",
     "general": "1570500604445458526",
     "gear-talk": "1570506861869015161",
     "off-topic": "1570506873050890350",
@@ -218,6 +221,67 @@ def post_feeds(log: list[str]):
         }
         send(CH["dev-log"], "", [embed])
         log.append(f"Posted {len(new)} change(s) in <#{CH['dev-log']}>")
+
+
+# ---------------------------------------------------------------- 1b. reels and the trailer
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+REELS = os.path.join(ROOT, "community", "reels.json")
+UPLOAD_LIMIT = 10 * 1024 * 1024
+
+
+def send_file(channel: str, content: str, path: str, name: str):
+    if DRY:
+        print(f"[dry] upload {path} to {channel}: {content[:200]}")
+        return {}
+    boundary = "riffhouse" + str(int(time.time() * 1000))
+    payload = json.dumps({"content": content, "allowed_mentions": {"parse": []},
+                          "attachments": [{"id": 0, "filename": name}]})
+    with open(path, "rb") as f:
+        data = f.read()
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"payload_json\"\r\nContent-Type: application/json\r\n\r\n"
+            f"{payload}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; filename=\"{name}\"\r\n"
+            f"Content-Type: video/mp4\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
+    req = urllib.request.Request(f"{API}/channels/{channel}/messages", data=body, method="POST")
+    req.add_header("Authorization", f"Bot {os.environ.get('DISCORD_BOT_TOKEN', '')}")
+    req.add_header("User-Agent", UA)
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.loads(r.read())
+
+
+def post_reels(log: list[str]):
+    if not os.path.exists(REELS):
+        return
+    with open(REELS, encoding="utf-8") as f:
+        reels = json.load(f)
+    if not reels:
+        return
+    chan = CH["announcements"]
+    done = set()
+    for m in my_messages(chan):
+        done.update(a["filename"] for a in m.get("attachments", []))
+        done.add(m.get("content", ""))
+    for r in reels:
+        rid, link, caption = r["id"], r.get("link", ""), r.get("caption", "").strip()
+        name = f"{rid}.mp4"
+        content = (caption + ("\n" + link if link else "")).strip()
+        if name in done or any(link and link in d for d in done) or content in done:
+            continue
+        video = os.path.join(ROOT, r["video"]) if r.get("video") else None
+        if video and os.path.exists(video) and os.path.getsize(video) <= UPLOAD_LIMIT:
+            msg = send_file(chan, content, video, name)
+        elif link:
+            msg = send(chan, content)
+        else:
+            print(f"warning: reel {rid}: video missing or over 10 MB and no link, skipped", file=sys.stderr)
+            continue
+        if msg.get("id"):
+            try:
+                call("POST", f"/channels/{chan}/messages/{msg['id']}/crosspost")
+            except RuntimeError as e:
+                print(f"warning: crosspost: {e}", file=sys.stderr)
+        log.append(f"Posted reel **{rid}** in <#{chan}>")
 
 
 # ---------------------------------------------------------------- 2. FAQ answers
@@ -575,7 +639,7 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
+    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
                  lambda: keep_on_purpose(cursor, log), lambda: triage(threads, cursor, log)):
         try:
             step()
