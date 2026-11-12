@@ -143,16 +143,12 @@ juce::String presetToShareCode (const Preset& p)
     return "riffhouse:" + juce::Base64::toBase64 (compressed.getData(), compressed.getDataSize());
 }
 
-bool presetFromShareCode (const juce::String& code, Preset& out, juce::String& error)
+namespace
 {
-    const auto trimmed = code.trim();
-    if (! trimmed.startsWith ("riffhouse:"))
-    {
-        error = "That doesn't look like a Riffhouse tone code.";
-        return false;
-    }
+bool decodeShareBody (const juce::String& body, Preset& out, juce::String& error)
+{
     juce::MemoryOutputStream decoded;
-    if (! juce::Base64::convertFromBase64 (decoded, trimmed.fromFirstOccurrenceOf ("riffhouse:", false, false)))
+    if (body.isEmpty() || ! juce::Base64::convertFromBase64 (decoded, body))
     {
         error = "The tone code is damaged.";
         return false;
@@ -160,6 +156,57 @@ bool presetFromShareCode (const juce::String& code, Preset& out, juce::String& e
     juce::MemoryInputStream raw (decoded.getData(), decoded.getDataSize(), false);
     juce::GZIPDecompressorInputStream gz (raw);
     return presetFromJson (gz.readString(), out, error);
+}
+
+bool isBase64Char (juce::juce_wchar c)
+{
+    return (c < 128 && juce::CharacterFunctions::isLetterOrDigit (c)) || c == '+' || c == '/' || c == '=';
+}
+} // namespace
+
+bool presetFromShareCode (const juce::String& text, Preset& out, juce::String& error)
+{
+    // The code can arrive inside a chat message, wrapped over lines by the app it went through,
+    // or with words after it. Try every "riffhouse:" in the text: first with line breaks inside
+    // the code joined up, then only up to the first space.
+    const juce::String tag ("riffhouse:");
+    int at = text.indexOf (tag);
+    if (at < 0)
+    {
+        error = "That doesn't look like a Riffhouse tone code.";
+        return false;
+    }
+    error = "The tone code is damaged.";
+    for (; at >= 0; at = text.indexOf (at + 1, tag))
+    {
+        juce::String joined, firstWord;
+        bool wordDone = false;
+        for (auto p = text.getCharPointer() + (at + tag.length()); ! p.isEmpty(); ++p)
+        {
+            const auto c = *p;
+            if (juce::CharacterFunctions::isWhitespace (c))
+            {
+                if (joined.isNotEmpty()) wordDone = true;
+                continue;
+            }
+            if (! isBase64Char (c)) break;
+            joined += c;
+            if (! wordDone) firstWord += c;
+        }
+        juce::String why;
+        if (decodeShareBody (joined, out, why)) return true;
+        if (firstWord != joined && decodeShareBody (firstWord, out, why)) return true;
+        if (why.isNotEmpty()) error = why;
+    }
+    return false;
+}
+
+juce::String presetToShareMessage (const Preset& p)
+{
+    const auto name = p.name.trim().isNotEmpty() ? p.name.trim() : juce::String ("My tone");
+    return name + ", a guitar tone made in Riffhouse, the free amp app: https://natikchhabra.github.io/riffhouse/\n"
+         + "To play it, copy this whole message, open Riffhouse and press Ctrl+V.\n"
+         + presetToShareCode (p);
 }
 
 void PresetLibrary::addFactory (const char* data, int size)

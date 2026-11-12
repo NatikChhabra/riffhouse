@@ -368,8 +368,8 @@ bool PresetBrowser::keyPressed (const juce::KeyPress& k)
 void PresetBrowser::copyShareCode()
 {
     const auto p = proc.captureCurrent (proc.currentPresetName(), "Shared");
-    juce::SystemClipboard::copyTextToClipboard (presetToShareCode (p));
-    if (onMessage) onMessage ("Tone code copied. Paste it anywhere to share this tone.");
+    juce::SystemClipboard::copyTextToClipboard (presetToShareMessage (p));
+    if (onMessage) onMessage ("Copied \"" + p.name + "\". Paste it in any chat; a friend copies it back and presses Ctrl+V in Riffhouse.");
 }
 
 void PresetBrowser::pasteShareCode()

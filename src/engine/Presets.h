@@ -47,7 +47,10 @@ juce::String presetToJson (const Preset& p);
 
 // Compact single-line form ("riffhouse:<base64>") for pasting into chats.
 juce::String presetToShareCode (const Preset& p);
-bool presetFromShareCode (const juce::String& code, Preset& out, juce::String& error);
+// Finds the code anywhere in pasted text (a whole chat message, line breaks inside the code).
+bool presetFromShareCode (const juce::String& text, Preset& out, juce::String& error);
+// What "Copy tone code" puts on the clipboard: a line a friend understands, the free download, the code.
+juce::String presetToShareMessage (const Preset& p);
 
 class PresetLibrary
 {
