@@ -215,7 +215,10 @@ def post_feeds(log: list[str]):
             log.append(f"Posted **{it['title']}** in <#{CH[chan]}>")
 
     # The dev log can move fast, so every new change since the last run goes in one message.
-    new = fresh(read_feed("devlog.xml"), CH["dev-log"], 3)
+    # players only: never site, Discord, workflow or work-in-progress commits, even if an old feed still has them
+    skip = re.compile(r"discord|feed|website|\bsite\b|readme|workflow|\bci\b|relay|roadmap|marketing|\bdocs?\b|bot\b|"
+                      r"\b\d+\.\d+\.\d+\b|review|\btests?\b|refactor|\bwip\b", re.I)
+    new = [i for i in fresh(read_feed("devlog.xml"), CH["dev-log"], 3) if not skip.search(i["title"])]
     if new:
         lines = [f"- [{i['title']}]({i['link']})" for i in reversed(new)][:15]
         embed = {
