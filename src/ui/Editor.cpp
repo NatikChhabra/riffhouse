@@ -1166,7 +1166,8 @@ void RiffhouseEditor::fileDragEnter (const juce::StringArray& files, int, int)
         case Dropped::capture: line = "This capture becomes your amp."; break;
         case Dropped::tone:    line = "This tone is loaded. Save it if you want to keep it."; break;
         case Dropped::sound:
-            line = proc.audioFileSeconds (first) <= kLongestImpulseSeconds
+            line = root->takesView.isVisible() ? "Make an MP3 or FLAC copy of it, saved beside it."
+                 : proc.audioFileSeconds (first) <= kLongestImpulseSeconds
                        ? "This impulse response becomes your cabinet."
                        : "This song plays in your headphones so you can play along. It stays out of your recording.";
             break;
@@ -1231,7 +1232,11 @@ void RiffhouseEditor::openFile (const juce::File& f)
         case Dropped::sound:
         {
             const double seconds = proc.audioFileSeconds (f);
-            if (seconds <= 0.0)
+            if (root->takesView.isVisible() && seconds > 0.0)
+            {
+                root->takesView.convertDropped (f); // the list of recordings is open: this is a file to share
+            }
+            else if (seconds <= 0.0)
             {
                 showToast ("Couldn't read " + f.getFileName() + ".");
             }
@@ -1572,6 +1577,8 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         r.addAndMakeVisible (a);
         a.setCentrePosition (r.getLocalBounds().getCentre());
         shoot ("audio-by-hand");
+        a.showExample (true);
+        shoot ("audio-asio");
         r.removeChildComponent (&a);
     }
 

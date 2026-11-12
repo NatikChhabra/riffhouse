@@ -22,6 +22,7 @@
 #include "engine/DeviceNames.h"
 #include "plugin/LevelMatcher.h"
 #include "plugin/Takes.h"
+#include "plugin/Export.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <chrono>
@@ -1244,6 +1245,19 @@ void testUpdates()
         CHECK (hardwareOf ("Microphone (Realtek(R) Audio)") == "Realtek(R) Audio", "got '%s'", hardwareOf ("Microphone (Realtek(R) Audio)").toRawUTF8());
         CHECK (outputBeside ("Microphone (USB Guitar Cable)", outs).isEmpty() && outputBeside ("Some input", outs).isEmpty(), "an input with no output of its own gets none");
         CHECK (outputBeside ("Line In (scarlett 4i4 usb)", { "Line 3/4 (Scarlett 4i4 USB)" }) == "Line 3/4 (Scarlett 4i4 USB)", "any output of the interface beats none");
+
+        // an interface's outputs, two at a time, named as a player reads them
+        CHECK (outputPairName ("Headphones L", "Headphones R") == "Headphones", "a pair with sides is one name: '%s'", outputPairName ("Headphones L", "Headphones R").toRawUTF8());
+        CHECK (outputPairName ("Main Left", "Main Right") == "Main", "got '%s'", outputPairName ("Main Left", "Main Right").toRawUTF8());
+        CHECK (outputPairName ("Out 1", "Out 2") == "Out 1 + 2", "numbered outputs keep their numbers: '%s'", outputPairName ("Out 1", "Out 2").toRawUTF8());
+        CHECK (outputPairName ("Analogue 3", "Analogue 4") == "Analogue 3 + 4", "got '%s'", outputPairName ("Analogue 3", "Analogue 4").toRawUTF8());
+        CHECK (outputPairName ("SPDIF", "Phones") == "SPDIF + Phones", "two unrelated names are both shown: '%s'", outputPairName ("SPDIF", "Phones").toRawUTF8());
+        // an ASIO driver and the same interface as Windows lists it
+        CHECK (sameHardware ("Focusrite USB ASIO", "Analogue 1 + 2 (Focusrite USB Audio)"), "the Focusrite driver finds its Windows input");
+        CHECK (sameHardware ("Yamaha Steinberg USB ASIO", "Line (Steinberg UR22C)"), "a Steinberg driver finds its interface");
+        CHECK (sameHardware ("BEHRINGER UMC 404HD 192k", "Line (UMC404HD 192k)") || sameHardware ("BEHRINGER UMC 404HD 192k", "Line (BEHRINGER UMC 404HD 192k)"), "a Behringer driver finds its interface");
+        CHECK (! sameHardware ("Focusrite USB ASIO", "Microphone (Realtek(R) Audio)"), "and never the computer's own sound card");
+        CHECK (! sameHardware ("Generic Low Latency ASIO Driver", "Microphone (USB Audio Device)"), "words every driver uses do not count as a match");
     }
 
     const juce::String hash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
@@ -1638,6 +1652,146 @@ void testFootControl()
     CHECK (fc.bindings().size() == 2 && fc.bindings()[0].press, "a line can be removed and a switch's kind corrected");
 }
 
+// Save as MP3 and FLAC: what comes out is the same sound, plays everywhere, and says what it is.
+void testExport (const juce::File& dir, const juce::File& take, double sr)
+{
+    std::printf ("save a copy as MP3 or FLAC\n");
+    juce::ignoreUnused (sr);
+    juce::AudioFormatManager fm;
+    fm.registerBasicFormats();
+    const auto readAll = [&fm] (const juce::File& f, double& rate, int& chans)
+    {
+        std::vector<float> l;
+        if (std::unique_ptr<juce::AudioFormatReader> r { fm.createReaderFor (f) })
+        {
+            rate = r->sampleRate;
+            chans = (int) r->numChannels;
+            juce::AudioBuffer<float> b ((int) r->numChannels, (int) r->lengthInSamples);
+            r->read (&b, 0, (int) r->lengthInSamples, 0, true, true);
+            l.assign (b.getReadPointer (0), b.getReadPointer (0) + b.getNumSamples());
+        }
+        return l;
+    };
+    double rate = 0.0;
+    int chans = 0;
+    const auto original = readAll (take, rate, chans);
+    const auto rms = [] (const std::vector<float>& x, size_t from, size_t n)
+    {
+        double e = 0.0;
+        for (size_t i = from; i < std::min (x.size(), from + n); ++i) e += (double) x[i] * x[i];
+        return std::sqrt (e / (double) std::max<size_t> (1, n));
+    };
+
+    // FLAC: every sample back as it went in
+    const auto flac = exportFileFor (dir, take, ExportFormat::flac);
+    CHECK (flac.getParentDirectory().getFileName() == "Copies to share (MP3 and FLAC)", "copies go in a folder that says what they are");
+    std::atomic<float> progress { 0.0f };
+    auto err = exportSound (take, flac, ExportFormat::flac, "Test Tone", &progress);
+    CHECK (err.isEmpty() && flac.existsAsFile() && progress.load() == 1.0f, "FLAC is written (%s)", err.toRawUTF8());
+    CHECK (flac.getSize() < take.getSize(), "and is smaller than the WAV (%lld against %lld bytes)", (long long) flac.getSize(), (long long) take.getSize());
+    {
+        double fr = 0.0;
+        int fc = 0;
+        const auto back = readAll (flac, fr, fc);
+        float worst = back.size() == original.size() ? 0.0f : 1.0f;
+        for (size_t i = 0; i < std::min (back.size(), original.size()); ++i) worst = std::max (worst, std::abs (back[i] - original[i]));
+        CHECK (worst < 1.0e-6f && fr == rate && fc == chans, "FLAC gives back every sample (worst %.2g, %d samples against %d)", worst, (int) back.size(), (int) original.size());
+    }
+
+    // MP3: the same sound and level, the length right, the tone's name in the tag, quickly
+    const auto mp3 = exportFileFor (dir, take, ExportFormat::mp3);
+    const auto t0 = std::chrono::steady_clock::now();
+    err = exportSound (take, mp3, ExportFormat::mp3, "Test Tone", &progress);
+    const double took = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+    CHECK (err.isEmpty() && mp3.existsAsFile(), "MP3 is written (%s)", err.toRawUTF8());
+    CHECK (took < 3.0, "3 s of guitar became an MP3 in %.2f s", took);
+    const double seconds = (double) original.size() / rate;
+    const double kbps = (double) mp3.getSize() * 8.0 / seconds / 1000.0;
+    CHECK (kbps > 300.0 && kbps < 345.0, "at about 320 kbps (%.0f)", kbps);
+    {
+        juce::MemoryBlock bytes;
+        mp3.loadFileAsData (bytes);
+        CHECK (bytes.getSize() > 10 && std::memcmp (bytes.getData(), "ID3", 3) == 0, "it starts with a tag");
+        bool title = false, info = false;
+        const auto* d = static_cast<const char*> (bytes.getData());
+        for (size_t i = 0; i + 9 < std::min<size_t> (bytes.getSize(), 8192); ++i)
+        {
+            title = title || std::memcmp (d + i, "Test Tone", 9) == 0;
+            info = info || std::memcmp (d + i, "Info", 4) == 0 || std::memcmp (d + i, "Xing", 4) == 0;
+        }
+        CHECK (title, "the tag carries the tone's name");
+        CHECK (info, "the first frame tells players the exact length");
+    }
+    {
+        double mr = 0.0;
+        int mc = 0;
+        const auto back = readAll (mp3, mr, mc);
+        CHECK (mr == rate && mc == 2, "it plays at the take's rate in stereo (%.0f Hz, %d channels)", mr, mc);
+        CHECK (std::abs ((double) back.size() / mr - seconds) < 0.12, "and lasts as long (%.3f s against %.3f s)", (double) back.size() / mr, seconds);
+        // line the two up (an MP3 starts a little late) and compare
+        int bestLag = 0;
+        double best = -1.0;
+        const size_t from = (size_t) (0.5 * rate), n = (size_t) (1.5 * rate);
+        for (int lag = 0; lag < 3000 && from + n + (size_t) lag < back.size(); ++lag)
+        {
+            double c = 0.0, a = 0.0, b = 0.0;
+            for (size_t i = from; i < from + n; i += 4)
+            {
+                c += (double) original[i] * back[i + (size_t) lag];
+                a += (double) original[i] * original[i];
+                b += (double) back[i + (size_t) lag] * back[i + (size_t) lag];
+            }
+            const double r = c / std::sqrt (std::max (1.0e-12, a * b));
+            if (r > best) { best = r; bestLag = lag; }
+        }
+        CHECK (best > 0.995, "it is the same sound (correlation %.4f, %d samples late)", best, bestLag);
+        const double was = rms (original, from, n), now = rms (back, from + (size_t) bestLag, n);
+        CHECK (std::abs (20.0 * std::log10 (now / std::max (1.0e-9, was))) < 0.2, "at the same level (%.2f dB apart)", 20.0 * std::log10 (now / std::max (1.0e-9, was)));
+    }
+
+    // a mono file at a rate MP3 does not have comes out at one it does
+    {
+        const auto odd = dir.getChildFile ("odd rate.wav");
+        Render r;
+        r.l.resize (96000);
+        for (size_t i = 0; i < r.l.size(); ++i) r.l[i] = 0.3f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 440.0 * (double) i / 96000.0);
+        r.r = r.l;
+        writeWav (odd, r, 96000.0);
+        const auto out = dir.getChildFile ("odd rate.mp3");
+        err = exportSound (odd, out, ExportFormat::mp3, {}, nullptr);
+        double mr = 0.0;
+        int mc = 0;
+        const auto back = readAll (out, mr, mc);
+        CHECK (err.isEmpty() && mr == 48000.0 && std::abs ((double) back.size() / 48000.0 - 1.0) < 0.12, "96 kHz becomes a 48 kHz MP3 of the same length (%s, %.0f Hz, %.3f s)", err.toRawUTF8(), mr, (double) back.size() / std::max (1.0, mr));
+    }
+
+    // something that is not sound: a plain message, nothing left behind
+    {
+        const auto notSound = dir.getChildFile ("notes.wav");
+        notSound.replaceWithText ("not a sound");
+        const auto out = dir.getChildFile ("notes.mp3");
+        err = exportSound (notSound, out, ExportFormat::mp3, {}, nullptr);
+        CHECK (err.isNotEmpty() && ! out.exists() && ! out.getSiblingFile ("notes.mp3.part").exists(), "a file that is not sound is refused and leaves nothing (%s)", err.toRawUTF8());
+    }
+
+    // stopped half way: nothing left behind
+    {
+        const auto out = dir.getChildFile ("stopped.mp3");
+        int calls = 0;
+        err = exportSound (take, out, ExportFormat::mp3, {}, nullptr, [&calls] { return ++calls > 3; });
+        CHECK (err == "stopped" && ! out.exists() && ! out.getSiblingFile ("stopped.mp3.part").exists(), "a stopped export leaves nothing behind");
+    }
+
+    // on its own thread; the answer goes to the message thread, which this program does not run
+    {
+        const auto out = dir.getChildFile ("job.mp3");
+        ExportJob job (take, out, ExportFormat::mp3, "Test Tone", [] (juce::File, juce::String) {});
+        for (int i = 0; i < 500 && job.progress() < 1.0f; ++i) juce::Thread::sleep (10);
+        juce::Thread::sleep (50);
+        CHECK (job.progress() == 1.0f && out.existsAsFile() && job.output() == out, "the job saves the copy on its own thread");
+    }
+}
+
 void testTakes()
 {
     std::printf ("takes\n");
@@ -1760,6 +1914,7 @@ void testTakes()
         player.setPlaying (true);
         CHECK (player.position() < 0.5, "pressing play at the end starts again from the top");
     }
+    testExport (dir, wetFile, sr);
     dir.deleteRecursively();
 }
 

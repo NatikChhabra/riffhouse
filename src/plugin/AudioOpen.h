@@ -16,6 +16,9 @@ struct AudioOpen
     juce::String type, input, output;
     int bufferSize = 0;
     double sampleRate = 0;
+    // ASIO only: which pair of the interface's outputs the sound goes to, 0 for the first two.
+    // -1 leaves it to the driver (its first two).
+    int outputPair = -1;
     bool valid() const noexcept { return type.isNotEmpty() && (input.isNotEmpty() || output.isNotEmpty()); }
     static AudioOpen running (juce::AudioDeviceManager&); // what is open now; not valid() when nothing is
 };

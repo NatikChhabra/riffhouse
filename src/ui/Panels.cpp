@@ -902,17 +902,7 @@ int SettingsView::summaryHeight() const
 
 void SettingsView::showAdvancedAudio()
 {
-    auto* host = StandaloneHost::get();
-    if (host == nullptr) return;
-    juce::DialogWindow::LaunchOptions o;
-    o.content.setOwned (new AudioPicker (proc));
-    o.dialogTitle = "Audio settings";
-    o.dialogBackgroundColour = colours::panel;
-    o.escapeKeyTriggersCloseButton = true;
-    o.useNativeTitleBar = true;
-    o.resizable = false;
-    o.componentToCentreAround = this;
-    o.launchAsync();
+    showAudioPicker (proc, this);
 }
 
 void SettingsView::resized()
@@ -1020,7 +1010,7 @@ void SettingsView::paint (juce::Graphics& g)
         about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
                       "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
                       "any artist, band or equipment maker, and all trademarks belong to their owners. "
-                      "Built with JUCE, Neural Amp Modeler Core and Signalsmith Stretch. Fonts under the SIL Open Font License and the Apache License 2.0.",
+                      "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Fonts under the SIL Open Font License and the Apache License 2.0. Every licence is in Licences.txt beside the app.",
                       font (13.5f), colours::textDim);
         about.draw (g, left.removeFromTop (aboutH).toFloat());
     }

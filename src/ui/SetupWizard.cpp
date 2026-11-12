@@ -1,6 +1,8 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "SetupWizard.h"
+
+#include "AudioPicker.h"
 #include "../plugin/StandaloneHost.h"
 #include "../engine/DeviceNames.h"
 
@@ -143,6 +145,7 @@ void SetupWizard::showExample (int which, bool moving)
     if (which >= 5)
     {
         shownSummary.inputName = input;
+        shownSummary.outputName = "Headphones (High Definition Audio)";
         shownSummary.latencyMs = 9.3; shownSummary.bufferSize = 144; shownSummary.exclusive = true;
         shownSummary.inputGainDb = 1.5f; shownSummary.inputFix = true; shownSummary.inputFixDb = 21.0f; shownSummary.gateDb = -52.0f;
         if (moving) go (Step::done); else step = Step::done;
@@ -230,6 +233,14 @@ void SetupWizard::layoutButtons()
             secondary.setButtonText ("Run it again");
             secondary.setVisible (true);
             secondary.onClick = [this] { startSetup(); };
+            // the headphones are somewhere else: one window with the input and the output, and setup is kept
+            tertiary.setButtonText ("Change where the sound goes");
+            tertiary.setVisible (StandaloneHost::get() != nullptr);
+            tertiary.onClick = [this]
+            {
+                showAudioPicker (proc, getParentComponent() != nullptr ? getParentComponent() : this);
+                complete (true);
+            };
             break;
         case Step::failed:
             primary.setColour (juce::TextButton::buttonColourId, colours::accent);
@@ -348,7 +359,8 @@ void SetupWizard::resized()
     primary.setBounds (buttons.removeFromRight (180));
     buttons.removeFromRight (12);
     if (secondary.isVisible()) secondary.setBounds (buttons.removeFromRight (150));
-    if (tertiary.isVisible()) tertiary.setBounds (buttons.removeFromLeft (270));
+    buttons.removeFromRight (12);
+    if (tertiary.isVisible()) tertiary.setBounds (buttons.removeFromLeft (juce::jmin (270, buttons.getWidth())));
     meter.setBounds (card.reduced (48, 0).withY (card.getY() + 168).withHeight (12));
 }
 
@@ -613,7 +625,13 @@ void SetupWizard::paint (juce::Graphics& g)
             oneByOne = true;
             // an interface carries both ways: the name Windows gives the hardware stands in brackets at the end
             const auto hardware = hardwareOf (s.inputName);
-            bullet (true, s.outputFollows ? "Guitar in and sound out on " + (hardware.isNotEmpty() ? hardware : s.inputName) : "Guitar on " + s.inputName);
+            if (s.outputFollows)
+                bullet (true, "Guitar in and sound out on " + (hardware.isNotEmpty() ? hardware : s.inputName));
+            else
+            {
+                bullet (true, "Guitar on " + s.inputName);
+                if (s.outputName.isNotEmpty() && s.outputName != s.inputName) bullet (true, "Sound out on " + s.outputName);
+            }
             bullet (s.latencyMs < 15.0, "About " + juce::String (s.latencyMs, 1) + " ms from string to ear ("
                                           + juce::String (s.bufferSize) + " samples" + (s.exclusive ? ", exclusive mode)" : ")"));
             bullet (true, "Input level " + juce::String (s.inputGainDb >= 0 ? "+" : "") + juce::String (s.inputGainDb, 1)

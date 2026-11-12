@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "AudioPicker.h"
 
+#include "../engine/DeviceNames.h"
 #include "../plugin/StandaloneHost.h"
 
 namespace rh::ui
@@ -41,7 +42,12 @@ AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
         }
         apply (Change::input);
     };
-    output.onChange = [this] { if (! filling) apply (Change::output); };
+    output.onChange = [this]
+    {
+        if (filling) return;
+        if (isAsio && output.getSelectedId() >= kOtherOutputs) pickOtherOutputForAsio();
+        else apply (Change::output);
+    };
     buffer.onChange = [this] { if (! filling) apply (Change::buffer); };
     sharing.onClick = [this] { if (! filling) apply (Change::sharing); };
     addChildComponent (sharing);
@@ -97,9 +103,24 @@ void AudioPicker::refresh()
 
     // outputs go by the same names in every Windows mode; DirectSound has its own
     output.clear (juce::dontSendNotification);
+    pairs = 0;
     auto* outType = findType (dm, asioNow || ! now.valid() ? juce::String ("Windows Audio") : now.type);
-    if (outType == nullptr) outType = dm.getCurrentDeviceTypeObject();
-    if (outType != nullptr)
+    if (outType == nullptr && ! asioNow) outType = dm.getCurrentDeviceTypeObject();
+    if (asioNow && dev != nullptr)
+    {
+        // the interface's own outputs, two at a time: headphones and speakers each hang on a pair
+        const auto names = dev->getOutputChannelNames();
+        pairs = names.size() / 2;
+        for (int i = 0; i < pairs; ++i) output.addItem (outputPairName (names[2 * i], names[2 * i + 1]), i + 1);
+        output.setSelectedId (juce::jlimit (0, std::max (0, pairs - 1), std::max (0, now.outputPair)) + 1, juce::dontSendNotification);
+        if (outType != nullptr && outType->getDeviceNames (false).size() > 0)
+        {
+            output.addSectionHeading ("Somewhere else (through Windows, a little slower)");
+            const auto outs = outType->getDeviceNames (false);
+            for (int i = 0; i < outs.size(); ++i) output.addItem (outs[i], kOtherOutputs + i);
+        }
+    }
+    else if (outType != nullptr)
     {
         const auto outs = outType->getDeviceNames (false);
         output.addItemList (outs, 1);
@@ -129,7 +150,7 @@ void AudioPicker::refresh()
     if (inputs.empty())
         note = "No input was found on this computer. Plug the guitar in, or connect your audio interface, and open this window again.";
     else if (asioNow)
-        note = "This is your interface's own driver, the fastest way in. The sound comes out of the interface too.";
+        note = "This is your interface's own driver, the fastest way in. Under Sound out, pick the outputs your headphones or speakers are on.";
     else if (now.type == "Windows Audio (Exclusive Mode)")
         note = "Riffhouse has the sound card to itself, which gives the shortest delay. Other apps are silent while it is open.";
     else if (now.type == "DirectSound")
@@ -137,9 +158,11 @@ void AudioPicker::refresh()
     else if (now.valid() && canShare)
         note = "Other apps can play too. The delay is a little longer than with the sound card to itself.";
 
-    output.setVisible (! isAsio);
+    output.setVisible (true);
     sharing.setVisible (! isAsio && canShare);
-    panel.setVisible (dev != nullptr && dev->hasControlPanel());
+    // The driver's own window is full of settings nobody needs here. It is offered only when the
+    // driver keeps the delay to itself and that window is the one place to change it.
+    panel.setVisible (dev != nullptr && dev->hasControlPanel() && bufferSizes.size() <= 1);
     if (status.isEmpty()) status = AudioSwitch::running (dm, proc);
     resized();
     repaint();
@@ -157,6 +180,8 @@ void AudioPicker::apply (Change what)
     AudioChoice c;
     c.input = in->name;
     c.output = output.getText();
+    if (in->type == "ASIO" && now.type == "ASIO" && sameInput && output.getSelectedId() > 0 && output.getSelectedId() <= pairs)
+        c.outputPair = output.getSelectedId() - 1;
     c.types = AudioSwitch::modesFor (dm, in->type, in->name, sharing.getToggleState());
     if (sameInput && (what == Change::output || what == Change::buffer) && c.types.contains (now.type))
     {
@@ -191,6 +216,8 @@ void AudioPicker::apply (Change what)
             safe->status = r.message;
             if (r.ok && ! r.fastest) safe->status << " The fastest way would not start on this input, so the next one is in use.";
             if (r.ok && safe->followed) safe->status << " Sound now comes out of " << safe->output.getText() << ".";
+            if (r.ok && safe->afterNote.isNotEmpty()) safe->status << " " << safe->afterNote;
+            safe->afterNote = {};
             safe->followed = false;
             safe->statusIsProblem = ! r.ok;
             safe->refresh();
@@ -204,24 +231,67 @@ void AudioPicker::apply (Change what)
     });
 }
 
-void AudioPicker::showExample()
+void AudioPicker::pickOtherOutputForAsio()
+{
+    const auto* in = picked();
+    const auto wanted = output.getText();
+    if (in == nullptr || in->type != "ASIO") return;
+    // the same interface as Windows lists it, to play through any output
+    for (size_t i = 0; i < inputs.size(); ++i)
+        if (inputs[i].type != "ASIO" && sameHardware (in->name, inputs[i].name))
+        {
+            filling = true;
+            input.setSelectedItemIndex ((int) i, juce::dontSendNotification);
+            isAsio = false;
+            filling = false;
+            afterNote = "ASIO plays only through the interface itself, so its Windows driver sends the sound to " + wanted + ".";
+            apply (Change::input);
+            return;
+        }
+    status = "ASIO plays only through " + in->name + " itself. To hear the guitar on " + wanted
+           + ", pick the interface's Windows entry under Guitar in (the one without \"ASIO driver\").";
+    statusIsProblem = true;
+    refresh();
+}
+
+void AudioPicker::showExample (bool asio)
 {
     example = true;
     filling = true;
     for (auto* b : { &input, &output, &buffer }) b->clear (juce::dontSendNotification);
-    input.addItem ("Microphone (High Definition Audio)", 1);
+    isAsio = asio;
+    if (asio)
+    {
+        input.addItem ("Focusrite USB ASIO  (ASIO driver)", 1);
+        // the channel names an interface's driver gives, paired the way the list pairs them
+        pairs = 2;
+        output.addItem (outputPairName ("Output 1", "Output 2"), 1);
+        output.addItem (outputPairName ("Headphones L", "Headphones R"), 2);
+        output.addSectionHeading ("Somewhere else (through Windows, a little slower)");
+        output.addItem ("Speakers (Realtek(R) Audio)", kOtherOutputs);
+        output.setSelectedId (2, juce::dontSendNotification);
+        buffer.addItem ("1.3 ms  (64 samples)", 1);
+        buffer.addItem ("2.7 ms  (128 samples)", 2);
+        buffer.setSelectedId (1, juce::dontSendNotification);
+        note = "This is your interface's own driver, the fastest way in. Under Sound out, pick the outputs your headphones or speakers are on.";
+        status = "Running: 64 samples at 48.0 kHz, about 4.9 ms from string to ear.";
+    }
+    else
+    {
+        input.addItem ("Microphone (High Definition Audio)", 1);
+        output.addItem ("Headphones (High Definition Audio)", 1);
+        output.setSelectedItemIndex (0, juce::dontSendNotification);
+        buffer.addItem ("3.0 ms  (144 samples)", 1);
+        buffer.setSelectedItemIndex (0, juce::dontSendNotification);
+        note = "Riffhouse has the sound card to itself, which gives the shortest delay. Other apps are silent while it is open.";
+        status = "Running: 144 samples at 48.0 kHz, about 9.3 ms from string to ear.";
+    }
     input.setSelectedItemIndex (0, juce::dontSendNotification);
-    output.addItem ("Headphones (High Definition Audio)", 1);
-    output.setSelectedItemIndex (0, juce::dontSendNotification);
-    buffer.addItem ("3.0 ms  (144 samples)", 1);
-    buffer.setSelectedItemIndex (0, juce::dontSendNotification);
-    isAsio = false;
     output.setVisible (true);
-    sharing.setVisible (true);
+    sharing.setVisible (! asio);
     sharing.setToggleState (false, juce::dontSendNotification);
+    panel.setVisible (false);
     filling = false;
-    note = "Riffhouse has the sound card to itself, which gives the shortest delay. Other apps are silent while it is open.";
-    status = "Running: 144 samples at 48.0 kHz, about 9.3 ms from string to ear.";
     resized();
     repaint();
 }
@@ -282,5 +352,19 @@ void AudioPicker::paint (juce::Graphics& g)
         g.setFont (font (13.5f));
         g.drawFittedText (note, r, juce::Justification::topLeft, 4, 1.0f);
     }
+}
+
+void showAudioPicker (RiffhouseProcessor& proc, juce::Component* near)
+{
+    if (StandaloneHost::get() == nullptr) return;
+    juce::DialogWindow::LaunchOptions o;
+    o.content.setOwned (new AudioPicker (proc));
+    o.dialogTitle = "Audio settings";
+    o.dialogBackgroundColour = colours::panel;
+    o.escapeKeyTriggersCloseButton = true;
+    o.useNativeTitleBar = true;
+    o.resizable = false;
+    o.componentToCentreAround = near;
+    o.launchAsync();
 }
 } // namespace rh::ui

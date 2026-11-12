@@ -14,4 +14,12 @@ juce::String hardwareOf (const juce::String& deviceName);
 // is where headphones and speakers hang. Empty when the input has no output of its own
 // (a USB guitar cable, a webcam).
 juce::String outputBeside (const juce::String& input, const juce::StringArray& outputs);
+
+// Two output channels of an interface, named the way a player reads them: "Headphones L" and
+// "Headphones R" are "Headphones", "Out 1" and "Out 2" are "Out 1 + 2".
+juce::String outputPairName (const juce::String& left, const juce::String& right);
+
+// Whether an ASIO driver and a name Windows lists are the same interface: "Focusrite USB ASIO"
+// and "Analogue 1 + 2 (Focusrite USB Audio)" are; the computer's own sound card is not.
+bool sameHardware (const juce::String& asioDriver, const juce::String& windowsName);
 } // namespace rh

@@ -114,7 +114,8 @@ void AudioSwitch::tryNext()
                 }
         // the buffer asked for belongs to the first mode; one tried in its place picks its own
         const auto err = openExactly (dm, { type, want.input, output, tryIndex == 0 ? want.bufferSize : 0,
-                                            before.sampleRate > 0 ? before.sampleRate : 48000.0 });
+                                            before.sampleRate > 0 ? before.sampleRate : 48000.0,
+                                            type == "ASIO" ? want.outputPair : -1 });
         auto* dev = dm.getCurrentAudioDevice();
         if (err.isEmpty() && dev != nullptr && ! dev->getActiveInputChannels().isZero())
         {

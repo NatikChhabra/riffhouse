@@ -12,7 +12,10 @@ AudioOpen AudioOpen::running (juce::AudioDeviceManager& dm)
     if (dev == nullptr) return {};
     juce::AudioDeviceManager::AudioDeviceSetup s;
     dm.getAudioDeviceSetup (s);
-    return { dm.getCurrentAudioDeviceType(), s.inputDeviceName, s.outputDeviceName, dev->getCurrentBufferSizeSamples(), dev->getCurrentSampleRate() };
+    AudioOpen o { dm.getCurrentAudioDeviceType(), s.inputDeviceName, s.outputDeviceName, dev->getCurrentBufferSizeSamples(), dev->getCurrentSampleRate() };
+    if (o.type == "ASIO" && ! s.useDefaultOutputChannels && s.outputChannels.getHighestBit() >= 0)
+        o.outputPair = s.outputChannels.findNextSetBit (0) / 2;
+    return o;
 }
 
 juce::String openExactly (juce::AudioDeviceManager& dm, const AudioOpen& o)
@@ -39,7 +42,9 @@ juce::String openExactly (juce::AudioDeviceManager& dm, const AudioOpen& o)
         s.useDefaultInputChannels = false;
         s.inputChannels.clear();
         s.inputChannels.setRange (0, 2, true);
-        s.useDefaultOutputChannels = true;
+        s.useDefaultOutputChannels = o.outputPair < 0;
+        s.outputChannels.clear();
+        if (o.outputPair >= 0) s.outputChannels.setRange (2 * o.outputPair, 2, true);
         s.bufferSize = o.bufferSize;
         s.sampleRate = o.sampleRate;
         err = dm.setAudioDeviceSetup (s, true);
@@ -55,6 +60,12 @@ juce::String openExactly (juce::AudioDeviceManager& dm, const AudioOpen& o)
         if (o.sampleRate > 0) xml.setAttribute ("audioDeviceRate", o.sampleRate);
         if (o.bufferSize > 0) xml.setAttribute ("audioDeviceBufferSize", o.bufferSize);
         xml.setAttribute ("audioDeviceInChans", "11");
+        if (o.outputPair >= 0)
+        {
+            juce::BigInteger outs;
+            outs.setRange (2 * o.outputPair, 2, true);
+            xml.setAttribute ("audioDeviceOutChans", outs.toString (2));
+        }
         err = dm.initialise (2, 2, &xml, false);
     }
     auto* dev = dm.getCurrentAudioDevice();
