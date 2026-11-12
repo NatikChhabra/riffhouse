@@ -43,7 +43,7 @@ private:
     juce::StringArray driverTypes; // the driver list's items, in order; "" is Automatic
     static juce::String driverLabel (const juce::String& typeName);
     juce::ToggleButton sharing { "Let other apps play sound at the same time" };
-    juce::TextButton panel { "Delay: open the driver's own settings" };
+    juce::TextButton panel { "Open the interface's own settings" };
     std::vector<AutoSetup::Input> inputs;
     juce::Array<int> bufferSizes;
     int pairs = 0; // ASIO: how many pairs of outputs the interface has

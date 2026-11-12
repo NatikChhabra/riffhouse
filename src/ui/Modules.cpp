@@ -12,7 +12,7 @@ const std::vector<ModuleInfo>& modules()
         { "comp", "Comp", juce::Colour (0xff2dd4bf), P::compOn, -1, { P::compSustain, P::compAttack, P::compLevel, P::compBlend },
           "Evens out your picking and adds sustain. Great for clean funk and country." },
         { "wah", "Wah", juce::Colour (0xffa78bfa), P::wahOn, (int) P::wahMode, { P::wahPos, P::wahSens, P::wahQ },
-          "The vocal 'wah' sweep. Auto mode follows how hard you pick." },
+          "The vocal 'wah' sweep. Auto follows how hard you pick; Classic is the throaty 60s sweep." },
         { "pitch", "Pitch", juce::Colour (0xfff472b6), P::pitchOn, (int) P::pitchMode, { P::pitchSemis, P::pitchMix },
           "Adds a note an octave below, above, or any interval. Your dry note is never delayed." },
         { "drive", "Drive", juce::Colour (0xffa3e635), P::drvOn, (int) P::drvType, { P::drvGain, P::drvTone, P::drvLevel },
@@ -128,7 +128,8 @@ juce::String describeChoice (P param, int i)
         }
         case P::wahMode:
             return i == 0 ? "Drag the pedal to set the sweep, or automate it while recording."
-                          : "Follows how hard you pick. Funk heaven.";
+                 : i == 1 ? "Follows how hard you pick. Funk heaven."
+                          : "The classic 60s wah sweep: darker and more vocal, rocked with your foot or a pedal.";
         default: break;
     }
     return {};
@@ -814,7 +815,8 @@ void ModulePage::updateEnablement()
     }
     if (index == mWah && knobs.size() > 1)
     {
-        const bool manual = juce::roundToInt (proc.value (P::wahMode)) == choices::wahManual;
+        const int mode = juce::roundToInt (proc.value (P::wahMode));
+        const bool manual = mode == choices::wahManual || mode == choices::wahClassic; // both are rocked by foot
         if (treadle != nullptr) treadle->setRocking (manual);
         knobs[1]->setEnabled (! manual);
     }

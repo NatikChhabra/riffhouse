@@ -27,6 +27,21 @@ bool sameHardware (const juce::String& asioDriver, const juce::String& windowsNa
 // does not (exclusive mode, ASIO, or another system). `type` is the driver mode that runs.
 juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output);
 
+// The sample rates an ASIO driver is opened at, in order, when the one asked for does not play:
+// 0 is the rate the interface is already set to (in its own settings, or by Windows), which is
+// the one most likely to work, then the usual rates. Each rate comes once.
+juce::Array<double> asioRatesToTry (double asked);
+
+// What to say when an ASIO driver would not start or stayed silent at every rate, in words a
+// player can act on. `driver` is its name, `error` what the driver said (may be empty),
+// `silent` true when it opened but no sound came through.
+juce::String whyAsioFailed (const juce::String& driver, const juce::String& error, bool silent);
+
+// What to say when the interface's own settings hold the buffer at one size: empty when the
+// delay is short enough or Riffhouse can change it. `button` is the name of the button that
+// opens the driver's own settings.
+juce::String asioBufferAdvice (int bufferSize, double sampleRate, int sizesOffered, const juce::String& button);
+
 // The buffer sizes setup tries in one driver mode, smallest first, spread over the whole range.
 juce::Array<int> buffersToTry (const juce::Array<int>& available);
 

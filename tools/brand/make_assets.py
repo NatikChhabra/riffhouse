@@ -4,8 +4,9 @@
   Riffhouse --snapshots <folder> 2     writes icon.png, icon-small.png and cutouts/ (each piece of gear)
   python3 tools/brand/make_assets.py <folder>
 
-Writes the installer icon and wizard pictures into packaging/, and the README banner and the
-social preview into docs/. Needs Pillow and numpy.
+Writes the installer wizard pictures into packaging/, and the README banner and the social
+preview into docs/, from the logo in resources/brand (built by tools/brand/logo, which also
+makes packaging/riffhouse.ico). Needs Pillow and numpy.
 """
 import sys
 from pathlib import Path
@@ -17,35 +18,19 @@ FONTS = ROOT / "resources" / "fonts"
 INK, DIM, BG, AMBER = (236, 233, 227), (165, 161, 153), (14, 14, 14), (255, 163, 26)
 LINE = "Free guitar amp and pedalboard"
 
-# The mark on a 100 unit square, the same numbers as src/ui/Theme.cpp and resources/brand/mark.svg:
-# a guitar pick with a roof over the letter H cut out of it, and the pilot light under the roof.
-PICK = [((50, 5), (74, 5), (95, 14), (95, 36)), ((95, 36), (95, 58), (60, 96), (50, 96)),
-        ((50, 96), (40, 96), (5, 58), (5, 36)), ((5, 36), (5, 14), (26, 5), (50, 5))]
-ROOF = [(50, 21), (79, 45), (67.5, 45), (50, 30.5), (32.5, 45), (21, 45)]
-H = [(34.5, 51), (41.5, 51), (41.5, 61), (58.5, 61), (58.5, 51), (65.5, 51), (65.5, 78), (58.5, 78), (58.5, 68), (41.5, 68), (41.5, 78), (34.5, 78)]
-LAMP = (240, 138, 28)
+BRAND = ROOT / "resources" / "brand"
 
 
-def curve(p0, p1, p2, p3, steps=48):
-    for i in range(steps):
-        t = i / steps
-        a, b, c, d = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t * t, t ** 3
-        yield (a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1])
+def mark(size, ink=None):
+    """The amp-face badge (tools/brand/logo), scaled to size, on a clear background."""
+    return Image.open(BRAND / "mark-512.png").convert("RGBA").resize((size, size), Image.LANCZOS)
 
 
-def mark(size, ink=INK):
-    """The mark alone on a clear background, drawn four times too big and scaled down."""
-    k = 4
-    u = size * k / 100
-    mask = Image.new("L", (size * k, size * k), 0)
-    d = ImageDraw.Draw(mask)
-    d.polygon([(x * u, y * u) for seg in PICK for x, y in curve(*seg)], fill=255)
-    for hole in (ROOF, H):
-        d.polygon([(x * u, y * u) for x, y in hole], fill=0)
-    im = Image.new("RGBA", mask.size, ink + (0,))
-    im.putalpha(mask)
-    ImageDraw.Draw(im).ellipse([(50 - 4.4) * u, (42.2 - 4.4) * u, (50 + 4.4) * u, (42.2 + 4.4) * u], fill=LAMP + (255,))
-    return im.resize((size, size), Image.LANCZOS)
+def name_badge(height):
+    """The cream script name with its swash, as the 3D badge, scaled to a height."""
+    im = Image.open(BRAND / "wordmark-3d.png").convert("RGBA")
+    im = im.crop(im.split()[3].getbbox())
+    return im.resize((round(im.width * height / im.height), height), Image.LANCZOS)
 
 
 def tracked(draw, xy, text, font, fill, tracking):
@@ -57,13 +42,12 @@ def tracked(draw, xy, text, font, fill, tracking):
 
 
 def lockup(canvas, x, y, cap):
-    """Mark and name side by side; cap is the height of the capitals in pixels."""
-    d = ImageDraw.Draw(canvas)
-    font = ImageFont.truetype(str(FONTS / "BigShoulders-ExtraBold.ttf"), int(cap / 0.70))
+    """Badge and name side by side; cap sets the size (the old capital height), y the baseline."""
     m = int(cap * 1.75)
-    box = d.textbbox((0, 0), "H", font=font)
-    canvas.alpha_composite(mark(m), (x, int(y - m * 0.92 + m * 0.0)))
-    return tracked(d, (x + m + int(cap * 0.42), y - box[3]), "RIFFHOUSE", font, INK, cap * 0.23)
+    canvas.alpha_composite(mark(m), (x, int(y - m * 0.92)))
+    name = name_badge(int(m * 1.05))
+    canvas.alpha_composite(name, (x + m + int(cap * 0.35), int(y - m * 0.92 - m * 0.02)))
+    return x + m + int(cap * 0.35) + name.width
 
 
 def stage(size, light):
@@ -146,27 +130,24 @@ def cover(size, name, light, cap, text_xy, line_px, amp, pedals, horizon=None):
 
 
 def installer_art():
-    big = Image.open(SHOTS / "icon.png").convert("RGBA")
-    small = Image.open(SHOTS / "icon-small.png").convert("RGBA")
-    frames = [(big if s >= 64 else small).resize((s, s), Image.LANCZOS) for s in (256, 128, 64, 48, 32, 24, 16)]
-    out = ROOT / "packaging" / "riffhouse.ico"
-    frames[0].save(out, format="ICO", append_images=frames[1:], sizes=[f.size for f in frames])
-    print("wrote", out.relative_to(ROOT))
+    # packaging/riffhouse.ico comes straight from tools/brand/logo (photographed 48 px and up, drawn below)
     # the tall picture on the installer's first and last pages, and the small one on the others
-    for name, (w, h), m in (("wizard.bmp", (410, 797), 230), ("wizard-small.bmp", (138, 140), 104)):
+    for name, (w, h), m in (("wizard.bmp", (410, 797), 230), ("wizard-small.bmp", (138, 140), 112)):
         im = Image.new("RGBA", (w, h), (21, 20, 19, 255))
         g = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         ImageDraw.Draw(g).rectangle([0, 0, w, h // 2], fill=(255, 255, 255, 10))
         im.alpha_composite(g.filter(ImageFilter.GaussianBlur(h // 6)))
-        im.alpha_composite(mark(m), ((w - m) // 2, int(h * (0.20 if h > w else 0.12))))
+        im.alpha_composite(mark(m), ((w - m) // 2, int(h * (0.18 if h > w else 0.10))))
         if h > w * 1.5:
+            script = name_badge(118)
+            if script.width > w - 40:
+                script = script.resize((w - 40, round(script.height * (w - 40) / script.width)), Image.LANCZOS)
+            top = int(h * 0.18) + m + 20
+            im.alpha_composite(script, ((w - script.width) // 2, top))
             d = ImageDraw.Draw(im)
-            font = ImageFont.truetype(str(FONTS / "BigShoulders-ExtraBold.ttf"), 58)
-            width = sum(d.textlength(c, font=font) + 9 for c in "RIFFHOUSE") - 9
-            tracked(d, ((w - width) / 2, h * 0.20 + m + 26), "RIFFHOUSE", font, INK, 9)
             sub = ImageFont.truetype(str(FONTS / "InstrumentSans-Medium.ttf"), 25)
             line = "Free guitar amp and pedalboard"
-            d.text(((w - d.textlength(line, font=sub)) / 2, h * 0.20 + m + 108), line, font=sub, fill=DIM)
+            d.text(((w - d.textlength(line, font=sub)) / 2, top + script.height + 18), line, font=sub, fill=DIM)
         out = ROOT / "packaging" / name
         im.convert("RGB").save(out, format="BMP")
         print("wrote", out.relative_to(ROOT))

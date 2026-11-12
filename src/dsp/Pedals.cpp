@@ -366,7 +366,7 @@ void Wah::prepare (double sampleRate)
     reset();
 }
 
-void Wah::reset() { ic1 = ic2 = 0.0f; env.reset(); }
+void Wah::reset() { ic1 = ic2 = hp = 0.0f; env.reset(); }
 
 void Wah::set (int m, float p, float s, float q)
 {
@@ -378,6 +378,7 @@ void Wah::set (int m, float p, float s, float q)
 
 void Wah::process (float* x, int n)
 {
+    if (mode == 2) { processClassic (x, n); return; }
     const float k = 1.0f / lerp (2.0f, 9.0f, res); // damping
     for (int i = 0; i < n; ++i)
     {
@@ -402,6 +403,37 @@ void Wah::process (float* x, int n)
         const float low = v2;
         // a real wah is mostly a resonant bandpass with some low end left in
         x[i] = 2.2f * band + 0.25f * low;
+    }
+}
+
+// The classic 60s wah: an inductor and a transistor. The peak sweeps a narrower, lower range
+// (about 420 Hz to 1.8 kHz), is sharpest at the heel where an inductor's Q is highest, leaves
+// the deep bass out, and the little transistor stage rounds off the loudest peaks.
+void Wah::processClassic (float* x, int n)
+{
+    const float hpCoef = (float) std::exp (-2.0 * kPi * 90.0 / sr);
+    for (int i = 0; i < n; ++i)
+    {
+        posSmooth.setTarget (pos);
+        const float p = posSmooth.next();
+        const float f = expMap (p, 420.0f, 1800.0f);
+        const float q = lerp (lerp (5.0f, 11.0f, res), lerp (3.2f, 7.0f, res), p);
+        const float k = 1.0f / q;
+        const float g = (float) std::tan (kPi * f / sr);
+        const float a1 = 1.0f / (1.0f + g * (g + k));
+        const float a2 = g * a1;
+        const float a3 = g * a2;
+        // the input coupling keeps the lowest notes from booming through the peak
+        hp = undenorm (x[i] + hpCoef * (hp - x[i])); // hp follows the lows; what is left is the signal
+        const float in = x[i] - hp;
+        const float v3 = in - ic2;
+        const float v1 = a1 * ic1 + a2 * v3;
+        const float v2 = ic2 + a2 * ic1 + a3 * v3;
+        ic1 = undenorm (2.0f * v1 - ic1);
+        ic2 = undenorm (2.0f * v2 - ic2);
+        const float band = v1 * k;
+        const float y = 3.0f * band + 0.1f * v2;
+        x[i] = std::tanh (1.3f * y) / 1.3f;
     }
 }
 

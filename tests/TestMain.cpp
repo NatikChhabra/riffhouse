@@ -649,6 +649,14 @@ void testPresets (double sr)
                    "code wrapped over two lines: %s", e2.toRawUTF8());
             CHECK (presetFromShareCode (code + " sounds sick right", trailing, e3), "code with words after it: %s", e3.toRawUTF8());
             CHECK (! presetFromShareCode ("visit riffhouse: nothing here", fake, e4) && e4.isNotEmpty(), "junk after the tag must fail");
+            // a tone named after an artist carries the style line, and still pastes back
+            auto named = p;
+            named.name = "Inspired by Someone: A Song";
+            const auto namedMessage = presetToShareMessage (named);
+            Preset viaNamed; juce::String e5;
+            CHECK (namedMessage.contains ("Not affiliated with the artist.") && ! message.contains ("Not affiliated")
+                       && presetFromShareCode (namedMessage, viaNamed, e5) && viaNamed.name == named.name,
+                   "artist share message: %s", e5.toRawUTF8());
         }
     }
     if (! levels.empty())
@@ -1289,6 +1297,18 @@ void testUpdates()
                        && ! spread.contains (2048),
                    "setup tries buffer sizes across the range, not only the smallest six");
             CHECK (buffersToTry ({ 128, 64, 256 }) == juce::Array<int> ({ 64, 128, 256 }), "a short list is tried whole, smallest first");
+            // an ASIO driver held at one rate: the one asked for, then its own, then the usual rates, each once
+            CHECK (asioRatesToTry (48000.0) == juce::Array<double> ({ 48000.0, 0.0, 44100.0, 96000.0, 88200.0 }), "ASIO rates from 48 kHz");
+            CHECK (asioRatesToTry (0.0) == juce::Array<double> ({ 0.0, 48000.0, 44100.0, 96000.0, 88200.0 }), "ASIO rates from its own");
+            CHECK (whyAsioFailed ("Focusrite USB ASIO", "Driver failed to initialise", false).contains ("another program"),
+                   "a driver that will not start: another program has it");
+            CHECK (whyAsioFailed ("Focusrite USB ASIO", {}, true).contains ("clock source"), "a silent driver: its clock");
+            CHECK (! whyAsioFailed ("X", "Can't create i/o buffers", false).containsChar (0x2014), "no long dashes");
+            const auto advice = asioBufferAdvice (1024, 48000.0, 1, "Open it");
+            CHECK (advice.contains ("1024 samples") && advice.contains ("21.3 ms") && advice.contains ("\"Open it\""),
+                   "a buffer held by the driver says how to change it: %s", advice.toRawUTF8());
+            CHECK (asioBufferAdvice (128, 48000.0, 1, "x").isEmpty() && asioBufferAdvice (1024, 48000.0, 5, "x").isEmpty(),
+                   "no advice when the delay is short or Riffhouse can change it");
         }
     }
 

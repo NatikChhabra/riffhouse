@@ -22,12 +22,8 @@ namespace
 
     void drawLogo (juce::Graphics& g, juce::Rectangle<float> r)
     {
-        // the mark, then the name in condensed capitals, like the badge on a head
-        drawBrandMark (g, r.removeFromLeft (30.0f).withSizeKeepingCentre (30.0f, 30.0f).translated (0.0f, -1.5f), colours::text);
-        r.removeFromLeft (9.0f);
-        g.setColour (colours::text);
-        g.setFont (faceFont (Face::shoulders, 21.0f).withExtraKerningFactor (0.16f));
-        g.drawText ("RIFFHOUSE", r, juce::Justification::centredLeft);
+        // the amp-face badge, then the name in its script, like the plate on a combo
+        drawBrandLockup (g, r.withSizeKeepingCentre (r.getWidth(), 36.0f));
     }
 } // namespace
 
@@ -743,17 +739,17 @@ public:
     struct StatusItem { juce::String text; bool lit; };
     std::vector<StatusItem> statusItems() const
     {
+        // only what is doing something: a quiet bar says nothing needs a look
         std::vector<StatusItem> s;
         const int mains = proc.meters().mains.load();
         const int humMode = juce::roundToInt (proc.value (P::humFilter));
-        if (humMode == 0) s.push_back ({ "Hum filter off", false });
-        else if (mains > 0) s.push_back ({ juce::String (mains) + " Hz hum removed", true });
-        else s.push_back ({ "No hum found", false });
-        const bool fix = proc.value (P::inputFix) > 0.5f;
-        s.push_back ({ fix ? "Input fix on" : "Input fix off", fix });
-        const bool gate = proc.value (P::gateOn) > 0.5f;
-        const bool open = gate && proc.meters().gateOpen.load();
-        s.push_back ({ juce::String ("Gate ") + (! gate ? "off" : (open ? "open" : "closed")), open });
+        if (humMode != 0 && mains > 0) s.push_back ({ juce::String (mains) + " Hz hum removed", true });
+        if (proc.value (P::inputFix) > 0.5f) s.push_back ({ "Input fix on", true });
+        if (proc.value (P::gateOn) > 0.5f)
+        {
+            const bool open = proc.meters().gateOpen.load();
+            s.push_back ({ juce::String ("Gate ") + (open ? "open" : "closed"), open });
+        }
         return s;
     }
 
@@ -775,6 +771,7 @@ public:
                 lat += proc.getLatencySamples();
                 return juce::String (1000.0 * lat / std::max (1.0, dev->getCurrentSampleRate()), 1) + " ms round trip";
             }
+        if (proc.getLatencySamples() <= 0) return {}; // inside another app with nothing added: nothing to say
         return "The rig adds " + juce::String (1000.0 * proc.getLatencySamples() / std::max (1.0, proc.currentSampleRate()), 2) + " ms";
     }
 
@@ -1717,7 +1714,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         };
         const float big = 3.0f;
         struct Family { int module; int types; const char* name; };
-        for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 1, "wah" }, Family { mPitch, 1, "pitch" },
+        for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 3, "wah" }, Family { mPitch, 1, "pitch" },
                           Family { mDrive, 7, "drive" }, Family { mEq, 1, "eq" }, Family { mMod, 6, "mod" }, Family { mDelay, 4, "delay" },
                           Family { mReverb, 6, "reverb" }, Family { mLofi, 1, "lofi" } })
             for (int t = 0; t < fam.types; ++t)
@@ -1763,7 +1760,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         auto hex = [] (juce::uint32 c) { return juce::String::toHexString ((juce::int64) (c & 0xffffff)).paddedLeft ('0', 6); };
         juce::Array<juce::var> pedals;
         struct Family { int module; int types; const char* name; };
-        for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 1, "wah" }, Family { mPitch, 1, "pitch" },
+        for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 3, "wah" }, Family { mPitch, 1, "pitch" },
                           Family { mDrive, 7, "drive" }, Family { mEq, 1, "eq" }, Family { mMod, 6, "mod" }, Family { mDelay, 4, "delay" },
                           Family { mReverb, 6, "reverb" }, Family { mLofi, 1, "lofi" } })
             for (int t = 0; t < fam.types; ++t)

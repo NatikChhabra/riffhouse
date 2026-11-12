@@ -85,7 +85,7 @@ void setLook (Look l)
             bg = juce::Colour (0xff121212); bgTop = juce::Colour (0xff171717); panel = juce::Colour (0xff1a1a1a);
             raised = juce::Colour (0xff232323); raisedHi = juce::Colour (0xff2d2d2d); line = juce::Colour (0xff2e2e2e);
             well = juce::Colour (0xff0a0a0a); text = juce::Colour (0xffece9e3); textDim = juce::Colour (0xffa5a199);
-            textFaint = juce::Colour (0xff7f7b74); accent = juce::Colour (0xffe6dfd2); accentHi = juce::Colour (0xffffffff);
+            textFaint = juce::Colour (0xff7f7b74); accent = juce::Colour (0xffefe2bf); accentHi = juce::Colour (0xfffff6dc); // the logo's cream
             accentInk = juce::Colour (0xff121212); good = juce::Colour (0xff8fd694); warn = juce::Colour (0xffe8c25a); hot = juce::Colour (0xffffb020);
             record = juce::Colour (0xffe5483a);
             break;
@@ -935,8 +935,61 @@ void drawBrandMark (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour
     g.fillEllipse (juce::Rectangle<float> (r * 2.0f, r * 2.0f).withCentre (c));
 }
 
+namespace
+{
+    juce::Image loadBrand ([[maybe_unused]] const char* name)
+    {
+       #if RIFFHOUSE_HAS_ASSETS
+        int size = 0;
+        if (const char* data = RiffhouseAssets::getNamedResource (name, size))
+            return juce::ImageFileFormat::loadFrom (data, (size_t) size);
+       #endif
+        return {};
+    }
+} // namespace
+
+const juce::Image& brandBadge()
+{
+    static const juce::Image img = loadBrand ("mark160_png");
+    return img;
+}
+
+const juce::Image& brandName()
+{
+    static const juce::Image img = loadBrand ("wordmarkcream_png");
+    return img;
+}
+
+float drawBrandLockup (juce::Graphics& g, juce::Rectangle<float> area)
+{
+    const auto& badge = brandBadge();
+    const auto& name = brandName();
+    if (badge.isNull() || name.isNull())
+    {
+        // no pictures in this build: the name in plain letters
+        g.setColour (juce::Colour (0xffefe2bf));
+        g.setFont (font (20.0f, Weight::semibold));
+        g.drawText ("Riffhouse", area, juce::Justification::centredLeft);
+        return area.getWidth();
+    }
+    g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+    const float h = area.getHeight();
+    const float side = h * 0.86f;
+    const auto b = juce::Rectangle<float> (area.getX(), area.getCentreY() - side * 0.5f, side, side);
+    g.drawImage (badge, b, juce::RectanglePlacement::centred);
+    // the script rises to the right and its swash runs under it, so it sits a touch low and big
+    const float nh = h * 1.02f;
+    const float nw = nh * (float) name.getWidth() / (float) name.getHeight();
+    const auto n = juce::Rectangle<float> (b.getRight() + h * 0.22f, area.getCentreY() - nh * 0.5f + h * 0.04f, nw, nh);
+    g.drawImage (name, n, juce::RectanglePlacement::centred);
+    return n.getRight() - area.getX();
+}
+
 juce::Image renderAppIcon (int size, bool simple)
 {
+    // the badge itself when the build has it; the old hand-drawn mark only as a fallback
+    if (const auto& badge = brandBadge(); badge.isValid() && ! simple)
+        return badge.rescaled (size, size, juce::Graphics::highResamplingQuality);
     juce::Image icon (juce::Image::ARGB, size, size, true);
     juce::Graphics g (icon);
     const float s = (float) size;

@@ -84,6 +84,44 @@ juce::String whyShared (const juce::String& type, const juce::String& input, con
            "in Settings, Driver, input and output.";
 }
 
+juce::Array<double> asioRatesToTry (double asked)
+{
+    juce::Array<double> rates;
+    if (asked > 0) rates.add (asked);
+    for (double r : { 0.0, 48000.0, 44100.0, 96000.0, 88200.0 })
+        rates.addIfNotAlreadyThere (r);
+    return rates;
+}
+
+juce::String whyAsioFailed (const juce::String& driver, const juce::String& error, bool silent)
+{
+    const auto e = error.toLowerCase();
+    // the driver itself would not load or start: almost always another program has it
+    const bool held = e.contains ("initiali") || e.contains ("can't start") || e.contains ("not present")
+                      || e.contains ("no driver") || e.contains ("busy") || e.contains ("in use");
+    juce::String s;
+    if (silent)
+        s = driver + " opened but no sound came through it at any sample rate. In its own settings window, check that the "
+                     "clock source (or sync) is set to Internal, then pick it again.";
+    else if (held)
+        s = driver + " would not start. Most often another program is using it: close any music program, game, video call "
+                     "or browser tab that uses your interface, then pick it again.";
+    else
+        s = driver + " would not start at any sample rate or buffer size. Close other programs that use your interface, "
+                     "or unplug it and plug it back in, then pick it again.";
+    return s;
+}
+
+juce::String asioBufferAdvice (int bufferSize, double sampleRate, int sizesOffered, const juce::String& button)
+{
+    if (sizesOffered > 1 || bufferSize <= 0 || sampleRate <= 0) return {};
+    const double ms = 1000.0 * bufferSize / sampleRate;
+    if (ms < 6.0) return {};
+    return "Your interface's own settings hold the buffer at " + juce::String (bufferSize) + " samples ("
+           + juce::String (ms, 1) + " ms each way), and only they can change it. Press \"" + button
+           + "\", set the buffer size to 128 samples (or 64), and close that window. Riffhouse picks it up by itself.";
+}
+
 juce::Array<int> buffersToTry (const juce::Array<int>& available)
 {
     // Spread over the whole range, smallest first: the six smallest sizes can all be too small

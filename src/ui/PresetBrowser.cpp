@@ -224,9 +224,13 @@ void PresetBrowser::paint (juce::Graphics& g)
     auto bottom = getLocalBounds().reduced (24, 20).removeFromBottom (40);
     g.setFont (font (13.5f));
     g.setColour (colours::textDim);
-    g.drawText (juce::String ((int) results.size()) + (results.size() == 1 ? " tone" : " tones")
-                    + ". Click to try it while you play, double-click to close.",
-                bottom, juce::Justification::centredLeft);
+    // the tones named after artists say plainly what they are: a style, not the artist's own
+    const juce::String hint = category == "Inspired By"
+                                  ? ". Styles only. These tones are not made with or endorsed by the artists named."
+                                  : ". Click to try it while you play, double-click to close.";
+    g.drawFittedText (juce::String ((int) results.size()) + (results.size() == 1 ? " tone" : " tones") + hint,
+                      bottom.withTrimmedRight (paste.getWidth() + copy.getWidth() + folder.getWidth() + 36),
+                      juce::Justification::centredLeft, 2, 0.9f);
     if (results.empty())
     {
         auto lr = list.getBounds();

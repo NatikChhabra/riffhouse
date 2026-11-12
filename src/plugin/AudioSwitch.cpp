@@ -99,8 +99,20 @@ void AudioSwitch::apply (const AudioChoice& c, std::function<void (Result)> done
     onDone = std::move (done);
     before = AudioOpen::running (dm);
     tryIndex = 0;
-    sawNoInput = false;
+    rateIndex = 0;
+    lastError = {};
+    sawNoInput = sawSilence = false;
     tryNext();
+}
+
+double AudioSwitch::rateAt (int typeIndex, int index) const
+{
+    const double asked = before.sampleRate > 0 ? before.sampleRate : 48000.0;
+    // An ASIO driver can be held at one rate by its own settings or by Windows using the same
+    // interface; it gets every usual rate, starting with the one it is already set to. Other
+    // modes are tried once.
+    const auto rates = want.types[typeIndex] == "ASIO" ? asioRatesToTry (asked) : juce::Array<double> { asked };
+    return juce::isPositiveAndBelow (index, rates.size()) ? rates[index] : -1.0;
 }
 
 void AudioSwitch::tryNext()
@@ -108,6 +120,8 @@ void AudioSwitch::tryNext()
     while (tryIndex < want.types.size())
     {
         const auto type = want.types[tryIndex];
+        const double rate = rateAt (tryIndex, rateIndex);
+        if (rate < 0) { ++tryIndex; rateIndex = 0; continue; }
         juce::String output = type == "ASIO" ? want.input : want.output;
         if (type != "ASIO")
             for (auto* dt : dm.getAvailableDeviceTypes())
@@ -122,8 +136,7 @@ void AudioSwitch::tryNext()
                     }
                 }
         // the buffer asked for belongs to the first mode; one tried in its place picks its own
-        const auto err = openExactly (dm, { type, want.input, output, tryIndex == 0 ? want.bufferSize : 0,
-                                            before.sampleRate > 0 ? before.sampleRate : 48000.0,
+        const auto err = openExactly (dm, { type, want.input, output, tryIndex == 0 && rateIndex == 0 ? want.bufferSize : 0, rate,
                                             type == "ASIO" ? want.outputPair : -1, want.inputPair });
         auto* dev = dm.getCurrentAudioDevice();
         if (err.isEmpty() && dev != nullptr && ! dev->getActiveInputChannels().isZero())
@@ -133,11 +146,26 @@ void AudioSwitch::tryNext()
             startTimer (100);
             return;
         }
-        if (err.isEmpty() && dev != nullptr) sawNoInput = true;
-        ++tryIndex;
+        if (err.isNotEmpty()) lastError = err;
+        if (err.isEmpty() && dev != nullptr)
+        {
+            // it opened with no input at all: another rate will not grow one
+            sawNoInput = true;
+            ++tryIndex;
+            rateIndex = 0;
+            continue;
+        }
+        ++rateIndex;
     }
     goBack();
-    finish (false, want.input + (sawNoInput ? " has no input to plug a guitar into. " : " would not start. ") + wentBackTo());
+    finish (false, failureText());
+}
+
+juce::String AudioSwitch::failureText() const
+{
+    if (sawNoInput && lastError.isEmpty() && ! sawSilence) return want.input + " has no input to plug a guitar into. " + wentBackTo();
+    if (want.types.contains ("ASIO")) return whyAsioFailed (want.input, lastError, sawSilence && lastError.isEmpty()) + " " + wentBackTo();
+    return want.input + (sawSilence ? " opened but no sound came through it. " : " would not start. ") + wentBackTo();
 }
 
 juce::String AudioSwitch::wentBackTo() const
@@ -170,10 +198,9 @@ void AudioSwitch::timerCallback()
     if (juce::Time::getMillisecondCounterHiRes() - openedAt < kProveMs) return;
     stopTimer();
     devlog::note (want.input + " opened as " + want.types[tryIndex] + " but delivered no sound in " + juce::String ((int) kProveMs) + " ms");
-    ++tryIndex;
-    if (tryIndex < want.types.size()) { tryNext(); return; }
-    goBack();
-    finish (false, want.input + " opened but no sound came through it. " + wentBackTo());
+    sawSilence = true;
+    ++rateIndex; // the next rate, or the next mode once this one has had them all
+    tryNext();
 }
 
 void AudioSwitch::goBack()
@@ -186,9 +213,18 @@ void AudioSwitch::goBack()
 void AudioSwitch::finish (bool ok, const juce::String& message)
 {
     working = false;
+    auto text = message;
+    auto* dev = dm.getCurrentAudioDevice();
+    if (ok && rateIndex > 0 && dev != nullptr && dev->getTypeName() == "ASIO")
+    {
+        // the rate asked for would not play: say which one does, so a change nobody made is explained
+        const double asked = rateAt (tryIndex, 0);
+        text += " Your interface would not play at " + juce::String (asked / 1000.0, 1) + " kHz, so it runs at "
+                + juce::String (dev->getCurrentSampleRate() / 1000.0, 1) + " kHz, the rate it is set to.";
+    }
     auto done = std::move (onDone);
     onDone = nullptr;
-    if (done) done ({ ok, message, tryIndex == 0 });
+    if (done) done ({ ok, text, tryIndex == 0 });
 }
 
 void AudioSwitch::startTuning()

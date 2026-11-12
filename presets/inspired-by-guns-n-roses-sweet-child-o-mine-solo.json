@@ -27,7 +27,7 @@
     "cab_lowcut": 60,
     "cab_highcut": 12000,
     "wah_on": false,
-    "wah_mode": "Auto",
+    "wah_mode": "Classic",
     "wah_pos": 5,
     "wah_sens": 6.5,
     "wah_q": 5.5,

@@ -804,6 +804,7 @@ void SettingsView::refreshUpdate()
 
 void SettingsView::timerCallback()
 {
+    followScroll();
     refreshUpdate();
     inMeter.setLevel (proc.meters().gateInPeak.load());
     const auto s = deviceSummary();
@@ -954,26 +955,34 @@ juce::String SettingsView::sectionLead (Section s) const
 
 void SettingsView::show (Section s)
 {
+    // Everything is on one page; the side list only jumps to a part of it.
     if (! sections().contains (s)) s = sections().getFirst();
     current = s;
     const bool standalone = StandaloneHost::get() != nullptr;
-    auto in = [s] (Section where) { return s == where; };
-    runSetup.setVisible (standalone && in (Section::sound));
-    advanced.setVisible (standalone && in (Section::sound));
-    for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get() })
-        c->setVisible (in (Section::guitar));
-    for (auto* c : { (juce::Component*) &teachControl, (juce::Component*) &teachJob, (juce::Component*) &footView })
-        c->setVisible (in (Section::foot));
-    updateButton.setVisible (hasUpdater && in (Section::app));
-    autoUpdate.setVisible (hasUpdater && in (Section::app));
-    earlyVersions.setVisible (hasUpdater && in (Section::app));
-    lessMotion.setVisible (in (Section::app));
-    for (auto* c : { (juce::Component*) &website, (juce::Component*) &problem, (juce::Component*) &report })
-        c->setVisible (in (Section::help));
-    scroller.setViewPosition (0, 0);
+    runSetup.setVisible (standalone);
+    advanced.setVisible (standalone);
+    updateButton.setVisible (hasUpdater);
+    autoUpdate.setVisible (hasUpdater);
+    earlyVersions.setVisible (hasUpdater);
+    for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get(), &teachControl, &teachJob,
+                                                             &footView, &lessMotion, &website, &problem, &report })
+        c->setVisible (true);
     layoutPage();
+    scroller.setViewPosition (0, s == sections().getFirst() ? 0 : sectionTop[(size_t) s] - 8);
     repaint();
     page.repaint();
+}
+
+void SettingsView::followScroll()
+{
+    // the side list lights the part of the page being read
+    const int y = scroller.getViewPositionY() + 60;
+    auto now = sections().getFirst();
+    for (auto sec : sections())
+        if (sectionTop[(size_t) sec] <= y) now = sec;
+    // at the very bottom the last part counts, even when it is too short to reach the top
+    if (scroller.getViewPositionY() + scroller.getViewHeight() >= page.getHeight() - 4) now = sections().getLast();
+    if (now != current) { current = now; repaint (rail); }
 }
 
 int SettingsView::railItemAt (juce::Point<int> p) const
@@ -998,7 +1007,12 @@ void SettingsView::mouseExit (const juce::MouseEvent&)
 void SettingsView::mouseUp (const juce::MouseEvent& e)
 {
     const int i = railItemAt (e.getPosition());
-    if (i >= 0 && e.mouseWasClicked()) show (railItems[(size_t) i].first);
+    if (i >= 0 && e.mouseWasClicked())
+    {
+        show (railItems[(size_t) i].first);
+        current = railItems[(size_t) i].first; // lit even when the page cannot scroll that far
+        repaint (rail);
+    }
 }
 
 void SettingsView::resized()
@@ -1018,12 +1032,20 @@ void SettingsView::layoutPage()
 {
     const int w = std::max (320, scroller.getWidth() - 14);
     const int col = std::min (w, 720);
-    int y = 104; // under the section's name and its one line
+    int y = 0;
     auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
     auto gap = [&] (int g) { y += g; };
     plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = earlyText = motionHead = helpText = aboutHead = aboutArea = {};
 
-    switch (current)
+    // one page: every part under its own heading, one after another
+    bool firstPart = true;
+    for (auto part : sections())
+    {
+    if (! firstPart) gap (56); // room between parts, and a hairline in it (paintPage)
+    firstPart = false;
+    sectionTop[(size_t) part] = y;
+    gap (76); // the part's name and its one line
+    switch (part)
     {
         case Section::sound:
         {
@@ -1110,6 +1132,7 @@ void SettingsView::layoutPage()
             aboutArea = at (150);
             break;
         }
+    }
     }
     page.setSize (w, y + 40);
 }
@@ -1246,12 +1269,21 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
 void SettingsView::paintPage (juce::Graphics& g)
 {
     const int col = std::min (page.getWidth(), 720);
-    g.setColour (colours::text);
-    g.setFont (font (30.0f, Weight::display));
-    g.drawText (sectionName (current), 0, 0, col, 46, juce::Justification::centredLeft);
-    g.setColour (colours::textDim);
-    g.setFont (font (15.0f));
-    g.drawFittedText (sectionLead (current), juce::Rectangle<int> (0, 48, col, 44), juce::Justification::topLeft, 2, 1.0f);
+    auto heading = [&] (Section part)
+    {
+        const int top = sectionTop[(size_t) part];
+        if (part != sections().getFirst())
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.07f));
+            g.fillRect (0, top - 30, col, 1);
+        }
+        g.setColour (colours::text);
+        g.setFont (font (22.0f, Weight::display));
+        g.drawText (sectionName (part), 0, top, col, 32, juce::Justification::centredLeft);
+        g.setColour (colours::textDim);
+        g.setFont (font (14.5f));
+        g.drawFittedText (sectionLead (part), juce::Rectangle<int> (0, top + 34, col, 36), juce::Justification::topLeft, 2, 1.0f);
+    };
 
     auto small = [&g] (const juce::String& t, juce::Rectangle<int> a, int lines = 3)
     {
@@ -1266,7 +1298,10 @@ void SettingsView::paintPage (juce::Graphics& g)
         g.drawText (t, a, juce::Justification::centredLeft);
     };
 
-    switch (current)
+    for (auto part : sections())
+    {
+    heading (part);
+    switch (part)
     {
         case Section::sound:
             paintPlate (g, plateArea.toFloat());
@@ -1314,13 +1349,16 @@ void SettingsView::paintPage (juce::Graphics& g)
             about.setWordWrap (juce::AttributedString::byWord);
             about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
                           "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
-                          "any artist, band or equipment maker, and all trademarks belong to their owners. "
+                          "any artist, band or equipment maker, and all trademarks belong to their owners. If you are an artist named in a "
+                          "tone and want it changed or removed, open an issue and it will be done. ASIO and VST are trademarks of "
+                          "Steinberg Media Technologies GmbH. Riffhouse comes with absolutely no warranty. "
                           "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Fonts under the "
                           "SIL Open Font License and the Apache License 2.0. Every licence is in Licences.txt beside the app.",
                           font (13.5f), colours::textDim);
             about.draw (g, aboutArea.toFloat());
             break;
         }
+    }
     }
 }
 

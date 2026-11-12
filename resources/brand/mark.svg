@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Riffhouse">
-  <!-- A guitar pick with a roof over the letter H cut out of it, and the amp's pilot light under the roof.
-       Set `color` to tint the pick. -->
-  <path fill="currentColor" fill-rule="evenodd" d="M50 5C74 5 95 14 95 36 95 58 60 96 50 96 40 96 5 58 5 36 5 14 26 5 50 5ZM50 21 79 45H67.5L50 30.5 32.5 45H21ZM34.5 51h7v10h17V51h7v27h-7V68h-17v10h-7Z"/>
-  <circle cx="50" cy="42.2" r="4.4" fill="#f08a1c"/>
-</svg>

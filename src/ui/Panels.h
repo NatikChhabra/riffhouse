@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Widgets.h"
+#include <array>
 
 namespace rh::ui
 {
@@ -126,6 +127,8 @@ private:
     static juce::String sectionName (Section);
     juce::String sectionLead (Section) const;
     int railItemAt (juce::Point<int>) const;
+    void followScroll();
+    std::array<int, 5> sectionTop {}; // where each part starts on the page
     void layoutPage();
     void paintPage (juce::Graphics&);
     void paintPlate (juce::Graphics&, juce::Rectangle<float>);

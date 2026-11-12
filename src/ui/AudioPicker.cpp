@@ -213,6 +213,9 @@ void AudioPicker::refresh()
     note = {};
     if (inputs.empty())
         note = "No input was found on this computer. Plug the guitar in, or connect your audio interface, and open this window again.";
+    else if (asioNow && dev != nullptr
+             && asioBufferAdvice (dev->getCurrentBufferSizeSamples(), dev->getCurrentSampleRate(), bufferSizes.size(), panel.getButtonText()).isNotEmpty())
+        note = asioBufferAdvice (dev->getCurrentBufferSizeSamples(), dev->getCurrentSampleRate(), bufferSizes.size(), panel.getButtonText());
     else if (asioNow)
         note = "This is your interface's own driver, the fastest way in. Under Sound out, pick the outputs your headphones or speakers are on.";
     else if (now.type == "Windows Audio (Exclusive Mode)")

@@ -27,7 +27,7 @@ namespace colours
     inline juce::Colour warn      { 0xfffacc15 };
     inline juce::Colour hot       { 0xffffb020 }; // clipping and limiter warnings: amber, never red
     inline juce::Colour record    { 0xffe5483a }; // the record light only: the one red thing in the app
-    inline juce::Colour lamp      { 0xffffa31a }; // pilot lights: the logo's jewel, on lights, the unsaved mark
+    inline juce::Colour lamp      { 0xfff08a1c }; // pilot lights: the logo's lamp, on lights, the unsaved mark
     inline juce::Colour loud      { 0xff0f6b66 }; // pedalboard look: the one loud pedal
     inline juce::Colour silk      { 0xffece4cf }; // pedalboard look: silk-screen lettering
 } // namespace colours
@@ -61,6 +61,12 @@ float capsWidth (const juce::String&, float height, float tracking = 0.09f);
 void drawBrandMark (juce::Graphics&, juce::Rectangle<float> area, juce::Colour ink, bool simple = false);
 // The app icon: the mark on a dark tile. `simple` is the version for very small sizes.
 juce::Image renderAppIcon (int size, bool simple);
+// The logo as drawn by tools/brand/logo: the amp-face badge and the script name. Empty images
+// when the build has no assets.
+const juce::Image& brandBadge();
+const juce::Image& brandName();
+// The badge and the name side by side, fitted into `area` from its left edge; returns the width used.
+float drawBrandLockup (juce::Graphics&, juce::Rectangle<float> area);
 
 void drawCaps (juce::Graphics&, const juce::String&, juce::Rectangle<float>, float height, juce::Colour,
                juce::Justification = juce::Justification::centredLeft, float tracking = 0.09f);

@@ -77,6 +77,6 @@ namespace choices
     enum DelaySync { syncOff, sync1_2, sync1_4d, sync1_4, sync1_8d, sync1_8, sync1_8t, sync1_16, numSyncs };
     enum ReverbType { revRoom, revHall, revPlate, revSpring, revShimmer, revCloud, numReverbTypes };
     enum PitchMode { pitchSubOctave, pitchOctaveUp, pitchShift, numPitchModes };
-    enum WahMode { wahManual, wahAuto, numWahModes };
+    enum WahMode { wahManual, wahAuto, wahClassic, numWahModes };
 } // namespace choices
 } // namespace rh

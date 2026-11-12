@@ -439,6 +439,13 @@ bool AutoSetup::openMode (const juce::String& type, int bufferSize)
     AudioOpen o { type, chosen.name, outputFor ({ type, chosen.name }, t, s.outputDeviceName), bufferSize, 48000.0 };
     auto err = openExactly (dm, o);
     auto* dev = dm.getCurrentAudioDevice();
+    if ((err.isNotEmpty() || dev == nullptr) && type == "ASIO")
+    {
+        // an interface held at another rate (by its own settings, or by Windows using it): keep its rate
+        o.sampleRate = 0;
+        err = openExactly (dm, o);
+        dev = dm.getCurrentAudioDevice();
+    }
     if ((err.isNotEmpty() || dev == nullptr) && bufferSize == 0 && followOutput.isNotEmpty() && type != "ASIO")
     {
         // the interface's output would not open alongside its input: stay on the output that was playing

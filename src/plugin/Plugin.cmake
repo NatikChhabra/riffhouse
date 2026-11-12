@@ -1,7 +1,9 @@
 # The Riffhouse app (standalone) and plugin formats.
 
 file(GLOB RIFFHOUSE_FONTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/fonts/*.ttf")
-juce_add_binary_data(riffhouse_assets NAMESPACE RiffhouseAssets HEADER_NAME AssetData.h SOURCES ${RIFFHOUSE_FONTS})
+# the logo: the badge and the script name for the top bar (tools/brand/logo builds them)
+set(RIFFHOUSE_BRAND "${CMAKE_SOURCE_DIR}/resources/brand/mark-160.png" "${CMAKE_SOURCE_DIR}/resources/brand/wordmark-cream.png")
+juce_add_binary_data(riffhouse_assets NAMESPACE RiffhouseAssets HEADER_NAME AssetData.h SOURCES ${RIFFHOUSE_FONTS} ${RIFFHOUSE_BRAND})
 # Pictures of the gear from the 3D renderer (tools/gear3d). Without them the gear is drawn by hand.
 file(GLOB RIFFHOUSE_GEAR_ART CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/resources/gear/*.jpg" "${CMAKE_SOURCE_DIR}/resources/gear/*.png")
 if (RIFFHOUSE_GEAR_ART)

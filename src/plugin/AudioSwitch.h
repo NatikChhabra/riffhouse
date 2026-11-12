@@ -60,6 +60,7 @@ private:
     void tryNext();
     void goBack();
     juce::String wentBackTo() const;
+    juce::String failureText() const;
     void finish (bool ok, const juce::String& message);
 
     juce::AudioDeviceManager& dm;
@@ -68,7 +69,10 @@ private:
     std::function<void (Result)> onDone;
     AudioOpen before;
     int tryIndex = 0;
-    bool working = false, sawNoInput = false;
+    int rateIndex = 0;        // ASIO: which of asioRatesToTry is being tried
+    juce::String lastError;   // what the last driver that would not open said
+    bool working = false, sawNoInput = false, sawSilence = false;
+    double rateAt (int typeIndex, int index) const; // -1 past the last rate to try for that mode
     juce::uint32 beatAtOpen = 0;
     double openedAt = 0;
     // after a hand-picked input proves it plays: the smallest buffer that stays clean

@@ -164,10 +164,11 @@ public:
     void process (float* x, int n);
 
 private:
+    void processClassic (float* x, int n);
     double sr = 48000.0;
     int mode = 1;
     float pos = 0.5f, sens = 0.6f, res = 0.5f;
-    float ic1 = 0, ic2 = 0;
+    float ic1 = 0, ic2 = 0, hp = 0;
     EnvelopeFollower env;
     Smoother posSmooth;
 };

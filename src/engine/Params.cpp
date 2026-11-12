@@ -45,7 +45,7 @@ namespace
         s.push_back (knob (P::compBlend, "comp_blend", "Blend", 10.0f));
 
         s.push_back (tog (P::wahOn, "wah_on", "Wah", false));
-        s.push_back (pick (P::wahMode, "wah_mode", "Wah Mode", { "Manual", "Auto" }, 1));
+        s.push_back (pick (P::wahMode, "wah_mode", "Wah Mode", { "Manual", "Auto", "Classic" }, 1));
         s.push_back (knob (P::wahPos, "wah_pos", "Pedal", 5.0f));
         s.push_back (knob (P::wahSens, "wah_sens", "Sensitivity", 6.0f));
         s.push_back (knob (P::wahQ, "wah_q", "Peak", 5.0f));

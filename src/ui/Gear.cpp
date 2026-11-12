@@ -338,6 +338,7 @@ const PedalDesign* pedalDesignFor (int module, int type)
     static const PedalDesign gate   { "SILENCER", "noise gate", 0xff3e4537, 0xfff0e8cc, 0xff7dffa0, Finish::hammertone, KnobStyle::pedal, 0xfff0e8cc, Face::shoulders, true, 0.95f, 0, 0, 1 };
     static const PedalDesign comp   { "squeeze", "compressor", 0xff3f8fc4, 0xfff7f7f2, 0xffd9f1ff, Finish::enamel, KnobStyle::pedal, 0xfff7f7f2, Face::slab, false, 1.12f, 0, 3, 0 };
     static const PedalDesign wah    { "FUNK FILTER", "wah and envelope", 0xffd9a521, 0xff2a1d10, 0xff7dffa0, Finish::enamel, KnobStyle::chicken, 0xfff1ead8, Face::shoulders, true, 0.9f, 0, 0, 5 };
+    static const PedalDesign classic { "THROAT", "classic wah", 0xff27443a, 0xfff0e8cc, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xfff0e8cc, Face::shoulders, true, 0.9f, 0, 0, 5 };
     static const PedalDesign pitch  { "deep octave", "pitch shifter", 0xff5b3c8f, 0xffeae6f4, 0xffd9c4ff, Finish::sparkle, KnobStyle::dome, 0xff1b1d20, Face::slab, false, 0.95f, 0, 2, 0 };
     static const PedalDesign eq     { "GRAPHIC EQ", "seven band", 0xff18191b, 0xffeceae4, 0xff7dffa0, Finish::crinkle, KnobStyle::pedal, 0xffeceae4, Face::shoulders, true, 1.5f, 0, 0, 2 };
     static const PedalDesign lofi   { "dusty tape", "lo-fi machine", 0xff6b5a44, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xfff1ead8, Face::brush, false, 1.34f, 0, 0, 4 };
@@ -368,7 +369,7 @@ const PedalDesign* pedalDesignFor (int module, int type)
     {
         case 0:  return &gate;
         case 1:  return &comp;
-        case 2:  return &wah;
+        case 2:  return type == 2 ? &classic : &wah;
         case 3:  return &pitch;
         case 4:  return &drivePedalDesign (type);
         case 7:  return &eq;
