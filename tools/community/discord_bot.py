@@ -9,6 +9,8 @@ Each run it:
        tone    -> #tone-of-the-week
   1b. Posts each new reel or trailer listed in community/reels.json to #announcements
      (see community/reels/README.md for how to add one).
+  1c. Runs the release-day event in community/launch.json: a #general thread where the first 50
+      people get the Day One role. Starts itself when that release appears.
   2. Answers common questions in the #help and #bug-reports forums when a new post
      clearly matches one (sound, delay, crackles, ASIO, install warning, ...), with the fix
      and a link to the full help page. Posts it can't match are left for a person.
@@ -206,7 +208,11 @@ def post_feeds(log: list[str]):
             }
             if it["date"]:
                 embed["timestamp"] = it["date"].isoformat()
-            msg = send(CH[chan], f"<@&{ping[0]}>" if ping else "", [embed], ping)
+            preset = preset_file(it["link"]) if chan == "tone-of-the-week" else None
+            if preset:
+                msg = send_file(CH[chan], "", None, preset[0], preset[1], "application/json", [embed], ping)
+            else:
+                msg = send(CH[chan], f"<@&{ping[0]}>" if ping else "", [embed], ping)
             if publish and msg.get("id"):
                 try:
                     call("POST", f"/channels/{CH[chan]}/messages/{msg['id']}/crosspost")
@@ -238,24 +244,41 @@ REELS = os.path.join(ROOT, "community", "reels.json")
 UPLOAD_LIMIT = 10 * 1024 * 1024
 
 
-def send_file(channel: str, content: str, path: str, name: str):
+def send_file(channel: str, content: str, path: str | None, name: str, data: bytes | None = None,
+              mime: str = "video/mp4", embeds=None, ping_roles=()):
     if DRY:
-        print(f"[dry] upload {path} to {channel}: {content[:200]}")
+        print(f"[dry] upload {name} to {channel}: {content[:200]}")
         return {}
     boundary = "riffhouse" + str(int(time.time() * 1000))
-    payload = json.dumps({"content": content, "allowed_mentions": {"parse": []},
-                          "attachments": [{"id": 0, "filename": name}]})
-    with open(path, "rb") as f:
-        data = f.read()
+    body_json = {"content": content, "allowed_mentions": {"parse": [], "roles": list(ping_roles)},
+                 "attachments": [{"id": 0, "filename": name}]}
+    if embeds:
+        body_json["embeds"] = embeds
+    if data is None:
+        with open(path, "rb") as f:
+            data = f.read()
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"payload_json\"\r\nContent-Type: application/json\r\n\r\n"
-            f"{payload}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; filename=\"{name}\"\r\n"
-            f"Content-Type: video/mp4\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
+            f"{json.dumps(body_json)}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; filename=\"{name}\"\r\n"
+            f"Content-Type: {mime}\r\n\r\n").encode() + data + f"\r\n--{boundary}--\r\n".encode()
     req = urllib.request.Request(f"{API}/channels/{channel}/messages", data=body, method="POST")
     req.add_header("Authorization", f"Bot {os.environ.get('DISCORD_BOT_TOKEN', '')}")
     req.add_header("User-Agent", UA)
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.loads(r.read())
+
+
+def preset_file(link: str) -> tuple[str, bytes] | None:
+    """The preset .json behind a tone link, so people can grab the file straight from Discord."""
+    got = re.match(r"https://github\.com/([^/]+/[^/]+)/blob/([^/]+)/(presets/[\w.\-]+\.json)$", link or "")
+    if not got:
+        return None
+    raw = f"https://raw.githubusercontent.com/{got.group(1)}/{got.group(2)}/{got.group(3)}"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(raw, headers={"User-Agent": UA}), timeout=30) as r:
+            return os.path.basename(got.group(3)), r.read()
+    except urllib.error.URLError:
+        return None
 
 
 def post_reels(log: list[str]):
@@ -270,8 +293,15 @@ def post_reels(log: list[str]):
     for m in my_messages(chan):
         done.update(a["filename"] for a in m.get("attachments", []))
         done.add(m.get("content", ""))
+    now = dt.datetime.now(dt.timezone.utc)
     for r in reels:
         rid, link, caption = r["id"], r.get("link", ""), r.get("caption", "").strip()
+        if r.get("post_at"):  # queued: goes out on its own at this time (ISO, with a time zone)
+            when = dt.datetime.fromisoformat(r["post_at"].replace("Z", "+00:00"))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=dt.timezone(dt.timedelta(hours=5, minutes=30)))  # India time
+            if now < when:
+                continue
         name = f"{rid}.mp4"
         content = (caption + ("\n" + link if link else "")).strip()
         if name in done or any(link and link in d for d in done) or content in done:
@@ -290,6 +320,68 @@ def post_reels(log: list[str]):
             except RuntimeError as e:
                 print(f"warning: crosspost: {e}", file=sys.stderr)
         log.append(f"Posted reel **{rid}** in <#{chan}>")
+
+
+# ---------------------------------------------------------------- 1c. launch event
+
+LAUNCH = os.path.join(ROOT, "community", "launch.json")
+FOUNDER = "1570505112076427435"
+
+
+def launch_event(log: list[str]):
+    """On release day: a thread in #general, and the first people to post in it get a role for good.
+    Starts by itself when the release named in community/launch.json shows up in the feed."""
+    if not os.path.exists(LAUNCH):
+        return
+    with open(LAUNCH, encoding="utf-8") as f:
+        cfg = json.load(f)
+    tag, limit, role, name = cfg["version"], int(cfg.get("limit", 50)), cfg["role"], cfg["thread_name"]
+    if not any(i["guid"] == f"release-{tag}" for i in read_feed("builds.xml")):
+        return
+    gen = CH["general"]
+    th = next((t for t in call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
+               if t.get("parent_id") == gen and t["name"] == name), None)
+    if th is None:
+        archived = call("GET", f"/channels/{gen}/threads/archived/public?limit=50").get("threads", [])
+        if any(t["name"] == name for t in archived):
+            return  # event already ran
+        th = call("POST", f"/channels/{gen}/threads", {"name": name, "type": 11, "auto_archive_duration": 10080},
+                  reason="Launch event")
+        if not th.get("id"):
+            return
+        call("POST", f"/channels/{th['id']}/messages", {"content": (
+            f"{tag.lstrip('v')} is out. first {limit} people to drop a message in here get the **Day One** role, and it stays forever.\n"
+            "say what you're playing through it, or just say hi. update from Settings > Check for updates, "
+            "or grab it at https://natikchhabra.github.io/riffhouse/"), "allowed_mentions": {"parse": []}})
+        log.append(f"Launch event started: <#{th['id']}>")
+        return
+    if th.get("thread_metadata", {}).get("locked"):
+        return
+    members = []
+    after = "0"
+    while True:
+        page = call("GET", f"/guilds/{GUILD}/members?limit=1000&after={after}")
+        members += page
+        if len(page) < 1000:
+            break
+        after = page[-1]["user"]["id"]
+    have = {m["user"]["id"] for m in members if role in m["roles"]}
+    staff = {m["user"]["id"] for m in members if FOUNDER in m["roles"] or m["user"].get("bot")}
+    msgs = sorted(call("GET", f"/channels/{th['id']}/messages?limit=100"), key=lambda m: int(m["id"]))
+    for m in msgs:
+        if len(have) >= limit:
+            break
+        uid = m["author"]["id"]
+        if m["author"].get("bot") or uid in staff or uid in have or m.get("webhook_id"):
+            continue
+        call("PUT", f"/guilds/{GUILD}/members/{uid}/roles/{role}", reason="Launch event: first 50")
+        have.add(uid)
+        log.append(f"Day One: <@{uid}> ({len(have)}/{limit})")
+    if len(have) >= limit:
+        call("POST", f"/channels/{th['id']}/messages", {"content": f"that's {limit}. thanks for showing up on day one, means a lot",
+                                                         "allowed_mentions": {"parse": []}})
+        call("PATCH", f"/channels/{th['id']}", {"locked": True, "archived": True}, reason="Launch event full")
+        log.append(f"Launch event full, thread closed")
 
 
 # ---------------------------------------------------------------- 2. FAQ answers
@@ -647,7 +739,7 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
+    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: launch_event(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
                  lambda: keep_on_purpose(cursor, log), lambda: triage(threads, cursor, log)):
         try:
             step()

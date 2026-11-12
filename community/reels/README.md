@@ -16,6 +16,7 @@ Add an entry when a reel or the trailer goes live:
 - `id`: short and unique, never reused.
 - `caption`: Natik's voice. Short, lowercase is fine, no em dashes, no AI phrasing.
 - `link`: the public post (Instagram, YouTube). Optional if `video` is there.
+- `post_at`: optional. Queue it for later: `"2026-11-15T20:00:00+05:30"` (India time if no zone is given). The bot posts it on the first run after that time.
 - `video`: optional mp4 in this folder. Under 10 MB it is uploaded so it plays right inside Discord; bigger files are skipped and only the link is posted.
 
 Entries are posted oldest first. Removing an entry never deletes the Discord post.
