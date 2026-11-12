@@ -171,6 +171,18 @@ TakesView::TakesView (RiffhouseProcessor& p, TakeBar& b) : proc (p), bar (b)
         proc.recordingFolder.startAsProcess();
     };
     addAndMakeVisible (openFolder);
+    convert.setTooltip ("Turn any WAV, AIFF, FLAC, OGG or MP3 into an MP3 or FLAC, saved beside it. Dropping the file on this list does the same.");
+    convert.onClick = [this]
+    {
+        chooser = std::make_unique<juce::FileChooser> ("Which sound file?", proc.recordingFolder, "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                              [this] (const juce::FileChooser& fc)
+                              {
+                                  const auto f = fc.getResult();
+                                  if (f.existsAsFile()) offerCopy (f, f.getFileNameWithoutExtension(), f.getParentDirectory(), &convert);
+                              });
+    };
+    addAndMakeVisible (convert);
     list.setModel (this);
     list.setRowHeight (54);
     list.setColour (juce::ListBox::backgroundColourId, juce::Colours::transparentBlack);
@@ -198,6 +210,8 @@ void TakesView::resized()
     close.setBounds (head.removeFromRight (40).withSizeKeepingCentre (36, 36));
     head.removeFromRight (16);
     openFolder.setBounds (head.removeFromRight (150).withSizeKeepingCentre (150, 32));
+    head.removeFromRight (10);
+    convert.setBounds (head.removeFromRight (180).withSizeKeepingCentre (180, 32));
     r.removeFromTop (34);
     r.removeFromBottom (76); // the playing strip sits here
     list.setBounds (r);
@@ -231,6 +245,8 @@ TakesView::Cells TakesView::cells (int w, int h, bool hasClean) const
     c.remove = r.removeFromRight ((int) capsWidth ("Delete", 10.5f, 0.12f) + 6);
     r.removeFromRight (26);
     c.reveal = r.removeFromRight ((int) capsWidth ("Show file", 10.5f, 0.12f) + 6);
+    r.removeFromRight (26);
+    c.share = r.removeFromRight ((int) capsWidth ("MP3 / FLAC", 10.5f, 0.12f) + 6);
     r.removeFromRight (26);
     c.tone = r.removeFromRight ((int) capsWidth ("Change the tone", 10.5f, 0.12f) + 6);
     if (! hasClean) c.tone = {};
@@ -272,6 +288,7 @@ void TakesView::paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool
     g.drawText (juce::String (s / 60) + ":" + juce::String (s % 60).paddedLeft ('0', 2), c.length, juce::Justification::centredRight);
     if (! c.tone.isEmpty())
         drawCaps (g, "Change the tone", c.tone.toFloat(), 10.5f, colours::accent, juce::Justification::centredRight, 0.12f);
+    drawCaps (g, "MP3 / FLAC", c.share.toFloat(), 10.5f, colours::textDim, juce::Justification::centredRight, 0.12f);
     drawCaps (g, "Show file", c.reveal.toFloat(), 10.5f, colours::textDim, juce::Justification::centredRight, 0.12f);
     drawCaps (g, "Delete", c.remove.toFloat(), 10.5f, colours::textDim, juce::Justification::centredRight, 0.12f);
 }
@@ -295,6 +312,11 @@ void TakesView::listBoxItemClicked (int row, const juce::MouseEvent& e)
         return;
     }
     if (c.reveal.expanded (8, 0).contains (at)) { t.sound.revealToUser(); return; }
+    if (c.share.expanded (8, 0).contains (at))
+    {
+        offerCopy (t.sound, t.name, exportFileFor (proc.recordingFolder, t.sound, ExportFormat::mp3).getParentDirectory(), nullptr);
+        return;
+    }
     const bool tone = ! c.tone.isEmpty() && c.tone.expanded (8, 0).contains (at);
     if (! tone && bar.isActive() && bar.current() == t.sound && ! bar.isChangingTone())
     {
@@ -304,5 +326,53 @@ void TakesView::listBoxItemClicked (int row, const juce::MouseEvent& e)
     }
     if (onPlay) onPlay (t, tone);
     list.repaint();
+}
+
+void TakesView::convertDropped (const juce::File& f)
+{
+    if (f.existsAsFile()) offerCopy (f, f.getFileNameWithoutExtension(), f.getParentDirectory(), &convert);
+}
+
+void TakesView::offerCopy (const juce::File& source, const juce::String& title, juce::File folder, juce::Component* near)
+{
+    if (copying && copyJob != nullptr)
+    {
+        if (onMessage) onMessage ("Still saving " + copyJob->output().getFileName() + ". One moment.");
+        return;
+    }
+    juce::PopupMenu m;
+    m.addSectionHeader ("Save a copy of " + source.getFileName());
+    m.addItem (1, "MP3: to send or post (small, plays everywhere)");
+    m.addItem (2, "FLAC: to keep (every detail, half the size of WAV)");
+    auto options = juce::PopupMenu::Options();
+    options = near != nullptr ? options.withTargetComponent (near) : options.withMousePosition();
+    m.showMenuAsync (options, [safe = juce::Component::SafePointer<TakesView> (this), source, title, folder] (int chosen)
+    {
+        if (safe == nullptr || chosen == 0) return;
+        const auto format = chosen == 1 ? ExportFormat::mp3 : ExportFormat::flac;
+        auto out = folder.getChildFile (source.getFileNameWithoutExtension() + exportExtension (format));
+        // a copy is never written over the file it was made from, nor over something else of the player's
+        if (out == source || (out.existsAsFile() && folder == source.getParentDirectory())) out = out.getNonexistentSibling();
+        safe->startCopy (source, title, out, format);
+    });
+}
+
+void TakesView::startCopy (const juce::File& source, const juce::String& title, const juce::File& out, ExportFormat format)
+{
+    if (onMessage) onMessage ("Saving " + out.getFileName() + "...");
+    copying = true;
+    copyJob = std::make_unique<ExportJob> (source, out, format, title,
+                                           [safe = juce::Component::SafePointer<TakesView> (this), format] (juce::File made, juce::String err)
+                                           {
+                                               if (safe == nullptr) return;
+                                               safe->copying = false;
+                                               if (made.existsAsFile())
+                                               {
+                                                   if (safe->onMessage) safe->onMessage ("Saved as " + exportName (format) + ": " + made.getFileName() + ". It is shown in its folder.");
+                                                   made.revealToUser();
+                                               }
+                                               else if (safe->onMessage && err != "stopped")
+                                                   safe->onMessage ("Could not save the " + exportName (format) + ". " + err);
+                                           });
 }
 } // namespace rh::ui

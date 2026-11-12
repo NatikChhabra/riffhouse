@@ -51,6 +51,8 @@ Name: "desktopicon"; Description: "Put a shortcut on the desktop"; Flags: checke
 
 [Files]
 Source: "{#BuildDir}\Standalone\Riffhouse.exe"; DestDir: "{app}"; Flags: ignoreversion
+; The licence of Riffhouse and of every part in it (made by cmake/Notices.cmake)
+Source: "{#BuildDir}\..\..\..\Licences.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; The plugin for recording software. Skipped, not failed, when a DAW has it open.
 Source: "{#BuildDir}\VST3\Riffhouse.vst3\*"; DestDir: "{usercf}\VST3\Riffhouse.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: PluginIsFree
 

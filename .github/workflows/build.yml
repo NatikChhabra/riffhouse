@@ -179,6 +179,8 @@ jobs:
           $plugin = Join-Path $env:LOCALAPPDATA 'Programs\Common\VST3\Riffhouse.vst3'
           if (-not (Test-Path $app)) { Get-Content install.log -Tail 40; throw "Riffhouse.exe was not installed" }
           if (-not (Test-Path $plugin)) { throw "The VST3 plugin was not installed" }
+          $licences = Join-Path (Split-Path $app) 'Licences.txt'
+          if (-not (Test-Path $licences) -or -not (Select-String -Path $licences -Pattern 'LAME MP3 encoder' -Quiet)) { throw "Licences.txt with every part's licence was not installed" }
           $installed = (Get-Item $app).VersionInfo.ProductVersion
           if (-not "$installed".StartsWith($env:VERSION)) { throw "Installed version is '$installed', expected $env:VERSION" }
 

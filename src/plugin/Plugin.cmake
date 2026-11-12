@@ -50,6 +50,7 @@ target_sources(Riffhouse PRIVATE
     plugin/PluginProcessor.cpp
     plugin/Recorder.cpp
     plugin/Takes.cpp
+    plugin/Export.cpp
     plugin/Tuner.cpp
     plugin/AutoSetup.cpp
     plugin/DeviceGuard.cpp
@@ -112,6 +113,7 @@ target_link_libraries(Riffhouse
     PRIVATE
         nam_core
         riffhouse_stretch
+        riffhouse_lame
         riffhouse_assets
         juce::juce_audio_utils
         juce::juce_cryptography

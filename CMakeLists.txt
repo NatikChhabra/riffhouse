@@ -41,6 +41,8 @@ FetchContent_Declare(signalsmith_linear
     GIT_SHALLOW ON
     SOURCE_SUBDIR do-not-add)
 FetchContent_MakeAvailable(signalsmith_stretch signalsmith_linear)
+include(cmake/Lame.cmake)
+include(cmake/Notices.cmake)
 add_library(riffhouse_stretch INTERFACE)
 target_include_directories(riffhouse_stretch SYSTEM INTERFACE
     "${signalsmith_stretch_SOURCE_DIR}/include"
