@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include "Circuits.h"
 #include "Common.h"
 
 #include <atomic>
@@ -10,6 +11,51 @@
 
 namespace rh
 {
+// Takes mains hum out by subtracting it, not by notching. It keeps a model of the hum (the
+// first six harmonics of the mains, each a level and a phase) and learns it only while the
+// guitar is quiet, so the notes never move it. A notch filter on 50 Hz and its harmonics would
+// also cut G, B and D (98, 196, 247, 294 Hz) and, worse, ring on for a tenth of a second after
+// every note stops near those pitches: a high-gain amp turns that ringing into crunch on muted
+// strings. The model also follows the mains drifting off 50 or 60 Hz. If it has not been able
+// to learn for a long while (one long phrase) it lets go of the hum gently rather than guess.
+class HumCanceller
+{
+public:
+    static constexpr int kHarmonics = 6;
+    void prepare (double sampleRate);
+    void reset();
+    void setMains (int hz);
+    int mains() const noexcept { return mainsHz; }
+    float process (float x) noexcept;
+    float driftHz() const noexcept { return (float) (wCorr * sr / 6.283185307179586); }
+    bool learning() const noexcept { return adaptHold == 0; }
+
+private:
+    void stepDone();
+
+    double sr = 48000.0;
+    int mainsHz = 0;
+    double w0 = 0.0, wCorr = 0.0;
+    double zr = 1.0, zi = 0.0, rr = 1.0, ri = 0.0; // phasor of the mains, and its turn per sample
+    double a[kHarmonics] {}, b[kHarmonics] {};
+    double cs[kHarmonics] {}, sn[kHarmonics] {};
+    double mu = 0.0;
+    // when it may learn: the last 20 ms against the quietest it has been lately
+    int stepLength = 960, stepFill = 0;
+    double stepPower = 0.0, floorPower = -1.0, floorRise = 1.0;
+    float freezeAbove = 0.0f;
+    int adaptHold = 0, holdSamples = 0, frozenFor = 0, letGoAfter = 0;
+    double use = 0.0, useStep = 0.0; // how much of the model is subtracted (fades out when it cannot learn)
+    double lastTheta = 0.0; bool haveTheta = false; int thetaHarmonic = 0;
+    // the input's own quiet level: hum is part of it, so the model is never let be louder
+    double inPower = 0.0, inFloor = -1.0;
+    // the last 300 ms of 20 ms levels: hum and hiss hold still, a fading note does not
+    static constexpr int kSteady = 15;
+    float levels[kSteady] {};
+    int levelAt = 0, levelsHeard = 0;
+    void forget();
+};
+
 // Cleans up the raw input: removes DC and mains hum (auto-detects 50 or 60 Hz)
 // and, when Input Fix is on, restores the highs a low-impedance mic or line
 // input steals from a passive pickup.
@@ -32,8 +78,7 @@ private:
 
     double sr = 48000.0;
     DcBlocker dc;
-    static constexpr int kHarmonics = 6;
-    Biquad notches[kHarmonics];
+    HumCanceller hum;
     int activeMains = 0;
     int mode = humAuto;
     bool fix = false;
@@ -107,17 +152,29 @@ private:
 // second and a half, that is the noise floor, and the gate stays a little above it. So a
 // noisier evening, a guitar turned up or more Input Fix do not let hiss through, and
 // nobody has to run setup again for it. A ringing note fades and is never taken for noise.
+//
+// It hears the loudest the guitar has been over the last 20 ms (one swing of the lowest
+// string), so it neither flutters on a low note nor lags behind it. When the strings are
+// stopped by a hand, the level falls 18 dB or more inside about 30 ms, faster than any note
+// fades on its own: the gate closes in about 12 ms then, without waiting for the threshold,
+// and only a new pick opens it again. That is what makes muted chugs tight. The Rig also
+// applies the same gain after the amp (gainsOut), because a high-gain amp squashes a fade
+// made in front of it: 20 dB less going in is a few dB less coming out, and the hiss of a
+// closing gate turns into crunch.
 class NoiseGate
 {
 public:
-    static constexpr float kAboveFloorDb = 15.0f;   // threshold over the floor's level (its peaks sit about 10 dB up)
+    static constexpr float kAboveFloorDb = 17.0f;   // threshold over the floor's level (its peaks sit about 10 dB up; it closes 4 dB lower)
     static constexpr float kHighestFollowDb = -36.0f; // following never asks for more than this: notes must still ring out
+    static constexpr float kStopDropDb = 18.0f;     // this much down inside about 30 ms is a hand on the strings
+    static constexpr float kStopRangeDb = 24.0f;    // ... when it lands within this of the threshold
 
     void prepare (double sampleRate);
     void reset();
     void set (float thresholdDb, float releaseMs);
     void setFollowsNoise (bool f) noexcept { follows = f; }
-    void process (float* x, int n);
+    // Gates x in place. gainsOut, when given, gets the gain used on each sample.
+    void process (float* x, int n, float* gainsOut = nullptr);
     bool isOpen() const noexcept { return open; }
     float thresholdNowDb() const noexcept { return thrNowDb; }
     float noiseFloorDb() const noexcept { return floorDb; } // -120 until one has been heard
@@ -125,19 +182,25 @@ public:
 private:
     void windowDone (float levelDb);
     void applyThreshold();
+    void stepDone();
 
     double sr = 48000.0;
-    EnvelopeFollower env;
     float userThrDb = -62.0f, thrNowDb = -62.0f, floorDb = -120.0f;
     bool follows = true;
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
     float windows[kWindows] {};
     int windowAt = 0, windowsHeard = 0, windowLength = 4800, windowFill = 0;
     double windowPower = 0.0;
+    // the detector: peaks of 2.5 ms steps, the last 16 of them
+    static constexpr int kSteps = 16;
+    float steps[kSteps] {};
+    int stepAt = 0, stepLength = 120, stepFill = 0;
+    float stepPeak = 0.0f, heldPeak = 0.0f, recentPeak = 0.0f, earlierPeak = 0.0f;
+    float reopenAbove = 0.0f, reopenDecay = 1.0f;
     float thrOpen = 0.001f, thrClose = 0.0005f;
-    float gain = 0.0f, attackCoeff = 0.0f, releaseCoeff = 0.0f;
+    float gain = 0.0f, attackCoeff = 0.0f, releaseCoeff = 0.0f, stopCoeff = 0.0f;
     int holdSamples = 0, holdCounter = 0;
-    bool open = false;
+    bool open = false, stopping = false;
 };
 
 class Compressor
@@ -209,7 +272,8 @@ public:
 private:
     void update();
     double sr = 48000.0, osr = 192000.0;
-    std::unique_ptr<juce::dsp::Oversampling<float>> os;
+    std::unique_ptr<juce::dsp::Oversampling<float>> os, osHigh; // 8x, and 16x for the hard clippers
+    juce::dsp::Oversampling<float>* active() const noexcept { return (type == 4 || type == 5) && osHigh ? osHigh.get() : os.get(); }
     int type = 2;
     float drive = 0.4f, tone = 0.5f, level = 0.5f;
     bool dirty = true;
@@ -218,6 +282,11 @@ private:
     DcBlocker dc;
     Smoother gainS, levelS;
     float clean = 0.0f;
+    // the pedals built as their circuits (see Circuits.h and the pedal lab)
+    circuit::GreenDrive green;
+    circuit::RodentDist rodent;
+    circuit::BigFuzz fuzz;
+    bool isCircuit() const noexcept { return type == 2 || type == 4 || type == 5; }
 };
 
 class GraphicEq

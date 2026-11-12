@@ -71,6 +71,9 @@ void Rig::prepare (double sampleRate, int block)
     trimGain.reset (dbToGain (levelTrimDb.load()));
     outGain.prepare (sr, 20.0f);
     dry.assign ((size_t) maxBlock, 0.0f);
+    gateGains.assign ((size_t) maxBlock, 1.0f);
+    std::fill (std::begin (gateDelay), std::end (gateDelay), 1.0f);
+    gateDelayAt = 0;
     dryR.assign ((size_t) maxBlock, 0.0f);
     tailL.assign ((size_t) maxBlock, 0.0f);
     tailR.assign ((size_t) maxBlock, 0.0f);
@@ -84,6 +87,8 @@ void Rig::reset()
 {
     input.reset(); gate.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
     eq.reset(); mod.reset(); delay.reset(); reverb.reset(); lofi.reset(); doubler.reset(); limiter.reset();
+    std::fill (std::begin (gateDelay), std::end (gateDelay), 1.0f);
+    gateDelayAt = 0;
 }
 
 int Rig::latencySamples() const
@@ -198,7 +203,22 @@ void Rig::processMono (float* x, int n)
         m.gateInPeak.store (pk);
         if (pk > m.stagePeak.load (std::memory_order_relaxed)) m.stagePeak.store (pk, std::memory_order_relaxed);
     }
-    runFaded (fGate, x, n, dry, [&] (float* b, int k) { gate.process (b, k); });
+    if (fGate.idle())
+        std::fill (gateGains.begin(), gateGains.begin() + n, 1.0f);
+    else
+    {
+        // the same as runFaded, with the gain of each sample kept for after the amp
+        const bool full = fGate.full();
+        if (! full) std::copy (x, x + n, dry.begin());
+        gate.process (x, n, gateGains.data());
+        if (! full)
+            for (int i = 0; i < n; ++i)
+            {
+                const float g = 1.0f + (gateGains[(size_t) i] - 1.0f) * fGate.next();
+                gateGains[(size_t) i] = g;
+                x[i] = dry[(size_t) i] * g;
+            }
+    }
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });
     runFaded (fWah, x, n, dry, [&] (float* b, int k) { wah.process (b, k); });
     runFaded (fPitch, x, n, dry, [&] (float* b, int k) { pitch.process (b, k); });
@@ -218,6 +238,19 @@ void Rig::processMono (float* x, int n)
         else
             amp.process (b, k);
     });
+    // The gate again, after the drive and the amp, in step with what comes out of them: they
+    // squash a fade made in front of them, so a closing gate would leave crunch behind.
+    {
+        int late = neural ? nam.latencySamples() : (int) std::lround (amp.latencySamples());
+        if (! fDrive.idle()) late += (int) std::lround (drive.latencySamples());
+        late = juce::jlimit (0, kGateDelay - 1, late);
+        for (int i = 0; i < n; ++i)
+        {
+            gateDelay[gateDelayAt] = gateGains[(size_t) i];
+            x[i] *= gateDelay[(gateDelayAt - late + kGateDelay) % kGateDelay];
+            gateDelayAt = (gateDelayAt + 1) % kGateDelay;
+        }
+    }
     runFaded (fCab, x, n, dry, [&] (float* b, int k) { cab.process (b, k); });
     runFaded (fEq, x, n, dry, [&] (float* b, int k) { eq.process (b, k); });
 }

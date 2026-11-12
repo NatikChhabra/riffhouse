@@ -120,7 +120,10 @@ private:
     class PhraseCatcher* tap = nullptr;
     std::atomic<float> levelTrimDb { 0.0f };
     bool measuring = false;
-    std::vector<float> dry, dryR, tailL, tailR;
+    std::vector<float> dry, dryR, tailL, tailR, gateGains;
+    static constexpr int kGateDelay = 2048; // the gate's gains, waiting for the drive and amp to catch up
+    float gateDelay[kGateDelay] {};
+    int gateDelayAt = 0;
     RigMeters m;
 };
 } // namespace rh

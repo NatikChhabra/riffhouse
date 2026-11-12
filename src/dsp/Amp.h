@@ -4,6 +4,7 @@
 
 #include "Common.h"
 #include "ToneStack.h"
+#include "Tube.h"
 
 #include <juce_dsp/juce_dsp.h>
 #include <memory>
@@ -54,6 +55,9 @@ public:
     void setSettings (const AmpSettings& s);
     void process (float* data, int n);
     float latencySamples() const;
+    // The preamp as real 12AX7 stages (the default), or the earlier curve model, kept so the
+    // lab can hold the two side by side.
+    void setTubeStages (bool on) noexcept { tubeStages = on; dirty = true; updateFilters(); }
 
 private:
     void updateFilters();
@@ -77,6 +81,9 @@ private:
     Biquad baxLow, baxMid, baxHigh;
     ToneStack stack;
     Stage stages[5];
+    tube::Stage tubes[5];
+    double into[5] {};       // what reaches each tube's grid, per volt from the stage before
+    bool tubeStages = false;
     EnvelopeFollower supply;
     DcBlocker dcPre, dcPost;
     Smoother preGain, masterGain, outGain;

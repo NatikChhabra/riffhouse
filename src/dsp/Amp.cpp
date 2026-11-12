@@ -6,6 +6,8 @@ namespace rh
 {
 namespace
 {
+    constexpr double kPlateUnit = 80.0; // volts of plate swing that make one unit after the preamp
+
     using namespace tonestacks;
 
     // name, inHP, bright, gainMin, gainMax, stages, stageGain[5], stageBias[5], stageHp[5], stageLp[5],
@@ -66,6 +68,7 @@ void Amp::prepare (double sampleRate, int maxBlock)
 
     for (auto& s : stages)
         s.blocking.prepare (osr, 2.0f, 60.0f);
+    tube::standardLine(); // built here, never on the audio thread
     supply.prepare (osr, 4.0f, 180.0f);
     stack.prepare (osr);
     dcPre.prepare (osr);
@@ -87,6 +90,7 @@ void Amp::reset()
     baxLow.reset(); baxMid.reset(); baxHigh.reset();
     stack.reset();
     for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.blocking.reset(); }
+    for (auto& t : tubes) t.reset();
     supply.reset();
     dcPre.reset(); dcPost.reset();
 }
@@ -133,6 +137,27 @@ void Amp::updateFilters()
         st.bias = v->stageBias[i];
         st.hp.setCutoff (osr, std::max (5.0f, v->stageHpHz[i]));
         st.lp.setCutoff (osr, v->stageLpHz[i] > 0 ? v->stageLpHz[i] : 20000.0f);
+
+        // The same stage as a real triode. The coupling capacitor into a 1 MOhm grid leak sets
+        // how tight it is; the grid stopper against the tube's input capacitance sets where the
+        // top rolls off; the cathode sets the character: fully bypassed (warm, round), a small
+        // bypass cap (bright, a little harder) or unbypassed and biased cold (the hard, uneven
+        // clipping of high-gain preamps).
+        tube::StageParts parts;
+        parts.cCoupling = 1.0 / (kTwoPi * 1.0e6 * std::max (5.0f, v->stageHpHz[i]));
+        const double cin = 1.6e-12 + 51.0 * 1.7e-12;
+        const double lpHz = v->stageLpHz[i] > 0 ? v->stageLpHz[i] : 20000.0f;
+        parts.rStopper = std::clamp (1.0 / (kTwoPi * lpHz * cin), 10000.0, 1.0e6);
+        if (v->stageBias[i] < 0.18f) { parts.rCathode = 1500.0; parts.cCathode = 22e-6; }
+        else if (v->stageBias[i] < 0.28f) { parts.rCathode = 2700.0; parts.cCathode = 0.68e-6; }
+        else { parts.rCathode = 10000.0; parts.cCathode = 0.0; }
+        auto& t = tubes[i];
+        t.prepare (osr, parts);
+        // the drive between stages, matched to the curve model so the presets keep their gain:
+        // one unit there clipped where about 1.5 V at a grid does, and came out as about 80 V of
+        // plate (a 12AX7 stage's swing); the same small-signal gain, stage for stage
+        const double g = std::max (1.0, t.gain());
+        into[i] = i == 0 ? 2.0 * kPlateUnit / g : v->stageGain[i] / g;
     }
 
     const float b = settings.bass / 10.0f, m = settings.mid / 10.0f, t = settings.treble / 10.0f;
@@ -200,6 +225,17 @@ void Amp::process (float* data, int n)
         if (ns == 1)
             s *= preGain.next();
 
+        if (tubeStages)
+        {
+            double vt = s;
+            for (int k = 0; k < ns; ++k)
+            {
+                if (k == 1) vt *= preGain.next();
+                vt = tubes[k].process (vt * into[k]);
+            }
+            s = (float) (vt * (1.0 / kPlateUnit));
+        }
+        else
         for (int k = 0; k < ns; ++k)
         {
             auto& st = stages[k];

@@ -1076,9 +1076,10 @@ void testNeural (double sr)
 #endif
 }
 
-// Measured 3.6 with every pedal on (GCC, November 2026). The budget leaves room for a
-// different compiler and a noisy machine, and still catches a rig that got a third slower.
-constexpr double kRigCostBudget = 5.0;
+// Measured 3.6 with every pedal on (GCC, November 2026), then 4.9 to 5.5 once the default
+// drive pedal became its real circuit, solved at 8x (0.1.5). The budget leaves room for a
+// different compiler and a noisy machine, and still catches a rig that got a fifth slower.
+constexpr double kRigCostBudget = 6.0;
 
 // A fixed piece of arithmetic of the kind the rig is made of, timed on the same machine
 // at the same moment. Shared build machines differ by a factor of two and more from
@@ -2330,6 +2331,7 @@ int main (int argc, char** argv)
         }
         return 0;
     }
+    if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "cpu") { testCpu (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "profile")
     {
