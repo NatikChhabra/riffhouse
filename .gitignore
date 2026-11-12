@@ -10,3 +10,6 @@ renders/
 # website checker output
 site/.hallmark/
 site/.design-check/
+
+# packed when the site is published
+site/press/riffhouse-press-kit.zip

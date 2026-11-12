@@ -239,6 +239,38 @@
     });
   }
 
+  /* Press kit: the three ready paragraphs take turns in one frame, and each has a button that copies it */
+  function words() {
+    const lengths = $('[data-lengths]'), list = $('.blurbs');
+    if (lengths && list) {
+      const chips = $$('button', lengths), items = $$('.blurb', list);
+      const show = (i) => {
+        chips.forEach((b, k) => b.setAttribute('aria-pressed', k === i));
+        items.forEach((li, k) => { li.hidden = k !== i; });
+      };
+      chips.forEach((b, i) => b.addEventListener('click', () => show(i)));
+      list.classList.add('is-tabs');
+      lengths.hidden = false;
+      show(1);
+    }
+    if (!navigator.clipboard) return;
+    $$('[data-words]').forEach((btn) => {
+      const text = document.getElementById(btn.dataset.words);
+      if (!text) return;
+      let back = 0;
+      btn.hidden = false;
+      btn.addEventListener('click', () => {
+        navigator.clipboard.writeText(text.textContent.trim()).then(
+          () => { btn.textContent = 'Copied'; btn.classList.add('is-done'); },
+          () => { btn.textContent = 'Select it by hand'; }
+        ).then(() => {
+          clearTimeout(back);
+          back = setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('is-done'); }, 1800);
+        });
+      });
+    });
+  }
+
   /* The pedal in the first screen: a real model that leans toward the pointer, sinks when pressed and puts
      fuzz on the headline. The still in the page stands in until the model is drawn, and for good when
      there is no WebGL or the visitor asked to save data. */
@@ -389,5 +421,5 @@
   }
 
 
-  tabs(); reveals(); download(); finder(); demos(); copyId(); stomp(); counts(); play();
+  tabs(); reveals(); download(); finder(); demos(); copyId(); words(); stomp(); counts(); play();
 })();
