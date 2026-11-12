@@ -123,15 +123,15 @@ std::vector<AutoSetup::Candidate> AutoSetup::findCandidates (juce::AudioDeviceMa
         auto* wasapi = findType (dm, "Windows Audio");
         const auto outs = wasapi != nullptr ? wasapi->getDeviceNames (false) : juce::StringArray();
         const int def = wasapi != nullptr ? wasapi->getDefaultDeviceIndex (false) : -1;
-        // Realtek ASIO drives the computer's own sound chip, never a USB device with Realtek inside
         const bool listensOnRealtek = juce::isPositiveAndBelow (def, outs.size()) && outs[def].containsIgnoreCase ("realtek")
-                                      && ! outs[def].containsIgnoreCase ("usb") && ! DeviceGuard::looksLikeScreen (outs[def]);
+                                      && ! DeviceGuard::looksLikeScreen (outs[def]);
         bool guitarOnRealtek = false;
         if (wasapi != nullptr)
             for (const auto& in : wasapi->getDeviceNames (true))
                 // a socket a cable goes into: not a laptop's built-in mic array or the "what you hear" loopback
-                guitarOnRealtek = guitarOnRealtek || (in.containsIgnoreCase ("realtek") && ! in.containsIgnoreCase ("usb")
-                                                      && ! in.containsIgnoreCase ("stereo mix") && ! in.containsIgnoreCase ("array"));
+                // (newer boards show their own chip as "Realtek USB Audio", so that counts too)
+                guitarOnRealtek = guitarOnRealtek || (in.containsIgnoreCase ("realtek") && ! in.containsIgnoreCase ("stereo mix")
+                                                      && ! in.containsIgnoreCase ("array"));
         for (auto& name : asio->getDeviceNames (true))
             if (name.containsIgnoreCase ("realtek asio") && listensOnRealtek && guitarOnRealtek)
                 candidates.push_back ({ "ASIO", name });
@@ -275,7 +275,14 @@ void AutoSetup::checkNextDriver()
         return;
     }
     // every driver left has played in a test run: listen
-    if (candidates.empty()) return;
+    if (candidates.empty())
+    {
+        detailText = "There is no input left to try.";
+        if (original.valid()) openExactly (dm, original);
+        proc.muteOutput.store (false);
+        setPhase (Phase::noSignal);
+        return;
+    }
     openCandidate (candidates[0]);
     startTimerHz (25);
 }

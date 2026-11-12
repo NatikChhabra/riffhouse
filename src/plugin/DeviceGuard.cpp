@@ -31,9 +31,13 @@ bool DeviceGuard::looksLikeBluetooth (const juce::String& name)
     for (auto* w : { "bluetooth", "airpods", "hands-free", "handsfree", "buds", "wh-1000", "wf-1000", "bose qc", "quietcomfort",
                      "jbl tune", "jbl live", "soundcore", "beats ", "powerbeats", "freebuds", "earbuds", "jabra", " a2dp", "bt audio",
                      // speakers and earphones sold mostly as Bluetooth, and the " Stereo" Windows adds to them
-                     "rockerz", "airdopes", "boat ", "jbl flip", "jbl charge", "jbl go", "jbl clip", "srs-", "marshall major", "marshall motif", "marshall minor", "emberton", "stanmore", "acton ii", "acton iii", "woburn", "middleton", "tribit",
+                     "rockerz", "airdopes", "boat ", "jbl flip", "jbl charge", "jbl go", "jbl clip", "srs-", "marshall", "tribit",
                      "zebronics", "mivi", "galaxy buds", "oneplus buds", "realme buds", "noise buds", " stereo)" })
-        if (n.contains (w) && ! (juce::String (w) == " stereo)" && n.contains ("usb"))) return true; // a USB device is wired
+    {
+        // these two also name wired things: "Speakers (USB Audio Stereo)", a Marshall amp over USB
+        const bool alsoWired = juce::String (w) == " stereo)" || juce::String (w) == "marshall";
+        if (n.contains (w) && ! (alsoWired && (n.contains ("usb") || n.contains ("code")))) return true;
+    }
     return false;
 }
 

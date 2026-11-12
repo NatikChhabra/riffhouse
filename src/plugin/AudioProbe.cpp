@@ -154,10 +154,13 @@ int AudioProbe::run (const juce::StringArray& args)
     auto err = dev->open (ins, outs, first, 0);
     if (err.isNotEmpty())
     {
+        // one more try, at the rate it reports, or else 44.1 kHz, the other common one
         const double held = dev->getCurrentSampleRate();
         dev->close();
-        if (held > 0.0 && std::abs (held - first) > 1.0)
-            err = dev->open (ins, outs, held, 0);
+        const double second = held > 0.0 && std::abs (held - first) > 1.0 ? held
+                            : (rates.contains (44100.0) && std::abs (first - 44100.0) > 1.0 ? 44100.0 : 0.0);
+        if (second > 0.0)
+            err = dev->open (ins, outs, second, 0);
     }
     if (err.isNotEmpty()) return say ("failed " + err.trim().upToFirstOccurrenceOf ("\n", false, false), 2);
 

@@ -524,6 +524,10 @@ void runDeviceChecks (int& checks, int& failures)
         CHECK (! accents.contains ("Zo") && ! accents.contains ("Jos") && accents.contains ("(<you>'s JBL)") && ! accents.contains (juce::CharPointer_UTF8 ("\xe0\xa4\xb0")),
                "names with accents or in another script are taken out too: %s", accents.toRawUTF8());
         CHECK (accents.contains ("The 2's buffer"), "a number before 's stays");
+        const auto edges = reports::scrub (juce::String (juce::CharPointer_UTF8 ("Headphones (ASHA'S AIRPODS)\nSpeakers (Ravi's-JBL)\n"
+                                                                                  "\xe2\x80\x9c" "driver's buffer\nSpeakers\xe2\x80\x94Riffhouse's setup")), {});
+        CHECK (! edges.contains ("ASHA") && ! edges.contains ("Ravi"), "capital letters and a dash after 's do not hide a name: %s", edges.toRawUTF8());
+        CHECK (edges.contains ("driver's buffer") && edges.contains ("Riffhouse's setup"), "and curly quotes or dashes are not taken for letters");
         CHECK (reports::scrub ("AMP on", { "am" }) == "AMP on", "a two-letter name is not hunted, it would eat ordinary words");
         CHECK (reports::weekOf (juce::Time (2026, 10, 12, 12, 0)) == "2026-W46", "12 November 2026 is in week 46 (%s)", reports::weekOf (juce::Time (2026, 10, 12, 12, 0)).toRawUTF8());
         CHECK (reports::weekOf (juce::Time (2027, 0, 1, 12, 0)) == "2026-W53", "1 January 2027 still belongs to 2026's last week (%s)", reports::weekOf (juce::Time (2027, 0, 1, 12, 0)).toRawUTF8());
@@ -536,7 +540,7 @@ void runDeviceChecks (int& checks, int& failures)
                "a wired USB headphone dongle is neither");
         CHECK (! DeviceGuard::looksLikeScreen ("Headphones (Samsung USB C Earphones)") && ! DeviceGuard::looksLikeBluetooth ("Headphones (Samsung USB C Earphones)"),
                "wired Samsung earphones are neither a TV nor Bluetooth");
-        CHECK (! DeviceGuard::looksLikeBluetooth ("Speakers (Marshall CODE amp)") && DeviceGuard::looksLikeBluetooth ("Headphones (Marshall Major IV)"),
+        CHECK (! DeviceGuard::looksLikeBluetooth ("Speakers (Marshall CODE amp)") && DeviceGuard::looksLikeBluetooth ("Headphones (Marshall Major IV)") && DeviceGuard::looksLikeBluetooth ("Headphones (Marshall Monitor II A.N.C.)"),
                "a Marshall amp over USB is wired, Marshall Major headphones are Bluetooth");
         CHECK (! DeviceGuard::looksLikeBluetooth ("Speakers (USB Audio Stereo)") && DeviceGuard::looksLikeBluetooth ("Headphones (Rockerz 450 Stereo)"),
                "\"Stereo\" marks Bluetooth only when the device is not USB");

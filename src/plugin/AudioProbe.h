@@ -30,7 +30,7 @@ public:
     static constexpr double kTimeoutMs = 12000.0;
     // Starts `command` and calls `done` once, on the message thread. Message thread only.
     bool start (const juce::StringArray& command, double timeoutMs, std::function<void (Result)> done);
-    bool busy() const noexcept { return child != nullptr; }
+    bool busy() const noexcept { return child != nullptr || startFailed; }
     void cancel();
     void poll(); // what the timer does: looks at the test run once (tests call it directly)
 

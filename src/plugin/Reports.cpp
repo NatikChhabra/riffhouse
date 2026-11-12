@@ -50,12 +50,22 @@ namespace
         s = std::regex_replace (s, email, "<email>");
         auto t = juce::String::fromUTF8 (s.c_str());
         // the word before 's, in any alphabet: "Zoë's" and "José's" go as surely as "Asha's"
-        auto partOfName = [] (juce::juce_wchar c) { return c > 127 || juce::CharacterFunctions::isLetterOrDigit (c) || c == '-' || c == '_'; };
+        // A letter in any alphabet. Above ASCII everything counts except the Latin-1 signs, the
+        // general punctuation block (dashes, curly quotes, spaces) and the full-width signs.
+        auto letter = [] (juce::juce_wchar c)
+        {
+            if (c < 128) return juce::CharacterFunctions::isLetterOrDigit (c);
+            if (c < 0xc0 || c == 0xd7 || c == 0xf7) return false;
+            if (c >= 0x2000 && c <= 0x2bff) return false;
+            if (c >= 0x3000 && c <= 0x303f) return false;
+            return ! (c >= 0xff00 && c <= 0xff0f);
+        };
+        auto partOfName = [&letter] (juce::juce_wchar c) { return letter (c) || c == '-' || c == '_'; };
         juce::String out;
         int from = 0;
-        for (int at = t.indexOf ("'s"); at >= 0; at = t.indexOf (at + 2, "'s"))
+        for (int at = t.indexOfIgnoreCase ("'s"); at >= 0; at = t.indexOfIgnoreCase (at + 2, "'s"))
         {
-            if (at + 2 < t.length() && partOfName (t[at + 2])) continue; // "'sound": not an owner
+            if (at + 2 < t.length() && letter (t[at + 2])) continue; // "'sound": not an owner
             int begin = at;
             while (begin > from && partOfName (t[begin - 1])) --begin;
             const auto word = t.substring (begin, at);

@@ -186,7 +186,7 @@ juce::String delayFeel (double ms)
     // the figure counts every queue on the way, so these are generous to it
     if (ms <= 20.0) return "instant";
     if (ms <= 35.0) return "fine";
-    if (ms < 100.0) return "noticeable";
+    if (juce::roundToInt (ms) < 100) return "noticeable"; // as the figure beside it is rounded
     return "slow"; // short enough to fit beside a three-digit figure
 }
 
