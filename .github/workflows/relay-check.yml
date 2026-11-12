@@ -1,0 +1,24 @@
+name: Report relay check
+
+# Run by hand: sends one test report through the relay in the REPORT_URL secret and fails
+# unless the relay says it filed it in the private reports repository.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Send a test report
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Send it
+        env:
+          REPORT_URL: ${{ secrets.REPORT_URL }}
+        run: |
+          if [ -z "$REPORT_URL" ]; then echo "The REPORT_URL secret is not set"; exit 1; fi
+          body='{"key":"riffhouse-1","kind":"report","title":"Relay check","version":"check","body":"Riffhouse: check\nA test sent by the Report relay check workflow. It can be closed."}'
+          answer=$(curl -sS -L -m 60 -X POST -H 'Content-Type: application/json' --data "$body" "$REPORT_URL")
+          echo "The relay answered: $answer"
+          echo "$answer" | grep -q '"ok":true'
