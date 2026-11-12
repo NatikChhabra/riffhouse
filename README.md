@@ -106,7 +106,7 @@ Every change runs more than 6,900 automatic checks on the sound engine before it
 
 ## What comes next
 
-The next big update, 0.2.0, brings a real pedalboard (any pedal, in any order, two of the same), scenes you switch while you play, a Mic button that sends guitar and voice into any call, Share clip for the last 30 seconds you played, a second amp, drums, a daily practice goal and Hindi. Smaller updates before it fix what players report and lay its groundwork.
+The next big update, 0.2.0, brings a real pedalboard (any pedal, in any order, two of the same), scenes you switch while you play, a Mic button that sends guitar and voice into any call, Share clip for the last 30 seconds you played, a second amp, drums and a daily practice goal. Smaller updates before it fix what players report and lay its groundwork.
 
 The whole plan is in the [roadmap](ROADMAP.md) and on the [roadmap page](https://natikchhabra.github.io/riffhouse/roadmap.html). Things only get added to it, never pushed to a later version.
 
