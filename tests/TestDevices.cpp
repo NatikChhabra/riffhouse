@@ -494,12 +494,18 @@ void runDeviceChecks (int& checks, int& failures)
     }
     {
         std::printf ("reports and slow outputs\n");
-        const juce::String raw = "Recordings in C:\\Users\\Naiti\\Music\\Riffhouse Recordings\nCrash in /home/naiti/riffhouse\n"
-                                 "Signed in as Naiti Sharma on DESKTOP-NAITI7\nNAITI wrote this";
-        const auto clean = reports::scrub (raw, { "Naiti", "Naiti Sharma", "Sharma", "DESKTOP-NAITI7" });
-        CHECK (! clean.containsIgnoreCase ("naiti") && ! clean.containsIgnoreCase ("sharma"), "no trace of the name is left: %s", clean.toRawUTF8());
+        const juce::String raw = "Recordings in C:\\Users\\Meera\\Music\\Riffhouse Recordings\nCrash in /home/meera/riffhouse\n"
+                                 "Signed in as Meera Iyer on DESKTOP-MEERA7\nMEERA wrote this";
+        const auto clean = reports::scrub (raw, { "Meera", "Meera Iyer", "Iyer", "DESKTOP-MEERA7" });
+        CHECK (! clean.containsIgnoreCase ("meera") && ! clean.containsIgnoreCase ("iyer"), "no trace of the name is left: %s", clean.toRawUTF8());
         CHECK (clean.contains ("C:\\Users\\<you>\\Music") && clean.contains ("/home/<you>/riffhouse"), "user folders in paths are replaced");
         CHECK (clean.contains ("Riffhouse Recordings"), "and the rest of the path stays readable");
+        const auto devices = reports::scrub (juce::String (juce::CharPointer_UTF8 ("Output: Headphones (Asha's AirPods Pro)\nOutput: Speakers (Ravi\xe2\x80\x99s JBL)\n"
+                                                                                       "mail ravi.k@example.com\nIt's the driver's buffer. Riffhouse's setup")), {});
+        CHECK (! devices.contains ("Asha") && ! devices.contains ("Ravi") && devices.contains ("<you>'s AirPods Pro"),
+               "a name in a device name is taken out: %s", devices.toRawUTF8());
+        CHECK (devices.contains ("mail <email>"), "so is an email address");
+        CHECK (devices.contains ("It's the driver's buffer. Riffhouse's setup"), "ordinary words before 's stay");
         CHECK (reports::scrub ("AMP on", { "am" }) == "AMP on", "a two-letter name is not hunted, it would eat ordinary words");
         CHECK (reports::weekOf (juce::Time (2026, 10, 12, 12, 0)) == "2026-W46", "12 November 2026 is in week 46 (%s)", reports::weekOf (juce::Time (2026, 10, 12, 12, 0)).toRawUTF8());
         CHECK (reports::weekOf (juce::Time (2027, 0, 1, 12, 0)) == "2026-W53", "1 January 2027 still belongs to 2026's last week (%s)", reports::weekOf (juce::Time (2027, 0, 1, 12, 0)).toRawUTF8());

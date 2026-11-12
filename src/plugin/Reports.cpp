@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Reports.h"
 
+#include <regex>
 
 namespace rh::reports
 {
@@ -36,6 +37,29 @@ namespace
             }
         }
         return t;
+    }
+
+    // Names the player never typed into Riffhouse but that ride along in device names, such as
+    // "Headphones (Asha's AirPods)", and any email address. Ordinary words before 's are kept.
+    juce::String scrubNamesInDevices (const juce::String& text)
+    {
+        static const juce::StringArray ordinary { "it", "that", "there", "what", "here", "let", "he", "she", "who", "riffhouse",
+                                                  "windows", "computer", "driver", "guitar", "today", "player", "device", "card" };
+        std::string s = text.replace (juce::String::fromUTF8 ("\xe2\x80\x99"), "'").toStdString();
+        static const std::regex email (R"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})");
+        s = std::regex_replace (s, email, "<email>");
+        static const std::regex owner (R"(\b([A-Za-z][A-Za-z0-9_-]*)'s\b)");
+        std::string out;
+        auto last = s.cbegin();
+        for (std::sregex_iterator it (s.cbegin(), s.cend(), owner), end; it != end; ++it)
+        {
+            const auto& m = *it;
+            out.append (last, m[0].first);
+            out += ordinary.contains (juce::String (m[1].str()), true) ? m[0].str() : std::string ("<you>'s");
+            last = m[0].second;
+        }
+        out.append (last, s.cend());
+        return juce::String::fromUTF8 (out.c_str());
     }
 
     juce::String post (const juce::String& json)
@@ -80,7 +104,7 @@ namespace
 
 juce::String scrub (const juce::String& text, const juce::StringArray& privateWords)
 {
-    auto t = scrubUserFolders (text);
+    auto t = scrubNamesInDevices (scrubUserFolders (text));
     for (int i = 0; i < privateWords.size(); ++i)
     {
         const auto w = privateWords[i].trim();
