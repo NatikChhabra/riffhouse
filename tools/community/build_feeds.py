@@ -16,6 +16,13 @@ routes items by their <category> (one connection per channel, filtered on catego
   devlog.xml                                category: devlog
   weekly.xml   tone-of-the-week             category: tone
 
+The free feed bot follows at most three feeds, so it reads three combined ones and
+routes items by their <category> (one connection per channel, filtered on category):
+
+  builds.xml   releases.xml + beta.xml      categories: release, beta
+  devlog.xml                                category: devlog
+  weekly.xml   tone-of-the-week + challenge categories: tone, challenge
+
 Nothing here needs a secret. Release and commit data come from the public
 GitHub API (GITHUB_TOKEN is used when present, only to avoid rate limits).
 The weekly picks are worked out from the week number, so every run gives the
@@ -227,6 +234,10 @@ def tone_items(today: dt.date) -> list[dict]:
             "text": "\n".join(l for l in lines if l),
         })
     return items
+
+
+def newest_first(*groups: list[dict]) -> list[dict]:
+    return sorted((it for g in groups for it in g), key=lambda it: it["when"], reverse=True)
 
 
 def newest_first(*groups: list[dict]) -> list[dict]:
