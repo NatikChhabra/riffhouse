@@ -22,6 +22,9 @@ jobs:
           body='{"key":"riffhouse-1","kind":"report","title":"Relay check","version":"check","body":"Riffhouse: check\nA test sent by the Report relay check workflow. It can be closed."}'
           # no -X POST: the relay answers with a redirect that must be followed with GET, as browsers and Windows do
           # where the answer comes from, without the address itself (it stays a secret in the log)
+          # which deployment the secret points at: only the last five letters of its id, enough to tell two apart
+          echo "Deployment ends in: $(echo "$REPORT_URL" | sed -E 's#.*/s/[^/]*(.....)/exec.*#\1#')"
+          echo "GET: $(curl -sS -o /dev/null -m 60 -w '%{http_code} -> %{redirect_url}' "$REPORT_URL" | sed -E 's#(https://[^/]+)/[^ ]*#\1/...#')"
           echo "POST: $(curl -sS -o /dev/null -m 60 -H 'Content-Type: application/json' --data "$body" -w '%{http_code} -> %{redirect_url}' "$REPORT_URL" | sed -E 's#(https://[^/]+)/[^ ]*#\1/...#')"
           answer=$(curl -sS -L -m 60 -H 'Content-Type: application/json' --data "$body" "$REPORT_URL")
           echo "The relay answered: $answer"
