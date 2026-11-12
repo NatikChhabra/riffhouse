@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   check:
@@ -20,6 +21,34 @@ jobs:
           if [ -z "$REPORT_URL" ]; then echo "The REPORT_URL secret is not set"; exit 1; fi
           body='{"key":"riffhouse-1","kind":"report","title":"Relay check","version":"check","body":"Riffhouse: check\nA test sent by the Report relay check workflow. It can be closed."}'
           # no -X POST: the relay answers with a redirect that must be followed with GET, as browsers and Windows do
+          # where the answer comes from, without the address itself (it stays a secret in the log)
+          echo "POST: $(curl -sS -o /dev/null -m 60 -H 'Content-Type: application/json' --data "$body" -w '%{http_code} -> %{redirect_url}' "$REPORT_URL" | sed -E 's#(https://[^/]+)/[^ ]*#\1/...#')"
           answer=$(curl -sS -L -m 60 -H 'Content-Type: application/json' --data "$body" "$REPORT_URL")
           echo "The relay answered: $answer"
           echo "$answer" | grep -q '"ok":true'
+
+  app:
+    name: Send one from the Windows app
+    runs-on: windows-2022
+    steps:
+      - name: Get the newest installer built on main
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $run = gh run list -R $env:GITHUB_REPOSITORY --workflow build.yml --branch main --status success -L 1 --json databaseId,headSha | ConvertFrom-Json
+          "Installer from the build of $($run[0].headSha)"
+          gh run download $run[0].databaseId -R $env:GITHUB_REPOSITORY -n riffhouse-windows -D dist
+      - name: Install it and send a report the way the app does
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist\*windows-setup.exe -Recurse)[0].FullName
+          $p = Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-' -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(300000)) { throw "The installer did not finish" }
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Riffhouse\Riffhouse.exe'
+          $c = Start-Process $app -ArgumentList '--report-check' -PassThru -RedirectStandardOutput check.txt
+          $null = $c.Handle
+          if (-not $c.WaitForExit(90000)) { $c.Kill(); throw "The report check did not end in 90 seconds" }
+          "The app said: $(Get-Content check.txt -Raw)"
+          if ($c.ExitCode -ne 0) { throw "The app could not send its report (code $($c.ExitCode))" }
