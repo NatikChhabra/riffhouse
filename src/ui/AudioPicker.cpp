@@ -230,7 +230,9 @@ void AudioPicker::refresh()
     // driver keeps the delay to itself and that window is the one place to change it.
     panel.setVisible (dev != nullptr && dev->hasControlPanel() && bufferSizes.size() <= 1);
     if (status.isEmpty()) status = AudioSwitch::running (dm, proc);
-    setSize (580, socket.isVisible() && sharing.isVisible() ? 452 + kRow + kGap : 452);
+    // the window has room for one row beyond the four everyone has; each further one makes it taller
+    const int extra = (socket.isVisible() ? 1 : 0) + (sharing.isVisible() ? 1 : 0) + (panel.isVisible() ? 1 : 0);
+    setSize (580, 452 + std::max (0, extra - 1) * (kRow + kGap));
     resized();
     repaint();
 }
@@ -267,7 +269,7 @@ void AudioPicker::apply (Change what)
 
     status = "Trying " + c.input + "...";
     statusIsProblem = false;
-    for (juce::Component* b : { (juce::Component*) &driver, (juce::Component*) &input, (juce::Component*) &output, (juce::Component*) &buffer, (juce::Component*) &sharing })
+    for (juce::Component* b : { (juce::Component*) &driver, (juce::Component*) &input, (juce::Component*) &output, (juce::Component*) &buffer, (juce::Component*) &socket, (juce::Component*) &sharing })
         b->setEnabled (false);
     repaint();
     host->setupRunning (true); // whoever guards the connection stands aside while it is changed on purpose
@@ -283,7 +285,7 @@ void AudioPicker::apply (Change what)
                 h->setupRunning (false);
             }
             if (safe == nullptr) return;
-            for (juce::Component* b : { (juce::Component*) &safe->driver, (juce::Component*) &safe->input, (juce::Component*) &safe->output, (juce::Component*) &safe->buffer, (juce::Component*) &safe->sharing })
+            for (juce::Component* b : { (juce::Component*) &safe->driver, (juce::Component*) &safe->input, (juce::Component*) &safe->output, (juce::Component*) &safe->buffer, (juce::Component*) &safe->socket, (juce::Component*) &safe->sharing })
                 b->setEnabled (true);
             safe->status = r.message;
             if (! r.ok && safe->forced.isNotEmpty())
