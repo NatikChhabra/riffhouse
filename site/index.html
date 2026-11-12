@@ -204,13 +204,23 @@
   </div>
 </section>
 
-<section class="demos band-dark" id="hear" aria-labelledby="h-hear" hidden data-demos>
+<section class="demos band-stage" id="hear" aria-labelledby="h-hear" hidden data-demos>
   <div class="wrap">
     <div class="sec-head" data-reveal="rise">
       <h2 id="h-hear">Hear it</h2>
-      <p class="lead" data-demos-lead>One guitar part, recorded once through a mic jack, played back through different tones.</p>
+      <p class="lead">One take of clean guitar, straight into a PC’s input jack. Switch the tone while it plays.</p>
     </div>
-    <ul class="demo-list" data-demo-list></ul>
+    <div class="deck" data-ui data-reveal="rise">
+      <button class="deck-play" type="button" aria-label="Play" data-deck-play></button>
+      <div class="deck-wave" data-deck-wave>
+        <svg viewBox="0 0 80 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d=""/></svg>
+        <svg class="wave-played" viewBox="0 0 80 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d=""/></svg>
+        <input type="range" min="0" max="20" step="0.1" value="0" aria-label="Place in the clip, in seconds">
+      </div>
+      <p class="deck-time" data-deck-time>0:00 / 0:20</p>
+      <div class="deck-tones cats" role="group" aria-label="Tone" data-deck-tones></div>
+      <p class="deck-note" role="status" data-deck-note></p>
+    </div>
   </div>
 </section>
 

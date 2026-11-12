@@ -161,26 +161,68 @@
     const sec = $('[data-demos]');
     if (!sec) return;
     let clips;
-    try { const r = await fetch('demos.json'); if (!r.ok) return; clips = await r.json(); } catch { return; }
+    try { const r = await fetch('demos.json' + VER); if (!r.ok) return; clips = await r.json(); } catch { return; }
     if (!Array.isArray(clips) || !clips.length) return;
-    const audio = new Audio();
-    let live = null;
+    const play = $('[data-deck-play]', sec), wave = $('[data-deck-wave]', sec), seek = $('input', wave);
+    const time = $('[data-deck-time]', sec), note = $('[data-deck-note]', sec), lines = $$('path', wave);
+    const len = clips[0].seconds || 20;
+    /* Every clip is the same take, so each tone gets its own player and they all keep one place in the music */
+    const players = clips.map((c) => Object.assign(new Audio(), { preload: 'none', loop: true, src: c.file + VER }));
+    let cur = 0, on = false, frame = 0, warm = false;
     const icon = (playing) => playing
       ? '<svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M4 3h4v14H4zM12 3h4v14h-4z"/></svg>'
       : '<svg viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M5 2.5v15l12-7.5z"/></svg>';
-    const set = (b, playing) => { b.innerHTML = icon(playing); b.setAttribute('aria-pressed', playing); };
-    $('[data-demo-list]', sec).replaceChildren(...clips.map((c) => {
-      const b = el('button', { type: 'button' });
-      b.setAttribute('aria-label', `Play ${c.name}`);
-      set(b, false);
-      b.addEventListener('click', () => {
-        if (live === b && !audio.paused) { audio.pause(); set(b, false); return; }
-        if (live) set(live, false);
-        live = b; audio.src = c.file; audio.play(); set(b, true);
-      });
-      return el('li', {}, [b, el('b', { textContent: c.name }), el('span', { textContent: c.note || '' })]);
-    }));
-    audio.addEventListener('ended', () => live && set(live, false));
+    const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    const chips = clips.map((c, i) => {
+      const b = el('button', { type: 'button', textContent: c.name });
+      b.addEventListener('click', () => start(i));
+      return b;
+    });
+    const place = () => {
+      const t = Math.min(players[cur].currentTime, len);
+      wave.style.setProperty('--p', (t / len).toFixed(4));
+      seek.value = t;
+      const say = `${clock(t)} / ${clock(len)}`;
+      if (time.textContent !== say) time.textContent = say;
+    };
+    const tick = () => { place(); frame = on ? requestAnimationFrame(tick) : 0; };
+    const show = () => {
+      play.innerHTML = icon(on);
+      play.setAttribute('aria-label', on ? 'Pause' : 'Play');
+      chips.forEach((b, i) => b.setAttribute('aria-pressed', i === cur));
+      /* The bars are the real shape of each clip: a clean tone has tall peaks, a driven one is squashed flat */
+      const d = (clips[cur].peaks || []).map((h, i) => `M${i + 0.5} ${50 - h / 2}V${50 + h / 2}`).join('');
+      lines.forEach((p) => { p.setAttribute('d', d); p.style.setProperty('d', `path("${d}")`); });
+      note.textContent = clips[cur].note || '';
+      place();
+    };
+    function start(i) {
+      const t = players[cur].currentTime;
+      if (i !== cur) {
+        const next = players[i];
+        players[cur].pause();
+        next.currentTime = t;
+        /* A player that has not loaded yet forgets the place it was given, so it gets it again once it knows its length */
+        if (next.readyState < 1) next.addEventListener('loadedmetadata', () => { next.currentTime = t; }, { once: true });
+        cur = i;
+      }
+      on = true;
+      players[cur].play().catch(() => { on = false; show(); });
+      if (!warm) {
+        warm = true;
+        if (!(navigator.connection && navigator.connection.saveData)) players.forEach((a, k) => { if (k !== cur) { a.preload = 'auto'; a.load(); } });
+      }
+      show();
+      if (!frame) tick();
+    }
+    play.addEventListener('click', () => {
+      if (!on) { start(cur); return; }
+      on = false; players[cur].pause(); show();
+    });
+    seek.max = len;
+    seek.addEventListener('input', () => { players[cur].currentTime = Number(seek.value); place(); });
+    $('[data-deck-tones]', sec).replaceChildren(...chips);
+    show();
     sec.hidden = false;
   }
 
