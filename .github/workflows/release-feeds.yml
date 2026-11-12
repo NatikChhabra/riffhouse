@@ -1,0 +1,19 @@
+name: Release feeds
+
+# A new release or beta build should reach the Discord within minutes. Pages only deploys from main,
+# so this starts the website workflow on main, which rebuilds the feeds in site/feeds/.
+on:
+  release:
+    types: [published, edited]
+
+permissions:
+  actions: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rebuild the website and its feeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
