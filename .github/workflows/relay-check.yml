@@ -26,6 +26,8 @@ jobs:
           echo "Deployment ends in: $(echo "$REPORT_URL" | sed -E 's#.*/s/[^/]*(.....)/exec.*#\1#')"
           echo "GET: $(curl -sS -o /dev/null -m 60 -w '%{http_code} -> %{redirect_url}' "$REPORT_URL" | sed -E 's#(https://[^/]+)/[^ ]*#\1/...#')"
           echo "POST: $(curl -sS -o /dev/null -m 60 -H 'Content-Type: application/json' --data "$body" -w '%{http_code} -> %{redirect_url}' "$REPORT_URL" | sed -E 's#(https://[^/]+)/[^ ]*#\1/...#')"
+          # the safer relay answers junk with a plain sentence and never shows its own error text
+          echo "Junk gets: $(curl -sS -L -m 60 -H 'Content-Type: application/json' --data 'not json' "$REPORT_URL")"
           answer=$(curl -sS -L -m 60 -H 'Content-Type: application/json' --data "$body" "$REPORT_URL")
           echo "The relay answered: $answer"
           echo "$answer" | grep -q '"ok":true'

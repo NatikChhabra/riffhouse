@@ -110,7 +110,7 @@ The next big update, 0.2.0, brings a real pedalboard (any pedal, in any order, t
 
 The whole plan is in the [roadmap](ROADMAP.md) and on the [roadmap page](https://natikchhabra.github.io/riffhouse/roadmap.html). Things only get added to it, never pushed to a later version.
 
-Missing something? [Say so](https://github.com/NatikChhabra/riffhouse/issues/new). If something is broken, **Report a problem** in Settings fills in the details for you.
+Missing something? [Say so](https://github.com/NatikChhabra/riffhouse/issues/new). If something is broken, **Send a report** in Settings sends the details privately, or **Report in public** fills in a public report for you.
 
 ## Support Riffhouse
 

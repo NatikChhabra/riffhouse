@@ -14,7 +14,9 @@ Most things below are in **Settings** (the gear at the top right). Two buttons t
 
 Version 0.1.1 could close at the very end of setup, and could stop answering when the sound card was slow to start. Both are fixed in 0.1.2. Update first: Settings, **Check for updates**, or run the newest installer from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest) over the one you have. Your tones and settings stay.
 
-If it still happens on 0.1.2 or later, Riffhouse writes down what it was doing at that moment. Start it again, open Settings and press **Report a problem** or **Save a report**. That report is how the cause gets found. See [Still stuck](#still-stuck).
+If it still happens on 0.1.2 or later, Riffhouse writes down what it was doing at that moment. Start it again: from 0.1.5 it asks once whether to send a report, and **Send a report** does it in one click. That report is how the cause gets found. See [Still stuck](#still-stuck).
+
+Picking an ASIO driver froze the window in 0.1.4 and earlier when the driver hung (ASIO4ALL often does). From 0.1.5 a driver is tried in a hidden test run first, so the window keeps answering and a driver that hangs is stopped and left alone.
 
 ## Setup opens every time I start
 
@@ -28,7 +30,8 @@ Go through these in order.
 2. In setup, pick your input from the list yourself. "Find it for me" listens on every input in turn, and a quiet guitar on a computer's mic jack can be missed.
 3. Windows lets desktop apps use the microphone: Windows Settings, **Privacy & security**, **Microphone**, and switch on **Let desktop apps access your microphone**. A guitar input counts as a microphone to Windows.
 4. The input is not muted or turned down in Windows: Windows Settings, **System**, **Sound**, then your input under **Input**.
-5. On a laptop with one combined headphone and mic socket, a plain guitar cable often does not reach the mic contact. You need a splitter with a separate mic socket, or a USB guitar cable, or an audio interface.
+5. On a desktop, try the other socket. A guitar or pickup is louder than a mic, so the **line-in** socket (often blue) can work where the mic socket (pink) does not, and the other way round with a very quiet pickup.
+6. On a laptop with one combined headphone and mic socket, a plain guitar cable often does not reach the mic contact. You need a splitter with a separate mic socket, or a USB guitar cable, or an audio interface.
 
 ## I have an audio interface
 
@@ -50,7 +53,8 @@ One of the two is the clean guitar, and it comes from the audio interface, not f
 
 Setup measures this and shows it as "about so many ms from string to ear". Under about 12 ms feels immediate. Above about 20 ms most players feel it.
 
-- **Bluetooth headphones always add a delay you can feel**, well over 100 ms. No setting fixes that. Use wired headphones.
+- **Bluetooth headphones and speakers always add a delay you can feel**, often well over 100 ms. No setting in any amp program fixes that, which is why headphones sound in time and a Bluetooth speaker does not. Use wired headphones, or a cable from the computer's headphone socket to the speaker's AUX or Audio In socket. A TV or monitor over HDMI adds delay too. From 0.1.5 setup plays through wired headphones by itself when the computer has them plugged in, and says so.
+- Two separate USB devices, one for the guitar and one for the headphones, each add their own delay. Headphones in the same device as the guitar (the interface, or the computer's own sockets) are faster.
 - Run setup again with other audio programs closed. It tries the fastest modes one by one and keeps the fastest that runs clean.
 - With an audio interface, install its maker's driver and pick the ASIO entry.
 - Without an interface, the fastest way is for Riffhouse to have the sound card to itself. Setup picks that when it works.
@@ -65,13 +69,14 @@ Setup measures this and shows it as "about so many ms from string to ear". Under
 - Close browsers, games and other audio programs, and plug a laptop into power.
 - Run setup again. It only keeps settings that ran without a single dropout while you played.
 
-## Where did the driver list go? What about ASIO?
+## What about ASIO?
 
-There is no driver to pick any more. You choose where the guitar comes in and where the sound goes out, and Riffhouse tries the fastest way that input has. If that one will not start, it moves to the next by itself and tells you.
+Open **Driver, input and output...** in Settings to pick a driver yourself. Setup and the self-repair at start pick one for you, and if one will not start, Riffhouse goes back to the last one that worked and says why.
 
-- ASIO drivers come with audio interfaces. An interface with its maker's driver installed shows up in **Guitar in** with "(ASIO driver)" next to its name. Pick that entry.
-- With no interface there is no real ASIO driver on the computer, so ASIO is not offered. Nothing is missing: having the sound card to itself is as fast as a computer's own sound gets.
-- Stand-in drivers such as ASIO4ALL or FlexASIO are not an interface's own driver. They rarely beat the built-in way and often stay silent, so they are not listed.
+- ASIO drivers come with audio interfaces. An interface with its maker's driver installed is the fastest way in. Pick its ASIO entry.
+- Many computers with Realtek sound have **Realtek ASIO**. From 0.1.5 setup tries it when the guitar and the headphones both use the computer's own sockets, because then it beats Windows' own sound.
+- Every ASIO driver is first tried in a hidden test run. One that fails or hangs there never freezes the window, and setup leaves it out from then on. Picking it by hand tries it again.
+- Stand-in drivers such as ASIO4ALL or FlexASIO need every sound device they use all to themselves. They fail when Windows or another program holds one, and with a guitar on one USB device and headphones on another they often fail outright. Windows Audio (exclusive mode) is usually just as fast on such a computer.
 - Only one program can hold most ASIO drivers at a time. Close your recording software, then try again.
 
 ## An input I picked is undone
@@ -120,8 +125,10 @@ Riffhouse checks for a new version when it starts, downloads it in the backgroun
 
 ## Still stuck
 
-Open Settings and press **Report a problem**. It copies a report to your clipboard and opens the page where problems are reported. Paste the report there (Ctrl+V) and say in your own words what went wrong. You need a free GitHub account for that page.
+Open Settings and press **Send a report** (0.1.5 and later). It goes straight to the people who fix Riffhouse, privately, and needs no account. Your Windows user name, your computer's name, your user folder and any name inside a device name ("Asha's AirPods") are taken out before it leaves. At most three a day go from one computer.
 
-No account? Press **Save a report**. It writes the same report into your recordings folder as a text file and shows you the file. Send that file to whoever gave you Riffhouse.
+To report in the open, press **Report in public**. It opens a form on GitHub and puts the same report, with the names taken out, on your clipboard. Paste it (Ctrl+V) and say in your own words what went wrong. That page needs a free GitHub account.
 
-What is in the report: the version, your audio settings, the names of your inputs and outputs, what setup measured, your current tone, and a short diary of what Riffhouse did with the sound card and how long each thing took. If the last run froze or closed by itself, the diary says what it was doing. Nothing about you is in it, and nothing is ever sent by itself.
+**Save a report** writes the same report into your recordings folder as a text file and shows you the file, to keep or send by hand.
+
+What is in the report: the version, your audio settings, the names of your inputs and outputs, what setup measured, your current tone, and a short diary of what Riffhouse did with the sound card and how long each thing took. If the last run froze or closed by itself, the diary says what it was doing. Nothing is ever sent unless you press a button or say yes.
