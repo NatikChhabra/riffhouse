@@ -19,6 +19,7 @@ jobs:
         run: |
           if [ -z "$REPORT_URL" ]; then echo "The REPORT_URL secret is not set"; exit 1; fi
           body='{"key":"riffhouse-1","kind":"report","title":"Relay check","version":"check","body":"Riffhouse: check\nA test sent by the Report relay check workflow. It can be closed."}'
-          answer=$(curl -sS -L -m 60 -X POST -H 'Content-Type: application/json' --data "$body" "$REPORT_URL")
+          # no -X POST: the relay answers with a redirect that must be followed with GET, as browsers and Windows do
+          answer=$(curl -sS -L -m 60 -H 'Content-Type: application/json' --data "$body" "$REPORT_URL")
           echo "The relay answered: $answer"
           echo "$answer" | grep -q '"ok":true'
