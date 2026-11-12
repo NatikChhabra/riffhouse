@@ -31,7 +31,7 @@ Released 12 November 2026.
 Small fix releases come first, and each one also lays groundwork for 0.2.0.
 
 - **Fixes from your reports.** Something broke? In Settings, press **Save a report**. Every report gets read, and fixes go out as soon as they are ready.
-- **A weekly hello, only if you allow it.** An anonymous count of how many people play each week, so we know what to fix first. It stays off unless you switch it on.
+- **A weekly player count.** An anonymous count of how many people play each week, so we know what to fix first: a random number, the version and the week, nothing about you. One switch in Settings turns it off.
 
 ## The big one: 0.2.0
 

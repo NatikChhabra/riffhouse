@@ -188,7 +188,8 @@ juce::String sendNow (const juce::String& title, const juce::String& body)
     return post (juce::JSON::toString (juce::var (o), true));
 }
 
-bool helloOn (juce::PropertiesFile& s) { return s.getBoolValue ("weeklyHello", false); }
+// On unless the player switched it off (Natik, 12 Nov 2026): players who never open setup are counted too.
+bool helloOn (juce::PropertiesFile& s) { return s.getBoolValue ("weeklyHello", true); }
 void setHelloOn (juce::PropertiesFile& s, bool on) { s.setValue ("weeklyHello", on); s.saveIfNeeded(); }
 
 juce::String weekOf (juce::Time t)
@@ -200,18 +201,43 @@ juce::String weekOf (juce::Time t)
     return juce::String (thursday.getYear()) + "-W" + juce::String (yday / 7 + 1).paddedLeft ('0', 2);
 }
 
-void sayHelloIfDue (juce::PropertiesFile& s)
+juce::String installId (juce::PropertiesFile& s)
+{
+    // Random numbers only, made once: nothing from the player, the PC or its devices goes into it.
+    auto id = s.getValue ("installId");
+    if (! isInstallId (id))
+    {
+        id = juce::Uuid().toString(); // 32 lowercase hex digits from the system's random source
+        s.setValue ("installId", id);
+        s.saveIfNeeded();
+    }
+    return id;
+}
+
+bool isInstallId (const juce::String& id)
+{
+    return id.length() == 32 && id.containsOnly ("0123456789abcdef");
+}
+
+juce::String helloJson (const juce::String& week, const juce::String& id, const juce::String& version)
+{
+    auto* o = new juce::DynamicObject();
+    o->setProperty ("key", kKey);
+    o->setProperty ("kind", "hello");
+    o->setProperty ("week", week);
+    o->setProperty ("id", id);
+    o->setProperty ("version", version);
+    return juce::JSON::toString (juce::var (o), true);
+}
+
+void sayHelloIfDue (juce::PropertiesFile& s, const juce::String& version)
 {
     if (! helloOn (s) || ! canSend()) return;
     const auto week = weekOf (juce::Time::getCurrentTime());
     if (s.getValue ("helloWeek") == week) return;
     s.setValue ("helloWeek", week); // once a week, even if this one does not arrive
     s.saveIfNeeded();
-    auto* o = new juce::DynamicObject();
-    o->setProperty ("key", kKey);
-    o->setProperty ("kind", "hello");
-    o->setProperty ("week", week);
-    const auto json = juce::JSON::toString (juce::var (o), true);
+    const auto json = helloJson (week, installId (s), version);
     juce::Thread::launch ([json] { post (json); });
 }
 } // namespace rh::reports
