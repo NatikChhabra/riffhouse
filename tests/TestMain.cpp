@@ -2006,6 +2006,9 @@ void testChordSheet()
     const auto back = parse (toText (kept, 0, true));
     CHECK (back.title == sh.title && back.lines.size() == sh.lines.size() && back.shift == 3 && back.size == 2 && back.speed == 4,
            "sheet round trip: %d vs %d lines, shift %d", (int) back.lines.size(), (int) sh.lines.size(), back.shift);
+    auto tiny = parse ("Am  G");
+    tiny.title = "Two chords";
+    CHECK (parse (toText (tiny, 0, true)).title == "Two chords", "a tiny song keeps its title on disk");
     CHECK (toText (kept, 2, false).contains ("Bm") && ! toText (kept, 2, false).contains ("x_riffhouse"), "shared text is in the new key, no settings");
 
     // every chord shape plays only that chord's notes, its root among them, and fits a hand

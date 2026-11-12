@@ -214,6 +214,14 @@ jobs:
           "Installed app: window ready $($ready.Matches[0].Groups[1].Value) ms after starting" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if (Select-String -Path $log -Pattern 'stopped answering|Starting is taking more|ended in a crash' -Quiet) { throw "The log says the window froze or the app crashed" }
 
+          # A test build finds the newest release on GitHub during those 25 seconds, fetches it and
+          # installs it as it closes, the way a player's copy updates. Let that installer finish
+          # first: removing the app underneath it left a fresh copy behind (12 November 2026).
+          foreach ($i in 1..180) { if (-not (Get-Process | Where-Object { $_.ProcessName -like '*windows-setup*' })) { break }; Start-Sleep -Seconds 1 }
+          if (Get-Process | Where-Object { $_.ProcessName -like '*windows-setup*' }) { throw "The update the app started as it closed did not finish in 3 minutes" }
+          $now = (Get-Item $app).VersionInfo.ProductVersion
+          if ("$now" -ne "$installed") { "Updated itself on close: $installed to $now" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append }
+
           $remove = Join-Path (Split-Path $app) 'unins000.exe'
           if (-not (Test-Path $remove)) { throw "No uninstaller next to the app" }
           Start-Process $remove -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$PWD\uninstall.log" -Wait

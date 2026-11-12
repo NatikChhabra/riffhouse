@@ -413,7 +413,8 @@ juce::String toText (const Sheet& sheet, int semitones, bool withSettings)
 {
     const bool flats = flatsAfter (sheet, semitones);
     juce::StringArray out;
-    if (sheet.title.isNotEmpty()) { out.add (sheet.title); out.add ({}); }
+    // kept on disk, the title is marked so even a two-line song reads back with it
+    if (sheet.title.isNotEmpty()) { out.add (withSettings ? "{title: " + sheet.title + "}" : sheet.title); out.add ({}); }
     for (const auto& l : sheet.lines)
     {
         switch (l.kind)
