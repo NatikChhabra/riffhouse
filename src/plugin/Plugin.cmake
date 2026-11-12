@@ -60,6 +60,7 @@ target_sources(Riffhouse PRIVATE
     plugin/AudioSwitch.cpp
     plugin/AudioOpen.cpp
     plugin/AudioProbe.cpp
+    plugin/Reports.cpp
     plugin/Updater.cpp
     plugin/LevelMatcher.cpp
     plugin/Version.cpp
@@ -89,6 +90,14 @@ target_compile_definitions(Riffhouse PUBLIC
     JUCE_USE_MP3AUDIOFORMAT=1
     JUCE_USE_FLAC=1
     JUCE_USE_OGGVORBIS=1)
+
+# Where a report goes after the player says yes: a relay that files it in a private repository.
+# Release builds get it from the REPORT_URL secret; a build from source has none and sends nothing.
+set(RIFFHOUSE_REPORT_URL "$ENV{RIFFHOUSE_REPORT_URL}")
+if (RIFFHOUSE_REPORT_URL MATCHES "^https://[^\"]+$")
+    set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/Reports.cpp" PROPERTIES COMPILE_DEFINITIONS "RIFFHOUSE_REPORT_URL=\"${RIFFHOUSE_REPORT_URL}\"")
+    message(STATUS "Reports go to the relay")
+endif()
 
 # Each system gets only its own audio back ends: asking for JACK or ALSA on
 # Windows makes JUCE look for headers that do not exist there.

@@ -256,7 +256,7 @@ class NoticeBar : public juce::Component
 public:
     void set (const StandaloneHost::Notice& n)
     {
-        if (n.text == notice.text && n.action == notice.action) return;
+        if (n.text == notice.text && n.action == notice.action && n.second == notice.second) return;
         notice = n;
         setVisible (n.text.isNotEmpty());
         repaint();
@@ -265,6 +265,7 @@ public:
     {
         float w = 52.0f + juce::GlyphArrangement::getStringWidth (font (13.5f, Weight::medium), notice.text);
         if (notice.action.isNotEmpty()) w += 34.0f + juce::GlyphArrangement::getStringWidth (font (13.5f, Weight::semibold), notice.action);
+        if (notice.second.isNotEmpty()) w += 22.0f + juce::GlyphArrangement::getStringWidth (font (13.5f, Weight::medium), notice.second);
         return w;
     }
     void paint (juce::Graphics& g) override
@@ -279,6 +280,18 @@ public:
         g.setColour (notice.warning ? colours::hot : colours::textDim);
         g.fillEllipse (row.removeFromLeft (8.0f).withSizeKeepingCentre (8.0f, 8.0f));
         row.removeFromLeft (12.0f);
+        if (notice.second.isNotEmpty())
+        {
+            // the quieter choice sits at the far end, after the main one
+            g.setFont (font (13.5f, Weight::medium));
+            const float sw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), notice.second);
+            secondArea = row.removeFromRight (sw + 4.0f);
+            g.setColour (overSecond ? colours::text : colours::textDim);
+            g.drawText (notice.second, secondArea, juce::Justification::centredRight);
+            row.removeFromRight (18.0f);
+        }
+        else
+            secondArea = {};
         if (notice.action.isNotEmpty())
         {
             g.setFont (font (13.5f, Weight::semibold));
@@ -298,18 +311,28 @@ public:
     void mouseMove (const juce::MouseEvent& e) override
     {
         const bool o = actionArea.expanded (8.0f).contains (e.position);
-        if (o != over) { over = o; setMouseCursor (o ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor); repaint(); }
+        const bool o2 = secondArea.expanded (8.0f).contains (e.position);
+        if (o != over || o2 != overSecond)
+        {
+            over = o;
+            overSecond = o2;
+            setMouseCursor (o || o2 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+            repaint();
+        }
     }
-    void mouseExit (const juce::MouseEvent&) override { over = false; repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { over = overSecond = false; repaint(); }
     void mouseUp (const juce::MouseEvent& e) override
     {
-        if (e.mouseWasClicked() && actionArea.expanded (8.0f).contains (e.position) && onAction) onAction();
+        if (! e.mouseWasClicked()) return;
+        if (actionArea.expanded (8.0f).contains (e.position) && onAction) onAction();
+        else if (secondArea.expanded (8.0f).contains (e.position) && onSecond) onSecond();
     }
-    std::function<void()> onAction;
+    std::function<void()> onAction, onSecond;
 
 private:
     StandaloneHost::Notice notice;
-    juce::Rectangle<float> actionArea;
+    juce::Rectangle<float> actionArea, secondArea;
+    bool overSecond = false;
     bool over = false;
 };
 
@@ -454,6 +477,10 @@ public:
             if (proc.footTeaching() != RiffhouseProcessor::FootTeach::off) { proc.footTeachStop(); noticeTicks = 99; return; }
             if (auto* host = StandaloneHost::get()) host->audioNoticeAction();
         };
+        noticeBar.onSecond = [] { if (auto* host = StandaloneHost::get()) host->audioNoticeSecond(); };
+        // a report sent from the notice strip is the same one Settings saves
+        if (auto* host = StandaloneHost::get())
+            host->makeReport = [this] { return settings.reportText(); };
         // the foot controller changed a tone, taught itself a job, or pressed something that lives in this window
         proc.onFootMessage = [this] (const juce::String& m)
         {
@@ -479,6 +506,7 @@ public:
         proc.onFootMessage = nullptr; // the rig lives on after its window closes
         proc.onFootJob = nullptr;
         proc.footTeachStop();
+        if (auto* host = StandaloneHost::get()) host->makeReport = nullptr;
     }
 
     // -------------------------------------------------------------------------

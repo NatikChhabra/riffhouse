@@ -103,6 +103,7 @@ class SettingsView : public juce::Component, private juce::Timer
 public:
     explicit SettingsView (RiffhouseProcessor&);
     ~SettingsView() override;
+    juce::String reportText() const; // what Save a report writes and Send a report sends
     void paint (juce::Graphics&) override;
     void resized() override;
     void visibilityChanged() override;
@@ -152,8 +153,8 @@ private:
 
     IconButton close { icons::close() };
     juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and output..." };
-    juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report a problem" };
-    juce::String reportText() const;
+    juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report in public" }, sendReport { "Send a report" };
+    juce::ToggleButton weeklyHello { "Count me in the weekly number of players (nothing about you is sent)" };
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
     juce::ToggleButton earlyVersions { "Get new versions early, as a tester" };

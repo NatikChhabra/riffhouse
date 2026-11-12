@@ -287,6 +287,8 @@ void AudioPicker::apply (Change what)
             {
                 if (r.ok) h->saveAudioState(); // this is now the connection to keep alive
                 h->setupRunning (false);
+                // a driver that would not play is worth a report, if the player wants to send one
+                if (! r.ok) h->offerReport ("The sound card change did not work.");
             }
             if (safe == nullptr) return;
             for (juce::Component* b : { (juce::Component*) &safe->driver, (juce::Component*) &safe->input, (juce::Component*) &safe->output, (juce::Component*) &safe->buffer, (juce::Component*) &safe->socket, (juce::Component*) &safe->sharing })

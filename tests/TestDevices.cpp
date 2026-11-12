@@ -9,6 +9,7 @@
 
 #include "plugin/AudioOpen.h"
 #include "plugin/AudioProbe.h"
+#include "plugin/Reports.h"
 #include "plugin/DeviceGuard.h"
 #include "plugin/DeviceLog.h"
 
@@ -490,6 +491,27 @@ void runDeviceChecks (int& checks, int& failures)
         file.deleteFile();
         AudioProbe::Result r { AudioProbe::Outcome::timedOut, "It did not answer within 12 seconds", 12000.0 };
         CHECK (AudioProbe::describe (r, "ASIO4ALL v2").contains ("did not answer"), "the diary says a driver was stopped");
+    }
+    {
+        std::printf ("reports and slow outputs\n");
+        const juce::String raw = "Recordings in C:\\Users\\Naiti\\Music\\Riffhouse Recordings\nCrash in /home/naiti/riffhouse\n"
+                                 "Signed in as Naiti Sharma on DESKTOP-NAITI7\nNAITI wrote this";
+        const auto clean = reports::scrub (raw, { "Naiti", "Naiti Sharma", "Sharma", "DESKTOP-NAITI7" });
+        CHECK (! clean.containsIgnoreCase ("naiti") && ! clean.containsIgnoreCase ("sharma"), "no trace of the name is left: %s", clean.toRawUTF8());
+        CHECK (clean.contains ("C:\\Users\\<you>\\Music") && clean.contains ("/home/<you>/riffhouse"), "user folders in paths are replaced");
+        CHECK (clean.contains ("Riffhouse Recordings"), "and the rest of the path stays readable");
+        CHECK (reports::scrub ("AMP on", { "am" }) == "AMP on", "a two-letter name is not hunted, it would eat ordinary words");
+        CHECK (reports::weekOf (juce::Time (2026, 10, 12, 12, 0)) == "2026-W46", "12 November 2026 is in week 46 (%s)", reports::weekOf (juce::Time (2026, 10, 12, 12, 0)).toRawUTF8());
+        CHECK (reports::weekOf (juce::Time (2027, 0, 1, 12, 0)) == "2026-W53", "1 January 2027 still belongs to 2026's last week (%s)", reports::weekOf (juce::Time (2027, 0, 1, 12, 0)).toRawUTF8());
+        CHECK (reports::weekOf (juce::Time (2026, 0, 1, 12, 0)) == "2026-W01", "1 January 2026, a Thursday, starts week 1");
+
+        CHECK (DeviceGuard::looksLikeBluetooth ("Speakers (SRS-XP500)"), "a Sony party speaker is known as Bluetooth");
+        CHECK (DeviceGuard::looksLikeBluetooth ("Headphones (boAt Rockerz 450 Stereo)"), "and so are boAt headphones");
+        CHECK (DeviceGuard::looksLikeScreen ("4 - Mi TV (AMD High Definition Audio Device)"), "a TV over HDMI is known as a screen");
+        CHECK (! DeviceGuard::looksLikeBluetooth ("Headphones (4- CX31993+97220 HiFi)") && ! DeviceGuard::looksLikeScreen ("Headphones (4- CX31993+97220 HiFi)"),
+               "a wired USB headphone dongle is neither");
+        CHECK (! DeviceGuard::looksLikeScreen ("Speakers (USBAudio2.0)") && ! DeviceGuard::looksLikeBluetooth ("Speaker (Realtek(R) Audio)"), "nor are wired speakers");
+        CHECK (DeviceGuard::looksLikeVirtual ("Voicemeeter Input (VB-Audio Voicemeeter VAIO)"), "a virtual mixer is not a place to listen");
     }
 #undef CHECK
 }

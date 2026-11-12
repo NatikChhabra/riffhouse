@@ -3,6 +3,7 @@
 #include "AudioPicker.h"
 #include "Panels.h"
 #include "../plugin/DeviceLog.h"
+#include "../plugin/Reports.h"
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
 #include "../plugin/Version.h"
@@ -680,6 +681,39 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
                        "Nothing is sent anywhere. Attach it when you ask for help.");
     report.onClick = [this] { saveReport(); };
     page.addAndMakeVisible (report);
+    // straight to the people who fix Riffhouse, privately, when this build knows where to send
+    sendReport.setTooltip ("Sends the same report as Save a report, privately, to the people who fix Riffhouse. "
+                           "Your Windows user name and computer name are taken out first.");
+    sendReport.onClick = [this]
+    {
+        if (auto* host = StandaloneHost::get())
+        {
+            sendReport.setEnabled (false);
+            juce::Component::SafePointer<SettingsView> safe (this);
+            reports::send (host->settings(), "Report from Settings", reportText(), [safe] (bool ok, juce::String why)
+            {
+                if (safe == nullptr) return;
+                safe->sendReport.setEnabled (true);
+                if (safe->onMessage) safe->onMessage (ok ? "Report sent. Thank you, it gets read." : "The report did not go: " + why);
+            });
+        }
+    };
+    page.addChildComponent (sendReport);
+    weeklyHello.onClick = [this]
+    {
+        if (auto* host = StandaloneHost::get())
+        {
+            reports::setHelloOn (host->settings(), weeklyHello.getToggleState());
+            reports::sayHelloIfDue (host->settings());
+        }
+    };
+    page.addChildComponent (weeklyHello);
+    if (auto* host = StandaloneHost::get(); host != nullptr && reports::canSend())
+    {
+        sendReport.setVisible (true);
+        weeklyHello.setVisible (true);
+        weeklyHello.setToggleState (reports::helloOn (host->settings()), juce::dontSendNotification);
+    }
 
     // starts from what Windows is set to ("Animation effects"); the choice made here is kept
     lessMotion.setToggleState (motion::reduced(), juce::dontSendNotification);
@@ -862,7 +896,7 @@ juce::String SettingsView::reportText() const
         {
             line ("Buffer", juce::String (dev->getCurrentBufferSizeSamples()) + " samples at " + juce::String (dev->getCurrentSampleRate(), 0) + " Hz");
             line ("Reported delay", juce::String (dev->getInputLatencyInSamples()) + " in, " + juce::String (dev->getOutputLatencyInSamples()) + " out (samples)");
-            line ("Dropouts", juce::String (dev->getXRunCount()));
+            line ("Dropouts", dev->getXRunCount() < 0 ? juce::String ("not counted by this driver") : juce::String (dev->getXRunCount()));
         }
         else line ("Device", "none open");
         juce::StringArray drivers;
@@ -1120,13 +1154,22 @@ void SettingsView::layoutPage()
         case Section::help:
         {
             auto row = at (42);
-            for (auto* b : { &website, &problem, &report })
+            juce::Array<juce::Component*> buttons { &website, &sendReport, &problem, &report };
+            for (int i = buttons.size(); --i >= 0;)
+                if (! buttons[i]->isVisible()) buttons.remove (i);
+            const int bw = std::min (180, (row.getWidth() - 12 * (buttons.size() - 1)) / std::max (1, buttons.size()));
+            for (auto* b : buttons)
             {
-                b->setBounds (row.removeFromLeft (180));
+                b->setBounds (row.removeFromLeft (bw));
                 row.removeFromLeft (12);
             }
             gap (16);
             helpText = at (66);
+            if (weeklyHello.isVisible())
+            {
+                gap (6);
+                weeklyHello.setBounds (at (30));
+            }
             gap (36);
             aboutHead = at (26);
             gap (10);
@@ -1336,9 +1379,13 @@ void SettingsView::paintPage (juce::Graphics& g)
             break;
         case Section::help:
         {
-            small ("Help and fixes opens the page of common problems. Report a problem puts a report on your clipboard and opens "
-                   "the page to paste it into. Save a report writes it to a text file in your recordings folder, to send to "
-                   "whoever is helping you. Nothing is sent by itself.", helpText, 3);
+            small (sendReport.isVisible()
+                       ? "Help and fixes opens the page of common problems. Send a report sends it privately to the people who fix "
+                         "Riffhouse, with your user name and computer name taken out. Report in public opens the GitHub page. Save a report "
+                         "writes it to a text file you can read first. Nothing is sent without you pressing a button."
+                       : "Help and fixes opens the page of common problems. Report in public puts a report on your clipboard and opens "
+                         "the page to paste it into. Save a report writes it to a text file in your recordings folder, to send to "
+                         "whoever is helping you. Nothing is sent by itself.", helpText, 3);
             subhead ("About", aboutHead);
             juce::AttributedString about;
             about.setLineSpacing (4.0f);

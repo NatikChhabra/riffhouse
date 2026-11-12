@@ -29,7 +29,28 @@ bool DeviceGuard::looksLikeBluetooth (const juce::String& name)
 {
     const auto n = name.toLowerCase();
     for (auto* w : { "bluetooth", "airpods", "hands-free", "handsfree", "buds", "wh-1000", "wf-1000", "bose qc", "quietcomfort",
-                     "jbl tune", "jbl live", "soundcore", "beats ", "powerbeats", "freebuds", "earbuds", "jabra", " a2dp", "bt audio" })
+                     "jbl tune", "jbl live", "soundcore", "beats ", "powerbeats", "freebuds", "earbuds", "jabra", " a2dp", "bt audio",
+                     // speakers and earphones sold mostly as Bluetooth, and the " Stereo" Windows adds to them
+                     "rockerz", "airdopes", "boat ", "jbl flip", "jbl charge", "jbl go", "jbl clip", "srs-", "marshall", "tribit",
+                     "zebronics", "mivi", "galaxy buds", "oneplus buds", "realme buds", "noise buds", " stereo)" })
+        if (n.contains (w)) return true;
+    return false;
+}
+
+bool DeviceGuard::looksLikeScreen (const juce::String& name)
+{
+    // a TV or monitor over HDMI or DisplayPort: the screen holds the sound back to match its picture
+    const auto n = name.toLowerCase();
+    for (auto* w : { "hdmi", "displayport", "display audio", " tv ", " tv)", "- tv", "tv (", "nvidia high definition audio",
+                     "amd high definition audio", "intel(r) display", "lg tv", "samsung", "sony tv", "mi tv", "bravia", "android tv" })
+        if (n.contains (w)) return true;
+    return false;
+}
+
+bool DeviceGuard::looksLikeVirtual (const juce::String& name)
+{
+    const auto n = name.toLowerCase();
+    for (auto* w : { "voicemeeter", "vb-audio", "cable input", "cable output", "virtual", "steam streaming", "nvidia broadcast", "krisp", "obs" })
         if (n.contains (w)) return true;
     return false;
 }
@@ -72,7 +93,7 @@ void DeviceGuard::adopt()
     dm.getAudioDeviceSetup (s);
     if (s.inputDeviceName.isEmpty()) return;
     wanted = { dm.getCurrentAudioDeviceType(), s.inputDeviceName, s.outputDeviceName, dev->getCurrentBufferSizeSamples(), dev->getCurrentSampleRate() };
-    bluetoothName = looksLikeBluetooth (s.outputDeviceName) ? s.outputDeviceName : juce::String();
+    bluetoothName = looksLikeBluetooth (s.outputDeviceName) || looksLikeScreen (s.outputDeviceName) ? s.outputDeviceName : juce::String();
     bluetoothDismissed = false;
     attempts = looks = 0;
     nextTryAt = nextLookAt = 0;
@@ -304,7 +325,10 @@ DeviceGuard::Notice DeviceGuard::notice() const
             return { "No guitar input yet. Plug in and Riffhouse will find it.", "Run setup", false };
         case State::healthy:
             if (bluetoothName.isNotEmpty() && ! bluetoothDismissed)
-                return { "Bluetooth headphones add a delay you can feel. Wired headphones play in time.", "Got it", true };
+                return { looksLikeScreen (bluetoothName)
+                             ? "The sound goes to a TV or screen, which holds it back to match its picture: a delay you can feel in every app. Headphones or speakers on the PC play in time."
+                             : "Bluetooth speakers and headphones add a delay you can feel, in every app. Wired ones play in time.",
+                         "Got it", true };
             return {};
     }
     return {};

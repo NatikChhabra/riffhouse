@@ -111,6 +111,9 @@ jobs:
       # built as the release. Later commits, once the tag exists, are marked as built from source again.
       - name: Configure
         shell: pwsh
+        env:
+          # where reports go after a player says yes; empty on forks and pull requests
+          RIFFHOUSE_REPORT_URL: ${{ secrets.REPORT_URL }}
         run: |
           $v = (Select-String -Path CMakeLists.txt -Pattern 'project\(Riffhouse VERSION ([0-9.]+)').Matches[0].Groups[1].Value
           $label = ""

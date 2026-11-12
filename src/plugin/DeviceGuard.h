@@ -46,6 +46,8 @@ public:
     std::function<void (const juce::String&)> onMessage;  // good news worth a toast
 
     static bool looksLikeBluetooth (const juce::String& deviceName);
+    static bool looksLikeScreen (const juce::String& deviceName);  // a TV or monitor over HDMI or DisplayPort
+    static bool looksLikeVirtual (const juce::String& deviceName); // a virtual cable or mixer, not a place to listen
 
     enum class State { noDevice, healthy, stalled, lost };
     State state() const noexcept { return current; }

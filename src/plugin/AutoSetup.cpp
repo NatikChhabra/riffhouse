@@ -5,6 +5,7 @@
 #include "../engine/DeviceNames.h"
 #include "../engine/InputGuard.h"
 #include "AudioSwitch.h"
+#include "DeviceGuard.h"
 #include "DeviceLog.h"
 
 namespace rh
@@ -277,8 +278,19 @@ juce::String AutoSetup::outputFor (const Candidate& c, juce::AudioIODeviceType* 
     if (c.type == "ASIO") return c.name;
     const auto outputs = t != nullptr ? t->getDeviceNames (false) : juce::StringArray();
     if (followOutput.isNotEmpty() && outputs.contains (followOutput)) return followOutput;
-    if (current.isNotEmpty() && outputs.contains (current)) return current;
-    return defaultOutputFor (t);
+    auto pick = current.isNotEmpty() && outputs.contains (current) ? current : defaultOutputFor (t);
+    // Bluetooth and screens hold the sound back in every app. Wired headphones that Windows
+    // sees plugged in ("Headphones") play in time, so they are chosen instead; a plain speaker
+    // socket is not, since it may have nothing in it. The notice says why the rest lag.
+    if (DeviceGuard::looksLikeBluetooth (pick) || DeviceGuard::looksLikeScreen (pick))
+        for (const auto& o : outputs)
+            if (o.containsIgnoreCase ("headphone") && ! DeviceGuard::looksLikeBluetooth (o) && ! DeviceGuard::looksLikeScreen (o)
+                && ! DeviceGuard::looksLikeVirtual (o))
+            {
+                devlog::note ("Setup plays through " + o + " instead of " + pick + ", which adds delay");
+                return o;
+            }
+    return pick;
 }
 
 bool AutoSetup::openCandidate (const Candidate& c)

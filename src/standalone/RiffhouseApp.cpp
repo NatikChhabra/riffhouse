@@ -19,6 +19,7 @@
 #include "../engine/DeviceNames.h"
 #include "../plugin/DeviceGuard.h"
 #include "../plugin/DeviceLog.h"
+#include "../plugin/Reports.h"
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
 #include "../plugin/Version.h"
@@ -188,14 +189,17 @@ public:
         if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
             juce::Timer::callAfterDelay (3000, [this] { healSlowStart(); });
 
-        // A run that crashed or froze says so once, and where to send what it wrote down.
+        // A run that crashed or froze says so once, and offers to send what it wrote down.
         if (const auto last = devlog::lastRun(); last == devlog::LastRun::crashed || last == devlog::LastRun::froze)
             juce::Timer::callAfterDelay (5500, [this, last]
             {
-                if (auto* ed = editor())
-                    ed->showToast (juce::String (last == devlog::LastRun::crashed ? "Riffhouse closed by itself last time. " : "Riffhouse froze last time. ")
-                                   + "Settings, Report a problem tells us why.");
+                const juce::String what = last == devlog::LastRun::crashed ? "Riffhouse closed by itself last time." : "Riffhouse froze last time.";
+                if (reports::canSend()) offerReport (what);
+                else if (auto* ed = editor()) ed->showToast (what + " Settings, Save a report tells us why.");
             });
+        // the weekly count, only for players who switched it on
+        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+            juce::Timer::callAfterDelay (20000, [this] { reports::sayHelloIfDue (*properties.getUserSettings()); });
 
         // riffhouse --snapshots <folder> [scale]: render every screen to PNG and quit
         auto args = juce::StringArray::fromTokens (commandLine, true);
@@ -267,12 +271,42 @@ public:
     }
     Notice audioNotice() const override
     {
-        if (guard == nullptr) return {};
-        const auto n = guard->notice();
-        return { n.text, n.action, n.warning };
+        if (guard != nullptr)
+            if (const auto n = guard->notice(); n.text.isNotEmpty()) return { n.text, n.action, n.warning };
+        if (reportOffer.isNotEmpty())
+            return { reportOffer + " Send a report so it gets fixed? Your name and PC name are taken out.", "Send report", false, "Not now" };
+        return {};
+    }
+    bool offerShowing() const { return reportOffer.isNotEmpty() && (guard == nullptr || guard->notice().text.isEmpty()); }
+    void offerReport (const juce::String& what) override
+    {
+        if (! reports::canSend() || what.isEmpty()) return;
+        // the same trouble is offered once a day, however often it happens
+        auto& s = *properties.getUserSettings();
+        const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d ") + what;
+        if (s.getValue ("lastReportOffer") == stamp) return;
+        s.setValue ("lastReportOffer", stamp);
+        reportOffer = what;
+        devlog::note ("Offered to send a report: " + what);
+    }
+    void audioNoticeSecond() override
+    {
+        if (offerShowing()) { devlog::note ("Report not sent: not now"); reportOffer = {}; }
     }
     void audioNoticeAction() override
     {
+        if (offerShowing())
+        {
+            const auto what = reportOffer;
+            reportOffer = {};
+            const auto text = makeReport ? makeReport() : devlog::tail (120);
+            reports::send (*properties.getUserSettings(), what, text, [this] (bool ok, juce::String why)
+            {
+                devlog::note (ok ? "Report sent" : "Report did not go: " + why);
+                if (auto* ed = editor()) ed->showToast (ok ? "Report sent. Thank you, it gets read." : "The report did not go: " + why);
+            });
+            return;
+        }
         if (guard == nullptr) return;
         if (guard->state() == DeviceGuard::State::healthy) guard->dismissNotice();
         else if (guard->state() == DeviceGuard::State::stalled || guard->gaveUp()) guard->retry();
@@ -385,6 +419,7 @@ private:
     std::unique_ptr<DeviceGuard> guard;
     std::unique_ptr<AudioSwitch> healer;
     bool probeOnly = false;
+    juce::String reportOffer; // what went wrong, while the strip asks to send a report
     std::unique_ptr<Updater> updates;
     juce::InterProcessLock runLock { "RiffhouseRunning" };
     bool installerStarted = false;

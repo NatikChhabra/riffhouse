@@ -21,9 +21,14 @@ public:
 
     // Something about the audio connection the player should know: the input was unplugged,
     // audio is being restarted, Bluetooth headphones are in use. Empty text means all is well.
-    struct Notice { juce::String text, action; bool warning = false; };
+    struct Notice { juce::String text, action; bool warning = false; juce::String second; };
     virtual Notice audioNotice() const { return {}; }
     virtual void audioNoticeAction() {}
+    virtual void audioNoticeSecond() {} // the notice's second, smaller choice ("Not now")
+    // Something went wrong that a report would explain: the notice strip asks whether to send
+    // one. Nothing leaves the computer unless the player says yes.
+    virtual void offerReport (const juce::String& whatHappened) { juce::ignoreUnused (whatHappened); }
+    std::function<juce::String()> makeReport; // set by the window: the same text as Save a report
     virtual void setupRunning (bool) {} // the setup wizard is switching devices itself
     virtual Updater* updater() { return nullptr; }
     virtual void restartToUpdate() {}
