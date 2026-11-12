@@ -127,7 +127,7 @@ button.btn { border: 0; cursor: pointer; }
    --tx and --ty run from -1 to 1 with the pointer. */
 .hero-pedal { perspective: 1300px; container-type: inline-size; }
 .pedal-in, .pedal-turn, .pedal-body, .pedal-box, .pedal-parts, .pd-wall, .pd-cyl { display: block; transform-style: preserve-3d; }
-.pedal-body { --u: calc(100cqw / 620); --d: calc(223 * var(--u)); position: relative; transform: rotateX(calc(14deg + var(--ty, 0) * -16deg)) rotateY(calc(-24deg + var(--tx, 0) * 22deg)) translateZ(var(--pz, 0px)); transition: transform 260ms var(--ease); }
+.pedal-body { --u: calc(100cqw / 620); --d: calc(190 * var(--u)); position: relative; transform: rotateX(calc(12deg + var(--ty, 0) * -12deg)) rotateY(calc(-22deg + var(--tx, 0) * 16deg)) translateZ(var(--pz, 0px)); transition: transform 260ms var(--ease); }
 .hero-pedal:active .pedal-body, .hero-pedal.is-down .pedal-body { --pz: -8px; transition-duration: 90ms; }
 .pedal-body img { position: relative; display: block; width: 100%; height: auto; border-radius: calc(6 * var(--u)); }
 .pedal-box, .pedal-parts, .pedal-light, .pedal-ground { position: absolute; inset: 0; pointer-events: none; }
@@ -143,6 +143,12 @@ button.btn { border: 0; cursor: pointer; }
 .pd-wall-t::after { bottom: 0; } .pd-wall-b::after { top: 0; }
 .pd-wall-l::after, .pd-wall-r::after { top: 0; bottom: 0; width: 13%; }
 .pd-wall-l::after { right: 0; } .pd-wall-r::after { left: 0; }
+/* the rounded edge where face meets wall catches the light */
+.pd-wall::before { content: ""; position: absolute; background: var(--bone); opacity: .45; }
+.pd-wall-t::before, .pd-wall-b::before { left: 0; right: 0; height: calc(5 * var(--u)); }
+.pd-wall-t::before { top: 0; opacity: .7; } .pd-wall-b::before { bottom: 0; opacity: .2; }
+.pd-wall-l::before, .pd-wall-r::before { top: 0; bottom: 0; width: calc(5 * var(--u)); }
+.pd-wall-l::before { left: 0; } .pd-wall-r::before { right: 0; opacity: .25; }
 .pd-back { inset: 0; transform: translateZ(calc(var(--d) * -1)); background: var(--panel-2); }
 .pd-cyl { position: absolute; left: calc((var(--x) - var(--r)) * var(--u)); top: calc((var(--y) - var(--r)) * var(--u)); width: calc(var(--r) * 2 * var(--u)); aspect-ratio: 1; transform: translateZ(calc(var(--z, 0) * var(--u))); }
 .pd-cyl > i { position: absolute; left: 50%; top: 50%; width: calc(var(--r) * .33 * var(--u)); height: calc(var(--h) * var(--u)); margin-left: calc(var(--r) * -.165 * var(--u)); transform-origin: 50% 0; background: color-mix(in srgb, var(--hi) var(--s), var(--lo)); }
