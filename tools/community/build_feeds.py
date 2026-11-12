@@ -128,12 +128,28 @@ def release_items(prerelease: bool) -> list[dict]:
     return items[:10]
 
 
+# The dev log is for players: only changes to the app itself (code, sounds, presets, installer).
+# Website, Discord bot, workflow and docs changes never go there.
+APP_PATHS = ("src", "presets", "resources", "packaging", "CMakeLists.txt")
+NOT_FOR_PLAYERS = re.compile(r"discord|feed|website|\bsite\b|readme|workflow|\bci\b|relay|roadmap|marketing|\bdocs?\b|"
+                             r"bot\b|attribution|license|contributing|"
+                             # work in progress: unreleased version numbers, reviews, tests, refactors
+                             r"\b\d+\.\d+\.\d+\b|review|\btests?\b|refactor|\bwip\b", re.I)
+
+
 def devlog_items() -> list[dict]:
+    seen, commits = set(), []
+    for path in APP_PATHS:
+        for c in api(f"commits?sha=main&per_page=30&path={path}"):
+            if c["sha"] not in seen:
+                seen.add(c["sha"])
+                commits.append(c)
+    commits.sort(key=lambda c: c["commit"]["committer"]["date"], reverse=True)
     items = []
-    for c in api("commits?sha=main&per_page=30"):
+    for c in commits:
         msg = c["commit"]["message"].strip()
         first, _, rest = msg.partition("\n")
-        if first.startswith("Merge ") or "[skip devlog]" in msg:
+        if first.startswith("Merge ") or "[skip devlog]" in msg or NOT_FOR_PLAYERS.search(first):
             continue
         body = "\n".join(
             l for l in rest.strip().splitlines()
@@ -141,7 +157,7 @@ def devlog_items() -> list[dict]:
         ).strip()
         items.append({
             "category": "devlog",
-            "title": first[:200],
+            "title": re.sub(r"\s*\(#\d+\)$", "", first)[:200],
             "link": c["html_url"],
             "guid": f"commit-{c['sha']}",
             "when": parse_time(c["commit"]["committer"]["date"]),
@@ -210,7 +226,7 @@ def tone_items(today: dt.date) -> list[dict]:
             lines.append(f"Chain: {chain}")
         lines.append(
             f"Find it in Riff House under {p.get('category')} > {p['name']}. "
-            "Tweak it, then share your version in #tone-lab. Reply here with a clip if you play something with it."
+            "Tweak it, then share your version in #tone-lab, and post a clip in #showcase if you play something with it."
         )
         items.append({
             "category": "tone",
