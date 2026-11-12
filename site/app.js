@@ -133,6 +133,15 @@
           if (e.key === 'End') { e.preventDefault(); pick(all[all.length - 1], true); }
         });
       });
+      /* The pictures behind the other tabs load as the section comes near, so a first press never shows an empty frame */
+      if ('IntersectionObserver' in window && !(navigator.connection && navigator.connection.saveData)) {
+        const io = new IntersectionObserver(([e]) => {
+          if (!e.isIntersecting) return;
+          io.disconnect();
+          $$('img[loading="lazy"]', root).forEach((im) => { im.loading = 'eager'; });
+        }, { rootMargin: '600px 0px' });
+        io.observe(root);
+      }
     });
   }
 
