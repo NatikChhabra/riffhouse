@@ -6,6 +6,19 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
+## 0.1.4
+
+Fixes from the first day of 0.1.3, and a Riffhouse that puts itself back on the fast way in.
+
+- The delay on the Settings plate reads "48 ms". It showed "48.1..." with stray dots, because the "ms" did not fit.
+- When a driver you pick will not start, the Driver, Guitar in and Sound out boxes show what Riffhouse went back to, instead of the driver that failed. The message names that driver too: "went back to Guitar (Realtek USB Audio) on Windows Audio, exclusive mode, which works".
+- A driver that will not start names the usual cause first: another program using the device, often a voice call (Discord, Zoom, Meet). ASIO4ALL and FlexASIO also say they need the device all to themselves.
+- The Delay box is now called Buffer and lists "576 samples (12.0 ms)". The big figure on the Settings plate is the whole trip from string to ear, and its Runs line names the buffer, so the two numbers no longer look like they disagree.
+- Settings drops the side list. It is one page under the title, every part under its own heading.
+- After a run that crashed or did not close, Save a report keeps what happened in that run, not only the calm start after it.
+- A start on a slow way in (DirectSound, or a buffer over 20 ms) tries the fastest way the same input has, a few seconds after the window opens. It keeps it only if sound comes through clean, and says what it changed. Nothing changes if no faster way works.
+- Setup listens first to an input named for a guitar or an instrument, then audio interfaces, and leaves USB microphones and webcams for last. Every input is still in the list to pick by hand.
+
 ## 0.1.3
 
 A new logo, a sound card that sorts itself out, a cleaner window that fits any screen, a classic wah, and two new ways to share: tones as a plain message, and songs as chords and tabs you play from.
