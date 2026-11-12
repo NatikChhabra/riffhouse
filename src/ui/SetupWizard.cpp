@@ -654,7 +654,11 @@ void SetupWizard::paint (juce::Graphics& g)
             bullet (true, "Gate at " + juce::String (juce::roundToInt (s.gateDb)) + " dB, and it follows the room if the noise changes");
             bullet (true, "Auto level on: every tone comes out as loud as the last, matched to your playing");
             bullet (true, "Hum filter on automatic (removes 50 or 60 Hz buzz)");
-            const auto shared = whyShared (s.deviceType, s.inputName, s.outputName);
+            juce::StringArray outs;
+            if (auto* host = StandaloneHost::get())
+                for (auto* t : host->deviceManager().getAvailableDeviceTypes())
+                    if (t->getTypeName() == "Windows Audio") outs = t->getDeviceNames (false);
+            const auto shared = whyShared (s.deviceType, s.inputName, s.outputName, outs);
             if (s.clipping)
                 bullet (false, "Your input is clipping. Turn the guitar volume down a little.");
             else if (shared.isNotEmpty())

@@ -25,7 +25,10 @@ bool sameHardware (const juce::String& asioDriver, const juce::String& windowsNa
 
 // Why the sound runs through Windows' shared mode, in words a player can act on; empty when it
 // does not (exclusive mode, ASIO, or another system). `type` is the driver mode that runs.
-juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output);
+// `outputs`: every output Windows lists. When given and none is on the guitar's device (a guitar
+// cable with no headphone socket), the advice is an interface that does both, not a socket it lacks.
+juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output,
+                        const juce::StringArray& outputs = {});
 
 // The sample rates an ASIO driver is opened at, in order, when the one asked for does not play:
 // 0 is the rate the interface is already set to (in its own settings, or by Windows), which is

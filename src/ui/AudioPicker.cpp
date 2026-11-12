@@ -223,7 +223,7 @@ void AudioPicker::refresh()
     else if (now.type == "DirectSound")
         note = "Only the slowest way of driving this input started. Close other audio apps and pick the input again.";
     else if (now.valid() && forced.isEmpty() && ! sharing.getToggleState() && whyShared (now.type, now.input, now.output).isNotEmpty())
-        note = whyShared (now.type, now.input, now.output);
+        note = whyShared (now.type, now.input, now.output, findType (dm, "Windows Audio") != nullptr ? findType (dm, "Windows Audio")->getDeviceNames (false) : juce::StringArray());
     else if (now.valid() && canShare)
         note = "Other apps can play too. The delay is a little longer than with the sound card to itself.";
 

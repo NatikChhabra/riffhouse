@@ -67,15 +67,19 @@ bool sameHardware (const juce::String& asioDriver, const juce::String& windowsNa
     return false;
 }
 
-juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output)
+juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output,
+                        const juce::StringArray& outputs)
 {
     if (type != "Windows Audio" && type != "DirectSound") return {};
     const auto inHw = hardwareOf (input), outHw = hardwareOf (output);
     const auto inName = inHw.isNotEmpty() ? inHw : input;
     if (inHw.isNotEmpty() && outHw.isNotEmpty() && ! inHw.equalsIgnoreCase (outHw))
         return "Your guitar comes in on " + inHw + " and the sound goes out on " + outHw + ". Two separate devices can't keep "
-               "in step when Riffhouse has them to itself, so Windows' shared mode joins them, which adds delay. For the shortest "
-               "delay, plug your headphones into " + inHw + " and pick it under Sound out.";
+               "in step when Riffhouse has them to itself, so Windows' shared mode joins them, which adds delay. "
+               + (! outputs.isEmpty() && ! [&] { for (const auto& o : outputs) if (hardwareOf (o).equalsIgnoreCase (inHw)) return true; return false; }()
+                      ? juce::String (inHw + " has no headphone socket, so the shortest delay needs one device for both: an audio "
+                                      "interface with a guitar input and a headphone socket.")
+                      : juce::String ("For the shortest delay, plug your headphones into " + inHw + " and pick it under Sound out."));
     if (type == "DirectSound")
         return "Only DirectSound, the oldest and slowest way, would start on " + inName + ". Close other audio apps and run "
                "setup again, or pick a driver yourself in Settings, Driver, input and output.";

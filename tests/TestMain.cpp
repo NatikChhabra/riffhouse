@@ -1290,6 +1290,13 @@ void testUpdates()
             const auto two = whyShared ("Windows Audio", "Guitar (Realtek USB Audio)", "Headphones (4- CX31993+97220 HiFi)");
             CHECK (two.contains ("Realtek USB Audio") && two.contains ("CX31993") && two.contains ("plug your headphones into"),
                    "shared mode on two devices says which two, and what to plug where");
+            const auto noSocket = whyShared ("Windows Audio", "Guitar (Realtek USB Audio)", "Headphones (4- CX31993+97220 HiFi)",
+                                             { "Headphones (4- CX31993+97220 HiFi)", "4 - Mi TV (AMD High Definition Audio Device)" });
+            CHECK (noSocket.contains ("no headphone socket") && ! noSocket.contains ("plug your headphones into"),
+                   "a guitar cable with no headphone socket is not told to plug headphones into it: %s", noSocket.toRawUTF8());
+            CHECK (whyShared ("Windows Audio", "Guitar (Realtek USB Audio)", "Headphones (4- CX31993+97220 HiFi)",
+                              { "Headphones (Realtek USB Audio)", "Headphones (4- CX31993+97220 HiFi)" }).contains ("plug your headphones into"),
+                   "a guitar device that has a socket is pointed to it");
             CHECK (whyShared ("Windows Audio", "Microphone (Realtek(R) Audio)", "Speakers (Realtek(R) Audio)").contains ("Close other audio apps"),
                    "shared mode on one device says what to try");
             CHECK (whyShared ("Windows Audio (Exclusive Mode)", "Guitar (Realtek USB Audio)", "Headphones (CX31993 HiFi)").isEmpty()
