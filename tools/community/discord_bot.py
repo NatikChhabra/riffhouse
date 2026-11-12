@@ -174,6 +174,11 @@ def short(text: str, n: int) -> str:
     return text if len(text) <= n else text[: text.rfind("\n", 0, n) if "\n" in text[:n] else n].rstrip() + "\n..."
 
 
+def link_channels(text: str) -> str:
+    """#tone-lab in feed text becomes a clickable channel."""
+    return re.sub(r"#([a-z\-]+)", lambda m: f"<#{CH[m.group(1)]}>" if m.group(1) in CH else m.group(0), text)
+
+
 def post_feeds(log: list[str]):
     builds = read_feed("builds.xml")
     last_release = max((i["date"] for i in builds if i["category"] == "release" and i["date"]),
@@ -196,7 +201,7 @@ def post_feeds(log: list[str]):
             ping = [ROLE[role]] if role and not old else []
             embed = {
                 "title": it["title"][:256], "url": it["link"], "color": AMBER,
-                "description": short(it["description"], 1800),
+                "description": link_channels(short(it["description"], 1800)),
                 "footer": {"text": f"Riff House #{it['guid']}"},
             }
             if it["date"]:
