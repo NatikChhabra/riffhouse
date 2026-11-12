@@ -439,7 +439,7 @@ def keep_on_purpose(cursor: str | None, log: list[str]):
         chan = CH[name]
         msgs = call("GET", f"/channels/{chan}/messages?limit=100")
         nudged = recent_nudges(chan)
-        for m in msgs:
+        for m in reversed(msgs):  # oldest first, so a person's first question is the one answered
             t = snowflake_time(m["id"])
             if m["author"].get("bot") or t < since or now - t < dt.timedelta(minutes=10):
                 continue
