@@ -42,8 +42,11 @@ jobs:
       # Browsers keep the stylesheet and script for a while. A new address on every publish makes them fetch the new ones.
       - name: Stamp the stylesheet and script with this version
         run: |
-          sed -i "s/href=\"styles\.css\"/href=\"styles.css?v=${GITHUB_SHA::8}\"/; s/src=\"app\.js\"/src=\"app.js?v=${GITHUB_SHA::8}\"/" site/index.html site/roadmap.html
-          grep -c "?v=${GITHUB_SHA::8}" site/index.html site/roadmap.html
+          sed -i "s/href=\"styles\.css\"/href=\"styles.css?v=${GITHUB_SHA::8}\"/; s/src=\"app\.js\"/src=\"app.js?v=${GITHUB_SHA::8}\"/" site/index.html site/roadmap.html site/press.html site/buy.html
+          grep -c "?v=${GITHUB_SHA::8}" site/index.html site/roadmap.html site/press.html site/buy.html
+      # The press page offers its files one by one and as one download.
+      - name: Pack the press kit
+        run: cd site/press && zip -qr riffhouse-press-kit.zip README.md logo screenshots && ls -la riffhouse-press-kit.zip
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
