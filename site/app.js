@@ -301,9 +301,6 @@
     });
   }
 
-  const SPONSOR_URL = '';
-  const sponsor = $('[data-sponsor]');
-  if (sponsor && SPONSOR_URL) { sponsor.href = SPONSOR_URL; sponsor.hidden = false; }
 
   tabs(); reveals(); download(); finder(); demos(); copyId(); stomp(); counts(); play();
 })();

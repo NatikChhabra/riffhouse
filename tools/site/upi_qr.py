@@ -8,7 +8,7 @@ Needs: pip install qrcode
 from pathlib import Path
 import qrcode
 
-PAYLOAD = "upi://pay?pa=natik.chhabra@ptaxis&pn=Mr%20NATIK%20%20CHHABRA"
+PAYLOAD = "upi://pay?pa=natik.chhabra@ptaxis&pn=Riff%20House&cu=INR"
 INK, PAPER, QUIET = "#15100a", "#ece9e3", 4
 OUT = Path(__file__).resolve().parents[2] / "site" / "img" / "upi-qr.svg"
 
