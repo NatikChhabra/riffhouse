@@ -1,0 +1,29 @@
+name: Discord bot
+
+# Runs the Riff House Discord bot (tools/community/discord_bot.py): posts new releases, beta builds,
+# dev log and tone of the week, answers common questions in #help and #bug-reports, and keeps #bot-log.
+# Everything it needs to remember is kept in Discord, so a skipped or late run just catches up.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: discord-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/community
+      - name: Run the bot
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+        run: python3 tools/community/discord_bot.py

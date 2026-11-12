@@ -1,27 +1,14 @@
 #!/usr/bin/env python3
 """Build the RSS feeds the Riff House Discord reads.
 
-The website publishes these files next to the site. A feed bot in the Discord
-server watches each one and posts every new item into its channel:
+The website publishes these files next to the site. The Riff House bot
+(tools/community/discord_bot.py, run every 10 minutes by .github/workflows/discord-bot.yml)
+reads them and posts every new item into its channel, routed by <category>:
 
-  releases.xml          new stable versions          -> #releases
-  beta.xml              pre-release test builds      -> #beta-lab (Beta testers only)
-  devlog.xml            recent changes on main       -> #dev-log
-  tone-of-the-week.xml  one preset picked each week  -> #tone-of-the-week
-
-The free feed bot follows at most three feeds, so it reads three combined ones and
-routes items by their <category> (one connection per channel, filtered on category):
-
-  builds.xml   releases.xml + beta.xml      categories: release, beta
-  devlog.xml                                category: devlog
-  weekly.xml   tone-of-the-week             category: tone
-
-The free feed bot follows at most three feeds, so it reads three combined ones and
-routes items by their <category> (one connection per channel, filtered on category):
-
-  builds.xml   releases.xml + beta.xml      categories: release, beta
-  devlog.xml                                category: devlog
-  weekly.xml   tone-of-the-week + challenge categories: tone, challenge
+  builds.xml   category release -> #releases (pings Release pings)
+               category beta    -> #beta-lab (Beta testers only)
+  devlog.xml   recent changes on main       -> #dev-log
+  weekly.xml   one preset picked each week  -> #tone-of-the-week
 
 Nothing here needs a secret. Release and commit data come from the public
 GitHub API (GITHUB_TOKEN is used when present, only to avoid rate limits).
