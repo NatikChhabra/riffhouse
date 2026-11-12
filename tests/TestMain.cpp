@@ -1312,6 +1312,13 @@ void testUpdates()
                    "a buffer held by the driver says how to change it: %s", advice.toRawUTF8());
             CHECK (asioBufferAdvice (128, 48000.0, 1, "x").isEmpty() && asioBufferAdvice (1024, 48000.0, 5, "x").isEmpty(),
                    "no advice when the delay is short or Riffhouse can change it");
+            CHECK (whyAsioFailed ("ASIO4ALL v2", "Can't create i/o buffers", false).contains ("Discord")
+                       && whyAsioFailed ("ASIO4ALL v2", "Can't create i/o buffers", false).contains ("all to itself"),
+                   "a wrapper driver that will not start names a voice call and why");
+            CHECK (! whyAsioFailed ("Focusrite USB ASIO", "Can't create i/o buffers", false).contains ("all to itself"),
+                   "an interface's own driver is not told it wraps Windows audio");
+            CHECK (delayFigure (48.1234) == "48" && delayFigure (6.3) == "6.3" && delayFigure (9.96) == "10.0" && delayFigure (12.6) == "13",
+                   "the delay figure stays short: %s", delayFigure (48.1234).toRawUTF8());
         }
     }
 

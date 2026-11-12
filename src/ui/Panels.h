@@ -96,7 +96,7 @@ private:
     juce::Slider level;
 };
 
-// Settings: a rail of sections on the left, one section at a time on the right, scrolling when the
+// Settings: one scrolling page, every section under its own heading (once a rail of sections on the left), scrolling when the
 // window is short. Sound card and updates appear only in the standalone app.
 class SettingsView : public juce::Component, private juce::Timer
 {
@@ -144,7 +144,7 @@ private:
     RiffhouseProcessor& proc;
     Section current = Section::sound;
     int hover = -1;
-    juce::Rectangle<int> rail;
+    juce::Rectangle<int> rail, titleArea;
     std::vector<std::pair<Section, juce::Rectangle<int>>> railItems;
     Page page { *this };
     juce::Viewport scroller;

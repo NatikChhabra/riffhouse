@@ -165,12 +165,20 @@ juce::String AudioSwitch::failureText() const
 {
     if (sawNoInput && lastError.isEmpty() && ! sawSilence) return want.input + " has no input to plug a guitar into. " + wentBackTo();
     if (want.types.contains ("ASIO")) return whyAsioFailed (want.input, lastError, sawSilence && lastError.isEmpty()) + " " + wentBackTo();
-    return want.input + (sawSilence ? " opened but no sound came through it. " : " would not start. ") + wentBackTo();
+    const auto on = want.types.size() == 1 ? " on " + friendlyType (want.types[0]) : juce::String();
+    return want.input + on + (sawSilence ? " opened but no sound came through it. " : " would not start. ")
+         + (sawSilence ? juce::String() : juce::String ("Another program may be using it, often a voice call (Discord, Zoom, Meet): close it and try again. "))
+         + wentBackTo();
 }
 
 juce::String AudioSwitch::wentBackTo() const
 {
-    return before.valid() ? "Riffhouse went back to " + before.input + "." : juce::String ("Pick another input, or run the automatic setup.");
+    if (! before.valid()) return "Pick another input, or run the automatic setup.";
+    // name the driver too: going back to the same input on another driver is a real change
+    const auto what = before.input.isNotEmpty() ? before.input : before.output;
+    if (! want.types.contains (before.type) || what == want.input)
+        return "Riffhouse went back to " + what + " on " + friendlyType (before.type) + ", which works.";
+    return "Riffhouse went back to " + what + ".";
 }
 
 void AudioSwitch::timerCallback()

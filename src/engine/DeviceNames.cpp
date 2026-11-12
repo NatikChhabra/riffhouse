@@ -104,11 +104,15 @@ juce::String whyAsioFailed (const juce::String& driver, const juce::String& erro
         s = driver + " opened but no sound came through it at any sample rate. In its own settings window, check that the "
                      "clock source (or sync) is set to Internal, then pick it again.";
     else if (held)
-        s = driver + " would not start. Most often another program is using it: close any music program, game, video call "
+        s = driver + " would not start. Most often another program is using it: close any voice call (Discord, Zoom, Meet), music program, game "
                      "or browser tab that uses your interface, then pick it again.";
     else
-        s = driver + " would not start at any sample rate or buffer size. Close other programs that use your interface, "
-                     "or unplug it and plug it back in, then pick it again.";
+        s = driver + " would not start at any sample rate or buffer size. Most often another program is using the device, "
+                     "such as a voice call (Discord, Zoom, Meet), a music program or a browser tab: close it, or unplug the "
+                     "device and plug it back in, then pick it again.";
+    // a driver that wraps Windows audio (ASIO4ALL, FlexASIO) needs the device all to itself
+    if (! silent && (driver.containsIgnoreCase ("asio4all") || driver.containsIgnoreCase ("flexasio")))
+        s << " " << driver << " needs the device all to itself, so it cannot run while any other app uses that mic or those headphones.";
     return s;
 }
 
@@ -172,5 +176,10 @@ void BufferSearch::result (bool clean)
     crackled = true;
     if (foundClean || at + 1 >= sizes.size()) { trying = 0; return; }
     trying = sizes[++at];
+}
+juce::String delayFigure (double ms)
+{
+    // juce::String (x, 0) prints every digit, so the whole number is rounded here
+    return ms < 10.0 ? juce::String (ms, 1) : juce::String (juce::roundToInt (ms));
 }
 } // namespace rh

@@ -54,14 +54,14 @@ Setup measures this and shows it as "about so many ms from string to ear". Under
 - Run setup again with other audio programs closed. It tries the fastest modes one by one and keeps the fastest that runs clean.
 - With an audio interface, install its maker's driver and pick the ASIO entry.
 - Without an interface, the fastest way is for Riffhouse to have the sound card to itself. Setup picks that when it works.
-- You can choose a smaller delay by hand: **Input, output and delay...**, then **Delay**. If it crackles, go one step back up.
+- You can choose a smaller delay by hand: **Driver, input and output...**, then a smaller number under **Buffer**. If it crackles, go one step back up.
 - "Let other apps play sound at the same time" costs a few milliseconds. Leave it off for the shortest delay.
 - Turn off the interface's Direct Monitor if you hear a second, clean guitar. That is not a delay, it is two signals. See [I hear my guitar twice](#i-hear-my-guitar-twice).
 - Still feels late on 0.1.2 or later? Press **Save a report** in Settings and send it. It holds the numbers needed to see where the time goes.
 
 ## Crackles, pops or dropouts
 
-- Open **Input, output and delay...** and pick the next bigger number under **Delay**.
+- Open **Driver, input and output...** and pick the next bigger number under **Buffer**.
 - Close browsers, games and other audio programs, and plug a laptop into power.
 - Run setup again. It only keeps settings that ran without a single dropout while you played.
 

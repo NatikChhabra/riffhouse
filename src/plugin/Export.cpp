@@ -109,7 +109,7 @@ namespace
                                  .withBitsPerSample (24)
                                  .withQualityOptionIndex (flac.getQualityOptions().size() - 1); // the smallest file; it plays the same
         auto writer = flac.createWriterFor (os, options);
-        if (writer == nullptr) return "This sound cannot be written as FLAC (" + juce::String (reader.sampleRate, 0) + " Hz).";
+        if (writer == nullptr) return "This sound cannot be written as FLAC (" + juce::String (juce::roundToInt (reader.sampleRate)) + " Hz).";
         juce::AudioBuffer<float> buf ((int) reader.numChannels, block);
         const juce::int64 total = reader.lengthInSamples;
         for (juce::int64 done = 0; done < total;)

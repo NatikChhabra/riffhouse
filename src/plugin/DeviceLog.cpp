@@ -39,6 +39,7 @@ namespace
         juce::String doing; // what the sound card is being asked to do right now
         double doingSince = 0;
         LastRun lastRun = LastRun::fine;
+        juce::StringArray previousRun; // the run before, kept for reports when it did not end well
     };
 
     // Read from the end of the diary: a run that closed by itself wrote "---- closed" last.
@@ -220,6 +221,15 @@ void start (const juce::File& folder, const juce::String& version)
         s.file.readLines (old);
         old.removeEmptyStrings();
         s.lastRun = howItEnded (old);
+        if (s.lastRun != LastRun::fine)
+        {
+            // a report after a crash needs what led up to it, not only this calm new start
+            int from = 0;
+            for (int i = old.size(); --i >= 0;)
+                if (old[i].contains ("---- Riffhouse ")) { from = i; break; }
+            from = std::max (from, old.size() - 100);
+            for (int i = from; i < old.size(); ++i) s.previousRun.add (old[i]);
+        }
         if (s.file.getSize() > kFileMax)
         {
             // keep the newer half, so what led up to today is still there
@@ -262,6 +272,12 @@ juce::String tail (int maxLines)
     auto& s = state();
     const juce::ScopedLock l (s.lock);
     juce::StringArray out;
+    if (! s.previousRun.isEmpty())
+    {
+        out.add ("(the run before, which did not end well)");
+        out.addArray (s.previousRun);
+        out.add ("(this run)");
+    }
     const int from = std::max (0, (int) s.lines.size() - maxLines);
     for (int i = from; i < (int) s.lines.size(); ++i) out.add (s.lines[(size_t) i]);
     return out.joinIntoString ("\n");

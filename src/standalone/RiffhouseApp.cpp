@@ -13,6 +13,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
+#include "../plugin/AudioSwitch.h"
 #include "../plugin/DeviceGuard.h"
 #include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
@@ -169,6 +170,11 @@ public:
         // the window comes last: its settings screen asks for the guard and the updater
         window = std::make_unique<MainWindow> (*holder, *s);
 
+        // A start on a slow way in (DirectSound, or a huge buffer) tries the fastest way the
+        // same input has, once the window is up. It only stays if sound proves to come through.
+        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+            juce::Timer::callAfterDelay (3000, [this] { healSlowStart(); });
+
         // A run that crashed or froze says so once, and where to send what it wrote down.
         if (const auto last = devlog::lastRun(); last == devlog::LastRun::crashed || last == devlog::LastRun::froze)
             juce::Timer::callAfterDelay (5500, [this, last]
@@ -212,6 +218,7 @@ public:
     void shutdown() override
     {
         stopTimer();
+        healer.reset();
         guard.reset();
         if (holder != nullptr) holder->savePluginState();
         window.reset();
@@ -276,6 +283,53 @@ public:
     juce::PropertiesFile& settings() override { return *properties.getUserSettings(); }
 
 private:
+    // Riffhouse can come back on DirectSound with thousands of samples of delay (a fallback that
+    // was saved, a crash in the middle of trying another driver). The same input is offered the
+    // faster ways first; whatever proves to work is kept and named, and nothing changes if none do.
+    void healSlowStart()
+    {
+        if (holder == nullptr || (healer != nullptr && healer->busy())) return;
+        auto& dm = holder->deviceManager;
+        auto* dev = dm.getCurrentAudioDevice();
+        if (dev == nullptr) return; // nothing open: the guard and setup look after that
+        const auto now = AudioOpen::running (dm);
+        const int buf = dev->getCurrentBufferSizeSamples();
+        const double rate = std::max (1.0, dev->getCurrentSampleRate());
+        const bool slow = now.type == "DirectSound" || 1000.0 * buf / rate > 20.0;
+        if (! slow || now.input.isEmpty() || now.type == "ASIO") return;
+
+        AudioChoice c;
+        c.input = now.input;
+        c.output = now.output;
+        c.types = AudioSwitch::modesFor (dm, "Windows Audio", now.input, AudioSwitch::isShared (now.type) && now.type != "DirectSound");
+        c.types.removeString ("DirectSound");
+        if (c.types.isEmpty()) return;
+
+        const double msBefore = 1000.0 * buf / rate;
+        const auto typeBefore = now.type;
+        devlog::note ("Start was slow (" + typeBefore + ", " + juce::String (buf) + " samples): trying " + c.types.joinIntoString (", "));
+        auto& rig = *dynamic_cast<RiffhouseProcessor*> (holder->processor.get());
+        healer = std::make_unique<AudioSwitch> (dm, rig);
+        setupRunning (true);
+        healer->apply (c, [this, msBefore, typeBefore] (AudioSwitch::Result r)
+        {
+            setupRunning (false);
+            if (! r.ok) { devlog::note ("Stayed on " + typeBefore + ": " + r.message); return; }
+            // the faster way works: keep it, and leave the driver box on Automatic
+            properties.getUserSettings()->setValue ("audioDriver", juce::String());
+            saveAudioState();
+            juce::String msNow;
+            if (auto* d = holder->deviceManager.getCurrentAudioDevice())
+                msNow = juce::String (1000.0 * d->getCurrentBufferSizeSamples() / std::max (1.0, d->getCurrentSampleRate()), 1);
+            const auto text = "Riffhouse had started on " + AudioSwitch::friendlyType (typeBefore) + " with a "
+                            + juce::String (juce::roundToInt (msBefore)) + " ms buffer. It moved to "
+                            + AudioSwitch::friendlyType (holder->deviceManager.getCurrentAudioDeviceType())
+                            + (msNow.isNotEmpty() ? ", " + msNow + " ms" : juce::String()) + ", which plays clean.";
+            devlog::note (text);
+            if (auto* ed = editor()) ed->showToast (text);
+        });
+    }
+
     RiffhouseEditor* editor() const
     {
         return holder != nullptr ? dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()) : nullptr;
@@ -291,6 +345,7 @@ private:
     std::unique_ptr<juce::StandalonePluginHolder> holder;
     std::unique_ptr<MainWindow> window;
     std::unique_ptr<DeviceGuard> guard;
+    std::unique_ptr<AudioSwitch> healer;
     std::unique_ptr<Updater> updates;
     juce::InterProcessLock runLock { "RiffhouseRunning" };
     bool installerStarted = false;

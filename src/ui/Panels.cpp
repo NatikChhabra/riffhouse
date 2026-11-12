@@ -1017,14 +1017,15 @@ void SettingsView::mouseUp (const juce::MouseEvent& e)
 
 void SettingsView::resized()
 {
+    // One page, no side list: it scrolled anyway (Natik, 12 Nov). The column sits in the middle,
+    // under the title.
     auto r = getLocalBounds();
-    rail = r.removeFromLeft (juce::jlimit (210, 270, getWidth() / 5));
+    rail = {};
     railItems.clear();
-    auto items = rail.reduced (16, 0).withTrimmedTop (118);
-    for (auto s : sections())
-        railItems.push_back ({ s, items.removeFromTop (44) });
     close.setBounds (getWidth() - 64, 18, 44, 44);
-    scroller.setBounds (r.withTrimmedLeft (56).withTrimmedTop (36).withTrimmedRight (72));
+    const int colW = std::min (r.getWidth() - 2 * 72, 720 + 14);
+    titleArea = juce::Rectangle<int> ((getWidth() - colW) / 2, 36, colW, 64);
+    scroller.setBounds (titleArea.getX(), titleArea.getBottom() + 24, colW + 14, getHeight() - titleArea.getBottom() - 24);
     layoutPage();
 }
 
@@ -1140,16 +1141,10 @@ void SettingsView::layoutPage()
 void SettingsView::paint (juce::Graphics& g)
 {
     g.fillAll (colours::bg);
-    // the rail is the room's edge, a step darker, like the bars above and below the rig
-    g.setColour (juce::Colour (0xff0b0b0b));
-    g.fillRect (rail);
-    g.setColour (juce::Colour (0xff222120));
-    g.fillRect (rail.getRight() - 1, 0, 1, getHeight());
-
-    auto head = rail.reduced (28, 0).withTrimmedTop (36);
+    auto head = titleArea;
     g.setColour (colours::text);
-    g.setFont (font (24.0f, Weight::display));
-    g.drawText ("Settings", head.removeFromTop (32), juce::Justification::centredLeft);
+    g.setFont (font (28.0f, Weight::display));
+    g.drawText ("Settings", head.removeFromTop (36), juce::Justification::centredLeft);
     g.setColour (colours::textFaint);
     g.setFont (font (12.5f));
     g.drawText ("Riffhouse " + versionForPeople(), head.removeFromTop (22), juce::Justification::centredLeft);
@@ -1241,7 +1236,7 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     g.setColour (ms <= 12.0 ? colours::lamp : colours::lamp.withAlpha (0.7f));
     g.setFont (faceFont (Face::doto, 52.0f));
     auto num = figure.withTrimmedBottom (26.0f);
-    const auto msText = juce::String (ms, ms < 10.0 ? 1 : 0);
+    const auto msText = delayFigure (ms);
     g.drawText (msText, num, juce::Justification::centredLeft);
     const float numW = juce::GlyphArrangement::getStringWidth (faceFont (Face::doto, 52.0f), msText);
     g.setFont (font (16.0f, Weight::medium));
@@ -1261,7 +1256,8 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     line ("Driver", c.driver, colours::text);
     line ("In", c.input, colours::text);
     line ("Out", c.output, colours::text);
-    line ("Runs", juce::String (buf) + " samples at " + juce::String (sr / 1000.0, 1) + " kHz"
+    line ("Runs", juce::String (buf) + " samples at " + juce::String (sr / 1000.0, 1) + " kHz, a "
+                      + juce::String (1000.0 * buf / sr, 1) + " ms buffer"
                       + (dropouts > 0 ? ", " + juce::String (dropouts) + (dropouts == 1 ? " dropout" : " dropouts") : juce::String()),
           dropouts > 0 ? colours::hot : colours::textDim);
 }

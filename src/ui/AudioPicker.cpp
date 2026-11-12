@@ -202,7 +202,7 @@ void AudioPicker::refresh()
         {
             if (b > 2048) continue;
             bufferSizes.add (b);
-            buffer.addItem (juce::String (1000.0 * b / sr, 1) + " ms  (" + juce::String (b) + " samples)", bufferSizes.size());
+            buffer.addItem (juce::String (b) + " samples  (" + juce::String (1000.0 * b / sr, 1) + " ms)", bufferSizes.size());
         }
         buffer.setSelectedItemIndex (bufferSizes.indexOf (dev->getCurrentBufferSizeSamples()), juce::dontSendNotification);
     }
@@ -282,7 +282,8 @@ void AudioPicker::apply (Change what)
     {
         auto finished = [safe] (AudioSwitch::Result r)
         {
-            if (auto* h = StandaloneHost::get())
+            auto* h = StandaloneHost::get();
+            if (h != nullptr)
             {
                 if (r.ok) h->saveAudioState(); // this is now the connection to keep alive
                 h->setupRunning (false);
@@ -292,7 +293,17 @@ void AudioPicker::apply (Change what)
                 b->setEnabled (true);
             safe->status = r.message;
             if (! r.ok && safe->forced.isNotEmpty())
+            {
+                // the boxes show what runs now, not the driver that failed: the driver box follows
+                // the one Riffhouse went back to (Automatic when nothing is open)
+                const auto back = h != nullptr ? AudioOpen::running (h->deviceManager()) : AudioOpen {};
+                if (h != nullptr && back.type != safe->forced)
+                {
+                    safe->forced = back.valid() ? back.type : juce::String();
+                    h->settings().setValue ("audioDriver", safe->forced);
+                }
                 safe->status << " Pick another input, another driver, or Automatic above: nothing is locked.";
+            }
             if (r.ok && ! r.fastest) safe->status << " The fastest way would not start on this input, so the next one is in use.";
             if (r.ok && safe->followed) safe->status << " Sound now comes out of " << safe->output.getText() << ".";
             if (r.ok && safe->afterNote.isNotEmpty()) safe->status << " " << safe->afterNote;
@@ -355,8 +366,8 @@ void AudioPicker::showExample (bool asio)
         output.addSectionHeading ("Somewhere else (through Windows, a little slower)");
         output.addItem ("Speakers (Realtek(R) Audio)", kOtherOutputs);
         output.setSelectedId (2, juce::dontSendNotification);
-        buffer.addItem ("1.3 ms  (64 samples)", 1);
-        buffer.addItem ("2.7 ms  (128 samples)", 2);
+        buffer.addItem ("64 samples  (1.3 ms)", 1);
+        buffer.addItem ("128 samples  (2.7 ms)", 2);
         buffer.setSelectedId (1, juce::dontSendNotification);
         note = "This is your interface's own driver, the fastest way in. Under Sound out, pick the outputs your headphones or speakers are on.";
         status = "Running: 64 samples at 48.0 kHz, about 4.9 ms from string to ear.";
@@ -366,7 +377,7 @@ void AudioPicker::showExample (bool asio)
         input.addItem ("Microphone (High Definition Audio)", 1);
         output.addItem ("Headphones (High Definition Audio)", 1);
         output.setSelectedItemIndex (0, juce::dontSendNotification);
-        buffer.addItem ("3.0 ms  (144 samples)", 1);
+        buffer.addItem ("144 samples  (3.0 ms)", 1);
         buffer.setSelectedItemIndex (0, juce::dontSendNotification);
         note = "Riffhouse has the sound card to itself, which gives the shortest delay. Other apps are silent while it is open.";
         status = "Running: 144 samples at 48.0 kHz, about 9.3 ms from string to ear.";
@@ -407,7 +418,7 @@ void AudioPicker::paint (juce::Graphics& g)
     g.drawText ("Every change is tried first. If no sound comes through, the last working choice comes back.", r.removeFromTop (22), juce::Justification::centredLeft, true);
     r.removeFromTop (8);
 
-    const char* labels[] = { "Driver", "Guitar in", "Socket", "Sound out", "Delay" };
+    const char* labels[] = { "Driver", "Guitar in", "Socket", "Sound out", "Buffer" };
     juce::ComboBox* boxes[] = { &driver, &input, &socket, &output, &buffer };
     g.setFont (font (14.0f));
     for (int i = 0; i < 5; ++i)

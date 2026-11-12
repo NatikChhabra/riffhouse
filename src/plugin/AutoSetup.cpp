@@ -123,6 +123,23 @@ std::vector<AutoSetup::Candidate> AutoSetup::findCandidates (juce::AudioDeviceMa
             if (i != def && ! isLoopback (names[i]))
                 candidates.push_back ({ "Windows Audio", names[i] });
     }
+    {
+        // Windows' own inputs in the order a guitar is most likely on them: one named for a
+        // guitar or an instrument first (a cable often calls itself "Guitar"), then an audio
+        // interface, then the rest as Windows lists them, and USB microphones and webcams last.
+        auto rank = [] (const Candidate& c)
+        {
+            if (c.type == "ASIO") return 0;
+            const auto n = c.name.toLowerCase();
+            for (auto* w : { "guitar", "instrument", "hi-z", "hiz", "inst " })
+                if (n.contains (w)) return 1;
+            if (! looksLikeOnboardInput (c.name, c.type)) return 2;
+            for (auto* w : { "fifine", "yeti", "webcam", "camera", "hyperx", "quadcast", "razer seiren", "headset", "airpods", "buds", "hands-free", "maono", "boya", "rode nt-usb", "samson" })
+                if (n.contains (w)) return 4;
+            return 3;
+        };
+        std::stable_sort (candidates.begin(), candidates.end(), [&] (const Candidate& x, const Candidate& y) { return rank (x) < rank (y); });
+    }
     if (candidates.empty())
         if (auto* asio = findType (dm, "ASIO")) // only wrappers: still better than nothing
             for (auto& name : asio->getDeviceNames (true))
@@ -623,9 +640,9 @@ void AutoSetup::finish()
     proc.rememberSetup(); // new copies of the plugin in a DAW start from this
     proc.muteOutput.store (false);
     devlog::note ("Setup finished: " + result.deviceType + " / " + result.inputName + " -> " + result.outputName + ", "
-                  + juce::String (result.bufferSize) + " samples at " + juce::String (result.sampleRate, 0) + " Hz, "
+                  + juce::String (result.bufferSize) + " samples at " + juce::String (juce::roundToInt (result.sampleRate)) + " Hz, "
                   + juce::String (result.latencyMs, 1) + " ms, input " + juce::String (result.inputGainDb, 1) + " dB, fix "
-                  + juce::String (result.inputFix ? result.inputFixDb : 0.0f, 1) + " dB, gate " + juce::String (result.gateDb, 0) + " dB");
+                  + juce::String (result.inputFix ? result.inputFixDb : 0.0f, 1) + " dB, gate " + juce::String (juce::roundToInt (result.gateDb)) + " dB");
     setPhase (Phase::finished);
 }
 } // namespace rh
