@@ -327,7 +327,7 @@ details:not([open]) > p { display: none; }
 .h2-when::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 3px solid var(--act); box-sizing: border-box; }
 .h2-when.is-now::before { background: var(--act); }
 .road-list { grid-column: 6 / 13; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-content: start; }
-.road-list li, .feat-list li { display: grid; gap: 10px; align-content: start; padding: 24px; border-radius: var(--r-m); background: var(--well); }
+.road-list li, .feat-list li { display: grid; gap: 12px; align-content: start; padding: 24px; border-radius: var(--r-m); background: var(--well); }
 .feat-list li, .road-list li { min-height: 176px; align-content: end; padding: 28px; }
 .feat-list h3, .road-list h3 { font: 800 clamp(30px, 2.8vw, 40px)/.95 var(--font-display); text-transform: uppercase; }
 .road-list p, .feat-list p, .later-list p, .vow-list p { color: var(--soft); }
@@ -341,14 +341,14 @@ details:not([open]) > p { display: none; }
 .feat-board-say p { color: var(--ash); }
 .board { grid-column: 1 / -1; margin: 0; display: flex; align-items: flex-end; justify-content: space-around; gap: clamp(12px, 2vw, 28px); padding: clamp(20px, 3vw, 44px) clamp(16px, 2vw, 28px); border-radius: var(--r-m); background: var(--panel); }
 .board-zone { display: grid; gap: 12px; justify-items: center; min-width: 0; }
-.board-row { display: flex; align-items: flex-end; gap: clamp(6px, 1vw, 12px); }
+.board-row { display: flex; align-items: flex-end; gap: clamp(8px, 1vw, 12px); }
 .board-row img { flex: none; width: auto; height: clamp(84px, 14vw, 210px); }
 .board-amp .board-row img { height: auto; width: clamp(160px, 24vw, 360px); }
 .board-label { font-size: 14px; font-weight: 500; color: var(--ash); white-space: nowrap; }
 .feat-list { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 
 .later-list { grid-column: 6 / 13; counter-reset: later; display: grid; border-top: 2px solid var(--panel-2); }
-.later-list li { counter-increment: later; display: grid; grid-template-columns: 2.4em 1fr; column-gap: 12px; row-gap: 6px; padding: 30px 0; border-bottom: 2px solid var(--panel-2); }
+.later-list li { counter-increment: later; display: grid; grid-template-columns: 2.4em 1fr; column-gap: 12px; row-gap: 8px; padding: 32px 0; border-bottom: 2px solid var(--panel-2); }
 .later-list li::before { content: counter(later); grid-row: 1 / 3; font: 800 36px/.9 var(--font-display); color: var(--amber); }
 .later-list p { grid-column: 2; }
 
@@ -368,9 +368,10 @@ details:not([open]) > p { display: none; }
 @media (max-width: 699px) {
   .stops { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .stops::before { left: 12px; right: auto; top: 14px; bottom: 14px; width: 4px; height: auto; }
-  .stops a { grid-template-columns: auto 1fr; align-items: baseline; column-gap: 14px; padding: 6px 0 6px 48px; min-height: 56px; }
+  .stops a { grid-template-columns: auto 1fr; align-items: baseline; column-gap: 16px; padding: 8px 0 8px 48px; min-height: 56px; }
   .stops a::before { top: 50%; translate: 0 -50%; }
   .road-list, .feat-list { grid-template-columns: minmax(0, 1fr); }
+  .feat-list li, .road-list li { min-height: 0; padding: 24px; }
   .board { flex-direction: column; align-items: center; }
   .board-zone { flex: none; }
   .board-row img { height: 84px; }
