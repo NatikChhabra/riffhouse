@@ -650,11 +650,14 @@ void testPresets (double sr)
             CHECK (presetFromShareCode (code + " sounds sick right", trailing, e3), "code with words after it: %s", e3.toRawUTF8());
             CHECK (! presetFromShareCode ("visit riffhouse: nothing here", fake, e4) && e4.isNotEmpty(), "junk after the tag must fail");
             // a tone named after an artist carries the style line, and still pastes back
-            auto named = p;
+            // (whichever tone the folder lists first, so both cases are built here)
+            auto plain = p;
+            plain.name = "My Clean Tone"; plain.band = {}; plain.inspiredBy = {};
+            auto named = plain;
             named.name = "Inspired by Someone: A Song";
             const auto namedMessage = presetToShareMessage (named);
             Preset viaNamed; juce::String e5;
-            CHECK (namedMessage.contains ("Not affiliated with the artist.") && ! message.contains ("Not affiliated")
+            CHECK (namedMessage.contains ("Not affiliated with the artist.") && ! presetToShareMessage (plain).contains ("Not affiliated")
                        && presetFromShareCode (namedMessage, viaNamed, e5) && viaNamed.name == named.name,
                    "artist share message: %s", e5.toRawUTF8());
         }
