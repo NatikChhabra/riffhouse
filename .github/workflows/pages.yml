@@ -1,7 +1,7 @@
 name: Website
 
 # Publishes the site/ folder to GitHub Pages. Nothing is built: the folder is served as it is, with one version stamp added,
-# plus the RSS feeds in site/feeds/ that the Riff House Discord reads (releases, beta builds, dev log, weekly tone, riff challenge).
+# plus the RSS feeds in site/feeds/ that the Riff House Discord reads (releases, beta builds, dev log, tone of the week).
 on:
   push:
     branches: [main]
@@ -11,7 +11,7 @@ on:
       - 'tools/community/**'
       - '.github/workflows/pages.yml'
   schedule:
-    # Mondays 09:05 UTC: the new tone of the week and riff challenge go out.
+    # Mondays 09:05 UTC: the new tone of the week goes out.
     - cron: '5 9 * * 1'
     # Every day, so the dev log picks up changes that did not touch the site.
     - cron: '30 15 * * *'
