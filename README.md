@@ -8,7 +8,7 @@ Plug your guitar into whatever you have, an audio interface or the mic jack on a
 
 ### [Download for Windows](https://github.com/NatikChhabra/riffhouse/releases/latest)
 
-More on the [website](https://natikchhabra.github.io/riffhouse/), or go straight to [help and fixes](docs/TROUBLESHOOTING.md) and [what changed](CHANGELOG.md).
+More on the [website](https://natikchhabra.github.io/riffhouse/), or go straight to [help and fixes](docs/TROUBLESHOOTING.md), [what changed](CHANGELOG.md) and the [roadmap](ROADMAP.md).
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
@@ -94,7 +94,7 @@ The looper is for your own playing: press <kbd>O</kbd>, play a rhythm part, pres
 
 ## What we measure
 
-Every change runs more than 5,900 automatic checks on the sound engine before it ships.
+Every change runs more than 6,900 automatic checks on the sound engine before it ships.
 
 | | |
 |---|---|
@@ -102,18 +102,13 @@ Every change runs more than 5,900 automatic checks on the sound engine before it
 | Amp oversampling | 8x below 64 kHz, 4x above |
 | Aliasing on a hot amp | 42.9 dB below the wanted harmonics |
 | Everything switched on | about 8x faster than real time on one core of a build server |
-| Loudness across all 188 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
+| Loudness across all 189 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
 
 ## What comes next
 
-In this order:
+The next big update, 0.2.0, brings a real pedalboard (any pedal, in any order, two of the same), scenes you switch while you play, a Mic button that sends guitar and voice into any call, Share clip for the last 30 seconds you played, a second amp, drums, a daily practice goal and Hindi. Smaller updates before it fix what players report and lay its groundwork.
 
-1. Tones for the songs players asked for first, each one showing the band and the song it is for.
-2. Amps and cabinets modelled in 3D, the way the pedals already are.
-3. More pedals.
-4. Inputs beyond 1 and 2 on large interfaces.
-5. Crash reports, off unless you switch them on.
-6. A macOS build.
+The whole plan is in the [roadmap](ROADMAP.md) and on the [roadmap page](https://natikchhabra.github.io/riffhouse/roadmap.html). Things only get added to it, never pushed to a later version.
 
 Missing something? [Say so](https://github.com/NatikChhabra/riffhouse/issues/new). If something is broken, **Report a problem** in Settings fills in the details for you.
 
