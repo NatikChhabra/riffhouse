@@ -258,6 +258,7 @@ button.btn { border: 0; cursor: pointer; }
 .tone-d { color: var(--ash); font-size: var(--t-small); }
 .count { color: var(--ash); font-size: var(--t-small); }
 .finder-foot { display: flex; align-items: center; gap: 24px; }
+.finder-note { margin-top: 20px; font-size: var(--t-small); color: var(--soft); max-width: 40em; }
 button.more { border: 0; padding: 0; background: none; cursor: pointer; text-decoration: underline; text-underline-offset: .2em; }
 .found { display: none; }
 @media (hover: hover) and (pointer: fine) {
@@ -342,7 +343,7 @@ details:not([open]) > p { display: none; }
 .upi-id .actions { margin-top: 16px; }
 .upi-said { min-height: 1.6em; }
 .upi-open { display: none; }
-@media (pointer: coarse) { .upi-open { display: inline-flex; } }
+@media (pointer: coarse) { .upi-open { display: inline-flex; } .upi-id { order: -1; } } /* a phone cannot scan its own screen, so the button comes first */
 
 .close { padding-bottom: 48px; overflow: clip; }
 .monument { font-size: calc((100vw - 2 * var(--g)) / 3.76); line-height: .8; padding: .1em var(--g) 0; white-space: nowrap; text-align: center; }
