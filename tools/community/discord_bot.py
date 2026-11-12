@@ -10,7 +10,8 @@ Each run it:
   2. Answers common questions in the #help and #bug-reports forums when a new post
      clearly matches one (sound, delay, crackles, ASIO, install warning, ...), with the fix
      and a link to the full help page. Posts it can't match are left for a person.
-  3. Writes a log to #bot-log: who joined or left, new forum posts, and moderation
+  3. Closes forum posts tagged Solved, Fixed or Done after a quiet day.
+  4. Writes a log to #bot-log: who joined or left, new forum posts, and moderation
      (bans, kicks, timeouts, AutoMod) from the audit log.
 
 All state lives in Discord itself: what was already posted is read back from the
@@ -378,6 +379,29 @@ def answer_forums(threads: list[dict], log: list[str]):
         log.append(f"Answered <#{th['id']}> with the **{f['key']}** fix")
 
 
+# ---------------------------------------------------------------- 2b. tidy up
+
+DONE_TAGS = {"solved", "fixed", "done"}
+
+
+def close_finished(threads: list[dict], log: list[str]):
+    """Posts tagged Solved, Fixed or Done close themselves after a quiet day. Anyone can reopen by replying."""
+    done = {}
+    for forum in {t.get("parent_id") for t in threads} & set(FORUMS):
+        for tag in call("GET", f"/channels/{forum}").get("available_tags", []):
+            if tag["name"].lower() in DONE_TAGS:
+                done[tag["id"]] = tag["name"]
+    now = dt.datetime.now(dt.timezone.utc)
+    for th in threads:
+        if not set(th.get("applied_tags", [])) & set(done):
+            continue
+        last = th.get("last_message_id") or th["id"]
+        if now - snowflake_time(last) < dt.timedelta(days=1):
+            continue
+        call("PATCH", f"/channels/{th['id']}", {"archived": True}, reason="Marked done and quiet for a day")
+        log.append(f"Closed <#{th['id']}> (marked done, quiet for a day)")
+
+
 # ---------------------------------------------------------------- 3. log
 
 AUDIT = {20: "kicked", 22: "banned", 23: "unbanned", 72: "message deleted by a mod", 143: "AutoMod blocked a message",
@@ -468,7 +492,7 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: answer_forums(threads, log)):
+    for step in (lambda: post_feeds(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log)):
         try:
             step()
         except Exception as e:  # one broken part must not stop the others
