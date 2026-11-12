@@ -131,9 +131,10 @@ export function mount(canvas, opt = {}) {
   const quadScene = new THREE.Scene(); quadScene.add(quad);
   const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const page = new THREE.Mesh(new THREE.PlaneGeometry(SH * 2, SH * 2), new THREE.ShaderMaterial({
-    uniforms: { map: { value: rtA.texture }, strength: { value: 0.3 }, tint: { value: new THREE.Color(0x2b1200) } },
+    uniforms: { map: { value: rtA.texture }, strength: { value: 0.3 }, tint: { value: new THREE.Color(0x2b1200) }, frame: { value: new THREE.Vector2(1, 1) } },
     vertexShader: 'varying vec2 v; void main(){ v = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-    fragmentShader: 'uniform sampler2D map; uniform float strength; uniform vec3 tint; varying vec2 v; void main(){ vec2 e = smoothstep(0., .12, v) * smoothstep(0., .12, 1. - v); gl_FragColor = vec4(tint, texture2D(map, v).a * strength * e.x * e.y); }',
+    /* the shade dies away before the edge of the canvas, so the canvas never shows as a box on the page */
+    fragmentShader: 'uniform sampler2D map; uniform float strength; uniform vec3 tint; uniform vec2 frame; varying vec2 v; void main(){ vec2 s = gl_FragCoord.xy / frame; vec2 e = smoothstep(0., .2, s) * smoothstep(0., .2, 1. - s); gl_FragColor = vec4(tint, texture2D(map, v).a * strength * e.x * e.y); }',
     transparent: true, depthWrite: false, toneMapped: false,
   }));
   page.position.z = -2.2;
@@ -248,6 +249,7 @@ export function mount(canvas, opt = {}) {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
+    renderer.getDrawingBufferSize(page.material.uniforms.frame.value);
     camera.aspect = w / h;
     /* The canvas is one and a half times as tall as the button and sits right of and below its centre
        (styles.css, .pedal-live), so the camera frames 1.5 pedal heights and stands off by the same shift. */
@@ -278,9 +280,9 @@ export function mount(canvas, opt = {}) {
     lens.material.emissiveIntensity = 0.06 + now.on * 1.5;
     glow.intensity = now.on * 1.1; halo.material.opacity = now.on * 0.5;
     const lift = 1 - now.down * 0.45;
-    page.position.x = 1.25 * lift + now.tx * -0.3; page.position.y = -1.55 * lift + now.ty * 0.3;
+    page.position.x = 1.1 * lift + now.tx * -0.3; page.position.y = -1.3 * lift + now.ty * 0.3;
     page.material.uniforms.strength.value = 0.34 * (1 + now.down * 0.25) * (1 - now.scroll * 0.6);
-    throwShade(3.2 * lift);
+    throwShade(2.8 * lift);
     renderer.render(scene, camera);
     if (!drew) { drew = true; canvas.dispatchEvent(new Event('pedal-live')); }
   }
