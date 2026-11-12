@@ -11,7 +11,10 @@ Each run it:
      clearly matches one (sound, delay, crackles, ASIO, install warning, ...), with the fix
      and a link to the full help page. Posts it can't match are left for a person.
   3. Closes forum posts tagged Solved, Fixed or Done after a quiet day.
-  4. Writes a log to #bot-log: who joined or left, new forum posts, and moderation
+  4. Keeps chat channels on purpose: a setup question in #general gets the fix and a pointer to
+     #help, an idea gets pointed to #ideas (once a day per person, only if nobody answered in 10 min).
+  5. Flags help and bug posts nobody answered within an hour at the top of the log (URGENT for crashes).
+  6. Writes a log to #bot-log: who joined or left, new forum posts, and moderation
      (bans, kicks, timeouts, AutoMod) from the audit log.
 
 All state lives in Discord itself: what was already posted is read back from the
@@ -51,6 +54,10 @@ CH = {
     "beta-feedback": "1570507034372219052",
     "tone-lab": "1570506784672710766",
     "bot-log": "1570506931154591755",
+    "general": "1570500604445458526",
+    "gear-talk": "1570506861869015161",
+    "off-topic": "1570506873050890350",
+    "showcase": "1570506850963816468",
 }
 ROLE = {"release-pings": "1570506134857711637", "beta-tester": "1570505782259089549"}
 FORUMS = {CH[k]: k for k in ("help", "bug-reports", "ideas", "beta-feedback", "tone-lab")}
@@ -405,6 +412,79 @@ def close_finished(threads: list[dict], log: list[str]):
         log.append(f"Closed <#{th['id']}> (marked done, quiet for a day)")
 
 
+# ---------------------------------------------------------------- 2c. keep channels on purpose, triage
+
+CHAT = ("general", "gear-talk", "off-topic", "showcase")
+TROUBLE = re.compile(r"\b(help|problem|issue|not working|doesn'?t work|won'?t|can'?t|cannot|error|fix|stuck|bug|broken)\b")
+APP = re.compile(r"\b(riff ?house|the app|app|setup|asio|latency|driver|input|interface|installer|update)\b")
+IDEA = re.compile(r"\b(please add|can you add|could you add|would be (cool|nice|great|sick)|feature request|suggestion|wish it had|you should add|add (a|an|the) \w+ (amp|pedal|cab))\b")
+NUDGED_FOOTER = "Riff House nudge"
+
+
+def recent_nudges(channel: str) -> set[str]:
+    """Users the bot already pointed somewhere in this channel in the last day (one nudge a day, no nagging)."""
+    out, now = set(), dt.datetime.now(dt.timezone.utc)
+    for m in my_messages(channel, 100):
+        if now - snowflake_time(m["id"]) < dt.timedelta(days=1):
+            out.update(u["id"] for u in m.get("mentions", []))
+    return out
+
+
+def keep_on_purpose(cursor: str | None, log: list[str]):
+    """A help question in chat gets the fix (when known) and a pointer to #help; an idea gets pointed to #ideas.
+    Only after 10 quiet minutes with no reply from anyone else, so it never talks over people."""
+    now = dt.datetime.now(dt.timezone.utc)
+    since = snowflake_time(cursor) - dt.timedelta(minutes=15) if cursor else now - dt.timedelta(hours=1)
+    for name in CHAT:
+        chan = CH[name]
+        msgs = call("GET", f"/channels/{chan}/messages?limit=100")
+        nudged = recent_nudges(chan)
+        for m in msgs:
+            t = snowflake_time(m["id"])
+            if m["author"].get("bot") or t < since or now - t < dt.timedelta(minutes=10):
+                continue
+            uid, text = m["author"]["id"], (m.get("content") or "").lower()
+            if uid in nudged or len(text) < 12:
+                continue
+            answered = any(o["author"]["id"] != uid and not o["author"].get("bot") and snowflake_time(o["id"]) > t
+                           and (o.get("message_reference") or {}).get("message_id") == m["id"] for o in msgs)
+            if answered:
+                continue
+            ref = {"message_id": m["id"], "fail_if_not_exists": False}
+            if IDEA.search(text):
+                body = f"<@{uid}> nice one, drop it in <#{CH['ideas']}> as its own post so people can vote on it. The most voted ones get built first."
+            elif "?" in text and TROUBLE.search(text) and APP.search(text):
+                f = faq_for(text)
+                fix = (f["text"] + "\n\n") if f else ""
+                body = (f"<@{uid}> {fix}If that doesn't do it, make a post in <#{CH['help']}> with your Riff House version and what your guitar plugs into. "
+                        "Stuff there doesn't get buried and it helps the next person too.")
+            else:
+                continue
+            call("POST", f"/channels/{chan}/messages", {"content": body[:2000], "message_reference": ref,
+                                                         "allowed_mentions": {"users": [uid], "replied_user": False}})
+            nudged.add(uid)
+            log.append(f"Pointed <@{uid}> from <#{chan}> to {'#ideas' if IDEA.search(text) else '#help'}")
+
+
+def triage(threads: list[dict], cursor: str | None, log: list[str]):
+    """Puts what needs a person at the top of the log: help and bug posts with no human answer after an hour."""
+    if not cursor:
+        return
+    now = dt.datetime.now(dt.timezone.utc)
+    last = snowflake_time(cursor)
+    for th in threads:
+        if th.get("parent_id") not in (CH["help"], CH["bug-reports"], CH["beta-feedback"]):
+            continue
+        due = snowflake_time(th["id"]) + dt.timedelta(hours=1)
+        if not (last - dt.timedelta(minutes=1) < due <= now):  # flag each post once, when it crosses the hour
+            continue
+        msgs = call("GET", f"/channels/{th['id']}/messages?limit=50")
+        if any(not m["author"].get("bot") and m["author"]["id"] != th.get("owner_id") for m in msgs):
+            continue
+        urgent = re.search(r"crash|froze|freez|won'?t (open|start)|lost|deleted|install", (th["name"] + " ".join(m.get("content", "") for m in msgs)).lower())
+        log.insert(0, f"{'URGENT ' if urgent else ''}Needs a reply: <#{th['id']}> in <#{th['parent_id']}>, waiting over an hour")
+
+
 # ---------------------------------------------------------------- 3. log
 
 AUDIT = {20: "kicked", 22: "banned", 23: "unbanned", 72: "message deleted by a mod", 143: "AutoMod blocked a message",
@@ -495,7 +575,8 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log)):
+    for step in (lambda: post_feeds(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
+                 lambda: keep_on_purpose(cursor, log), lambda: triage(threads, cursor, log)):
         try:
             step()
         except Exception as e:  # one broken part must not stop the others
