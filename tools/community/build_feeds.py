@@ -10,6 +10,13 @@ server watches each one and posts every new item into its channel:
   tone-of-the-week.xml  one preset picked each week  -> #tone-of-the-week
   riff-challenge.xml    one riff prompt each Monday  -> #riff-challenge
 
+The free feed bot follows at most three feeds, so it reads three combined ones and
+routes items by their <category> (one connection per channel, filtered on category):
+
+  builds.xml   releases.xml + beta.xml      categories: release, beta
+  devlog.xml                                category: devlog
+  weekly.xml   tone-of-the-week + challenge categories: tone, challenge
+
 Nothing here needs a secret. Release and commit data come from the public
 GitHub API (GITHUB_TOKEN is used when present, only to avoid rate limits).
 The weekly picks are worked out from the week number, so every run gives the
@@ -94,6 +101,7 @@ def write_feed(path: Path, title: str, link: str, about: str, items: list[dict])
             f"<link>{escape(it['link'])}</link>",
             f'<guid isPermaLink="false">{escape(it["guid"])}</guid>',
             f"<pubDate>{rfc822(it['when'])}</pubDate>",
+            f"<category>{escape(it['category'])}</category>",
             f"<description>{escape(it['text'])}</description>",
             "</item>",
         ]
@@ -118,6 +126,7 @@ def release_items(prerelease: bool) -> list[dict]:
             title = f"Riff House {tag} is out"
             text = f"{notes}\n\nThe app updates itself. New here? Download: {SITE}"
         items.append({
+            "category": "beta" if prerelease else "release",
             "title": title,
             "link": r["html_url"],
             "guid": f"release-{tag}",
@@ -139,6 +148,7 @@ def devlog_items() -> list[dict]:
             if not re.match(r"^(Co-Authored-By|Signed-off-by|Claude-Session):", l, re.I)
         ).strip()
         items.append({
+            "category": "devlog",
             "title": first[:200],
             "link": c["html_url"],
             "guid": f"commit-{c['sha']}",
@@ -211,6 +221,7 @@ def tone_items(today: dt.date) -> list[dict]:
             "Tweak it, then share your version in #tone-lab. Reply here with a clip if you play something with it."
         )
         items.append({
+            "category": "tone",
             "title": f"Tone of the week: {p['name']}",
             "link": f"https://github.com/{REPO}/blob/main/presets/{p['file']}",
             "guid": f"tone-week-{w}",
@@ -231,6 +242,7 @@ def challenge_items(today: dt.date) -> list[dict]:
             "React to the takes you like. New prompt next Monday."
         )
         items.append({
+            "category": "challenge",
             "title": f"Riff challenge, week {w + 1}: {c['title']}",
             "link": SITE,
             "guid": f"riff-week-{w}",
@@ -240,28 +252,37 @@ def challenge_items(today: dt.date) -> list[dict]:
     return items
 
 
+def newest_first(*groups: list[dict]) -> list[dict]:
+    return sorted((it for g in groups for it in g), key=lambda it: it["when"], reverse=True)
+
+
 def main() -> int:
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "site/feeds")
     out.mkdir(parents=True, exist_ok=True)
     today = dt.datetime.now(dt.timezone.utc).date()
+    gh = f"https://github.com/{REPO}"
 
+    tones, challenges = tone_items(today), challenge_items(today)
     write_feed(out / "tone-of-the-week.xml", "Riff House tone of the week", SITE,
-               "One Riff House preset picked every Monday.", tone_items(today))
+               "One Riff House preset picked every Monday.", tones)
     write_feed(out / "riff-challenge.xml", "Riff House riff challenge", SITE,
-               "A new riff prompt every Monday.", challenge_items(today))
+               "A new riff prompt every Monday.", challenges)
+    write_feed(out / "weekly.xml", "Riff House weekly", SITE,
+               "Tone of the week and the riff challenge, every Monday.", newest_first(tones, challenges))
 
-    # GitHub data. If the API is down, keep going: the weekly feeds above still publish.
-    for name, title, about, build in (
-        ("releases.xml", "Riff House releases", "New Riff House versions.", lambda: release_items(False)),
-        ("beta.xml", "Riff House beta builds", "Test builds before they ship.", lambda: release_items(True)),
-        ("devlog.xml", "Riff House dev log", "What changed in Riff House this week.", devlog_items),
-    ):
-        try:
-            items = build()
-        except Exception as e:  # noqa: BLE001 - report and carry on
-            print(f"warning: {name}: {e}", file=sys.stderr)
-            continue
-        write_feed(out / name, title, f"https://github.com/{REPO}", about, items)
+    # GitHub data. If the API is down, keep the old files out of the way and carry on:
+    # the weekly feeds above still publish.
+    try:
+        stable, beta = release_items(False), release_items(True)
+        write_feed(out / "releases.xml", "Riff House releases", gh, "New Riff House versions.", stable)
+        write_feed(out / "beta.xml", "Riff House beta builds", gh, "Test builds before they ship.", beta)
+        write_feed(out / "builds.xml", "Riff House builds", gh, "New versions and beta builds.", newest_first(stable, beta))
+    except Exception as e:  # noqa: BLE001 - report and carry on
+        print(f"warning: releases: {e}", file=sys.stderr)
+    try:
+        write_feed(out / "devlog.xml", "Riff House dev log", gh, "What changed in Riff House.", devlog_items())
+    except Exception as e:  # noqa: BLE001
+        print(f"warning: devlog: {e}", file=sys.stderr)
 
     for f in sorted(out.glob("*.xml")):
         print(f"{f.name}: {f.read_text(encoding='utf-8').count('<item>')} items")
