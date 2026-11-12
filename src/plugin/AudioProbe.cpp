@@ -51,11 +51,11 @@ bool AudioProbe::start (const juce::StringArray& command, double timeoutMs, std:
     timeout = timeoutMs;
     if (! child->start (command, juce::ChildProcess::wantStdOut))
     {
+        // said by the timer on the next turn of the message loop, as if it had run, so that
+        // cancel() and the destructor can still take it back
         child.reset();
-        auto finished = std::move (onDone);
-        onDone = nullptr;
-        // said on the next turn of the message loop, as if it had run
-        juce::MessageManager::callAsync ([finished] { if (finished) finished ({ Outcome::couldNotStart, "The check could not be started", 0 }); });
+        startFailed = true;
+        startTimer (1);
         return false;
     }
     startTimer (100);
@@ -65,6 +65,7 @@ bool AudioProbe::start (const juce::StringArray& command, double timeoutMs, std:
 void AudioProbe::cancel()
 {
     stopTimer();
+    startFailed = false;
     if (child != nullptr)
     {
         if (child->isRunning()) child->kill();
@@ -74,6 +75,15 @@ void AudioProbe::cancel()
 
 void AudioProbe::poll()
 {
+    if (startFailed)
+    {
+        stopTimer();
+        startFailed = false;
+        auto finished = std::move (onDone);
+        onDone = nullptr;
+        if (finished) finished ({ Outcome::couldNotStart, "The check could not be started", 0 });
+        return;
+    }
     if (child == nullptr) { stopTimer(); return; }
     const double ms = nowMs() - began;
     Result r;
@@ -134,12 +144,21 @@ int AudioProbe::run (const juce::StringArray& args)
     std::unique_ptr<juce::AudioIODevice> dev (t->createDevice (both || t->getDeviceNames (false).contains (name) ? name : juce::String(), name));
     if (dev == nullptr) return say ("failed The driver would not load", 2);
 
+    // 48 kHz first, as the app asks; if that fails, the rate the driver says it is held at (by
+    // its own panel, say), as the app also tries, so a driver held at 44.1 kHz still passes
     const auto rates = dev->getAvailableSampleRates();
-    const double rate = rates.contains (48000.0) ? 48000.0 : (rates.isEmpty() ? 0.0 : rates[0]);
+    const double first = rates.contains (48000.0) ? 48000.0 : (rates.isEmpty() ? 0.0 : rates[0]);
     juce::BigInteger ins, outs;
     ins.setRange (0, std::min (2, std::max (1, dev->getInputChannelNames().size())), true);
     outs.setRange (0, std::min (2, std::max (1, dev->getOutputChannelNames().size())), true);
-    const auto err = dev->open (ins, outs, rate, 0);
+    auto err = dev->open (ins, outs, first, 0);
+    if (err.isNotEmpty())
+    {
+        const double held = dev->getCurrentSampleRate();
+        dev->close();
+        if (held > 0.0 && std::abs (held - first) > 1.0)
+            err = dev->open (ins, outs, held, 0);
+    }
     if (err.isNotEmpty()) return say ("failed " + err.trim().upToFirstOccurrenceOf ("\n", false, false), 2);
 
     Counter counter;

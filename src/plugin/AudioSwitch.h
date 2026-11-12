@@ -87,6 +87,5 @@ private:
     bool tryOpened = false;
     // an ASIO driver is first started in a test run outside the app (AudioProbe)
     AudioProbe probe;
-    bool probing = false;
 };
 } // namespace rh

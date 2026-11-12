@@ -55,5 +55,6 @@ private:
     std::unique_ptr<juce::ChildProcess> child;
     std::function<void (Result)> onDone;
     double began = 0, timeout = 0;
+    bool startFailed = false;
 };
 } // namespace rh

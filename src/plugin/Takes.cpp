@@ -48,7 +48,7 @@ std::vector<Take> listTakes (const juce::File& folder)
     // it is a copy of a WAV beside it
     auto files = folder.findChildFiles (juce::File::findFiles, false, "*.wav;*.flac;*.mp3;*.ogg;*.oga;*.aif;*.aiff;*.mpeg;*.mpga;*.mp2;*.m4a;*.aac;*.wma");
     for (int i = files.size(); --i >= 0;)
-        if (! files[i].hasFileExtension ("wav") && files[i].getSiblingFile (files[i].getFileNameWithoutExtension()).withFileExtension ("wav").existsAsFile())
+        if (! files[i].hasFileExtension ("wav") && files[i].withFileExtension ("wav").existsAsFile())
             files.remove (i);
     for (const auto& f : files)
     {

@@ -2005,6 +2005,12 @@ void testTakes()
         // a copy of a take beside it (the same name, another kind of file) is not a second take
         sent.copyFileTo (wetFile.withFileExtension ("flac"));
         CHECK ((int) listTakes (dir).size() == before + 1, "a copy beside a WAV take is not listed twice");
+        // "riff.mp3.mpeg" is not a copy of an own take called "riff.wav"
+        const auto own = dir.getChildFile ("Friend riff.wav");
+        writeWav (own, renderWith (v1, di, sr, 512), sr);
+        CHECK ((int) listTakes (dir).size() == before + 2, "a sent file stays listed beside an own take with a similar name (%d of %d)",
+               (int) listTakes (dir).size(), before + 2);
+        own.deleteFile();
     }
     dir.deleteRecursively();
 }

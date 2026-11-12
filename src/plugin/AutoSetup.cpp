@@ -123,12 +123,15 @@ std::vector<AutoSetup::Candidate> AutoSetup::findCandidates (juce::AudioDeviceMa
         auto* wasapi = findType (dm, "Windows Audio");
         const auto outs = wasapi != nullptr ? wasapi->getDeviceNames (false) : juce::StringArray();
         const int def = wasapi != nullptr ? wasapi->getDefaultDeviceIndex (false) : -1;
+        // Realtek ASIO drives the computer's own sound chip, never a USB device with Realtek inside
         const bool listensOnRealtek = juce::isPositiveAndBelow (def, outs.size()) && outs[def].containsIgnoreCase ("realtek")
-                                      && ! DeviceGuard::looksLikeScreen (outs[def]);
+                                      && ! outs[def].containsIgnoreCase ("usb") && ! DeviceGuard::looksLikeScreen (outs[def]);
         bool guitarOnRealtek = false;
         if (wasapi != nullptr)
             for (const auto& in : wasapi->getDeviceNames (true))
-                guitarOnRealtek = guitarOnRealtek || (in.containsIgnoreCase ("realtek") && ! in.containsIgnoreCase ("stereo mix"));
+                // a socket a cable goes into: not a laptop's built-in mic array or the "what you hear" loopback
+                guitarOnRealtek = guitarOnRealtek || (in.containsIgnoreCase ("realtek") && ! in.containsIgnoreCase ("usb")
+                                                      && ! in.containsIgnoreCase ("stereo mix") && ! in.containsIgnoreCase ("array"));
         for (auto& name : asio->getDeviceNames (true))
             if (name.containsIgnoreCase ("realtek asio") && listensOnRealtek && guitarOnRealtek)
                 candidates.push_back ({ "ASIO", name });
@@ -193,6 +196,7 @@ void AutoSetup::buildCandidates()
 void AutoSetup::start (const Input* only)
 {
     stopTimer();
+    probe.cancel(); // a test run from an earlier start must not steer this one
     original = AudioOpen::running (dm);
     devlog::note ("Setup started" + (only != nullptr ? " on " + only->type + " / " + only->name : juce::String (", finding the input")));
     result = {};
@@ -247,7 +251,7 @@ void AutoSetup::checkNextDriver()
         probe.start (AudioProbe::commandFor ("ASIO", name), AudioProbe::kTimeoutMs, [this, name] (AudioProbe::Result r)
         {
             devlog::note (AudioProbe::describe (r, name));
-            AudioProbe::remember (name, r.ok());
+            if (r.outcome != AudioProbe::Outcome::couldNotStart) AudioProbe::remember (name, r.ok());
             if (! r.ok())
             {
                 for (size_t i = 0; i < candidates.size(); ++i)
@@ -271,6 +275,7 @@ void AutoSetup::checkNextDriver()
         return;
     }
     // every driver left has played in a test run: listen
+    if (candidates.empty()) return;
     openCandidate (candidates[0]);
     startTimerHz (25);
 }

@@ -19,7 +19,7 @@ namespace
     // the folder after "Users" or "home" in a path is the person's name
     juce::String scrubUserFolders (juce::String t)
     {
-        for (auto* marker : { "\\Users\\", "/Users/", "/home/", "\\users\\" })
+        for (auto* marker : { "\\Users\\", "/Users/", "/home/" }) // found ignoring case
         {
             const juce::String m (marker);
             const auto sep = m.getLastCharacter();
@@ -48,18 +48,23 @@ namespace
         std::string s = text.replace (juce::String::fromUTF8 ("\xe2\x80\x99"), "'").toStdString();
         static const std::regex email (R"([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})");
         s = std::regex_replace (s, email, "<email>");
-        static const std::regex owner (R"(\b([A-Za-z][A-Za-z0-9_-]*)'s\b)");
-        std::string out;
-        auto last = s.cbegin();
-        for (std::sregex_iterator it (s.cbegin(), s.cend(), owner), end; it != end; ++it)
+        auto t = juce::String::fromUTF8 (s.c_str());
+        // the word before 's, in any alphabet: "Zoë's" and "José's" go as surely as "Asha's"
+        auto partOfName = [] (juce::juce_wchar c) { return c > 127 || juce::CharacterFunctions::isLetterOrDigit (c) || c == '-' || c == '_'; };
+        juce::String out;
+        int from = 0;
+        for (int at = t.indexOf ("'s"); at >= 0; at = t.indexOf (at + 2, "'s"))
         {
-            const auto& m = *it;
-            out.append (last, m[0].first);
-            out += ordinary.contains (juce::String (m[1].str()), true) ? m[0].str() : std::string ("<you>'s");
-            last = m[0].second;
+            if (at + 2 < t.length() && partOfName (t[at + 2])) continue; // "'sound": not an owner
+            int begin = at;
+            while (begin > from && partOfName (t[begin - 1])) --begin;
+            const auto word = t.substring (begin, at);
+            if (word.isEmpty() || juce::CharacterFunctions::isDigit (word[0]) || ordinary.contains (word, true)) continue;
+            out << t.substring (from, begin) << "<you>";
+            from = at;
         }
-        out.append (last, s.cend());
-        return juce::String::fromUTF8 (out.c_str());
+        out << t.substring (from);
+        return out;
     }
 
     juce::String post (const juce::String& json)

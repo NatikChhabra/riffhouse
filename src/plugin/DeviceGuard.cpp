@@ -31,9 +31,9 @@ bool DeviceGuard::looksLikeBluetooth (const juce::String& name)
     for (auto* w : { "bluetooth", "airpods", "hands-free", "handsfree", "buds", "wh-1000", "wf-1000", "bose qc", "quietcomfort",
                      "jbl tune", "jbl live", "soundcore", "beats ", "powerbeats", "freebuds", "earbuds", "jabra", " a2dp", "bt audio",
                      // speakers and earphones sold mostly as Bluetooth, and the " Stereo" Windows adds to them
-                     "rockerz", "airdopes", "boat ", "jbl flip", "jbl charge", "jbl go", "jbl clip", "srs-", "marshall", "tribit",
+                     "rockerz", "airdopes", "boat ", "jbl flip", "jbl charge", "jbl go", "jbl clip", "srs-", "marshall major", "marshall motif", "marshall minor", "emberton", "stanmore", "acton ii", "acton iii", "woburn", "middleton", "tribit",
                      "zebronics", "mivi", "galaxy buds", "oneplus buds", "realme buds", "noise buds", " stereo)" })
-        if (n.contains (w)) return true;
+        if (n.contains (w) && ! (juce::String (w) == " stereo)" && n.contains ("usb"))) return true; // a USB device is wired
     return false;
 }
 
@@ -42,7 +42,7 @@ bool DeviceGuard::looksLikeScreen (const juce::String& name)
     // a TV or monitor over HDMI or DisplayPort: the screen holds the sound back to match its picture
     const auto n = name.toLowerCase();
     for (auto* w : { "hdmi", "displayport", "display audio", " tv ", " tv)", "- tv", "tv (", "nvidia high definition audio",
-                     "amd high definition audio", "intel(r) display", "lg tv", "samsung", "sony tv", "mi tv", "bravia", "android tv" })
+                     "amd high definition audio", "intel(r) display", "lg tv", "samsung tv", "samsung smart tv", "[tv] samsung", "sony tv", "mi tv", "bravia", "android tv" })
         if (n.contains (w)) return true;
     return false;
 }

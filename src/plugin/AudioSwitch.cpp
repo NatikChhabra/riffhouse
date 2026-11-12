@@ -140,14 +140,12 @@ void AudioSwitch::tryNext()
         {
             // A test run outside the app first: an ASIO driver that takes seconds to fail, or
             // hangs, must not freeze the window. The driver needs the sound devices free for it.
-            probing = true;
             dm.closeAudioDevice();
             devlog::note ("Testing " + want.input + " in a test run first");
             probe.start (AudioProbe::commandFor (type, want.input), AudioProbe::kTimeoutMs, [this] (AudioProbe::Result r)
             {
-                probing = false;
                 devlog::note (AudioProbe::describe (r, want.input));
-                AudioProbe::remember (want.input, r.ok());
+                if (r.outcome != AudioProbe::Outcome::couldNotStart) AudioProbe::remember (want.input, r.ok());
                 if (! r.ok())
                 {
                     // one try per driver: it is not opened in the app at any rate

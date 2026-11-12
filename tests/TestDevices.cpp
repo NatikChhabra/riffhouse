@@ -7,6 +7,7 @@
 // is made up: it can refuse to open, open and stay silent, vanish and come back. What is
 // counted is how often the guard touches it.
 
+#include "engine/DeviceNames.h"
 #include "plugin/AudioOpen.h"
 #include "plugin/AudioProbe.h"
 #include "plugin/Reports.h"
@@ -460,6 +461,18 @@ void runDeviceChecks (int& checks, int& failures)
             probe.cancel();
             CHECK (! probe.busy() && ! called, "cancelling stops it and says nothing");
         }
+        {
+            // a program that cannot be started: the answer comes later, and cancel still takes it back
+            const juce::StringArray missing { "/no/such/riffhouse-probe-program" };
+            auto [calledMissing, none] = runProbe (missing, 10000.0);
+            CHECK (calledMissing && ! none.ok(), "a test run that cannot start says so, once");
+            AudioProbe probe;
+            bool called = false;
+            probe.start (missing, 10000.0, [&] (AudioProbe::Result) { called = true; });
+            probe.cancel();
+            for (int i = 0; i < 20; ++i) { juce::Thread::sleep (10); probe.poll(); }
+            CHECK (! called, "and once cancelled it says nothing, even when it could not start");
+        }
         CHECK (AudioProbe::isProbeCommandLine ("--probe-audio ASIO \"ASIO4ALL v2\"") && ! AudioProbe::isProbeCommandLine ("--snapshots out"),
                "the app knows when it was started only to test a driver");
         CHECK (AudioProbe::commandFor ("ASIO", "ASIO4ALL v2").joinIntoString ("|").endsWith ("|--probe-audio|ASIO|ASIO4ALL v2"),
@@ -506,6 +519,11 @@ void runDeviceChecks (int& checks, int& failures)
                "a name in a device name is taken out: %s", devices.toRawUTF8());
         CHECK (devices.contains ("mail <email>"), "so is an email address");
         CHECK (devices.contains ("It's the driver's buffer. Riffhouse's setup"), "ordinary words before 's stay");
+        const auto accents = reports::scrub (juce::String (juce::CharPointer_UTF8 ("Output: Headphones (Zo\xc3\xab's AirPods)\nOutput: Speakers (Jos\xc3\xa9's JBL)\n"
+                                                                                     "Output: \xe0\xa4\xb0\xe0\xa4\xbe\xe0\xa4\xae's Buds\nThe 2's buffer")), {});
+        CHECK (! accents.contains ("Zo") && ! accents.contains ("Jos") && accents.contains ("(<you>'s JBL)") && ! accents.contains (juce::CharPointer_UTF8 ("\xe0\xa4\xb0")),
+               "names with accents or in another script are taken out too: %s", accents.toRawUTF8());
+        CHECK (accents.contains ("The 2's buffer"), "a number before 's stays");
         CHECK (reports::scrub ("AMP on", { "am" }) == "AMP on", "a two-letter name is not hunted, it would eat ordinary words");
         CHECK (reports::weekOf (juce::Time (2026, 10, 12, 12, 0)) == "2026-W46", "12 November 2026 is in week 46 (%s)", reports::weekOf (juce::Time (2026, 10, 12, 12, 0)).toRawUTF8());
         CHECK (reports::weekOf (juce::Time (2027, 0, 1, 12, 0)) == "2026-W53", "1 January 2027 still belongs to 2026's last week (%s)", reports::weekOf (juce::Time (2027, 0, 1, 12, 0)).toRawUTF8());
@@ -516,6 +534,15 @@ void runDeviceChecks (int& checks, int& failures)
         CHECK (DeviceGuard::looksLikeScreen ("4 - Mi TV (AMD High Definition Audio Device)"), "a TV over HDMI is known as a screen");
         CHECK (! DeviceGuard::looksLikeBluetooth ("Headphones (4- CX31993+97220 HiFi)") && ! DeviceGuard::looksLikeScreen ("Headphones (4- CX31993+97220 HiFi)"),
                "a wired USB headphone dongle is neither");
+        CHECK (! DeviceGuard::looksLikeScreen ("Headphones (Samsung USB C Earphones)") && ! DeviceGuard::looksLikeBluetooth ("Headphones (Samsung USB C Earphones)"),
+               "wired Samsung earphones are neither a TV nor Bluetooth");
+        CHECK (! DeviceGuard::looksLikeBluetooth ("Speakers (Marshall CODE amp)") && DeviceGuard::looksLikeBluetooth ("Headphones (Marshall Major IV)"),
+               "a Marshall amp over USB is wired, Marshall Major headphones are Bluetooth");
+        CHECK (! DeviceGuard::looksLikeBluetooth ("Speakers (USB Audio Stereo)") && DeviceGuard::looksLikeBluetooth ("Headphones (Rockerz 450 Stereo)"),
+               "\"Stereo\" marks Bluetooth only when the device is not USB");
+        CHECK (DeviceGuard::looksLikeScreen ("Samsung TV (NVIDIA High Definition Audio)") || DeviceGuard::looksLikeScreen ("[TV] Samsung (Intel(R) Display Audio)"),
+               "a Samsung TV is still a screen");
+        CHECK (delayFeel (12.0) == "instant" && delayFeel (48.0) == "noticeable" && delayFeel (125.0) == "slow", "the delay word is short for slow figures");
         CHECK (! DeviceGuard::looksLikeScreen ("Speakers (USBAudio2.0)") && ! DeviceGuard::looksLikeBluetooth ("Speaker (Realtek(R) Audio)"), "nor are wired speakers");
         CHECK (DeviceGuard::looksLikeVirtual ("Voicemeeter Input (VB-Audio Voicemeeter VAIO)"), "a virtual mixer is not a place to listen");
     }
