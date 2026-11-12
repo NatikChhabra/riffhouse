@@ -216,10 +216,17 @@ jobs:
 
           $remove = Join-Path (Split-Path $app) 'unins000.exe'
           if (-not (Test-Path $remove)) { throw "No uninstaller next to the app" }
-          Start-Process $remove -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait
+          Start-Process $remove -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$PWD\uninstall.log" -Wait
           $left = $true
-          foreach ($i in 1..60) { if (-not (Test-Path $app)) { $left = $false; break }; Start-Sleep -Seconds 1 }
-          if ($left) { throw "Riffhouse.exe is still there after the uninstaller ran" }
+          foreach ($i in 1..90) { if (-not (Test-Path $app)) { $left = $false; break }; Start-Sleep -Seconds 1 }
+          if ($left)
+          {
+            # say what held it: a process still running from that folder, and the uninstaller's own account
+            Get-Process | Where-Object { $_.Path -and $_.Path -like "*Riffhouse*" } | Format-Table Id, ProcessName, Path -AutoSize | Out-String | Write-Host
+            Get-ChildItem (Split-Path $app) -ErrorAction SilentlyContinue | Format-Table Name, Length -AutoSize | Out-String | Write-Host
+            if (Test-Path uninstall.log) { Get-Content uninstall.log -Tail 60 }
+            throw "Riffhouse.exe is still there after the uninstaller ran"
+          }
           "Installed $installed, started, drew its screens, removed."
 
       # The pictures are only there to look at when something went wrong. A build that passed
