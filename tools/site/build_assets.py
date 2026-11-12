@@ -14,7 +14,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
-SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] != "--tones" else None
 
 # Cutout file, name on the box, what it does, in the order of the signal chain.
 PEDALS = [
@@ -90,6 +90,32 @@ def gear():
     return out
 
 
+LQ, RQ = "\u201c", "\u201d"
+
+
+def shown(d):
+    """How the app lists a tone made after someone (Preset::artist, title, part and credit in
+    src/engine/Presets.cpp): the band, or the player, in front; the song in quotation marks;
+    and a credit line for whatever the title does not already say."""
+    who, band, song, name = d.get("inspiredBy", ""), d.get("band") or "", d.get("song") or "", d["name"]
+    if not who:
+        return {}
+    artist = band or who
+    title = name.split(": ", 1)[1] if name.startswith("Inspired by ") and ": " in name else name
+    starts = bool(song) and title.lower().startswith(song.lower())
+    if starts:
+        rest = title[len(song):].strip()
+        title = LQ + song + RQ + (" " + rest if rest else "")
+    other = who if who != artist else ""
+    names_song = bool(song) and not starts
+    quoted = LQ + song + RQ
+    if other:
+        credit = "Inspired by " + other + (" on " + quoted + ". " if names_song else ". ")
+    else:
+        credit = "After " + quoted + ". " if names_song else ""
+    return {"w": artist, "t": title, "x": credit, "b": band, "s": song}
+
+
 def tones(pedals):
     rows = []
     for f in sorted((ROOT / "presets").glob("*.json")):
@@ -106,9 +132,11 @@ def tones(pedals):
                 chain.append(["cab", i, CABS[i]])
             else:
                 chain.append([prefix, i, pedals[f"{prefix}-{i}"]["name"]])
-        rows.append({"n": d["name"], "c": d["category"], "g": d["genres"], "a": d.get("inspiredBy", ""),
-                     "d": d["description"], "r": chain})
-    rows.sort(key=lambda r: r["n"].lower())
+        row = {"n": d["name"], "c": d["category"], "g": d["genres"], "a": d.get("inspiredBy", ""),
+               "d": d["description"], "r": chain}
+        row.update(shown(d))
+        rows.append(row)
+    rows.sort(key=lambda r: ((r.get("w") or r["n"]) + " " + (r.get("t") or "")).lower())
     (SITE / "tones.json").write_text(json.dumps(rows, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     return len(rows)
 
@@ -152,6 +180,9 @@ def fonts():
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--tones"]:  # only the tone list, from presets/, no pictures needed
+        print(tones({k: {"name": n} for k, n, _ in PEDALS}), "tones")
+        sys.exit()
     if not SHOTS or not (SHOTS / "cutouts").is_dir():
         sys.exit(__doc__)
     made = gear()
