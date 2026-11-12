@@ -3,6 +3,7 @@
 
   Riffhouse --snapshots <folder> 2          every screen and each piece of gear, drawn by the app
   python3 tools/site/build_assets.py <folder>
+  python3 tools/site/build_assets.py <folder> --screens     only the screen pictures, no cutouts needed
 
 Writes site/img/ (gear cutouts, screen crops, icons), site/fonts/ and site/tones.json.
 Needs Pillow and fonttools with brotli. Run it again whenever the gear or the tones change.
@@ -15,6 +16,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
 SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] != "--tones" else None
+ONLY_SCREENS = sys.argv[2:] == ["--screens"]
 
 # Cutout file, name on the box, what it does, in the order of the signal chain.
 PEDALS = [
@@ -55,6 +57,9 @@ CROPS = {
     "tuner": ("tuner.png", None, None),
     "looper": ("looper.png", None, None),
 }
+# Rows taken out of a screen before it is cropped: (top, bottom, end of the list). What sits between
+# bottom and end moves up to close the gap. The setup card's delay figure describes one PC, not yours.
+CUTS = {"setup-done": (602, 666, 1100)}
 
 
 def save(im, path, quality=86, **kw):
@@ -145,13 +150,20 @@ def screens():
     for name, (src, box, _) in CROPS.items():
         im = Image.open(SHOTS / src).convert("RGB")
         if box:
+            if name in CUTS:
+                top, bottom, end = CUTS[name]
+                im.paste(im.crop((box[0], bottom, box[2], end)), (box[0], top))
+                im.paste(im.getpixel((box[0] + 40, end)), (box[0], end - (bottom - top), box[2], end))
             im = im.crop(box)
         for width in (2400, 1200):
             if im.width >= width or width == 1200:
                 small = im if im.width <= width else im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
                 save(small, SITE / "img" / "app" / f"{name}-{small.width}.webp", 82)
-    for name in ("take-tone",):  # this one needs a recorded take, so it comes from docs/
-        im = Image.open(ROOT / "docs" / "screenshots" / f"{name}.png").convert("RGB")
+    for name in ("take-tone",):  # this one needs a recorded take, so it comes from docs/ unless the folder has one
+        own = SHOTS / f"{name}.png"
+        im = Image.open(own if own.is_file() else ROOT / "docs" / "screenshots" / f"{name}.png").convert("RGB")
+        if im.width > 1800:
+            im = im.resize((1800, round(im.height * 1800 / im.width)), Image.LANCZOS)
         save(im, SITE / "img" / "app" / f"{name}-{im.width}.webp", 82)
         small = im.resize((1200, round(im.height * 1200 / im.width)), Image.LANCZOS)
         save(small, SITE / "img" / "app" / f"{name}-1200.webp", 82)
@@ -182,6 +194,9 @@ def fonts():
 if __name__ == "__main__":
     if sys.argv[1:] == ["--tones"]:  # only the tone list, from presets/, no pictures needed
         print(tones({k: {"name": n} for k, n, _ in PEDALS}), "tones")
+        sys.exit()
+    if SHOTS and ONLY_SCREENS:
+        screens()
         sys.exit()
     if not SHOTS or not (SHOTS / "cutouts").is_dir():
         sys.exit(__doc__)
