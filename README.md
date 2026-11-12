@@ -2,7 +2,7 @@
 
 # Riffhouse
 
-**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 29 pedals, 9 speaker cabinets and 188 tones. All of it is free, with no account, no ads and no paid version.
+**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 9 speaker cabinets and 189 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
 
@@ -12,14 +12,17 @@ More on the [website](https://natikchhabra.github.io/riffhouse/), or go straight
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
-## New in 0.1.2
+## New in 0.1.3
 
-- **Setup no longer closes the app.** 0.1.1 could close at the very end of setup and could stop answering when a sound card was slow. Both are fixed, and every build now runs the end of a real setup before it ships.
-- **Setup runs once.** It no longer opens at every start, and it no longer stutters while it listens.
-- **No driver to pick.** Choose where the guitar comes in and where the sound goes out. Riffhouse tries the fastest way that input has and moves to the next by itself if one will not start.
-- **Reports that explain themselves.** Riffhouse keeps a short diary of what it did with the sound card. **Report a problem** and **Save a report** in Settings include it, so a problem on your computer can be found without you knowing any of the words.
-- **Eleven new tones, 188 in all,** ten of them made after songs the first players asked for. Search finds tones by band and by song.
-- **Recordings explain themselves.** The folder with the bare guitar is now called "Clean guitar (for Change the tone)".
+- **A new look.** The new Riffhouse logo, a window that fills any screen shape, Settings on one simple page, and a bottom bar that only speaks up when something is happening.
+- **Your sound card, your way.** Pick the driver yourself (Automatic, ASIO, WASAPI exclusive or shared, DirectSound) or let Riffhouse pick. Every ASIO driver is listed, ASIO4ALL and FlexASIO included.
+- **ASIO sorts itself out.** An interface stuck at another sample rate still starts. When a driver will not, Riffhouse says why in plain words, and when only the interface's own settings can lower the delay, it opens them for you.
+- **A classic wah.** The throaty 60s sweep, rocked with your foot or an expression pedal, on its own green pedal.
+- **Chords and tabs.** Paste a song from any website: chords over the words, tab on six strings, chord shapes along the top. Change the key, make it bigger, let it scroll while you play.
+- **Share a tone as a message.** Copy tone code gives a short message with the free download link. Your friend copies it and presses Ctrl+V.
+- **MP3 and FLAC.** Every take has an MP3 / FLAC button, and any sound file can be converted.
+
+![Chords and tabs, read from your chair](docs/screenshots/chords.png)
 
 The full list is in the [changelog](CHANGELOG.md).
 

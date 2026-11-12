@@ -6,6 +6,52 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
+## 0.1.3
+
+A new logo, a sound card that sorts itself out, a cleaner window that fits any screen, a classic wah, and two new ways to share: tones as a plain message, and songs as chords and tabs you play from.
+
+### Your sound card, your way
+
+- Settings > Driver, input and output has a Driver box again: Automatic, ASIO, WASAPI exclusive, WASAPI shared and DirectSound. Each lists its own inputs and outputs.
+- Every ASIO driver on the computer is listed when you pick ASIO, ASIO4ALL and FlexASIO included.
+- Automatic uses your interface's ASIO driver when there is one, and otherwise Windows exclusive mode, the fastest. It no longer settles for shared mode when exclusive works.
+- ASIO sorts itself out. An interface stuck at another sample rate (by its own settings, or because Windows is using it) is tried at its own rate and every usual one, and Riffhouse says which rate it ended on.
+- When an ASIO driver will not start, it says why in plain words: most often another program is using it, or its clock is set to an outside source.
+- When only the interface's own settings can change the delay, Riffhouse says how many milliseconds that costs and opens those settings with one button. It picks up the change by itself.
+- When it has to use shared mode, it says why in plain words. The usual reason is a guitar on one USB device and headphones on another, and it says what to plug in instead.
+- Picking an input by hand now ends on the lowest delay that plays without crackles, the same way setup does.
+- Nothing locks you out: a driver that will not start puts back the last setup that worked and tells you what happened.
+- With an ASIO driver, Sound out lists your interface's outputs by name (headphones, speakers), and any other output on the computer below them.
+- Interfaces with more than two inputs get a Socket box, so a guitar in socket 3 or 4 is heard.
+- A loop in the looper stays when the delay or the sound card changes at the same sample rate.
+
+### Cleaner, and fits any window
+
+- The new Riffhouse logo: the amp-face badge and the script name, in the top bar, on the app icon and in the installer.
+- The rig grows to fill the window, wide or tall, instead of sitting in black bars.
+- Settings is one simple page again, with a short list on the side that jumps to each part, and a plate that shows the delay.
+- The bar at the bottom only shows what is doing something (hum removed, Input Fix, the gate), so a quiet bar means nothing needs a look.
+- The take strip at the bottom no longer covers Settings or any other page.
+- Pedal knob labels are printed on the pedal like real silk-screen.
+
+### A classic wah
+
+- The wah has a third type, Classic: the throaty 60s sweep, darker and more vocal than the others, rocked with your foot or an expression pedal. It has its own green pedal, THROAT.
+- New tone: Rocked Wah Soul. The solo tone inspired by Sweet Child O' Mine now uses the Classic wah.
+
+### Share and play
+
+- Copy tone code now copies a short message: the tone's name, the free download link and the code. A friend copies the whole message and presses Ctrl+V in Riffhouse. The code is found even when a chat app wraps it over lines.
+- Chords and tabs: copy a song's chords or tab from any website and press Ctrl+V. Chords sit over their words, tab is drawn on six strings, and each chord's shape is shown along the top. Change the key, make it bigger to read from your chair, let it scroll by itself while you play, and copy it out in the key you see. Songs are kept as text files in Documents/Riffhouse/Songs.
+- Every take has an MP3 / FLAC button. Convert a sound file does the same for any WAV, AIFF, FLAC, OGG or MP3. Copies never replace the original.
+
+### Also
+
+- Settings > Updates: "Get new versions early, as a tester" offers test versions a few days before everyone gets them.
+- Riffhouse starts in about half the time.
+- Tones named after an artist say plainly that they are a style, in the tone list and in a shared tone's message. About says how an artist can ask for a change.
+- The installer carries every part's licence in Licences.txt.
+
 ## 0.1.2
 
 0.1.1 broke for the first people who installed it: it could close at the end of setup, stop answering, and open setup again at every start. This version fixes those, and changes how every build is checked so they do not come back.
