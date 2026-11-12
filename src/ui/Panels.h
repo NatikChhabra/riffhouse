@@ -148,7 +148,7 @@ private:
     bool hasUpdater = false, exampleCard = false;
 
     IconButton close { icons::close() };
-    juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Input, output and delay..." };
+    juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and output..." };
     juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report a problem" };
     juce::String reportText() const;
     juce::TextButton updateButton { "Check for updates" };

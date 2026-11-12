@@ -171,7 +171,9 @@ void RiffhouseProcessor::prepareToPlay (double sr, int block)
     }
     if (songSection.active()) // the part in memory was made for the old sample rate
         setJamSection (songSection.startSeconds(), songSection.endSeconds());
-    if (loopReady) // a loop recorded at another sample rate would play at the wrong speed: start clean
+    // A loop recorded at another sample rate would play at the wrong speed: start clean. A new
+    // buffer size alone (a change of delay in Settings) keeps the loop going round.
+    if (loopReady && std::abs (loop.sampleRate() - sr) > 0.5)
     {
         const juce::SpinLock::ScopedLockType sl (loopLock);
         loop.prepare (sr);

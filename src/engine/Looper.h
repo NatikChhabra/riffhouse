@@ -28,6 +28,7 @@ public:
     double lengthSeconds() const noexcept { return rate > 0.0 ? (double) length.load() / rate : 0.0; }
     double positionSeconds() const noexcept { return rate > 0.0 ? (double) pos.load() / rate : 0.0; }
     double maxSeconds() const noexcept { return rate > 0.0 ? (double) capacity / rate : 0.0; }
+    double sampleRate() const noexcept { return rate; }
     std::atomic<float> level { 0.85f };
 
     // Audio thread.

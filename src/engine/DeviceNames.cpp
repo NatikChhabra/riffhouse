@@ -78,10 +78,10 @@ juce::String whyShared (const juce::String& type, const juce::String& input, con
                "delay, plug your headphones into " + inHw + " and pick it under Sound out.";
     if (type == "DirectSound")
         return "Only DirectSound, the oldest and slowest way, would start on " + inName + ". Close other audio apps and run "
-               "setup again, or pick a driver yourself in Input, output and delay.";
+               "setup again, or pick a driver yourself in Settings, Driver, input and output.";
     return "The faster modes would not play clean on " + inName + " (another app may be holding it, or its driver refuses "
            "them), so Windows' shared mode is in use. Close other audio apps and run setup again, or pick a driver yourself "
-           "in Input, output and delay.";
+           "in Settings, Driver, input and output.";
 }
 
 juce::Array<int> buffersToTry (const juce::Array<int>& available)

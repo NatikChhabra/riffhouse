@@ -1271,7 +1271,7 @@ void SettingsView::paintPage (juce::Graphics& g)
         case Section::sound:
             paintPlate (g, plateArea.toFloat());
             small ("Setup listens to your guitar and picks the fastest way that plays clean. To choose the input, the "
-                   "headphones or the delay yourself, use Input, output and delay.", soundText, 2);
+                   "headphones or the delay yourself, use Driver, input and output.", soundText, 2);
             break;
         case Section::guitar:
         {

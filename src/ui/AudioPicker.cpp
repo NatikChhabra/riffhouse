@@ -398,7 +398,7 @@ void AudioPicker::paint (juce::Graphics& g)
     auto r = getLocalBounds().reduced (28, 24);
     g.setColour (colours::text);
     g.setFont (font (20.0f, Weight::display));
-    g.drawText ("Input and output", r.removeFromTop (28), juce::Justification::centredLeft);
+    g.drawText ("Driver, input and output", r.removeFromTop (28), juce::Justification::centredLeft);
     g.setColour (colours::textDim);
     g.setFont (font (13.5f));
     g.drawText ("Every change is tried first. If no sound comes through, the last working choice comes back.", r.removeFromTop (22), juce::Justification::centredLeft, true);
