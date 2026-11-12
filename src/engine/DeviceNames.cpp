@@ -105,4 +105,34 @@ juce::Array<int> buffersToTry (const juce::Array<int>& available)
     return picked;
 }
 
+
+BufferSearch::BufferSearch (const juce::Array<int>& all, int running) : bestSize (running)
+{
+    for (int b : all)
+        if (b < running) sizes.add (b);
+    sizes.sort();
+    if (sizes.isEmpty()) return;
+    // nearest to 128 samples: about 3 ms at 44.1 kHz, where most sound cards run clean
+    at = 0;
+    for (int i = 1; i < sizes.size(); ++i)
+        if (std::abs (sizes[i] - 128) < std::abs (sizes[at] - 128)) at = i;
+    trying = sizes[at];
+}
+
+void BufferSearch::result (bool clean)
+{
+    if (trying == 0) return;
+    if (clean)
+    {
+        foundClean = true;
+        bestSize = std::min (bestSize, trying);
+        // smaller while it stays clean; after a crackle below, this is the floor
+        trying = (! crackled && at > 0) ? sizes[--at] : 0;
+        return;
+    }
+    // it crackled: below this one never runs clean. Above it, unless a clean one is already known.
+    crackled = true;
+    if (foundClean || at + 1 >= sizes.size()) { trying = 0; return; }
+    trying = sizes[++at];
+}
 } // namespace rh

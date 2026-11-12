@@ -12,13 +12,22 @@ namespace
 {
     constexpr double kProveMs = 2000.0; // how long a driver gets to deliver its first sound
     constexpr juce::uint32 kBlocksWanted = 4;
+    constexpr double kBufferTryMs = 1600.0; // as long as setup listens to each buffer size
 }
 
 AudioSwitch::AudioSwitch (juce::AudioDeviceManager& d, RiffhouseProcessor& p) : dm (d), proc (p) {}
 
 AudioSwitch::~AudioSwitch()
 {
-    if (working)
+    if (working && search != nullptr)
+    {
+        // closed while finding the buffer: keep the one already proven to play
+        stopTimer();
+        openExactly (dm, proven);
+        search.reset();
+        finish (true, {});
+    }
+    else if (working)
     {
         // closed in the middle of a try: leave what worked, and let whoever is waiting know
         stopTimer();
@@ -138,9 +147,23 @@ juce::String AudioSwitch::wentBackTo() const
 
 void AudioSwitch::timerCallback()
 {
+    if (search != nullptr)
+    {
+        if (juce::Time::getMillisecondCounterHiRes() - triedAt < kBufferTryMs) return;
+        auto* dev = dm.getCurrentAudioDevice();
+        const bool clean = tryOpened && dev != nullptr && dm.getXRunCount() - xrunsAtTry <= 0
+                           && proc.blockCounter.load() - beatAtOpen >= kBlocksWanted && dm.getCpuUsage() < 0.7;
+        search->result (clean);
+        if (search->next() > 0) tryBuffer (search->next());
+        else endTuning();
+        return;
+    }
     if (proc.blockCounter.load() - beatAtOpen >= kBlocksWanted)
     {
         stopTimer();
+        // an input picked by hand, with no buffer asked for: end at the lowest delay that plays
+        // clean, the way setup does, instead of the driver's own (often 10 ms or more)
+        if (want.bufferSize == 0) { startTuning(); return; }
         finish (true, running (dm, proc));
         return;
     }
@@ -166,5 +189,44 @@ void AudioSwitch::finish (bool ok, const juce::String& message)
     auto done = std::move (onDone);
     onDone = nullptr;
     if (done) done ({ ok, message, tryIndex == 0 });
+}
+
+void AudioSwitch::startTuning()
+{
+    proven = AudioOpen::running (dm);
+    auto* dev = dm.getCurrentAudioDevice();
+    if (dev == nullptr || ! proven.valid()) { finish (true, running (dm, proc)); return; }
+    search = std::make_unique<BufferSearch> (buffersToTry (dev->getAvailableBufferSizes()), dev->getCurrentBufferSizeSamples());
+    if (search->next() <= 0) { search.reset(); finish (true, running (dm, proc)); return; }
+    devlog::note ("Finding the lowest buffer that plays clean on " + proven.input + ", from " + juce::String (proven.bufferSize));
+    tryBuffer (search->next());
+    startTimer (100);
+}
+
+void AudioSwitch::tryBuffer (int size)
+{
+    auto o = proven;
+    o.bufferSize = size;
+    tryOpened = openExactly (dm, o).isEmpty() && dm.getCurrentAudioDevice() != nullptr
+                && dm.getCurrentAudioDevice()->getCurrentBufferSizeSamples() == size;
+    xrunsAtTry = dm.getXRunCount();
+    beatAtOpen = proc.blockCounter.load();
+    triedAt = juce::Time::getMillisecondCounterHiRes();
+}
+
+void AudioSwitch::endTuning()
+{
+    stopTimer();
+    const int best = search->best();
+    search.reset();
+    auto* dev = dm.getCurrentAudioDevice();
+    if (dev == nullptr || dev->getCurrentBufferSizeSamples() != best)
+    {
+        auto o = proven;
+        o.bufferSize = best;
+        if (openExactly (dm, o).isNotEmpty()) openExactly (dm, proven);
+    }
+    devlog::note ("Settled on " + juce::String (best) + " samples");
+    finish (true, running (dm, proc));
 }
 } // namespace rh

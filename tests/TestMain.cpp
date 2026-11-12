@@ -2045,6 +2045,26 @@ void testChordSheet()
     std::printf ("  %d chord shapes checked\n", shapes);
 }
 
+void testBufferSearch()
+{
+    std::printf ("buffer search\n");
+    auto run = [] (juce::Array<int> sizes, int running, int floor, int& tries)
+    {
+        // a sound card that plays clean at `floor` samples and above
+        BufferSearch s (sizes, running);
+        tries = 0;
+        while (s.next() > 0) { s.result (s.next() >= floor); ++tries; }
+        return s.best();
+    };
+    int tries = 0;
+    CHECK (run ({ 32, 64, 128, 256, 512 }, 576, 64, tries) == 64 && tries == 3, "down to 64 in 3 tries, got %d", tries);
+    CHECK (run ({ 32, 64, 128, 256, 512 }, 576, 256, tries) == 256 && tries == 2, "up to 256 in 2 tries, got %d", tries);
+    CHECK (run ({ 32, 64, 128, 256, 512 }, 576, 1000, tries) == 576 && tries == 3, "nothing smaller runs: stays at 576 (%d tries)", tries);
+    CHECK (run ({ 480 }, 480, 32, tries) == 480 && tries == 0, "one size: nothing to try");
+    CHECK (run ({ 64, 128, 256 }, 256, 32, tries) == 64 && tries == 2, "already near the floor: %d tries", tries);
+}
+
+
 int main (int argc, char** argv)
 {
     juce::ConsoleApplication* unused = nullptr; (void) unused;
@@ -2263,6 +2283,7 @@ int main (int argc, char** argv)
     test::runDeviceChecks (checks, failures);
     if (args.contains ("--devices")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testChordSheet();
+    testBufferSearch();
     if (args.contains ("--sheet")) { std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     testHistory();
     testLooper();

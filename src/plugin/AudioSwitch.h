@@ -4,6 +4,7 @@
 
 #include "PluginProcessor.h"
 #include "AudioOpen.h"
+#include "../engine/DeviceNames.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 
 namespace rh
@@ -69,5 +70,14 @@ private:
     bool working = false, sawNoInput = false;
     juce::uint32 beatAtOpen = 0;
     double openedAt = 0;
+    // after a hand-picked input proves it plays: the smallest buffer that stays clean
+    void startTuning();
+    void tryBuffer (int size);
+    void endTuning();
+    std::unique_ptr<BufferSearch> search;
+    AudioOpen proven;
+    int xrunsAtTry = 0;
+    double triedAt = 0;
+    bool tryOpened = false;
 };
 } // namespace rh

@@ -29,4 +29,21 @@ juce::String whyShared (const juce::String& type, const juce::String& input, con
 
 // The buffer sizes setup tries in one driver mode, smallest first, spread over the whole range.
 juce::Array<int> buffersToTry (const juce::Array<int>& available);
+
+// Picking an input by hand ends at the smallest buffer that plays clean, in a few tries: it
+// starts near 128 samples, goes down while the sound stays clean and up when it crackles.
+// Only sizes below the one already running clean are tried.
+class BufferSearch
+{
+public:
+    BufferSearch (const juce::Array<int>& sizes, int running);
+    int next() const noexcept { return trying; } // 0 when the search is over
+    void result (bool clean);
+    int best() const noexcept { return bestSize; }
+
+private:
+    juce::Array<int> sizes; // smallest first
+    int at = -1, trying = 0, bestSize = 0;
+    bool foundClean = false, crackled = false;
+};
 } // namespace rh
