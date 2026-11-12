@@ -458,8 +458,8 @@ def write_log(log: list[str], cursor: str):
 
 def main() -> int:
     if not os.environ.get("DISCORD_BOT_TOKEN"):
-        print("DISCORD_BOT_TOKEN is not set", file=sys.stderr)
-        return 1
+        print("::warning::DISCORD_BOT_TOKEN is not set, nothing to do")
+        return 0
     log: list[str] = []
     failed = False
     try:
