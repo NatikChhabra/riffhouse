@@ -371,7 +371,7 @@ details:not([open]) > p { display: none; }
 .later-ask { grid-column: 6 / 13; }
 
 /* Press kit page: facts as rows, words to copy, logos on the grounds they are made for, screenshots, contact */
-.kit-hero .actions { margin-top: 12px; }
+.kit-hero .actions, .buy-hero .actions { margin-top: 12px; }
 .kit-mark { position: absolute; right: var(--g); top: calc(var(--top) + clamp(0px, 2vw, 32px)); width: clamp(96px, 28vw, 420px); height: auto; }
 .kit-jump { display: flex; flex-wrap: wrap; gap: 0 clamp(20px, 2.6vw, 36px); margin-top: clamp(32px, 4vw, 52px); padding-top: 12px; border-top: 4px solid var(--coal); }
 .kit-jump a { min-height: 48px; display: inline-flex; align-items: center; font-size: var(--t-h3); font-weight: 600; text-decoration: none; }
@@ -466,6 +466,44 @@ details:not([open]) > p { display: none; }
   .board-amp .board-row img { width: 200px; }
 }
 
+/* What to buy page: a plug on the poster, then each way in drawn as stops on one cable */
+.hero h1 .plug-line { display: flex; align-items: center; gap: .14em; }
+.plug { flex: none; height: .5em; width: auto; max-width: none; aspect-ratio: 3000 / 120; fill: var(--coal); }
+.plug-cut { fill: none; stroke: var(--amber); stroke-width: 5; }
+.way-list { display: grid; border-top: 2px solid var(--panel-2); }
+.way { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: 36px; align-items: center; padding: clamp(40px, 5vw, 64px) 0; border-bottom: 2px solid var(--panel-2); }
+.way-say { grid-column: 1 / 5; display: grid; gap: 16px; }
+.way-say h3 { font: 800 clamp(40px, 4.4vw, 64px)/.9 var(--font-display); text-transform: uppercase; }
+.way-say p { color: var(--soft); max-width: 24em; }
+.path { grid-column: 5 / 13; position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: 16px; }
+.path::before { content: ""; position: absolute; left: 0; right: 0; top: 12px; height: 4px; border-radius: 2px; background: var(--ash-dark); }
+.path li { position: relative; display: grid; gap: 4px; align-content: start; padding-top: 44px; font-size: var(--t-h3); font-weight: 600; line-height: 1.2; }
+.path li::before { content: ""; position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--bg); border: 4px solid var(--ash); }
+.path .is-buy { color: var(--amber); }
+.path .is-buy::before { background: var(--amber); border-color: var(--amber); }
+.path small { font-size: var(--t-small); font-weight: 400; color: var(--soft); }
+.buy-notes { grid-column: 1 / -1; margin-top: 0; }
+.way:last-child { padding-bottom: 0; border-bottom: 0; }
+.keep-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 40px var(--gap); }
+.keep-list li { display: grid; gap: 12px; align-content: start; }
+.keep-face { display: flex; align-items: flex-end; justify-content: center; gap: clamp(8px, 1vw, 16px); height: clamp(200px, 20vw, 288px); margin-bottom: 12px; padding: clamp(20px, 2.4vw, 36px); border-radius: var(--r-m); background: var(--well); }
+.keep-face img { flex: 0 1 auto; width: auto; height: 100%; min-width: 0; object-fit: contain; object-position: 50% 100%; }
+.keep-face.is-amp img { width: 100%; height: auto; max-height: 100%; }
+.keep-list h3 { font: 800 clamp(30px, 2.8vw, 40px)/.95 var(--font-display); text-transform: uppercase; }
+.keep-list p { color: var(--soft); }
+@media (max-width: 899px) {
+  .way-say, .path { grid-column: 1 / -1; }
+  .keep-list { grid-template-columns: minmax(0, 1fr); }
+  .keep-face { height: clamp(200px, 44vw, 300px); }
+}
+@media (max-width: 699px) {
+  .plug { height: .6em; }
+  .path { grid-auto-flow: row; }
+  .path::before { left: 12px; right: auto; top: 14px; bottom: 14px; width: 4px; height: auto; }
+  .path li { align-content: center; min-height: 56px; padding: 8px 0 8px 48px; }
+  .path li::before { top: 50%; translate: 0 -50%; }
+}
+
 /* Phone and tablet: their own compositions */
 @media (max-width: 899px) {
   .jack-head, .figure, .jack-shot, .steps, .measure-grid .sec-head, .facts, .get-main, .get-notes, .support-say, .upi, .close-say, .close-facts { grid-column: 1 / -1; }
@@ -521,12 +559,21 @@ details:not([open]) > p { display: none; }
 @keyframes pan-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes hit { 30% { transform: translateY(3px) scale(.95); } }
 @keyframes chain-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
+@keyframes plug-in { from { opacity: 0; transform: translateX(34%); } }
 
 @media (prefers-reduced-motion: no-preference) {
   .hero h1 .line > span { transform-origin: 50% 100%; animation: line-up 820ms var(--ease) both; }
   .hero h1 .line:nth-child(2) > span { animation-delay: 110ms; }
   .hero-pedal { animation: pedal-in 900ms var(--land) 200ms both; }
   .kit-mark { animation: pedal-in 900ms var(--land) 200ms both; }
+  /* What to buy: the plug comes in from the side, and each cable runs out before its stops land */
+  .plug { animation: plug-in 900ms var(--land) 260ms both; }
+  html.js .way .path::before { transform-origin: 0 0; transition: transform 900ms var(--ease) 150ms; }
+  html.js .way:not(.is-in) .path::before { transform: scaleX(0); }
+  @media (max-width: 699px) { html.js .way:not(.is-in) .path::before { transform: scaleY(0); } }
+  html.js .way .path li::before { transition: scale 520ms var(--land), opacity 260ms var(--ease); transition-delay: calc(320ms + var(--n, 0) * 110ms); }
+  html.js .way:not(.is-in) .path li::before { scale: .4; opacity: 0; }
+  .path li:nth-child(2) { --n: 1; } .path li:nth-child(3) { --n: 2; } .path li:nth-child(4) { --n: 3; } .path li:nth-child(5) { --n: 4; }
   .deck-wave path { transition: d 280ms var(--ease); }
   .deck-play { transition: transform var(--fast) var(--ease); }
   .deck-play:active { transform: scale(.94); }
