@@ -647,18 +647,22 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
 {
     close.onClick = [this] { if (onClose) onClose(); };
     addAndMakeVisible (close);
+    scroller.setViewedComponent (&page, false);
+    scroller.setScrollBarsShown (true, false);
+    scroller.setScrollBarThickness (8);
+    addAndMakeVisible (scroller);
     const bool standalone = StandaloneHost::get() != nullptr;
     runSetup.onClick = [this] { if (onRunSetup) onRunSetup(); };
     advanced.onClick = [this] { showAdvancedAudio(); };
     runSetup.setVisible (standalone);
     advanced.setVisible (standalone);
-    addChildComponent (runSetup);
-    addChildComponent (advanced);
+    page.addChildComponent (runSetup);
+    page.addChildComponent (advanced);
     runSetup.setColour (juce::TextButton::buttonColourId, colours::accent);
     runSetup.setColour (juce::TextButton::textColourOffId, colours::bg);
     website.setTooltip ("Opens the page of common problems and how to fix them.");
     website.onClick = [] { juce::URL ("https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md").launchInDefaultBrowser(); };
-    addAndMakeVisible (website);
+    page.addAndMakeVisible (website);
     problem.setTooltip ("Copies the report to your clipboard and opens the page where problems are reported. "
                         "Paste it there and say what went wrong. Nothing is sent by itself.");
     problem.onClick = [this]
@@ -671,11 +675,11 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
             .launchInDefaultBrowser();
         if (onMessage) onMessage ("The report is on your clipboard. Paste it into the page that just opened.");
     };
-    addAndMakeVisible (problem);
+    page.addAndMakeVisible (problem);
     report.setTooltip ("Writes your settings and what setup measured into a text file in your recordings folder. "
                        "Nothing is sent anywhere. Attach it when you ask for help.");
     report.onClick = [this] { saveReport(); };
-    addAndMakeVisible (report);
+    page.addAndMakeVisible (report);
 
     // starts from what Windows is set to ("Animation effects"); the choice made here is kept
     lessMotion.setToggleState (motion::reduced(), juce::dontSendNotification);
@@ -684,13 +688,14 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
         motion::setReduced (lessMotion.getToggleState());
         proc.uiState.setProperty ("lessMotion", lessMotion.getToggleState() ? 1 : 0, nullptr);
     };
-    addAndMakeVisible (lessMotion);
+    page.addAndMakeVisible (lessMotion);
 
     if (auto* host = StandaloneHost::get())
         if (auto* up = host->updater())
         {
-            addAndMakeVisible (updateButton);
-            addAndMakeVisible (autoUpdate);
+            hasUpdater = true;
+            page.addAndMakeVisible (updateButton);
+            page.addAndMakeVisible (autoUpdate);
             autoUpdate.setToggleState (up->automatic(), juce::dontSendNotification);
             autoUpdate.onClick = [this]
             {
@@ -715,25 +720,25 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
         k->setGear (KnobStyle::modern, colours::text, colours::textDim, Face::instrumentSemi, true);
         k->capsLabel = true;
     }
-    addAndMakeVisible (inGain);
-    addAndMakeVisible (gate);
-    addAndMakeVisible (inputFix);
-    addAndMakeVisible (gateOn);
+    page.addAndMakeVisible (inGain);
+    page.addAndMakeVisible (gate);
+    page.addAndMakeVisible (inputFix);
+    page.addAndMakeVisible (gateOn);
     inputFixAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.state(), spec (P::inputFix).key, inputFix);
     gateOnAtt = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.state(), spec (P::gateOn).key, gateOn);
     hum = std::make_unique<ChipRow> (proc, P::humFilter, colours::accent);
-    addAndMakeVisible (*hum);
+    page.addAndMakeVisible (*hum);
     looks = std::make_unique<ChipRow> (juce::StringArray { lookName (Look::studio), lookName (Look::signal), lookName (Look::pedalboard) },
                                        colours::accent, [this] (int i) { if (onLookChange) onLookChange ((Look) i); });
     looks->setSelected ((int) look());
-    addChildComponent (*looks); // one look now: the gear brings the colour
-    addAndMakeVisible (inMeter);
+    page.addChildComponent (*looks); // one look now: the gear brings the colour
+    page.addAndMakeVisible (inMeter);
 
     footList = std::make_unique<FootList> (proc);
     footView.setViewedComponent (footList.get(), false);
     footView.setScrollBarsShown (true, false);
     footView.setScrollBarThickness (8);
-    addAndMakeVisible (footView);
+    page.addAndMakeVisible (footView);
     // Teaching happens on the rig itself, so this screen steps aside for it.
     teachControl.onClick = [this] { proc.footTeachTouch(); if (onClose) onClose(); };
     teachJob.onClick = [this]
@@ -752,8 +757,10 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
                              if (safe->onClose) safe->onClose();
                          });
     };
-    addAndMakeVisible (teachControl);
-    addAndMakeVisible (teachJob);
+    page.addAndMakeVisible (teachControl);
+    page.addAndMakeVisible (teachJob);
+    if (! standalone) current = Section::guitar;
+    show (current);
 }
 
 SettingsView::~SettingsView() = default;
@@ -764,7 +771,7 @@ void SettingsView::visibilityChanged()
     {
         summary = deviceSummary();
         lessMotion.setToggleState (motion::reduced(), juce::dontSendNotification);
-        resized();
+        show (current);
         startTimerHz (30);
     }
     else stopTimer();
@@ -785,7 +792,7 @@ void SettingsView::refreshUpdate()
     if (updateButton.getButtonText() != label) updateButton.setButtonText (label);
     updateButton.setEnabled (! busy && ! (up->canInstall() && recording));
     const auto text = up->statusText();
-    if (text != lastUpdateText) { lastUpdateText = text; repaint (updateStatus); }
+    if (text != lastUpdateText) { lastUpdateText = text; page.repaint (updateStatus); }
 }
 
 void SettingsView::timerCallback()
@@ -793,9 +800,9 @@ void SettingsView::timerCallback()
     refreshUpdate();
     inMeter.setLevel (proc.meters().gateInPeak.load());
     const auto s = deviceSummary();
-    if (s != summary) { summary = s; resized(); repaint(); }
+    if (s != summary) { summary = s; layoutPage(); page.repaint(); }
     static int tick = 0;
-    if (++tick % 10 == 0) repaint (getLocalBounds().withTrimmedTop (getHeight() / 2));
+    if (++tick % 10 == 0) page.repaint(); // the hum and Input Fix readings move slowly
 }
 
 juce::String SettingsView::deviceSummary() const
@@ -894,168 +901,415 @@ void SettingsView::saveReport()
     if (ok) f.revealToUser();
 }
 
-int SettingsView::summaryHeight() const
-{
-    const int lines = summary.containsChar ('\n') ? juce::StringArray::fromLines (summary).size() : (summary.length() > 68 ? 2 : 1);
-    return lines * 20 + 14;
-}
-
 void SettingsView::showAdvancedAudio()
 {
     showAudioPicker (proc, this);
 }
 
+juce::Array<SettingsView::Section> SettingsView::sections() const
+{
+    juce::Array<Section> s;
+    if (StandaloneHost::get() != nullptr) s.add (Section::sound);
+    s.add (Section::guitar);
+    s.add (Section::foot);
+    s.add (Section::app);
+    s.add (Section::help);
+    return s;
+}
+
+juce::String SettingsView::sectionName (Section s)
+{
+    switch (s)
+    {
+        case Section::sound:  return "Sound card";
+        case Section::guitar: return "Guitar input";
+        case Section::foot:   return "Foot control";
+        case Section::app:    return "Updates and motion";
+        case Section::help:   return "Help and about";
+    }
+    return {};
+}
+
+juce::String SettingsView::sectionLead (Section s) const
+{
+    const bool standalone = StandaloneHost::get() != nullptr;
+    switch (s)
+    {
+        case Section::sound:  return "Where the guitar comes in, where the sound goes, and how long it takes.";
+        case Section::guitar: return "What happens to the guitar before it reaches the first pedal.";
+        case Section::foot:   return standalone ? "Play hands free: a MIDI foot controller, expression pedal or keyboard works the moment you plug it in."
+                                                : "Send MIDI from a foot controller, expression pedal or keyboard to this plugin.";
+        case Section::app:    return "New versions, and how much the screen moves.";
+        case Section::help:   return "When something sounds wrong, or does not work at all.";
+    }
+    return {};
+}
+
+void SettingsView::show (Section s)
+{
+    if (! sections().contains (s)) s = sections().getFirst();
+    current = s;
+    const bool standalone = StandaloneHost::get() != nullptr;
+    auto in = [s] (Section where) { return s == where; };
+    runSetup.setVisible (standalone && in (Section::sound));
+    advanced.setVisible (standalone && in (Section::sound));
+    for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get() })
+        c->setVisible (in (Section::guitar));
+    for (auto* c : { (juce::Component*) &teachControl, (juce::Component*) &teachJob, (juce::Component*) &footView })
+        c->setVisible (in (Section::foot));
+    updateButton.setVisible (hasUpdater && in (Section::app));
+    autoUpdate.setVisible (hasUpdater && in (Section::app));
+    lessMotion.setVisible (in (Section::app));
+    for (auto* c : { (juce::Component*) &website, (juce::Component*) &problem, (juce::Component*) &report })
+        c->setVisible (in (Section::help));
+    scroller.setViewPosition (0, 0);
+    layoutPage();
+    repaint();
+    page.repaint();
+}
+
+int SettingsView::railItemAt (juce::Point<int> p) const
+{
+    for (size_t i = 0; i < railItems.size(); ++i)
+        if (railItems[i].second.contains (p)) return (int) i;
+    return -1;
+}
+
+void SettingsView::mouseMove (const juce::MouseEvent& e)
+{
+    const int h = railItemAt (e.getPosition());
+    if (h != hover) { hover = h; repaint (rail); }
+    setMouseCursor (h >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+}
+
+void SettingsView::mouseExit (const juce::MouseEvent&)
+{
+    if (hover >= 0) { hover = -1; repaint (rail); }
+}
+
+void SettingsView::mouseUp (const juce::MouseEvent& e)
+{
+    const int i = railItemAt (e.getPosition());
+    if (i >= 0 && e.mouseWasClicked()) show (railItems[(size_t) i].first);
+}
+
 void SettingsView::resized()
 {
-    close.setBounds (getWidth() - 70, 20, 46, 46);
-    auto r = getLocalBounds().reduced (60, 40);
-    r.removeFromTop (50);
-    auto cols = r;
-    auto left = cols.removeFromLeft (cols.getWidth() / 2 - 20);
-    cols.removeFromLeft (40);
-    auto right = cols;
+    auto r = getLocalBounds();
+    rail = r.removeFromLeft (juce::jlimit (210, 270, getWidth() / 5));
+    railItems.clear();
+    auto items = rail.reduced (16, 0).withTrimmedTop (118);
+    for (auto s : sections())
+        railItems.push_back ({ s, items.removeFromTop (44) });
+    close.setBounds (getWidth() - 64, 18, 44, 44);
+    scroller.setBounds (r.withTrimmedLeft (56).withTrimmedTop (36).withTrimmedRight (72));
+    layoutPage();
+}
 
-    // left: audio
-    left.removeFromTop (36);
-    left.removeFromTop (summaryHeight()); // summary text
-    auto row = left.removeFromTop (40);
-    runSetup.setBounds (row.removeFromLeft (230));
-    row.removeFromLeft (10);
-    advanced.setBounds (row.removeFromLeft (230));
-    left.removeFromTop (32);
-    left.removeFromTop (36);
-    left.removeFromTop (aboutH); // about text
-    auto helpRow = left.removeFromTop (36);
-    website.setBounds (helpRow.removeFromLeft (150));
-    helpRow.removeFromLeft (10);
-    problem.setBounds (helpRow.removeFromLeft (150));
-    helpRow.removeFromLeft (10);
-    report.setBounds (helpRow.removeFromLeft (150));
-    left.removeFromTop (24);
-    updateHeading = left.removeFromTop (36);
-    updateStatus = left.removeFromTop (24);
-    left.removeFromTop (8);
-    autoUpdate.setBounds (left.removeFromTop (30));
-    left.removeFromTop (12);
-    updateButton.setBounds (left.removeFromTop (36).removeFromLeft (230));
-    left.removeFromTop (20);
-    motionHeading = left.removeFromTop (36);
-    lessMotion.setBounds (left.removeFromTop (30));
+void SettingsView::layoutPage()
+{
+    const int w = std::max (320, scroller.getWidth() - 14);
+    const int col = std::min (w, 720);
+    int y = 104; // under the section's name and its one line
+    auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
+    auto gap = [&] (int g) { y += g; };
+    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = motionHead = helpText = aboutHead = aboutArea = {};
 
-    // right: input
-    right.removeFromTop (36);
-    auto knobs = right.removeFromTop (130);
-    inGain.setBounds (knobs.removeFromLeft (120));
-    knobs.removeFromLeft (10);
-    gate.setBounds (knobs.removeFromLeft (120));
-    knobs.removeFromLeft (24);
-    knobs.removeFromTop (18);
-    meterCaption = knobs.removeFromTop (22);
-    inMeter.setBounds (knobs.removeFromTop (8).withTrimmedRight (10));
-    knobs.removeFromTop (18);
-    gateOn.setBounds (knobs.removeFromTop (30));
-    right.removeFromTop (14);
-    inputFix.setBounds (right.removeFromTop (30));
-    right.removeFromTop (40);
-    right.removeFromTop (26);
-    hum->setBounds (right.removeFromTop (34));
-    right.removeFromTop (10 + 40 + 14);
-    footHeading = right.removeFromTop (36);
-    footText = right.removeFromTop (40);
-    right.removeFromTop (8);
-    row = right.removeFromTop (36);
-    teachControl.setBounds (row.removeFromLeft (230));
-    row.removeFromLeft (10);
-    teachJob.setBounds (row.removeFromLeft (230));
-    right.removeFromTop (10);
-    footView.setBounds (right);
-    footList->setSize (right.getWidth() - 12, FootList::rowH);
-    footList->refresh();
+    switch (current)
+    {
+        case Section::sound:
+        {
+            plateArea = at (164).withWidth (std::min (col, 660));
+            gap (24);
+            auto row = at (42);
+            runSetup.setBounds (row.removeFromLeft (250));
+            row.removeFromLeft (12);
+            advanced.setBounds (row.removeFromLeft (250));
+            gap (16);
+            soundText = at (44);
+            break;
+        }
+        case Section::guitar:
+        {
+            auto knobs = at (130);
+            inGain.setBounds (knobs.removeFromLeft (120));
+            knobs.removeFromLeft (10);
+            gate.setBounds (knobs.removeFromLeft (120));
+            knobs.removeFromLeft (32);
+            knobs.removeFromTop (16);
+            meterCaption = knobs.removeFromTop (22);
+            inMeter.setBounds (knobs.removeFromTop (8).withTrimmedRight (10));
+            knobs.removeFromTop (18);
+            gateOn.setBounds (knobs.removeFromTop (30).withWidth (220));
+            gap (30);
+            inputFix.setBounds (at (30));
+            gap (4);
+            fixText = at (40).withTrimmedLeft (52);
+            gap (28);
+            humRow = at (26);
+            gap (8);
+            hum->setBounds (at (36).withWidth (std::min (col, 430)));
+            gap (12);
+            humText = at (40);
+            break;
+        }
+        case Section::foot:
+        {
+            auto row = at (40);
+            teachControl.setBounds (row.removeFromLeft (240));
+            row.removeFromLeft (12);
+            teachJob.setBounds (row.removeFromLeft (240));
+            gap (12);
+            footText = at (22);
+            gap (10);
+            footView.setBounds (at (220));
+            footList->setSize (footView.getWidth() - 12, FootList::rowH);
+            footList->refresh();
+            break;
+        }
+        case Section::app:
+        {
+            if (hasUpdater)
+            {
+                updateStatus = at (26);
+                gap (14);
+                autoUpdate.setBounds (at (30));
+                gap (16);
+                updateButton.setBounds (at (40).withWidth (250));
+                gap (40);
+            }
+            motionHead = at (26);
+            gap (10);
+            lessMotion.setBounds (at (30));
+            break;
+        }
+        case Section::help:
+        {
+            auto row = at (42);
+            for (auto* b : { &website, &problem, &report })
+            {
+                b->setBounds (row.removeFromLeft (180));
+                row.removeFromLeft (12);
+            }
+            gap (16);
+            helpText = at (66);
+            gap (36);
+            aboutHead = at (26);
+            gap (10);
+            aboutArea = at (150);
+            break;
+        }
+    }
+    page.setSize (w, y + 40);
 }
 
 void SettingsView::paint (juce::Graphics& g)
 {
     g.fillAll (colours::bg);
-    auto r = getLocalBounds().reduced (60, 40);
-    g.setColour (colours::text);
-    g.setFont (font (28.0f, Weight::display));
-    auto titleRow = r.removeFromTop (50);
-    g.drawText ("Settings", titleRow, juce::Justification::centredLeft);
-    // which copy this is, where nobody has to look for it
-    g.setColour (colours::textDim);
-    g.setFont (font (14.0f));
-    g.drawText ("Riffhouse " + versionForPeople(), titleRow.withTrimmedLeft (180).withTrimmedRight (titleRow.getWidth() / 2 + 20).translated (0, 5), juce::Justification::centredLeft);
-    auto cols = r;
-    auto left = cols.removeFromLeft (cols.getWidth() / 2 - 20);
-    cols.removeFromLeft (40);
-    auto right = cols;
+    // the rail is the room's edge, a step darker, like the bars above and below the rig
+    g.setColour (juce::Colour (0xff0b0b0b));
+    g.fillRect (rail);
+    g.setColour (juce::Colour (0xff222120));
+    g.fillRect (rail.getRight() - 1, 0, 1, getHeight());
 
-    auto heading = [&g] (juce::Rectangle<int> a, const juce::String& t)
-    {
-        g.setColour (colours::textFaint);
-        g.setFont (font (12.5f, Weight::semibold));
-        g.drawText (t.toUpperCase(), a, juce::Justification::centredLeft);
-    };
-    heading (left.removeFromTop (36), "Audio");
+    auto head = rail.reduced (28, 0).withTrimmedTop (36);
     g.setColour (colours::text);
-    g.setFont (font (15.0f));
-    g.drawFittedText (summary, left.removeFromTop (summaryHeight()), juce::Justification::topLeft, 5, 1.0f);
-    left.removeFromTop (40 + 32);
-    heading (left.removeFromTop (36), "About");
+    g.setFont (font (24.0f, Weight::display));
+    g.drawText ("Settings", head.removeFromTop (32), juce::Justification::centredLeft);
+    g.setColour (colours::textFaint);
+    g.setFont (font (12.5f));
+    g.drawText ("Riffhouse " + versionForPeople(), head.removeFromTop (22), juce::Justification::centredLeft);
+
+    for (size_t i = 0; i < railItems.size(); ++i)
     {
-        // one paragraph with air between its lines
-        juce::AttributedString about;
-        about.setLineSpacing (4.0f);
-        about.setWordWrap (juce::AttributedString::byWord);
-        about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
-                      "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
-                      "any artist, band or equipment maker, and all trademarks belong to their owners. "
-                      "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Fonts under the SIL Open Font License and the Apache License 2.0. Every licence is in Licences.txt beside the app.",
-                      font (13.5f), colours::textDim);
-        about.draw (g, left.removeFromTop (aboutH).toFloat());
+        const auto [s, area] = railItems[i];
+        const bool on = s == current, over = (int) i == hover;
+        auto a = area.toFloat();
+        if (on || over)
+        {
+            g.setColour (juce::Colours::white.withAlpha (on ? 0.06f : 0.03f));
+            g.fillRoundedRectangle (a, 6.0f);
+        }
+        // the open section has its pilot light lit, like the AMP ON lamp on the rig
+        const auto lamp = juce::Rectangle<float> (7.0f, 7.0f).withCentre ({ a.getX() + 16.0f, a.getCentreY() });
+        if (on)
+        {
+            g.setColour (colours::lamp.withAlpha (0.25f));
+            g.fillEllipse (lamp.expanded (3.0f));
+            g.setColour (colours::lamp);
+            g.fillEllipse (lamp);
+        }
+        else
+        {
+            g.setColour (juce::Colour (0xff2a2826));
+            g.fillEllipse (lamp);
+        }
+        g.setColour (on ? colours::text : over ? colours::text.withAlpha (0.85f) : colours::textDim);
+        g.setFont (font (15.0f, on ? Weight::semibold : Weight::medium));
+        g.drawText (sectionName (s), area.withTrimmedLeft (34), juce::Justification::centredLeft);
     }
-    heading (motionHeading, "Motion");
-    if (updateButton.isVisible())
+}
+
+void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
+{
+    // The sound card's state on a display window, like the tone's name in the top bar: the delay
+    // in lit figures on the left, what is plugged in where on the right.
+    g.setColour (juce::Colour (0xff151413));
+    g.fillRoundedRectangle (a, 6.0f);
+    g.setGradientFill (juce::ColourGradient (juce::Colours::black.withAlpha (0.55f), 0.0f, a.getY(),
+                                             juce::Colours::transparentBlack, 0.0f, a.getY() + 10.0f, false));
+    g.fillRoundedRectangle (a, 6.0f);
+    g.setColour (juce::Colours::white.withAlpha (0.07f));
+    g.fillRect (a.getX() + 4.0f, a.getBottom() - 1.0f, a.getWidth() - 8.0f, 1.0f);
+
+    // what is running, or the example used for pictures of the app
+    struct Card { bool open = false; juce::String driver, input, output; int buffer = 0, dropouts = 0; double rate = 48000.0, ms = 0.0; } c;
+    auto* host = StandaloneHost::get();
+    if (exampleCard)
+        c = { true, "Windows Audio (Exclusive Mode)", "Guitar (Realtek USB Audio)", "Headphones (Realtek USB Audio)", 144, 0, 48000.0, 6.3 };
+    else if (auto* dev = host != nullptr ? host->deviceManager().getCurrentAudioDevice() : nullptr)
     {
-        heading (updateHeading, "Updates");
+        juce::AudioDeviceManager::AudioDeviceSetup setup;
+        host->deviceManager().getAudioDeviceSetup (setup);
+        c.open = true;
+        c.driver = dev->getTypeName();
+        c.input = setup.inputDeviceName.isNotEmpty() ? setup.inputDeviceName : juce::String ("none");
+        c.output = setup.outputDeviceName.isNotEmpty() ? setup.outputDeviceName : juce::String ("none");
+        c.rate = std::max (1.0, dev->getCurrentSampleRate());
+        c.buffer = dev->getCurrentBufferSizeSamples();
+        int lat = dev->getInputLatencyInSamples() + dev->getOutputLatencyInSamples();
+        if (lat <= 0) lat = 2 * c.buffer;
+        c.ms = 1000.0 * (lat + proc.getLatencySamples()) / c.rate;
+        c.dropouts = dev->getXRunCount();
+    }
+    auto in = a.reduced (26.0f, 20.0f);
+    auto figure = in.removeFromLeft (190.0f);
+    g.setColour (juce::Colours::black.withAlpha (0.6f));
+    g.fillRect (figure.getRight() + 4.0f, in.getY(), 1.0f, in.getHeight());
+    in.removeFromLeft (30.0f);
+
+    if (! c.open)
+    {
+        g.setColour (colours::lamp.withAlpha (0.35f));
+        g.setFont (faceFont (Face::doto, 52.0f));
+        g.drawText ("0.0", figure.withTrimmedBottom (26.0f), juce::Justification::centredLeft);
+        drawCaps (g, "No sound card", figure.removeFromBottom (20.0f), 11.0f, colours::textDim, juce::Justification::centredLeft, 0.14f);
         g.setColour (colours::text);
-        g.setFont (font (15.0f));
-        g.drawText (lastUpdateText, updateStatus, juce::Justification::centredLeft);
+        g.setFont (font (16.0f, Weight::medium));
+        g.drawFittedText ("Nothing is open yet. Run the automatic setup and Riffhouse finds your guitar for you.",
+                          in.toNearestInt(), juce::Justification::centredLeft, 3, 1.0f);
+        return;
     }
+    const double ms = c.ms, sr = c.rate;
+    const int buf = c.buffer, dropouts = c.dropouts;
 
-    heading (right.removeFromTop (36), "Your guitar input");
+    // fast enough not to notice is amber; slow enough to feel is a softer amber, never red
+    g.setColour (ms <= 12.0 ? colours::lamp : colours::lamp.withAlpha (0.7f));
+    g.setFont (faceFont (Face::doto, 52.0f));
+    auto num = figure.withTrimmedBottom (26.0f);
+    const auto msText = juce::String (ms, ms < 10.0 ? 1 : 0);
+    g.drawText (msText, num, juce::Justification::centredLeft);
+    const float numW = juce::GlyphArrangement::getStringWidth (faceFont (Face::doto, 52.0f), msText);
+    g.setFont (font (16.0f, Weight::medium));
     g.setColour (colours::textDim);
-    g.setFont (font (13.0f));
-    g.drawText ("Level going into the rig", meterCaption, juce::Justification::centredLeft);
-    right.removeFromTop (130 + 14 + 30);
-    g.setColour (colours::textDim);
-    g.setFont (font (13.0f));
-    g.drawFittedText ("Setup measures how much treble your input loses and sets the strength (now "
-                          + juce::String (juce::roundToInt (proc.value (P::inputFixAmt))) + " dB). Interfaces with a guitar (Hi-Z) input don't need it.",
-                      right.removeFromTop (40).withTrimmedLeft (44), juce::Justification::topLeft, 2, 1.0f);
+    g.drawText ("ms", num.withTrimmedLeft (numW + 8.0f).withTrimmedTop (18.0f), juce::Justification::centredLeft);
+    drawCaps (g, "From string to ear", figure.removeFromBottom (20.0f), 11.0f, colours::textDim, juce::Justification::centredLeft, 0.14f);
+
+    const float rowH = in.getHeight() / 4.0f;
+    auto line = [&] (const juce::String& k, const juce::String& v, juce::Colour ink)
+    {
+        auto row = in.removeFromTop (rowH);
+        drawCaps (g, k, row.removeFromLeft (52.0f), 10.5f, colours::textFaint, juce::Justification::centredLeft, 0.14f);
+        g.setColour (ink);
+        g.setFont (font (15.0f));
+        g.drawText (v, row, juce::Justification::centredLeft, true);
+    };
+    line ("Driver", c.driver, colours::text);
+    line ("In", c.input, colours::text);
+    line ("Out", c.output, colours::text);
+    line ("Runs", juce::String (buf) + " samples at " + juce::String (sr / 1000.0, 1) + " kHz"
+                      + (dropouts > 0 ? ", " + juce::String (dropouts) + (dropouts == 1 ? " dropout" : " dropouts") : juce::String()),
+          dropouts > 0 ? colours::hot : colours::textDim);
+}
+
+void SettingsView::paintPage (juce::Graphics& g)
+{
+    const int col = std::min (page.getWidth(), 720);
     g.setColour (colours::text);
-    g.setFont (font (14.5f, Weight::medium));
-    auto humRow = right.removeFromTop (26);
-    g.drawText ("Mains hum filter", humRow, juce::Justification::centredLeft);
-    const int mains = proc.meters().mains.load();
-    g.setColour (mains > 0 ? colours::good : colours::textFaint);
-    g.setFont (font (13.0f));
-    g.drawText (mains > 0 ? "Found " + juce::String (mains) + " Hz hum, removing it" : "No hum detected", humRow, juce::Justification::centredRight);
-    right.removeFromTop (34 + 10);
+    g.setFont (font (30.0f, Weight::display));
+    g.drawText (sectionName (current), 0, 0, col, 46, juce::Justification::centredLeft);
     g.setColour (colours::textDim);
-    g.setFont (font (13.0f));
-    g.drawFittedText ("Auto listens for the 50 Hz (India, Europe, most of Asia and Africa) or 60 Hz (Americas) buzz from "
-                      "power lines and removes just that, leaving your low notes alone.",
-                      right.removeFromTop (40), juce::Justification::topLeft, 3, 1.0f);
+    g.setFont (font (15.0f));
+    g.drawFittedText (sectionLead (current), juce::Rectangle<int> (0, 48, col, 44), juce::Justification::topLeft, 2, 1.0f);
 
-    heading (footHeading, "Foot control");
-    g.setColour (colours::textDim);
-    g.setFont (font (13.0f));
-    g.drawFittedText (juce::String (StandaloneHost::get() != nullptr
-                                        ? "A MIDI foot controller, expression pedal or keyboard works the moment you plug it in. "
-                                        : "Send MIDI from a foot controller, expression pedal or keyboard to this plugin. ")
-                          + "Program changes pick your starred tones in order.",
-                      footText, juce::Justification::topLeft, 2, 1.0f);
+    auto small = [&g] (const juce::String& t, juce::Rectangle<int> a, int lines = 3)
+    {
+        g.setColour (colours::textDim);
+        g.setFont (font (13.5f));
+        g.drawFittedText (t, a, juce::Justification::topLeft, lines, 1.0f);
+    };
+    auto subhead = [&g] (const juce::String& t, juce::Rectangle<int> a)
+    {
+        g.setColour (colours::text);
+        g.setFont (font (16.0f, Weight::semibold));
+        g.drawText (t, a, juce::Justification::centredLeft);
+    };
+
+    switch (current)
+    {
+        case Section::sound:
+            paintPlate (g, plateArea.toFloat());
+            small ("Setup listens to your guitar and picks the fastest way that plays clean. To choose the input, the "
+                   "headphones or the delay yourself, use Input, output and delay.", soundText, 2);
+            break;
+        case Section::guitar:
+        {
+            g.setColour (colours::textDim);
+            g.setFont (font (13.0f));
+            g.drawText ("Level going into the rig", meterCaption, juce::Justification::centredLeft);
+            small ("Setup measures how much treble your input loses and sets the strength (now "
+                       + juce::String (juce::roundToInt (proc.value (P::inputFixAmt))) + " dB). Interfaces with a guitar (Hi-Z) input don't need it.",
+                   fixText, 2);
+            subhead ("Mains hum filter", humRow);
+            const int mains = proc.meters().mains.load();
+            g.setColour (mains > 0 ? colours::good : colours::textFaint);
+            g.setFont (font (13.0f));
+            g.drawText (mains > 0 ? "Found " + juce::String (mains) + " Hz hum, removing it" : "No hum heard", humRow, juce::Justification::centredRight);
+            small ("Auto listens for the 50 Hz (India, Europe, most of Asia and Africa) or 60 Hz (Americas) buzz from "
+                   "power lines and removes just that, leaving your low notes alone.", humText, 2);
+            break;
+        }
+        case Section::foot:
+            small ("Program changes pick your starred tones in order. What you have taught is listed here.", footText, 1);
+            break;
+        case Section::app:
+            if (hasUpdater)
+            {
+                g.setColour (colours::text);
+                g.setFont (font (16.0f, Weight::medium));
+                g.drawText (lastUpdateText, updateStatus, juce::Justification::centredLeft);
+            }
+            subhead ("Motion", motionHead);
+            break;
+        case Section::help:
+        {
+            small ("Help and fixes opens the page of common problems. Report a problem puts a report on your clipboard and opens "
+                   "the page to paste it into. Save a report writes it to a text file in your recordings folder, to send to "
+                   "whoever is helping you. Nothing is sent by itself.", helpText, 3);
+            subhead ("About", aboutHead);
+            juce::AttributedString about;
+            about.setLineSpacing (4.0f);
+            about.setWordWrap (juce::AttributedString::byWord);
+            about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
+                          "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
+                          "any artist, band or equipment maker, and all trademarks belong to their owners. "
+                          "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Fonts under the "
+                          "SIL Open Font License and the Apache License 2.0. Every licence is in Licences.txt beside the app.",
+                          font (13.5f), colours::textDim);
+            about.draw (g, aboutArea.toFloat());
+            break;
+        }
+    }
 }
 
 //==============================================================================

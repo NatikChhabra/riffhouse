@@ -24,7 +24,7 @@
 
 namespace rh
 {
-// Keeps the editor at its designed aspect ratio inside a freely resizable window.
+// Holds the editor so it always fills the window: the editor lays itself out for the window's shape.
 class Letterbox : public juce::Component
 {
 public:
@@ -33,12 +33,7 @@ public:
         addAndMakeVisible (editor);
     }
     void paint (juce::Graphics& g) override { g.fillAll (ui::colours::bg); }
-    void resized() override
-    {
-        const float s = std::min ((float) getWidth() / RiffhouseEditor::baseWidth, (float) getHeight() / RiffhouseEditor::baseHeight);
-        const int w = juce::roundToInt (RiffhouseEditor::baseWidth * s), h = juce::roundToInt (RiffhouseEditor::baseHeight * s);
-        editor.setBounds (getLocalBounds().withSizeKeepingCentre (w, h));
-    }
+    void resized() override { editor.setBounds (getLocalBounds()); }
 
 private:
     juce::AudioProcessorEditor& editor;

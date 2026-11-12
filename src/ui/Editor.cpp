@@ -432,6 +432,7 @@ public:
         takeBar.onMessage = [this] (juce::String m) { editor.showToast (m); };
         takeBar.onChanged = [this]
         {
+            placeOverlays(); // an open page makes room for the strip, or takes it back
             placeBars();
             if (takesView.isVisible()) takesView.refresh();
         };
@@ -445,6 +446,7 @@ public:
         addChildComponent (dropHint);
         addChildComponent (toast);
         addChildComponent (noticeBar);
+        addChildComponent (takeBacking);
         addChildComponent (takeBar);
         noticeBar.onAction = [this]
         {
@@ -562,17 +564,35 @@ public:
         proc.tunerOpen.store (&c == &tuner);
         tunerButton.setToggleState (&c == &tuner, juce::dontSendNotification);
         settingsButton.setToggleState (&c == &settings, juce::dontSendNotification);
+        placeBars();
         takeBar.toFront (false);
         toast.toFront (false);
+    }
+
+    // The pages that open over the rig. A playing take's strip sits above the bottom bar, and an
+    // open page ends above the strip, so the strip never covers a button.
+    void placeOverlays()
+    {
+        const int bottom = takeBar.isActive() ? bottomY() - 48 : getHeight();
+        const auto overlay = juce::Rectangle<int> (0, topH + 1, getWidth(), bottom - topH - 1);
+        for (auto* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings, (juce::Component*) &takesView })
+            c->setBounds (overlay);
     }
 
     // The strip for a playing take and the audio notice share one place above the bottom bar.
     void placeBars()
     {
+        const bool pageOpen = browser.isVisible() || tuner.isVisible() || settings.isVisible() || takesView.isVisible();
+        takeBacking.setVisible (takeBar.isActive() && pageOpen);
+        if (takeBacking.isVisible())
+        {
+            takeBacking.setBounds (0, bottomY() - 48, getWidth(), getHeight() - (bottomY() - 48));
+            takeBacking.toFront (false);
+        }
         if (takeBar.isActive())
         {
             const int w = juce::jmin (getWidth() - 48, 900);
-            takeBar.setBounds ((getWidth() - w) / 2, bottomY - 40, w, 32);
+            takeBar.setBounds ((getWidth() - w) / 2, bottomY() - 40, w, 32);
             takeBar.toFront (false);
             noticeBar.setVisible (false);
         }
@@ -593,6 +613,7 @@ public:
         proc.tunerOpen.store (false);
         tunerButton.setToggleState (false, juce::dontSendNotification);
         settingsButton.setToggleState (false, juce::dontSendNotification);
+        takeBacking.setVisible (false);
     }
 
     void showPopover (Popover& p, juce::Rectangle<int> anchor, int w, int h)
@@ -669,7 +690,7 @@ public:
                 if (auto* host = StandaloneHost::get(); host != nullptr && wizard == nullptr && ! takeBar.isActive())
                     n = host->audioNotice();
             noticeBar.set (n);
-            if (noticeBar.isVisible()) noticeBar.setBounds (0, bottomY - 34, getWidth(), 34);
+            if (noticeBar.isVisible()) noticeBar.setBounds (0, bottomY() - 34, getWidth(), 34);
         }
         amp.refresh();
         for (auto* pg : pages) if (pg != nullptr && pg->isVisible()) pg->refresh();
@@ -681,7 +702,7 @@ public:
             wasRecording = proc.recorder().isRecording() || proc.isCountingIn();
         }
         const auto status = bottomStatus();
-        if (status != lastStatus) { lastStatus = status; repaint (0, bottomY, getWidth(), getHeight() - bottomY); }
+        if (status != lastStatus) { lastStatus = status; repaint (0, bottomY(), getWidth(), getHeight() - bottomY()); }
         if (++frame % 15 == 0) refreshTop();
     }
 
@@ -749,7 +770,9 @@ public:
     }
 
     // -------------------------------------------------------------------------
-    static constexpr int topH = 56, chainY = 66, chainH = 98, pageY = 176, bottomY = 712;
+    static constexpr int topH = 56, chainY = 66, chainH = 98, pageY = 176, bottomH = 68;
+    // the bottom bar sits on the window's floor, however tall the window is
+    int bottomY() const { return getHeight() - bottomH; }
 
     void resized() override
     {
@@ -783,28 +806,24 @@ public:
         redoButton.setBounds (left.removeFromLeft (30));
 
         chain.setBounds (0, chainY, getWidth(), chainH);
-        const auto page = juce::Rectangle<int> (24, pageY, getWidth() - 48, bottomY - pageY - 6);
+        const auto page = juce::Rectangle<int> (24, pageY, getWidth() - 48, bottomY() - pageY - 6);
         amp.setBounds (page);
         for (auto* pg : pages) if (pg != nullptr) pg->setBounds (page);
 
         // bottom bar: input on the left, the three big-picture knobs in the middle, output on the right
-        auto bottom = juce::Rectangle<int> (24, bottomY, getWidth() - 48, getHeight() - bottomY);
+        auto bottom = juce::Rectangle<int> (24, bottomY(), getWidth() - 48, getHeight() - bottomY());
         inMeterArea = bottom.removeFromLeft (380);
         inMeter.setBounds (inMeterArea.getX() + 62, inMeterArea.getY() + 17, 226, 13);
         outMeterArea = bottom.removeFromRight (380);
         outMeter.setBounds (outMeterArea.getRight() - 226 - 54, outMeterArea.getY() + 17, 226, 13);
         levelSpot.setBounds (outMeter.getX() - 70, outMeterArea.getY() + 36, 170, 20);
-        auto macros = bottom.withSizeKeepingCentre (3 * 92, getHeight() - bottomY);
+        auto macros = bottom.withSizeKeepingCentre (3 * 92, getHeight() - bottomY());
         for (auto* k : { &space, &doubler, &volume })
             k->setBounds (macros.removeFromLeft (92).withSizeKeepingCentre (64, 58));
 
-        const auto overlay = juce::Rectangle<int> (0, topH + 1, getWidth(), getHeight() - topH - 1);
-        browser.setBounds (overlay);
-        tuner.setBounds (overlay);
-        settings.setBounds (overlay);
-        takesView.setBounds (overlay);
+        placeOverlays();
         placeBars();
-        toast.setBounds (0, bottomY - 34, getWidth(), 34);
+        toast.setBounds (0, bottomY() - 34, getWidth(), 34);
         dropHint.setBounds (getLocalBounds());
         stage = {};
     }
@@ -818,10 +837,10 @@ public:
             // the bars at top and bottom are the edges of the room, a step darker
             sg.setColour (juce::Colour (0xff0b0b0b));
             sg.fillRect (0, 0, getWidth(), topH);
-            sg.fillRect (0, bottomY, getWidth(), getHeight() - bottomY);
+            sg.fillRect (0, bottomY(), getWidth(), getHeight() - bottomY());
             sg.setColour (juce::Colour (0xff222120));
             sg.fillRect (0, topH, getWidth(), 1);
-            sg.fillRect (0, bottomY, getWidth(), 1);
+            sg.fillRect (0, bottomY(), getWidth(), 1);
         }
         g.drawImageAt (stage, 0, 0);
         drawLogo (g, logoArea.toFloat());
@@ -932,6 +951,8 @@ public:
     NoticeBar noticeBar;
     bool footStrip = false; // the strip is showing how to teach a foot controller
     TakeBar takeBar;
+    // under the strip while a page is open, so the rig does not show through between them
+    struct Backing : juce::Component { void paint (juce::Graphics& g) override { g.fillAll (colours::bg); } } takeBacking;
     TakesView takesView;
     int noticeTicks = 0;
     bool quietNotices = false; // pictures of the app are taken without a message about the missing guitar
@@ -961,8 +982,7 @@ RiffhouseEditor::RiffhouseEditor (RiffhouseProcessor& p) : AudioProcessorEditor 
     tooltips.setLookAndFeel (&lnf);
 
     setResizable (true, true);
-    setResizeLimits (baseWidth * 3 / 4, baseHeight * 3 / 4, baseWidth * 2, baseHeight * 2);
-    if (auto* c = getConstrainer()) c->setFixedAspectRatio ((double) baseWidth / baseHeight);
+    setResizeLimits (baseWidth * 3 / 4, baseHeight * 3 / 4, maxWidth * 2, maxHeight * 2);
     const double scale = (double) proc.uiState.getProperty ("scale", 1.0);
     setSize (juce::roundToInt (baseWidth * scale), juce::roundToInt (baseHeight * scale));
     setWantsKeyboardFocus (proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone);
@@ -1029,9 +1049,16 @@ void RiffhouseEditor::applyLook (ui::Look l, bool reopenSettings)
 
 void RiffhouseEditor::resized()
 {
-    const float s = (float) getWidth() / (float) baseWidth;
-    root->setTransform (juce::AffineTransform::scale (s));
-    root->setBounds (0, 0, baseWidth, baseHeight);
+    // The rig is laid out for whatever shape the window has: it is scaled so the designed size just
+    // fits, and the other side grows to fill the window. Only past a very wide or very tall window
+    // does the rest stay empty, centred.
+    const float s = std::min ((float) getWidth() / (float) baseWidth, (float) getHeight() / (float) baseHeight);
+    if (s <= 0.0f) return;
+    const int w = juce::jlimit (baseWidth, maxWidth, juce::roundToInt ((float) getWidth() / s));
+    const int h = juce::jlimit (baseHeight, maxHeight, juce::roundToInt ((float) getHeight() / s));
+    root->setBounds (0, 0, w, h);
+    root->setTransform (juce::AffineTransform::scale (s).translated (0.5f * ((float) getWidth() - (float) w * s),
+                                                                      0.5f * ((float) getHeight() - (float) h * s)));
     proc.uiState.setProperty ("scale", s, nullptr);
 }
 
@@ -1265,7 +1292,7 @@ void RiffhouseEditor::openFile (const juce::File& f)
 
 void RiffhouseEditor::showToast (const juce::String& m)
 {
-    root->toast.setTopLeftPosition (root->toast.getX(), Root::bottomY - (root->noticeBar.isVisible() ? 68 : 34));
+    root->toast.setTopLeftPosition (root->toast.getX(), root->bottomY() - (root->noticeBar.isVisible() ? 68 : 34));
     root->toast.toFront (false);
     root->toast.show (m);
 }
@@ -1434,7 +1461,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     {
         // one picture with the message that shows when no guitar is connected
         r.noticeBar.set ({ "No guitar input yet. Plug in and Riffhouse will find it.", "Run setup", false });
-        r.noticeBar.setBounds (0, Root::bottomY - 34, r.getWidth(), 34);
+        r.noticeBar.setBounds (0, r.bottomY() - 34, r.getWidth(), 34);
         shoot ("notice");
         r.noticeBar.set ({});
     }
@@ -1445,7 +1472,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         proc.footTeachTouch();
         r.footStrip = true;
         r.noticeBar.set (r.footNotice());
-        r.noticeBar.setBounds (0, Root::bottomY - 34, r.getWidth(), 34);
+        r.noticeBar.setBounds (0, r.bottomY() - 34, r.getWidth(), 34);
         shoot ("foot-touch");
         proc.setValue (P::drvOn, driveWas > 0.5f ? 0.0f : 1.0f);
         proc.footTick();
@@ -1509,7 +1536,16 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
     shoot ("tuner");
     r.closeOverlays();
     r.toggleOverlay (r.settings);
+    shoot ("settings-none");
+    r.settings.showExampleCard();
     shoot ("settings");
+    {
+        using S = SettingsView::Section;
+        const std::pair<S, const char*> each[] = { { S::guitar, "settings-guitar" }, { S::foot, "settings-foot" },
+                                                    { S::app, "settings-app" }, { S::help, "settings-help" } };
+        for (const auto& [section, name] : each) { r.settings.show (section); shoot (name); }
+        r.settings.show (S::sound);
+    }
     r.closeOverlays();
     r.showPopover (r.recordPanel, r.recordOptions.getBounds(), 380, 522);
     shoot ("record");
@@ -1568,6 +1604,8 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         shoot ("setup-again");
         const char* names[] = { "setup-1-find", "setup-2-delay", "setup-3-play", "setup-4-quiet", "setup-found", "setup-done" };
         for (int i = 0; i < 6; ++i) { w.showExample (i); shoot (names[i]); }
+        w.showExample (6);
+        shoot ("setup-done-shared");
         r.removeChildComponent (&w);
     }
     {
@@ -1798,6 +1836,46 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
         root->setProperty ("pedals", pedals);
         root->setProperty ("amps", amps);
         dir.getChildFile ("gear.json").replaceWithText (juce::JSON::toString (juce::var (root)));
+    }
+    {
+        // The whole window in the shapes people's screens give it: the rig has to fill each one,
+        // with nothing cut off and nothing covered.
+        const auto was = getBounds();
+        auto shootWindow = [&] (const juce::String& name)
+        {
+            r.tick();
+            const auto img = createComponentSnapshot (getLocalBounds(), true, 1.0f);
+            juce::PNGImageFormat png;
+            auto f = folder.getChildFile (name + ".png");
+            f.deleteFile();
+            if (auto out = f.createOutputStream()) png.writeImageToStream (img, *out);
+        };
+        struct Shape { const char* name; int w, h; };
+        for (const auto& sh : { Shape { "16x9", 1600, 900 }, Shape { "16x10", 1440, 900 }, Shape { "21x9", 2100, 900 },
+                                Shape { "4x3", 1024, 768 }, Shape { "tall", 900, 1100 }, Shape { "small", 700, 455 } })
+        {
+            setSize (sh.w, sh.h);
+            r.closeOverlays();
+            r.showPage (mAmp);
+            shootWindow (juce::String ("window-") + sh.name);
+            r.toggleOverlay (r.settings);
+            shootWindow (juce::String ("window-") + sh.name + "-settings");
+            r.closeOverlays();
+        }
+        // a take playing while Settings is open: the strip must not cover anything
+        setSize (1600, 900);
+        const auto takes = listTakes (proc.recordingFolder);
+        if (! takes.empty())
+        {
+            r.takeBar.start (takes.front(), false);
+            r.toast.setVisible (false);
+            r.toggleOverlay (r.settings);
+            r.settings.show (SettingsView::Section::app); // the page whose button the strip used to cover
+            shootWindow ("window-settings-take");
+            r.closeOverlays();
+            r.takeBar.stop();
+        }
+        setBounds (was);
     }
 }
 

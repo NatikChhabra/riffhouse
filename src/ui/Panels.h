@@ -95,7 +95,8 @@ private:
     juce::Slider level;
 };
 
-// Input, audio and about. Audio settings appear only in the standalone app.
+// Settings: a rail of sections on the left, one section at a time on the right, scrolling when the
+// window is short. Sound card and updates appear only in the standalone app.
 class SettingsView : public juce::Component, private juce::Timer
 {
 public:
@@ -104,24 +105,54 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
     void visibilityChanged() override;
+    void mouseMove (const juce::MouseEvent&) override;
+    void mouseExit (const juce::MouseEvent&) override;
+    void mouseUp (const juce::MouseEvent&) override;
     std::function<void()> onClose, onRunSetup;
     std::function<void (Look)> onLookChange;
     std::function<void (const juce::String&)> onMessage;
+
+    enum class Section { sound, guitar, foot, app, help };
+    void show (Section);
+    // For pictures of the app: the display shows a sound card running, as on a PC with one.
+    void showExampleCard() { exampleCard = true; page.repaint(); }
 
 private:
     void timerCallback() override;
     void saveReport();
     juce::String deviceSummary() const;
     void showAdvancedAudio();
+    juce::Array<Section> sections() const;
+    static juce::String sectionName (Section);
+    juce::String sectionLead (Section) const;
+    int railItemAt (juce::Point<int>) const;
+    void layoutPage();
+    void paintPage (juce::Graphics&);
+    void paintPlate (juce::Graphics&, juce::Rectangle<float>);
+
+    // the scrolling side; it paints its words through the view that owns it
+    struct Page : public juce::Component
+    {
+        explicit Page (SettingsView& o) : owner (o) {}
+        void paint (juce::Graphics& g) override { owner.paintPage (g); }
+        SettingsView& owner;
+    };
 
     RiffhouseProcessor& proc;
+    Section current = Section::sound;
+    int hover = -1;
+    juce::Rectangle<int> rail;
+    std::vector<std::pair<Section, juce::Rectangle<int>>> railItems;
+    Page page { *this };
+    juce::Viewport scroller;
+    bool hasUpdater = false, exampleCard = false;
+
     IconButton close { icons::close() };
     juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Input, output and delay..." };
     juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report a problem" };
     juce::String reportText() const;
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
-    juce::Rectangle<int> updateHeading, updateStatus, motionHeading;
     juce::ToggleButton lessMotion { "Less motion: nothing slides, fades are short" };
     void refreshUpdate();
     juce::String lastUpdateText;
@@ -131,16 +162,14 @@ private:
     std::unique_ptr<ChipRow> hum, looks;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> inputFixAtt, gateOnAtt;
     Meter inMeter;
-    juce::Rectangle<int> meterCaption;
     juce::String summary;
-    int summaryHeight() const; // the device summary is one line or four: what follows sits right under it
     // Foot control: teach a controller, and the list of what is taught
     class FootList;
     juce::TextButton teachControl { "Teach a knob or switch" }, teachJob { "Teach a button..." };
     juce::Viewport footView;
     std::unique_ptr<FootList> footList;
-    juce::Rectangle<int> footHeading, footText;
-    static constexpr int aboutH = 100;
+    // the words on the page, painted where the layout put them
+    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, motionHead, helpText, aboutHead, aboutArea;
 };
 
 // Ask for a name and save the current tone.

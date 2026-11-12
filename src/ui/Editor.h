@@ -25,6 +25,8 @@ public:
     bool keyPressed (const juce::KeyPress&) override;
 
     static constexpr int baseWidth = 1200, baseHeight = 780;
+    // the rig fills a window up to this shape (wider than 21:9, taller than 4:3), then centres
+    static constexpr int maxWidth = 1900, maxHeight = 920;
 
     // Drop a file on the window: a .nam capture becomes the amp, a short sound file the
     // cabinet, a long one the song to play along with, a tone file the tone.
