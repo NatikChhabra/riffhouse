@@ -14,6 +14,8 @@
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 #include "../plugin/AudioSwitch.h"
+#include "../plugin/AutoSetup.h"
+#include "../engine/DeviceNames.h"
 #include "../plugin/DeviceGuard.h"
 #include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
@@ -298,23 +300,47 @@ private:
         const bool slow = now.type == "DirectSound" || 1000.0 * buf / rate > 20.0;
         if (! slow || now.input.isEmpty() || now.type == "ASIO") return;
 
+        // An audio interface plays best through its own ASIO driver, and some only work that
+        // way: that is tried first when the input belongs to one. Then the fastest Windows ways.
+        std::vector<AudioChoice> tries;
+        if (auto* asio = [&]() -> juce::AudioIODeviceType* { for (auto* t : dm.getAvailableDeviceTypes()) if (t->getTypeName() == "ASIO") return t; return nullptr; }())
+            for (const auto& d : asio->getDeviceNames (true))
+                if (! AutoSetup::isAsioWrapper (d) && sameHardware (d, now.input))
+                {
+                    AudioChoice a;
+                    a.types = { "ASIO" };
+                    a.input = a.output = d;
+                    tries.push_back (a);
+                    break;
+                }
         AudioChoice c;
         c.input = now.input;
         c.output = now.output;
         c.types = AudioSwitch::modesFor (dm, "Windows Audio", now.input, AudioSwitch::isShared (now.type) && now.type != "DirectSound");
         c.types.removeString ("DirectSound");
-        if (c.types.isEmpty()) return;
+        if (! c.types.isEmpty()) tries.push_back (c);
+        if (tries.empty()) return;
 
-        const double msBefore = 1000.0 * buf / rate;
-        const auto typeBefore = now.type;
-        devlog::note ("Start was slow (" + typeBefore + ", " + juce::String (buf) + " samples): trying " + c.types.joinIntoString (", "));
+        devlog::note ("Start was slow (" + now.type + ", " + juce::String (buf) + " samples): trying a faster way");
         auto& rig = *dynamic_cast<RiffhouseProcessor*> (holder->processor.get());
         healer = std::make_unique<AudioSwitch> (dm, rig);
         setupRunning (true);
-        healer->apply (c, [this, msBefore, typeBefore] (AudioSwitch::Result r)
+        healNext (std::move (tries), 0, now.type, 1000.0 * buf / rate);
+    }
+
+    void healNext (std::vector<AudioChoice> tries, size_t i, juce::String typeBefore, double msBefore)
+    {
+        if (i >= tries.size() || healer == nullptr) { setupRunning (false); return; }
+        const auto choice = tries[i];
+        healer->apply (choice, [this, tries, i, typeBefore, msBefore] (AudioSwitch::Result r)
         {
+            if (! r.ok)
+            {
+                devlog::note ("Not faster: " + r.message);
+                juce::MessageManager::callAsync ([this, tries, i, typeBefore, msBefore] { healNext (tries, i + 1, typeBefore, msBefore); });
+                return;
+            }
             setupRunning (false);
-            if (! r.ok) { devlog::note ("Stayed on " + typeBefore + ": " + r.message); return; }
             // the faster way works: keep it, and leave the driver box on Automatic
             properties.getUserSettings()->setValue ("audioDriver", juce::String());
             saveAudioState();
