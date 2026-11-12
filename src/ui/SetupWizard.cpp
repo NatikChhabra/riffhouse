@@ -488,11 +488,11 @@ void SetupWizard::paint (juce::Graphics& g)
             strokeIcon (g, icons::headphones(), box.removeFromLeft (58).withTrimmedRight (20.0f).withSizeKeepingCentre (34, 34), colours::accent, 2.0f);
             g.setColour (colours::text);
             g.setFont (font (16.0f, Weight::semibold));
-            g.drawText ("Put on headphones first", box.removeFromTop (44).withTrimmedTop (14), juce::Justification::centredLeft);
+            g.drawText ("Put on wired headphones first", box.removeFromTop (44).withTrimmedTop (14), juce::Justification::centredLeft);
             g.setColour (colours::textDim);
             g.setFont (font (14.5f));
-            g.drawFittedText ("If your guitar is plugged into the computer's mic jack, speakers can howl. "
-                              "Plug the guitar in, turn its volume up, and press Start.",
+            g.drawFittedText ("Bluetooth adds a delay you can hear, and speakers can howl. Plug the guitar into an audio "
+                              "interface or the computer's line-in or mic jack, turn its volume up, and press Start.",
                               box.reduced (0, 4).toNearestInt().withTrimmedRight (16), juce::Justification::topLeft, 3, 1.0f);
             if (listRows() == 0) break;
 
@@ -666,7 +666,7 @@ void SetupWizard::paint (juce::Graphics& g)
             else if (s.fixHeldBack)
                 bullet (false, "This input hisses, so a little of the Input Fix was held back.");
             else if (s.latencyMs >= 15.0)
-                bullet (false, "Delay is a bit high. Closing other audio apps can help.");
+                bullet (false, "Delay is a bit high for this sound card. An audio interface, or headphones in the computer's own jack, bring it down.");
             else if (! AutoSetup::looksLikeOnboardInput (s.inputName, s.deviceType))
                 bullet (false, "Hearing the guitar twice? Switch off Direct Monitor on your interface.");
             else if (s.exclusive)

@@ -664,15 +664,15 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     website.setTooltip ("Opens the page of common problems and how to fix them.");
     website.onClick = [] { juce::URL ("https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md").launchInDefaultBrowser(); };
     page.addAndMakeVisible (website);
-    problem.setTooltip ("Copies the report to your clipboard and opens the page where problems are reported. "
-                        "Paste it there and say what went wrong. Nothing is sent by itself.");
+    problem.setTooltip ("Copies the report, with your user name and computer name taken out, and opens the public page where "
+                        "problems are reported. Paste it there and say what went wrong. Nothing is sent by itself.");
     problem.onClick = [this]
     {
-        juce::SystemClipboard::copyTextToClipboard (reportText());
+        // public, so the player's user name and computer name are taken out first
+        juce::SystemClipboard::copyTextToClipboard (reports::scrubForThisComputer (reportText()));
         juce::URL ("https://github.com/NatikChhabra/riffhouse/issues/new")
-            .withParameter ("title", "Problem: ")
-            .withParameter ("body", "What happened:\n\n\nWhat I expected:\n\n\nReport (press Ctrl+V here, Riffhouse put it on your clipboard):\n\n\n\nRiffhouse "
-                                        + versionLabel() + " on " + juce::SystemStats::getOperatingSystemName())
+            .withParameter ("template", "bug_report.yml")
+            .withParameter ("version", versionLabel())
             .launchInDefaultBrowser();
         if (onMessage) onMessage ("The report is on your clipboard. Paste it into the page that just opened.");
     };

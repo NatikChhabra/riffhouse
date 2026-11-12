@@ -17,4 +17,10 @@ juce::String versionForPeople()
     if (v.containsChar ('-')) return v + " (test build)";
     return v;
 }
+
+// kept to one sentence that fits a toast; change it in the release commit of each version
+juce::String whatsNew()
+{
+    return "Picking ASIO no longer freezes the window, and setup goes for the lowest delay by itself.";
+}
 } // namespace rh

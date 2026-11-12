@@ -196,7 +196,7 @@ public:
             updates->start();
             const auto fresh = updates->justUpdatedTo();
             if (fresh.isNotEmpty())
-                juce::Timer::callAfterDelay (2500, [this, fresh] { if (auto* ed = editor()) ed->showToast ("Updated to version " + fresh); });
+                juce::Timer::callAfterDelay (2500, [this, fresh] { if (auto* ed = editor()) ed->showToast ("Updated to version " + fresh + ". " + whatsNew()); });
         }
 
         // the window comes last: its settings screen asks for the guard and the updater

@@ -1,0 +1,48 @@
+name: Something is wrong
+description: Riffhouse does something it should not, or will not do something it should.
+title: "Problem: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. In Riffhouse, open Settings, then Help, and press **Report in public**: it puts a report on your clipboard with your user name and computer name taken out. Paste it in the last box.
+        Sound problems? The [troubleshooting page](https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md) fixes the common ones.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      placeholder: "I picked ASIO and the window froze."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      placeholder: "It switches to ASIO and keeps playing."
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. Open Settings
+        2. Pick ASIO4ALL
+  - type: input
+    id: version
+    attributes:
+      label: Riffhouse version
+      description: The top of Settings shows it.
+      placeholder: "0.1.5"
+    validations:
+      required: true
+  - type: input
+    id: gear
+    attributes:
+      label: Your guitar connection and headphones or speakers
+      placeholder: "Focusrite Solo, wired headphones"
+  - type: textarea
+    id: report
+    attributes:
+      label: Report from Riffhouse
+      description: Press Ctrl+V here after Report in public.
+      render: text

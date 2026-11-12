@@ -12,4 +12,7 @@ juce::String versionLabel();
 
 // "0.1.0", or "0.1.0-rc2 (test build)": for the places that say what this copy is.
 juce::String versionForPeople();
+
+// One line on what this version changed for the player, said once after an update.
+juce::String whatsNew();
 } // namespace rh

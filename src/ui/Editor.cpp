@@ -213,10 +213,11 @@ public:
     {
         text = t;
         setVisible (true);
-        // it comes up from the bar it lies on, stays two and a half seconds, and fades where it is
+        // it comes up from the bar it lies on, stays two and a half seconds (longer for a long
+        // line, so it can be read to the end), and fades where it is
         shown.to (1.0f, motion::ui, motion::Curve::out, true);
         motion::run (*this, [this] { return shown.moving(); });
-        startTimer (2500);
+        startTimer (juce::jlimit (2500, 6000, 2500 + 40 * (t.length() - 50)));
         repaint();
     }
     void paint (juce::Graphics& g) override

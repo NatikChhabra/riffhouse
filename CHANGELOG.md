@@ -6,6 +6,23 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
+## 0.1.5
+
+No more frozen window when you pick ASIO, a setup that goes for the lowest delay by itself, and a way to send us a report in one click.
+
+- Picking an ASIO driver no longer freezes the window. A driver is first tried in a second, hidden copy of Riffhouse; one that hangs or fails there (ASIO4ALL often does when the sound devices under it are busy) is stopped from outside and never opened in the app. Automatic setup skips a driver that failed on this computer before. Picking it by hand checks it again.
+- When the computer's own Realtek chip plays the sound, setup also tries Realtek's ASIO driver, which goes lower than Windows Audio on the same jacks.
+- Setup no longer opens the sound card a second time at the end when the buffer it found is already running, so each step lags less.
+- Bluetooth speakers and headphones, TVs and monitors over HDMI are named as slow outputs. Setup plays through wired headphones instead when the computer has them, and says so. Bluetooth always adds a delay you can hear; a cable to the speaker's AUX in fixes it.
+- The delay on the Settings plate says how it feels: instant, fine or noticeable. When the buffer is already the smallest the driver allows, it says that too.
+- Send a report (Settings, Help) sends what Riffhouse wrote down to the people who fix it, privately, with your user name and computer name taken out. After a crash, a freeze or a sound card change that did not work, Riffhouse asks once whether to send one. Nothing leaves the computer unless you say yes, and at most three a day.
+- Report in public opens a form on GitHub and puts the report on your clipboard, with your names taken out too.
+- "Count me in the weekly number of players" (Settings, Help, off unless you switch it on) adds one to a count of players each week, nothing else.
+- The taskbar shows the new icon after an update, not the old house.
+- Takes plays any audio file you drop in its folder: MP3, FLAC, OGG, M4A and files with odd names like ".mp3.mpeg".
+- Setup's first page asks for wired headphones and says where the guitar can plug in. After an update, Riffhouse says in one line what changed.
+- A driver that does not count dropouts says "not counted by this driver" instead of "-1".
+
 ## 0.1.4
 
 Fixes from the first day of 0.1.3, and a Riffhouse that puts itself back on the fast way in.
