@@ -19,8 +19,31 @@ namespace
     }
 }
 
+juce::String AudioPicker::driverLabel (const juce::String& t)
+{
+    if (t.isEmpty()) return "Automatic (recommended)";
+    if (t == "ASIO") return "ASIO: audio interface drivers";
+    if (t == "Windows Audio (Exclusive Mode)") return "WASAPI exclusive: fastest Windows mode";
+    if (t == "Windows Audio (Low Latency Mode)") return "WASAPI low latency";
+    if (t == "Windows Audio") return "WASAPI shared: other apps play too";
+    if (t == "DirectSound") return "DirectSound: oldest and slowest";
+    return t;
+}
+
 AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
 {
+    if (auto* host = StandaloneHost::get()) forced = host->settings().getValue ("audioDriver");
+    addAndMakeVisible (driver);
+    driver.onChange = [this]
+    {
+        if (filling) return;
+        const int i = driver.getSelectedItemIndex();
+        if (! juce::isPositiveAndBelow (i, driverTypes.size())) return;
+        forced = driverTypes[i];
+        if (auto* host = StandaloneHost::get()) host->settings().setValue ("audioDriver", forced);
+        refresh(); // the inputs and outputs that driver offers
+        apply (Change::driver);
+    };
     for (auto* b : { &input, &output, &buffer })
     {
         addAndMakeVisible (*b);
@@ -66,7 +89,7 @@ AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
     };
     if (auto* host = StandaloneHost::get())
         changer = std::make_unique<AudioSwitch> (host->deviceManager(), proc);
-    setSize (560, 392);
+    setSize (580, 452);
     refresh();
 }
 
@@ -86,10 +109,36 @@ void AudioPicker::refresh()
     const bool asioNow = now.type == "ASIO";
 
     filling = true;
-    // every input a guitar could be on: an interface's own ASIO driver first, then what Windows lists
-    inputs = AutoSetup::inputs (dm);
-    for (size_t i = inputs.size(); i-- > 0;)
-        if (inputs[i].type == "ASIO" && AutoSetup::isAsioWrapper (inputs[i].name)) inputs.erase (inputs.begin() + (long) i);
+    // the driver row: Automatic, then every driver this computer has
+    driver.clear (juce::dontSendNotification);
+    driverTypes.clear();
+    driverTypes.add ({});
+    for (auto* t : dm.getAvailableDeviceTypes())
+        driverTypes.add (t->getTypeName());
+    if (! driverTypes.contains (forced)) forced = {};
+    for (int i = 0; i < driverTypes.size(); ++i)
+        driver.addItem (driverLabel (driverTypes[i]), i + 1);
+    driver.setSelectedItemIndex (driverTypes.indexOf (forced), juce::dontSendNotification);
+
+    if (forced.isEmpty())
+    {
+        // every input a guitar could be on: an interface's own ASIO driver first, then what Windows lists.
+        // Drivers that only wrap Windows audio are left to the player who asks for ASIO by name.
+        inputs = AutoSetup::inputs (dm);
+        for (size_t i = inputs.size(); i-- > 0;)
+            if (inputs[i].type == "ASIO" && AutoSetup::isAsioWrapper (inputs[i].name)) inputs.erase (inputs.begin() + (long) i);
+    }
+    else
+    {
+        // one driver, every input it has: ASIO4ALL and FlexASIO included
+        inputs.clear();
+        if (auto* t = findType (dm, forced))
+        {
+            t->scanForDevices();
+            for (const auto& n : t->getDeviceNames (true))
+                inputs.push_back ({ forced, n });
+        }
+    }
     input.clear (juce::dontSendNotification);
     int sel = -1;
     for (size_t i = 0; i < inputs.size(); ++i)
@@ -104,7 +153,8 @@ void AudioPicker::refresh()
     // outputs go by the same names in every Windows mode; DirectSound has its own
     output.clear (juce::dontSendNotification);
     pairs = 0;
-    auto* outType = findType (dm, asioNow || ! now.valid() ? juce::String ("Windows Audio") : now.type);
+    auto* outType = findType (dm, forced.isNotEmpty() && forced != "ASIO" ? forced
+                                  : asioNow || ! now.valid() ? juce::String ("Windows Audio") : now.type);
     if (outType == nullptr && ! asioNow) outType = dm.getCurrentDeviceTypeObject();
     if (asioNow && dev != nullptr)
     {
@@ -155,11 +205,13 @@ void AudioPicker::refresh()
         note = "Riffhouse has the sound card to itself, which gives the shortest delay. Other apps are silent while it is open.";
     else if (now.type == "DirectSound")
         note = "Only the slowest way of driving this input started. Close other audio apps and pick the input again.";
+    else if (now.valid() && forced.isEmpty() && ! sharing.getToggleState() && whyShared (now.type, now.input, now.output).isNotEmpty())
+        note = whyShared (now.type, now.input, now.output);
     else if (now.valid() && canShare)
         note = "Other apps can play too. The delay is a little longer than with the sound card to itself.";
 
     output.setVisible (true);
-    sharing.setVisible (! isAsio && canShare);
+    sharing.setVisible (forced.isEmpty() && ! isAsio && canShare);
     // The driver's own window is full of settings nobody needs here. It is offered only when the
     // driver keeps the delay to itself and that window is the one place to change it.
     panel.setVisible (dev != nullptr && dev->hasControlPanel() && bufferSizes.size() <= 1);
@@ -170,6 +222,9 @@ void AudioPicker::refresh()
 
 void AudioPicker::apply (Change what)
 {
+    // a new driver lists its own inputs: when the one in use is not among them, the first is tried
+    if (what == Change::driver && input.getSelectedItemIndex() < 0 && input.getNumItems() > 0)
+        input.setSelectedItemIndex (0, juce::dontSendNotification);
     auto* host = StandaloneHost::get();
     const auto* in = picked();
     if (host == nullptr || changer == nullptr || changer->busy() || in == nullptr) return;
@@ -182,7 +237,8 @@ void AudioPicker::apply (Change what)
     c.output = output.getText();
     if (in->type == "ASIO" && now.type == "ASIO" && sameInput && output.getSelectedId() > 0 && output.getSelectedId() <= pairs)
         c.outputPair = output.getSelectedId() - 1;
-    c.types = AudioSwitch::modesFor (dm, in->type, in->name, sharing.getToggleState());
+    c.types = forced.isNotEmpty() ? juce::StringArray { forced } // the driver the player chose, and only that
+                                  : AudioSwitch::modesFor (dm, in->type, in->name, sharing.getToggleState());
     if (sameInput && (what == Change::output || what == Change::buffer) && c.types.contains (now.type))
     {
         // only the output or the buffer changes: stay with the mode that runs
@@ -195,7 +251,7 @@ void AudioPicker::apply (Change what)
 
     status = "Trying " + c.input + "...";
     statusIsProblem = false;
-    for (juce::Component* b : { (juce::Component*) &input, (juce::Component*) &output, (juce::Component*) &buffer, (juce::Component*) &sharing })
+    for (juce::Component* b : { (juce::Component*) &driver, (juce::Component*) &input, (juce::Component*) &output, (juce::Component*) &buffer, (juce::Component*) &sharing })
         b->setEnabled (false);
     repaint();
     host->setupRunning (true); // whoever guards the connection stands aside while it is changed on purpose
@@ -211,9 +267,11 @@ void AudioPicker::apply (Change what)
                 h->setupRunning (false);
             }
             if (safe == nullptr) return;
-            for (juce::Component* b : { (juce::Component*) &safe->input, (juce::Component*) &safe->output, (juce::Component*) &safe->buffer, (juce::Component*) &safe->sharing })
+            for (juce::Component* b : { (juce::Component*) &safe->driver, (juce::Component*) &safe->input, (juce::Component*) &safe->output, (juce::Component*) &safe->buffer, (juce::Component*) &safe->sharing })
                 b->setEnabled (true);
             safe->status = r.message;
+            if (! r.ok && safe->forced.isNotEmpty())
+                safe->status << " Pick another input, another driver, or Automatic above: nothing is locked.";
             if (r.ok && ! r.fastest) safe->status << " The fastest way would not start on this input, so the next one is in use.";
             if (r.ok && safe->followed) safe->status << " Sound now comes out of " << safe->output.getText() << ".";
             if (r.ok && safe->afterNote.isNotEmpty()) safe->status << " " << safe->afterNote;
@@ -258,7 +316,9 @@ void AudioPicker::showExample (bool asio)
 {
     example = true;
     filling = true;
-    for (auto* b : { &input, &output, &buffer }) b->clear (juce::dontSendNotification);
+    for (auto* b : { &driver, &input, &output, &buffer }) b->clear (juce::dontSendNotification);
+    driver.addItem (driverLabel (asio ? juce::String ("ASIO") : juce::String()), 1);
+    driver.setSelectedItemIndex (0, juce::dontSendNotification);
     isAsio = asio;
     if (asio)
     {
@@ -300,7 +360,7 @@ void AudioPicker::resized()
 {
     auto r = getLocalBounds().reduced (28, 24);
     r.removeFromTop (58); // heading and a line under it
-    for (auto* b : { &input, &output, &buffer })
+    for (auto* b : { &driver, &input, &output, &buffer })
     {
         if (! b->isVisible()) continue;
         b->setBounds (r.removeFromTop (kRow).withTrimmedLeft (kLabel));
@@ -319,13 +379,13 @@ void AudioPicker::paint (juce::Graphics& g)
     g.drawText ("Input and output", r.removeFromTop (28), juce::Justification::centredLeft);
     g.setColour (colours::textDim);
     g.setFont (font (13.5f));
-    g.drawText ("Every change is tried first. If no sound comes through, the last working choice comes back.", r.removeFromTop (22), juce::Justification::centredLeft);
+    g.drawText ("Every change is tried first. If no sound comes through, the last working choice comes back.", r.removeFromTop (22), juce::Justification::centredLeft, true);
     r.removeFromTop (8);
 
-    const char* labels[] = { "Guitar in", "Sound out", "Delay" };
-    juce::ComboBox* boxes[] = { &input, &output, &buffer };
+    const char* labels[] = { "Driver", "Guitar in", "Sound out", "Delay" };
+    juce::ComboBox* boxes[] = { &driver, &input, &output, &buffer };
     g.setFont (font (14.0f));
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 4; ++i)
     {
         if (! boxes[i]->isVisible()) continue;
         g.setColour (colours::textDim);

@@ -22,4 +22,11 @@ juce::String outputPairName (const juce::String& left, const juce::String& right
 // Whether an ASIO driver and a name Windows lists are the same interface: "Focusrite USB ASIO"
 // and "Analogue 1 + 2 (Focusrite USB Audio)" are; the computer's own sound card is not.
 bool sameHardware (const juce::String& asioDriver, const juce::String& windowsName);
+
+// Why the sound runs through Windows' shared mode, in words a player can act on; empty when it
+// does not (exclusive mode, ASIO, or another system). `type` is the driver mode that runs.
+juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output);
+
+// The buffer sizes setup tries in one driver mode, smallest first, spread over the whole range.
+juce::Array<int> buffersToTry (const juce::Array<int>& available);
 } // namespace rh

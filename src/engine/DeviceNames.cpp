@@ -3,6 +3,7 @@
 #include "DeviceNames.h"
 
 #include <cstring>
+#include <cstdlib>
 
 namespace rh
 {
@@ -65,4 +66,43 @@ bool sameHardware (const juce::String& asioDriver, const juce::String& windowsNa
         if (w.length() >= 3 && ! common.contains (w) && ! w.containsOnly ("0123456789") && whereWords.contains (w)) return true;
     return false;
 }
+
+juce::String whyShared (const juce::String& type, const juce::String& input, const juce::String& output)
+{
+    if (type != "Windows Audio" && type != "DirectSound") return {};
+    const auto inHw = hardwareOf (input), outHw = hardwareOf (output);
+    const auto inName = inHw.isNotEmpty() ? inHw : input;
+    if (inHw.isNotEmpty() && outHw.isNotEmpty() && ! inHw.equalsIgnoreCase (outHw))
+        return "Your guitar comes in on " + inHw + " and the sound goes out on " + outHw + ". Two separate devices can't keep "
+               "in step when Riffhouse has them to itself, so Windows' shared mode joins them, which adds delay. For the shortest "
+               "delay, plug your headphones into " + inHw + " and pick it under Sound out.";
+    if (type == "DirectSound")
+        return "Only DirectSound, the oldest and slowest way, would start on " + inName + ". Close other audio apps and run "
+               "setup again, or pick a driver yourself in Input, output and delay.";
+    return "The faster modes would not play clean on " + inName + " (another app may be holding it, or its driver refuses "
+           "them), so Windows' shared mode is in use. Close other audio apps and run setup again, or pick a driver yourself "
+           "in Input, output and delay.";
+}
+
+juce::Array<int> buffersToTry (const juce::Array<int>& available)
+{
+    // Spread over the whole range, smallest first: the six smallest sizes can all be too small
+    // for a USB device that runs clean at 256 or 512, and a mode is only judged by what is tried.
+    juce::Array<int> all;
+    for (int b : available)
+        if (b >= 32 && b <= 1024) all.addIfNotAlreadyThere (b);
+    all.sort();
+    if (all.size() <= 6) return all;
+    juce::Array<int> picked { all.getFirst() };
+    for (int target : { 64, 128, 256, 512, 1024 })
+    {
+        int nearest = all.getFirst();
+        for (int b : all)
+            if (std::abs (b - target) < std::abs (nearest - target)) nearest = b;
+        picked.addIfNotAlreadyThere (nearest);
+    }
+    picked.sort();
+    return picked;
+}
+
 } // namespace rh

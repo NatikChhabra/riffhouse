@@ -74,6 +74,7 @@ void SetupWizard::startSetup()
             if (auto* h = StandaloneHost::get())
             {
                 h->saveAudioState();
+                h->settings().removeValue ("audioDriver"); // setup chose: the driver is Automatic again
                 h->settings().setValue ("setupDone", true);
                 h->settings().setValue ("setupVersion", AutoSetup::kSetupVersion);
                 // what was measured, kept for the report a player can save when asking for help
@@ -146,7 +147,16 @@ void SetupWizard::showExample (int which, bool moving)
     {
         shownSummary.inputName = input;
         shownSummary.outputName = "Headphones (High Definition Audio)";
+        shownSummary.deviceType = "Windows Audio (Exclusive Mode)";
         shownSummary.latencyMs = 9.3; shownSummary.bufferSize = 144; shownSummary.exclusive = true;
+        if (which >= 6)
+        {
+            // a guitar on one USB device and headphones on another: shared mode, and why
+            shownSummary.inputName = "Guitar (Realtek USB Audio)";
+            shownSummary.outputName = "Headphones (CX31993 HiFi)";
+            shownSummary.deviceType = "Windows Audio";
+            shownSummary.latencyMs = 24.1; shownSummary.bufferSize = 576; shownSummary.exclusive = false;
+        }
         shownSummary.inputGainDb = 1.5f; shownSummary.inputFix = true; shownSummary.inputFixDb = 21.0f; shownSummary.gateDb = -52.0f;
         if (moving) go (Step::done); else step = Step::done;
     }
@@ -439,15 +449,18 @@ void SetupWizard::paint (juce::Graphics& g)
     bool oneByOne = false; // the summary's lines arrive one after another; a list of things to check is simply there
     auto bullet = [&] (bool ok, const juce::String& t)
     {
-        auto row = r.removeFromTop (32);
+        // a long explanation wraps onto more lines instead of shrinking
+        const int textW = std::max (1, r.getWidth() - 30);
+        const int lines = juce::jlimit (1, 4, (int) std::ceil (juce::GlyphArrangement::getStringWidth (font (15.0f), t) / (float) textW * 1.08f));
+        auto row = r.removeFromTop (32 + 21 * (lines - 1));
         const int wait = 70 + 45 * line++;
         const float shown = oneByOne ? motion::after (doneAt, wait, motion::ui) : 1.0f;
-        const auto icon = row.removeFromLeft (30).toFloat().withSizeKeepingCentre (18, 18);
+        const auto icon = row.removeFromLeft (30).removeFromTop (32).toFloat().withSizeKeepingCentre (18, 18);
         if (ok) check (icon, oneByOne ? motion::after (doneAt, wait + 60, motion::overlay) : 1.0f, 2.2f);
         else { g.setColour (colours::warn.withMultipliedAlpha (shown)); g.fillEllipse (icon.withSizeKeepingCentre (8, 8)); }
         g.setColour (colours::text.withMultipliedAlpha (shown));
         g.setFont (font (15.0f));
-        g.drawFittedText (t, row, juce::Justification::centredLeft, 1);
+        g.drawFittedText (t, row.reduced (0, lines > 1 ? 5 : 0), lines > 1 ? juce::Justification::topLeft : juce::Justification::centredLeft, lines, 1.0f);
     };
 
     switch (step)
@@ -629,7 +642,7 @@ void SetupWizard::paint (juce::Graphics& g)
                 bullet (true, "Guitar in and sound out on " + (hardware.isNotEmpty() ? hardware : s.inputName));
             else
             {
-                bullet (true, "Guitar on " + s.inputName);
+                bullet (true, "Listening on " + s.inputName);
                 if (s.outputName.isNotEmpty() && s.outputName != s.inputName) bullet (true, "Sound out on " + s.outputName);
             }
             bullet (s.latencyMs < 15.0, "About " + juce::String (s.latencyMs, 1) + " ms from string to ear ("
@@ -641,8 +654,11 @@ void SetupWizard::paint (juce::Graphics& g)
             bullet (true, "Gate at " + juce::String (juce::roundToInt (s.gateDb)) + " dB, and it follows the room if the noise changes");
             bullet (true, "Auto level on: every tone comes out as loud as the last, matched to your playing");
             bullet (true, "Hum filter on automatic (removes 50 or 60 Hz buzz)");
+            const auto shared = whyShared (s.deviceType, s.inputName, s.outputName);
             if (s.clipping)
                 bullet (false, "Your input is clipping. Turn the guitar volume down a little.");
+            else if (shared.isNotEmpty())
+                bullet (false, shared);
             else if (s.fixHeldBack)
                 bullet (false, "This input hisses, so a little of the Input Fix was held back.");
             else if (s.latencyMs >= 15.0)

@@ -1258,6 +1258,21 @@ void testUpdates()
         CHECK (sameHardware ("BEHRINGER UMC 404HD 192k", "Line (UMC404HD 192k)") || sameHardware ("BEHRINGER UMC 404HD 192k", "Line (BEHRINGER UMC 404HD 192k)"), "a Behringer driver finds its interface");
         CHECK (! sameHardware ("Focusrite USB ASIO", "Microphone (Realtek(R) Audio)"), "and never the computer's own sound card");
         CHECK (! sameHardware ("Generic Low Latency ASIO Driver", "Microphone (USB Audio Device)"), "words every driver uses do not count as a match");
+        {
+            const auto two = whyShared ("Windows Audio", "Guitar (Realtek USB Audio)", "Headphones (4- CX31993+97220 HiFi)");
+            CHECK (two.contains ("Realtek USB Audio") && two.contains ("CX31993") && two.contains ("plug your headphones into"),
+                   "shared mode on two devices says which two, and what to plug where");
+            CHECK (whyShared ("Windows Audio", "Microphone (Realtek(R) Audio)", "Speakers (Realtek(R) Audio)").contains ("Close other audio apps"),
+                   "shared mode on one device says what to try");
+            CHECK (whyShared ("Windows Audio (Exclusive Mode)", "Guitar (Realtek USB Audio)", "Headphones (CX31993 HiFi)").isEmpty()
+                       && whyShared ("ASIO", "Focusrite USB ASIO", "Focusrite USB ASIO").isEmpty(),
+                   "the fast modes need no explaining");
+            const auto spread = buffersToTry ({ 32, 48, 64, 80, 96, 112, 128, 144, 160, 192, 256, 288, 384, 480, 512, 1024, 2048 });
+            CHECK (spread.size() <= 6 && spread.contains (32) && spread.contains (256) && spread.contains (512) && spread.contains (1024)
+                       && ! spread.contains (2048),
+                   "setup tries buffer sizes across the range, not only the smallest six");
+            CHECK (buffersToTry ({ 128, 64, 256 }) == juce::Array<int> ({ 64, 128, 256 }), "a short list is tried whole, smallest first");
+        }
     }
 
     const juce::String hash = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";

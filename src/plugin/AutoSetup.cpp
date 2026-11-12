@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "AutoSetup.h"
 
+#include "../engine/DeviceNames.h"
 #include "../engine/InputGuard.h"
 #include "AudioSwitch.h"
 #include "DeviceLog.h"
@@ -318,18 +319,22 @@ void AutoSetup::timerCallback()
             const int xr = dm.getXRunCount() - std::max (0, xrunStart);
             auto* dev = dm.getCurrentAudioDevice();
             const bool ok = ! lastOpenFailed && dev != nullptr && xr <= 0 && cpuMax < 0.7 && tunePeak > 1.0e-7f;
+            bool settled = false;
             if (ok)
             {
                 const double lat = measuredLatencyMs();
                 if (lat < best.latency)
                     best = { modes[modeIndex], dev->getCurrentBufferSizeSamples(), lat, dev->getCurrentSampleRate() };
+                // A mode with the sound card to itself that plays clean is kept: shared mode, which
+                // only adds Windows' own mixing delay, is never tried over it.
+                settled = ! AudioSwitch::isShared (modes[modeIndex]);
                 ++modeIndex; // this mode's best is found, try the next mode
                 bufferIndex = 0;
             }
             else
                 ++bufferIndex;
 
-            if (best.latency <= 12.0 || modeIndex >= modes.size())
+            if (settled || best.latency <= 12.0 || modeIndex >= modes.size())
             {
                 finishTuning();
                 return;
@@ -451,10 +456,7 @@ bool AutoSetup::openMode (const juce::String& type, int bufferSize)
 
     if (bufferSize == 0)
     {
-        buffers.clear();
-        for (int b : dev->getAvailableBufferSizes())
-            if (b >= 32 && b <= 1024) buffers.addIfNotAlreadyThere (b);
-        buffers.sort();
+        buffers = rh::buffersToTry (dev->getAvailableBufferSizes());
         if (buffers.isEmpty()) buffers.add (dev->getCurrentBufferSizeSamples());
     }
 

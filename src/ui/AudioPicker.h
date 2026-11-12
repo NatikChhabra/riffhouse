@@ -25,7 +25,7 @@ public:
     void showExample (bool asio = false);
 
 private:
-    enum class Change { input, output, buffer, sharing };
+    enum class Change { input, output, buffer, sharing, driver };
     void refresh(); // the lists and the selection, from what is running
     void apply (Change);
     const AutoSetup::Input* picked() const;
@@ -37,7 +37,11 @@ private:
 
     RiffhouseProcessor& proc;
     std::unique_ptr<AudioSwitch> changer;
-    juce::ComboBox input, output, buffer;
+    juce::ComboBox driver, input, output, buffer;
+    // The driver the player chose, or empty for Automatic: the fastest way that plays clean.
+    juce::String forced;
+    juce::StringArray driverTypes; // the driver list's items, in order; "" is Automatic
+    static juce::String driverLabel (const juce::String& typeName);
     juce::ToggleButton sharing { "Let other apps play sound at the same time" };
     juce::TextButton panel { "Delay: open the driver's own settings" };
     std::vector<AutoSetup::Input> inputs;
