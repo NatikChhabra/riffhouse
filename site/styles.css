@@ -408,7 +408,7 @@ details:not([open]) > p { display: none; }
 .board-row img { flex: none; width: auto; height: clamp(84px, 14vw, 210px); }
 .board-amp .board-row img { height: auto; width: clamp(160px, 24vw, 360px); }
 .board-label { font-size: 14px; font-weight: 500; color: var(--ash); white-space: nowrap; }
-.feat-list { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.feat-list { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 
 .later-list { grid-column: 6 / 13; counter-reset: later; display: grid; border-top: 2px solid var(--panel-2); }
 .later-list li { counter-increment: later; display: grid; grid-template-columns: 2.4em 1fr; column-gap: 12px; row-gap: 6px; padding: 30px 0; border-bottom: 2px solid var(--panel-2); }
