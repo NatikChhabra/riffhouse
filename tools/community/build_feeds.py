@@ -8,7 +8,13 @@ server watches each one and posts every new item into its channel:
   beta.xml              pre-release test builds      -> #beta-lab (Beta testers only)
   devlog.xml            recent changes on main       -> #dev-log
   tone-of-the-week.xml  one preset picked each week  -> #tone-of-the-week
-  riff-challenge.xml    one riff prompt each Monday  -> #riff-challenge
+
+The free feed bot follows at most three feeds, so it reads three combined ones and
+routes items by their <category> (one connection per channel, filtered on category):
+
+  builds.xml   releases.xml + beta.xml      categories: release, beta
+  devlog.xml                                category: devlog
+  weekly.xml   tone-of-the-week             category: tone
 
 The free feed bot follows at most three feeds, so it reads three combined ones and
 routes items by their <category> (one connection per channel, filtered on category):
@@ -42,7 +48,6 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "NatikChhabra/riffhouse")
 SITE = "https://natikchhabra.github.io/riffhouse/"
 ROOT = Path(__file__).resolve().parents[2]
 PRESETS = ROOT / "presets"
-CHALLENGES = Path(__file__).with_name("challenges.json")
 WEEKS_KEPT = 6
 # Week 0 of the weekly posts. The Monday the Discord server opened.
 FIRST_MONDAY = dt.date(2026, 11, 9)
@@ -231,25 +236,8 @@ def tone_items(today: dt.date) -> list[dict]:
     return items
 
 
-def challenge_items(today: dt.date) -> list[dict]:
-    prompts = json.loads(CHALLENGES.read_text(encoding="utf-8"))
-    items = []
-    for w, when in weeks_so_far(today):
-        c = prompts[w % len(prompts)]
-        text = (
-            f"{c['prompt']}\n\n"
-            "Reply in this thread with a clip (phone video is fine), and say which Riff House preset or settings you used. "
-            "React to the takes you like. New prompt next Monday."
-        )
-        items.append({
-            "category": "challenge",
-            "title": f"Riff challenge, week {w + 1}: {c['title']}",
-            "link": SITE,
-            "guid": f"riff-week-{w}",
-            "when": when,
-            "text": text,
-        })
-    return items
+def newest_first(*groups: list[dict]) -> list[dict]:
+    return sorted((it for g in groups for it in g), key=lambda it: it["when"], reverse=True)
 
 
 def newest_first(*groups: list[dict]) -> list[dict]:
@@ -262,13 +250,11 @@ def main() -> int:
     today = dt.datetime.now(dt.timezone.utc).date()
     gh = f"https://github.com/{REPO}"
 
-    tones, challenges = tone_items(today), challenge_items(today)
+    tones = tone_items(today)
     write_feed(out / "tone-of-the-week.xml", "Riff House tone of the week", SITE,
                "One Riff House preset picked every Monday.", tones)
-    write_feed(out / "riff-challenge.xml", "Riff House riff challenge", SITE,
-               "A new riff prompt every Monday.", challenges)
     write_feed(out / "weekly.xml", "Riff House weekly", SITE,
-               "Tone of the week and the riff challenge, every Monday.", newest_first(tones, challenges))
+               "The tone of the week, every Monday.", tones)
 
     # GitHub data. If the API is down, keep the old files out of the way and carry on:
     # the weekly feeds above still publish.
