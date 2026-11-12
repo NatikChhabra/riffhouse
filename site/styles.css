@@ -23,9 +23,6 @@
   --ash-dark: #57534c;
   --coal: #15100a;
   --field-edge: #77726a;
-  --case: #e9dec4;
-  --case-2: #cdc1a3;
-  --case-3: #a89c80;
 
   --font-display: "Big Shoulders", "Big Shoulders Fallback", "Arial Narrow", sans-serif;
   --font-text: "Instrument Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -122,78 +119,17 @@ button.btn { border: 0; cursor: pointer; }
 .hero-say { position: relative; z-index: 1; margin-top: auto; padding-top: 32px; max-width: 30em; display: grid; gap: 28px; }
 .hero-say .lead { font-weight: 500; max-width: 26em; }
 .defs { position: absolute; }
-.hero-pedal { border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; display: block; }
-/* The pedal is a real box, in face pixels (--u is one of them): the face is 620 by 777 and the box is
-   223 deep. Knobs, footswitch and jacks are cylinders of twenty strips, lit from the upper left.
-   --tx and --ty run from -1 to 1 with the pointer. */
-.hero-pedal { perspective: 1300px; container-type: inline-size; }
-.pedal-in, .pedal-turn, .pedal-body, .pedal-box, .pedal-parts, .pd-wall, .pd-cyl { display: block; transform-style: preserve-3d; }
-.pedal-body { --u: calc(100cqw / 620); --d: calc(190 * var(--u)); position: relative; transform: rotateX(calc(12deg + var(--ty, 0) * -12deg)) rotateY(calc(-22deg + var(--tx, 0) * 16deg)) translateZ(var(--pz, 0px)); transition: transform 260ms var(--ease); }
-.hero-pedal:active .pedal-body, .hero-pedal.is-down .pedal-body { --pz: -8px; transition-duration: 90ms; }
-.pedal-body img { position: relative; display: block; width: 100%; height: auto; border-radius: calc(6 * var(--u)); }
-.pedal-box, .pedal-parts, .pedal-light, .pedal-ground { position: absolute; inset: 0; pointer-events: none; }
-.pd-wall, .pd-back { position: absolute; }
-.pd-wall-t, .pd-wall-b { left: 0; right: 0; height: var(--d); }
-.pd-wall-l, .pd-wall-r { top: 0; bottom: 0; width: var(--d); }
-.pd-wall-t { top: 0; transform-origin: 50% 0; transform: rotateX(-90deg); background: var(--case); }
-.pd-wall-b { bottom: 0; transform-origin: 50% 100%; transform: rotateX(90deg); background: var(--case-3); }
-.pd-wall-l { left: 0; transform-origin: 0 50%; transform: rotateY(90deg); background: var(--case-2); }
-.pd-wall-r { right: 0; transform-origin: 100% 50%; transform: rotateY(-90deg); background: var(--case-3); }
-.pd-wall::after { content: ""; position: absolute; background: var(--panel-2); }
-.pd-wall-t::after, .pd-wall-b::after { left: 0; right: 0; height: 13%; }
-.pd-wall-t::after { bottom: 0; } .pd-wall-b::after { top: 0; }
-.pd-wall-l::after, .pd-wall-r::after { top: 0; bottom: 0; width: 13%; }
-.pd-wall-l::after { right: 0; } .pd-wall-r::after { left: 0; }
-/* the rounded edge where face meets wall catches the light */
-.pd-wall::before { content: ""; position: absolute; background: var(--bone); opacity: .45; }
-.pd-wall-t::before, .pd-wall-b::before { left: 0; right: 0; height: calc(5 * var(--u)); }
-.pd-wall-t::before { top: 0; opacity: .7; } .pd-wall-b::before { bottom: 0; opacity: .2; }
-.pd-wall-l::before, .pd-wall-r::before { top: 0; bottom: 0; width: calc(5 * var(--u)); }
-.pd-wall-l::before { left: 0; } .pd-wall-r::before { right: 0; opacity: .25; }
-.pd-back { inset: 0; transform: translateZ(calc(var(--d) * -1)); background: var(--panel-2); }
-.pd-cyl { position: absolute; left: calc((var(--x) - var(--r)) * var(--u)); top: calc((var(--y) - var(--r)) * var(--u)); width: calc(var(--r) * 2 * var(--u)); aspect-ratio: 1; transform: translateZ(calc(var(--z, 0) * var(--u))); }
-.pd-cyl > i { position: absolute; left: 50%; top: 50%; width: calc(var(--r) * .33 * var(--u)); height: calc(var(--h) * var(--u)); margin-left: calc(var(--r) * -.165 * var(--u)); transform-origin: 50% 0; background: color-mix(in srgb, var(--hi) var(--s), var(--lo)); }
-.pd-cyl > b { position: absolute; inset: 0; border-radius: 50%; transform: translateZ(calc(var(--h) * var(--u))); }
-.pd-knob { --lo: var(--black); --hi: var(--ash-dark); }
-.pd-knob > b { background: var(--black); }
-.pd-knob > b::after { content: ""; position: absolute; left: 50%; top: 3%; width: 4%; height: 22%; margin-left: -2%; border-radius: 2px; background: var(--bone); transform-origin: 50% 214%; rotate: var(--a); }
-.pd-cap { --lo: var(--black); --hi: var(--ash-dark); }
-.pd-cap > b, .pd-stomp > b { background: url(img/hero-caps.webp) calc(var(--i) * 100% / 3) 0 / 400% 100% no-repeat; }
-.pd-stomp { --lo: var(--ash-dark); --hi: var(--bone); transition: transform 90ms var(--ease); }
-.hero-pedal:active .pd-stomp, .hero-pedal.is-down .pd-stomp { transform: translateZ(calc(-14 * var(--u))); }
-.pd-plug { --lo: var(--black); --hi: var(--ash); transform: rotateY(180deg); }
-.pd-plug > b { background: var(--black); border: calc(6 * var(--u)) solid var(--ash); }
-.pd-led { position: absolute; left: calc(431 * var(--u)); top: calc(584 * var(--u)); width: calc(28 * var(--u)); aspect-ratio: 1; border-radius: 50%; background: var(--amber); filter: blur(calc(9 * var(--u))); opacity: .2; transform: translateZ(2px); transition: opacity 120ms var(--ease); }
-.is-fuzz .pd-led { opacity: .9; }
-.pd-cyl > i:nth-child(1) { --s: 8%; transform: rotateZ(0deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(2) { --s: 8%; transform: rotateZ(18deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(3) { --s: 8%; transform: rotateZ(36deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(4) { --s: 8%; transform: rotateZ(54deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(5) { --s: 27%; transform: rotateZ(72deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(6) { --s: 46%; transform: rotateZ(90deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(7) { --s: 63%; transform: rotateZ(108deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(8) { --s: 73%; transform: rotateZ(126deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(9) { --s: 78%; transform: rotateZ(144deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(10) { --s: 75%; transform: rotateZ(162deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(11) { --s: 66%; transform: rotateZ(180deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(12) { --s: 51%; transform: rotateZ(198deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(13) { --s: 32%; transform: rotateZ(216deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(14) { --s: 11%; transform: rotateZ(234deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(15) { --s: 8%; transform: rotateZ(252deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(16) { --s: 8%; transform: rotateZ(270deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(17) { --s: 8%; transform: rotateZ(288deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(18) { --s: 8%; transform: rotateZ(306deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(19) { --s: 8%; transform: rotateZ(324deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pd-cyl > i:nth-child(20) { --s: 8%; transform: rotateZ(342deg) translateY(calc(var(--r) * var(--u))) rotateX(90deg); }
-.pedal-light { transform: translateZ(1px); overflow: hidden; border-radius: calc(6 * var(--u)); }
-.pedal-light::before { content: ""; position: absolute; left: 10%; top: 0; width: 80%; aspect-ratio: 1; border-radius: 50%; background: var(--bone); opacity: .2; filter: blur(48px); translate: calc(var(--tx, 0) * -55%) calc(var(--ty, 0) * -45%); transition: translate 260ms var(--ease); }
-.pedal-ground { inset: 6% 2% 0 8%; border-radius: 10%; background: var(--black); filter: blur(26px); opacity: .5; translate: calc(10% + var(--tx, 0) * -5%) calc(10% + var(--ty, 0) * -4%); transition: translate 260ms var(--ease), scale 160ms var(--ease), opacity 160ms var(--ease); }
-.hero-pedal:active .pedal-ground, .hero-pedal.is-down .pedal-ground { scale: .98; opacity: .58; }
-.stomp-say { font-size: var(--t-small); font-weight: 500; }
+.hero-pedal { border: 0; padding: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; display: block; aspect-ratio: 620 / 777; }
+/* The pedal is a real model drawn by pedal3d.js. Its still stands in until the model is live, and stays
+   where there is no WebGL. Both reach past the button, down and to the right, where the pedal's shade falls. */
+.pedal-still, .pedal-live { position: absolute; left: -15%; top: -10%; width: 170%; height: 150%; max-width: none; pointer-events: none; }
+.pedal-live { opacity: 0; }
+.hero-pedal.is-live .pedal-live { opacity: 1; }
+.hero-pedal.is-live .pedal-still { opacity: 0; }
 .is-fuzz .hero h1, .is-fuzz .monument { filter: url(#fuzz); }
 .is-fuzz h2, .is-fuzz .num { filter: url(#fuzz-s); }
 .is-fuzz .close h2 { filter: none; }
-.hero-pedal { position: absolute; z-index: 0; width: min(calc((100% - 2 * var(--g)) * .27), 46svh, 470px); right: calc(var(--g) + 90px); top: calc(var(--top) + var(--h1) * .92 + 24px); rotate: -6deg; transform-origin: 50% 60%; }
+.hero-pedal { position: absolute; z-index: 0; width: min(calc((100% - 2 * var(--g)) * .27), 46svh, 470px); right: calc(var(--g) + 90px); top: calc(var(--top) + var(--h1) * .92 + 24px); }
 
 /* The mic jack */
 .jack-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: clamp(48px, 6vw, 96px); align-items: end; }
@@ -448,7 +384,7 @@ details:not([open]) > p { display: none; }
   .rail-row { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .hero { min-height: 100svh; padding-bottom: 0; }
   .hero-say { margin-top: 20px; padding-top: 0; gap: 20px; }
-  .hero-pedal { position: relative; order: 3; top: auto; right: auto; width: min(60vw, 36svh); margin: 48px auto -24%; rotate: -5deg; }
+  .hero-pedal { position: relative; order: 3; top: auto; right: auto; width: min(60vw, 36svh); margin: 48px auto -24%; }
   .tone-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .amp-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .faq-head, .faq-list { grid-column: 1 / -1; }
@@ -482,12 +418,11 @@ details:not([open]) > p { display: none; }
 
 /* Motion: the poster arrives once, sections open as they are reached */
 @keyframes line-up { from { opacity: 0; transform: perspective(900px) translateY(70%) rotateX(-78deg); } }
-@keyframes pedal-in { from { opacity: 0; } }
-@keyframes pedal-drop { from { transform: translate3d(8%, -46%, 380px) rotateX(58deg) rotateY(-64deg) rotateZ(16deg); } }
-@keyframes ground-in { from { opacity: 0; scale: 1.5; } }
-@keyframes sway { from { rotate: y -5deg; translate: 0 1%; } to { rotate: y 6deg; translate: 0 -1%; } }
+@keyframes pedal-in { from { opacity: 0; transform: translateY(-9%) scale(1.07) rotate(5deg); } }
 @keyframes stand { from { transform: perspective(1400px) rotateX(34deg) scale(.86); } to { transform: perspective(1400px) rotateX(0deg) scale(1); } }
-@keyframes turn { to { transform: rotateX(50deg) rotateY(-30deg) translateZ(-90px); } }
+@keyframes cable { from { transform: scaleX(0); } }
+@keyframes cable-down { from { transform: scaleY(0); } }
+@keyframes stop-in { from { scale: .4; opacity: 0; } }
 @keyframes say-in { from { opacity: 0; transform: translateY(16px); } }
 @keyframes push { from { transform: translateX(5%); } }
 @keyframes drift { to { translate: 0 22vh; rotate: -10deg; } }
@@ -498,10 +433,21 @@ details:not([open]) > p { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .hero h1 .line > span { transform-origin: 50% 100%; animation: line-up 820ms var(--ease) both; }
   .hero h1 .line:nth-child(2) > span { animation-delay: 110ms; }
-  .hero-pedal { animation: pedal-in 320ms var(--ease) 200ms both; }
-  .pedal-in { animation: pedal-drop 1100ms var(--land) 200ms both, sway 6s ease-in-out 1400ms infinite alternate; }
-  .pedal-ground { animation: ground-in 1100ms var(--ease) 200ms both; }
+  .hero-pedal { animation: pedal-in 900ms var(--land) 200ms both; }
+  /* Going between the home page and the roadmap, the top bar stays put and the page changes under it */
+  @view-transition { navigation: auto; }
+  .top { view-transition-name: top; }
   .hero-say { animation: say-in 560ms var(--ease) 420ms both; }
+  /* Roadmap: the cable runs out from the left and each stop lands on it in turn */
+  .stops::before { transform-origin: 0 0; animation: cable 900ms var(--ease) 250ms both; }
+  @media (max-width: 699px) { .stops::before { animation-name: cable-down; } }
+  .stops li { animation: say-in 520ms var(--ease) both; animation-delay: calc(420ms + var(--n, 0) * 130ms); }
+  .stops li:nth-child(2) { --n: 1; } .stops li:nth-child(3) { --n: 2; } .stops li:nth-child(4) { --n: 3; }
+  .stops a::before { animation: stop-in 520ms var(--land) both; animation-delay: calc(480ms + var(--n, 0) * 130ms); }
+  /* Roadmap: the pedals are set down on the board one after another */
+  html.js .feat-board .board-row img { transition: transform 640ms var(--land), opacity 260ms var(--ease); transition-delay: calc(260ms + var(--n, 0) * 90ms); }
+  html.js .feat-board:not(.is-in) .board-row img { opacity: 0; transform: translateY(-44px) rotate(-6deg); }
+  .board-zone:first-child img:nth-child(2) { --n: 1; } .board-amp img { --n: 2; } .board-zone:last-child img { --n: 3; } .board-zone:last-child img:nth-child(2) { --n: 4; }
   .chain.is-fresh li { animation: chain-in 360ms var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); }
 
   html.js [data-reveal] { transition: opacity 700ms var(--ease), transform 700ms var(--ease), clip-path 900ms var(--ease); }
@@ -532,9 +478,8 @@ details:not([open]) > p { display: none; }
     .rail-row li:not(.rail-own):hover { --rot: -2deg; }
   }
   @supports (animation-timeline: view()) {
-    .hero-pedal { animation: pedal-in 320ms var(--ease) 200ms both, drift linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 100svh; }
+    .hero-pedal { animation: pedal-in 900ms var(--land) 200ms both, drift linear both; animation-timeline: auto, scroll(root); animation-range: normal, 0 100svh; }
     .pan .shot img, .jack-shot img { transform-origin: 50% 100%; animation: stand linear both; animation-timeline: view(); animation-range: entry 0% cover 42%; }
-    .pedal-turn { animation: turn linear both; animation-timeline: scroll(root); animation-range: 0 100svh; }
     .monument span { animation: push linear both; animation-timeline: view(); animation-range: entry 0% entry 100%; }
   }
 }

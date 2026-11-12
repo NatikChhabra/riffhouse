@@ -1,5 +1,7 @@
-/* Riffhouse website. No libraries: the page reads fine without this file. */
+/* Riffhouse website. The page reads fine without this file. Its one library is three.js, kept in vendor/
+   and fetched after the page has loaded, for the pedal in the first screen. */
 (() => {
+  const VER = document.currentScript && document.currentScript.src.includes('?') ? '?' + document.currentScript.src.split('?')[1] : '';
   const REPO = 'NatikChhabra/riffhouse';
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -186,14 +188,17 @@
     });
   }
 
-  /* The pedal in the first screen: it leans toward the pointer, and pressing it puts fuzz on the headline */
+  /* The pedal in the first screen: a real model that leans toward the pointer, sinks when pressed and puts
+     fuzz on the headline. The still in the page stands in until the model is drawn, and for good when
+     there is no WebGL or the visitor asked to save data. */
   function stomp() {
     const pedal = $('[data-stomp]'), hero = pedal && pedal.closest('.hero');
     if (!pedal) return;
     const say = $('[data-stomp-say]'), map = $('#fuzz feDisplacementMap'), small = $('#fuzz-s feDisplacementMap');
+    const still = $('img', pedal), canvas = $('canvas', pedal);
     const page = document.documentElement;
     const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let on = false, raf = 0;
+    let on = false, raf = 0, rig = null, up = 0;
     const settle = (to) => {
       cancelAnimationFrame(raf);
       if (calm) { map.setAttribute('scale', to); small.setAttribute('scale', to * 0.4); return; }
@@ -208,16 +213,45 @@
       };
       raf = requestAnimationFrame(step);
     };
+    const press = (down) => {
+      clearTimeout(up);
+      if (rig) rig.press(down);
+      if (down) up = setTimeout(() => press(false), 600);
+    };
+    pedal.addEventListener('pointerdown', () => press(true));
+    pedal.addEventListener('pointerleave', () => press(false));
+    pedal.addEventListener('pointercancel', () => press(false));
     pedal.addEventListener('click', () => {
       on = !on;
       pedal.setAttribute('aria-pressed', on);
       page.classList.add('is-fuzz');
       if (say) say.textContent = on ? 'Fuzz on. Press again for clean.' : 'Press the pedal for fuzz.';
-      pedal.classList.add('is-down');
-      setTimeout(() => pedal.classList.remove('is-down'), 170);
+      press(true);
+      clearTimeout(up);
+      up = setTimeout(() => press(false), 150);
+      if (rig) rig.light(on);
+      else if (still) still.src = on ? 'img/hero-pedal-on.webp' : 'img/hero-pedal.webp';
       settle(on ? Math.max(3, parseFloat(getComputedStyle($('h1', hero)).fontSize) * 0.045) : 0);
       if (!on) setTimeout(() => { if (!on) page.classList.remove('is-fuzz'); }, calm ? 0 : 560);
     });
+
+    const wake = () => {
+      if (!canvas || !window.WebGL2RenderingContext || (navigator.connection && navigator.connection.saveData)) return;
+      import('./pedal3d.js' + VER).then(({ mount }) => {
+        canvas.addEventListener('pedal-live', () => pedal.classList.add('is-live'), { once: true });
+        canvas.addEventListener('webglcontextlost', () => { pedal.classList.remove('is-live'); rig = null; still.src = on ? 'img/hero-pedal-on.webp' : 'img/hero-pedal.webp'; });
+        rig = mount(canvas, { calm, phone: innerWidth < 700, progress: () => Math.min(1, scrollY / innerHeight) });
+        rig.light(on);
+        let seen = true;
+        const run = () => { if (!rig) return; if (seen && !document.hidden) rig.start(); else rig.stop(); };
+        if ('IntersectionObserver' in window) new IntersectionObserver(([e]) => { seen = e.isIntersecting; run(); }).observe(canvas);
+        document.addEventListener('visibilitychange', run);
+        if ('ResizeObserver' in window) new ResizeObserver(() => rig && rig.resize()).observe(canvas);
+        run();
+      }).catch(() => {});
+    };
+    if (document.readyState === 'complete') wake(); else addEventListener('load', wake, { once: true });
+
     if (calm || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
     let queued = false;
     hero.addEventListener('pointermove', (e) => {
@@ -227,11 +261,13 @@
         queued = false;
         const r = pedal.getBoundingClientRect();
         const x = (e.clientX - (r.left + r.width / 2)) / innerWidth, y = (e.clientY - (r.top + r.height / 2)) / innerHeight;
-        hero.style.setProperty('--tx', Math.max(-1, Math.min(1, x * 2.4)).toFixed(3));
-        hero.style.setProperty('--ty', Math.max(-1, Math.min(1, y * 2.4)).toFixed(3));
+        const tx = Math.max(-1, Math.min(1, x * 2.4)), ty = Math.max(-1, Math.min(1, y * 2.4));
+        hero.style.setProperty('--tx', tx.toFixed(3));
+        hero.style.setProperty('--ty', ty.toFixed(3));
+        if (rig) rig.tilt(tx, ty);
       });
     });
-    hero.addEventListener('pointerleave', () => { hero.style.setProperty('--tx', 0); hero.style.setProperty('--ty', 0); });
+    hero.addEventListener('pointerleave', () => { hero.style.setProperty('--tx', 0); hero.style.setProperty('--ty', 0); if (rig) rig.tilt(0, 0); });
   }
 
   /* Numbers that count up when they are first seen, and grids whose pieces land one after another */
