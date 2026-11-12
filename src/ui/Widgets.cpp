@@ -110,6 +110,19 @@ void Knob::paint (juce::Graphics& g)
                   juce::Justification::centred, track);
         return;
     }
+    if (gear && ! active && gearFace != Face::shoulders)
+    {
+        // Silk-screened onto the box, the way pedal makers letter their knobs: small spaced capitals
+        // in the box's own ink, with a hairline of shadow where the paint sits on the enclosure.
+        const auto txt = label.toUpperCase();
+        const float size = juce::jlimit (9.5f, 12.0f, h * 0.8f);
+        const float track = capsWidth (txt, size, 0.16f) > (float) r.getWidth() ? 0.05f : 0.16f;
+        const auto area = r.toFloat().withTrimmedTop (2.0f).withHeight (size + 5.0f);
+        const float on = isEnabled() ? 1.0f : 0.4f;
+        drawCaps (g, txt, area.translated (0.0f, 1.0f), size, juce::Colours::black.withAlpha (0.42f * on), juce::Justification::centred, track);
+        drawCaps (g, txt, area, size, gearInk.withMultipliedAlpha (0.94f * on), juce::Justification::centred, track);
+        return;
+    }
     if (gear)
     {
         // lettering printed on the panel; the value shows while you turn it
