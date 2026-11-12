@@ -1246,7 +1246,7 @@ AmpLayout ampLayout (R area, const AmpDesign& d)
 }
 namespace
 {
-    void tolexTexture (juce::Graphics& g, R r, const AmpDesign& d)
+    void tolexGrain (juce::Graphics& g, R r, const AmpDesign& d)
     {
         const C base (d.tolexColour);
         g.setColour (base);
@@ -1296,6 +1296,27 @@ namespace
                 g.setColour (juce::Colours::black.withAlpha (d.tolex == Tolex::cream ? 0.10f : 0.25f));
                 g.fillEllipse (jx + 0.6f, jy + 0.9f, s * 0.8f, s * 0.6f);
             }
+    }
+
+    // The grain is tens of thousands of small marks. Drawn straight onto the amp, each one is
+    // cut to the amp's rounded outline on its own, which made the amp the slowest thing in the
+    // app to draw. They are drawn on a plain sheet at the same resolution instead, and the
+    // sheet is laid on the amp once.
+    void tolexTexture (juce::Graphics& g, R r, const AmpDesign& d)
+    {
+        // tweed is a few hundred threads that blend with what is under them: it stays as it was
+        if (d.tolex == Tolex::tweed) { tolexGrain (g, r, d); return; }
+        const float scale = juce::jlimit (0.05f, 8.0f, g.getInternalContext().getPhysicalPixelScaleFactor());
+        const int w = (int) std::ceil (r.getWidth() * scale), h = (int) std::ceil (r.getHeight() * scale);
+        if (w <= 0 || h <= 0) return;
+        if ((juce::int64) w * h > 16 * 1024 * 1024) { tolexGrain (g, r, d); return; }
+        juce::Image sheet (juce::Image::ARGB, w, h, true);
+        {
+            juce::Graphics sg (sheet);
+            sg.addTransform (juce::AffineTransform::scale (scale));
+            tolexGrain (sg, r.withPosition (0.0f, 0.0f), d);
+        }
+        g.drawImageTransformed (sheet, juce::AffineTransform::scale (1.0f / scale).translated (r.getX(), r.getY()));
     }
 
     void panelFinish (juce::Graphics& g, R r, const AmpDesign& d)

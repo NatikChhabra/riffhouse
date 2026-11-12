@@ -887,13 +887,13 @@ void ModulePage::resized()
         const int model = juce::roundToInt (proc.value (P::cabModel));
         const float zoneW = room.getWidth() - preW - gap;
         cab = cabLayout ({ room.getX(), room.getY(), zoneW, floorY - room.getY() }, model);
+        cabModelLaidOut = model;
         const float cabW = cab.box.getWidth();
         const float x0 = cab.box.getX();
         cabArea = { x0 - 50.0f, room.getY() - 6.0f, cabW + 100.0f, floorY - room.getY() + 46.0f };
-        pedalImage = renderCab (model, cab, cabArea, 2.0f, proc.userIrName());
         pre = micPreLayout ({ room.getRight() - preW, floorY - preH - 6.0f, preW, preH });
         preArea = pre.box.expanded (44.0f);
-        preImage = renderMicPre (pre, preArea, 2.0f);
+        artStale = true;
         if (micMap != nullptr)
             micMap->setBounds (juce::Rectangle<float> (pre.box.getX(), room.getY() + 4.0f, preW, pre.box.getY() - room.getY() - 26.0f).toNearestInt());
         for (int i = 0; i < knobs.size() && i < (int) pre.cells.size(); ++i)
@@ -913,7 +913,7 @@ void ModulePage::resized()
     // the picture is wider and taller than the box: its side wall, its feet and the shadow it
     // throws on the floor need the room
     pedalDraw = pedalArea.expanded (70.0f, 0.0f).withBottom (pedalArea.getBottom() + 46.0f);
-    pedalImage = renderPedal (d, pedal, pedalDraw, 2.0f);
+    artStale = true;
     foot->setStyle (footswitchStyle (pedal), juce::Colour (d.body), pedalPictured (d));
     foot->setBounds (pedal.footswitch.toNearestInt());
     if (treadle != nullptr)
@@ -949,8 +949,21 @@ void ModulePage::resized()
     }
 }
 
+void ModulePage::renderArt()
+{
+    artStale = false;
+    if (cabMode)
+    {
+        pedalImage = renderCab (cabModelLaidOut, cab, cabArea, 2.0f, proc.userIrName());
+        preImage = renderMicPre (pre, preArea, 2.0f);
+    }
+    else
+        pedalImage = renderPedal (design(), pedal, pedalDraw, 2.0f);
+}
+
 void ModulePage::paint (juce::Graphics& g)
 {
+    if (artStale && ! getLocalBounds().isEmpty()) renderArt();
     const bool on = power.isOn();
     if (! lampPrimed) { lamp.snap (on ? 1.0f : 0.0f); lampPrimed = true; }
     lamp.to (on ? 1.0f : 0.0f, on ? motion::ledUp : motion::ledDown, motion::Curve::out, true);

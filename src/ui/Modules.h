@@ -116,6 +116,11 @@ private:
     PedalLayout pedal;
     juce::Rectangle<float> pedalArea, pedalDraw;
     juce::Image pedalImage;
+    // The picture of the gear is made when the page is first drawn, not when it is laid out:
+    // a page nobody opens costs nothing at start.
+    bool artStale = true;
+    int cabModelLaidOut = 0;
+    void renderArt();
     void visibilityChanged() override { lampPrimed = false; }
     motion::Glide lamp { 1.0f }; // the light coming on or going out
     bool lampPrimed = false;
