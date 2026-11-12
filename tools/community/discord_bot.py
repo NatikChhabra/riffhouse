@@ -166,9 +166,12 @@ def short(text: str, n: int) -> str:
 
 def post_feeds(log: list[str]):
     builds = read_feed("builds.xml")
+    last_release = max((i["date"] for i in builds if i["category"] == "release" and i["date"]),
+                       default=dt.datetime.min.replace(tzinfo=dt.timezone.utc))
     plan = [
         ("releases", [i for i in builds if i["category"] == "release"], 1, "release-pings", True),
-        ("beta-lab", [i for i in builds if i["category"] == "beta"], 1, "beta-tester", False),
+        # a beta older than the newest release is already out for everyone, so it is not news
+        ("beta-lab", [i for i in builds if i["category"] == "beta" and i["date"] and i["date"] > last_release], 1, "beta-tester", False),
         ("tone-of-the-week", read_feed("weekly.xml"), 1, None, False),
     ]
     for chan, items, keep, role, publish in plan:
