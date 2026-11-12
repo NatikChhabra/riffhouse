@@ -115,6 +115,24 @@ std::vector<AutoSetup::Candidate> AutoSetup::findCandidates (juce::AudioDeviceMa
         for (auto& name : asio->getDeviceNames (true))
             if (! isAsioWrapper (name))
                 candidates.push_back ({ "ASIO", name });
+    if (auto* asio = findType (dm, "ASIO"))
+    {
+        // Realtek's own ASIO driver runs the computer's sockets with far less delay than Windows
+        // does, but only when the guitar and the listening both use them: the sound would
+        // otherwise go to sockets nobody listens on. So only when Windows plays there too.
+        auto* wasapi = findType (dm, "Windows Audio");
+        const auto outs = wasapi != nullptr ? wasapi->getDeviceNames (false) : juce::StringArray();
+        const int def = wasapi != nullptr ? wasapi->getDefaultDeviceIndex (false) : -1;
+        const bool listensOnRealtek = juce::isPositiveAndBelow (def, outs.size()) && outs[def].containsIgnoreCase ("realtek")
+                                      && ! DeviceGuard::looksLikeScreen (outs[def]);
+        bool guitarOnRealtek = false;
+        if (wasapi != nullptr)
+            for (const auto& in : wasapi->getDeviceNames (true))
+                guitarOnRealtek = guitarOnRealtek || (in.containsIgnoreCase ("realtek") && ! in.containsIgnoreCase ("stereo mix"));
+        for (auto& name : asio->getDeviceNames (true))
+            if (name.containsIgnoreCase ("realtek asio") && listensOnRealtek && guitarOnRealtek)
+                candidates.push_back ({ "ASIO", name });
+    }
     if (auto* wasapi = findType (dm, "Windows Audio"))
     {
         const auto names = wasapi->getDeviceNames (true);

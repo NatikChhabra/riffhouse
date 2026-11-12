@@ -1984,6 +1984,28 @@ void testTakes()
         CHECK (player.position() < 0.5, "pressing play at the end starts again from the top");
     }
     testExport (dir, wetFile, sr);
+
+    // a take a friend sent, saved as "riff.mp3.mpeg", is listed and plays: read by what is in it
+    {
+        const auto before = (int) listTakes (dir).size();
+        const auto sent = dir.getChildFile ("Friend riff.mp3.mpeg");
+        writeWav (sent, renderWith (v1, di, sr, 512), sr);
+        auto all = listTakes (dir);
+        bool found = false;
+        for (const auto& t : all)
+            if (t.sound == sent)
+            {
+                found = true;
+                CHECK (std::abs (t.seconds - 3.0) < 0.05, "its length is read from inside it (%.2f s)", t.seconds);
+                TakePlayer player;
+                player.prepare (sr, 256);
+                CHECK (player.load (t, TakePlayer::Mode::asRecorded), "and it plays");
+            }
+        CHECK (found && (int) all.size() == before + 1, "a sound file with a name no reader knows is listed (%d of %d)", (int) all.size(), before + 1);
+        // a copy of a take beside it (the same name, another kind of file) is not a second take
+        sent.copyFileTo (wetFile.withFileExtension ("flac"));
+        CHECK ((int) listTakes (dir).size() == before + 1, "a copy beside a WAV take is not listed twice");
+    }
     dir.deleteRecursively();
 }
 

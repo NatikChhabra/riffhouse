@@ -181,6 +181,14 @@ void BufferSearch::result (bool clean)
     if (foundClean || at + 1 >= sizes.size()) { trying = 0; return; }
     trying = sizes[++at];
 }
+juce::String delayFeel (double ms)
+{
+    // the figure counts every queue on the way, so these are generous to it
+    if (ms <= 20.0) return "instant";
+    if (ms <= 35.0) return "fine";
+    return "noticeable";
+}
+
 juce::String delayFigure (double ms)
 {
     // juce::String (x, 0) prints every digit, so the whole number is rounded here

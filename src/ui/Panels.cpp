@@ -1235,7 +1235,7 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     g.fillRect (a.getX() + 4.0f, a.getBottom() - 1.0f, a.getWidth() - 8.0f, 1.0f);
 
     // what is running, or the example used for pictures of the app
-    struct Card { bool open = false; juce::String driver, input, output; int buffer = 0, dropouts = 0; double rate = 48000.0, ms = 0.0; } c;
+    struct Card { bool open = false; juce::String driver, input, output; int buffer = 0, dropouts = 0; double rate = 48000.0, ms = 0.0; int smallest = 0; } c;
     auto* host = StandaloneHost::get();
     if (exampleCard)
         c = { true, "Windows Audio (Exclusive Mode)", "Guitar (Realtek USB Audio)", "Headphones (Realtek USB Audio)", 144, 0, 48000.0, 6.3 };
@@ -1253,6 +1253,8 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
         if (lat <= 0) lat = 2 * c.buffer;
         c.ms = 1000.0 * (lat + proc.getLatencySamples()) / c.rate;
         c.dropouts = dev->getXRunCount();
+        const auto sizes = dev->getAvailableBufferSizes();
+        if (! sizes.isEmpty()) c.smallest = sizes[0];
     }
     auto in = a.reduced (26.0f, 20.0f);
     auto figure = in.removeFromLeft (190.0f);
@@ -1285,6 +1287,10 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     g.setFont (font (16.0f, Weight::medium));
     g.setColour (colours::textDim);
     g.drawText ("ms", num.withTrimmedLeft (numW + 8.0f).withTrimmedTop (18.0f), juce::Justification::centredLeft);
+    // what the number means to someone playing, beside it
+    const float msW = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), "ms");
+    g.setFont (font (13.5f, Weight::medium));
+    g.drawText (delayFeel (ms), num.withTrimmedLeft (numW + 8.0f + msW + 10.0f).withTrimmedTop (19.0f), juce::Justification::centredLeft, true);
     drawCaps (g, "From string to ear", figure.removeFromBottom (20.0f), 11.0f, colours::textDim, juce::Justification::centredLeft, 0.14f);
 
     const float rowH = in.getHeight() / 4.0f;
@@ -1301,6 +1307,7 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     line ("Out", c.output, colours::text);
     line ("Runs", juce::String (buf) + " samples at " + juce::String (sr / 1000.0, 1) + " kHz, a "
                       + juce::String (1000.0 * buf / sr, 1) + " ms buffer"
+                      + (c.smallest > 256 && buf <= c.smallest ? juce::String (", the smallest this driver allows") : juce::String())
                       + (dropouts > 0 ? ", " + juce::String (dropouts) + (dropouts == 1 ? " dropout" : " dropouts") : juce::String()),
           dropouts > 0 ? colours::hot : colours::textDim);
 }

@@ -21,6 +21,10 @@ bool allowedToday (juce::PropertiesFile&);       // at most 3 reports a day leav
 // Sends on a background thread; `done` is called on the message thread with whether it arrived.
 void send (juce::PropertiesFile&, const juce::String& title, const juce::String& body, std::function<void (bool, juce::String)> done);
 
+// Sends straight away on this thread and returns what went wrong, or nothing. For the
+// "--report-check" run that proves a release build reaches the relay; not limited per day.
+juce::String sendNow (const juce::String& title, const juce::String& body);
+
 // The weekly hello, only when the player switched it on: adds one to this week's count. Once a week at most.
 bool helloOn (juce::PropertiesFile&);
 void setHelloOn (juce::PropertiesFile&, bool);

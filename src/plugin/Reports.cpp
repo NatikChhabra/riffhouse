@@ -40,16 +40,37 @@ namespace
 
     juce::String post (const juce::String& json)
     {
-        juce::URL url (kRelay);
-        url = url.withPOSTData (json);
+        // The relay answers a POST with a redirect to its reply, which has to be fetched with GET.
+        // JUCE would repeat the POST there and get a "not found" page, so the redirect is followed here.
+        juce::URL url = juce::URL (kRelay).withPOSTData (json);
         int status = 0;
+        juce::StringPairArray headers;
         auto stream = url.createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inPostData)
                                                  .withExtraHeaders ("Content-Type: application/json")
-                                                 .withConnectionTimeoutMs (15000)
+                                                 .withConnectionTimeoutMs (20000)
                                                  .withStatusCode (&status)
-                                                 .withNumRedirectsToFollow (5));
+                                                 .withResponseHeaders (&headers)
+                                                 .withNumRedirectsToFollow (0));
         if (stream == nullptr) return "could not reach the report service";
-        const auto answer = stream->readEntireStreamAsString();
+        juce::String answer;
+        if (status >= 300 && status < 400)
+        {
+            juce::String location;
+            for (const auto& k : headers.getAllKeys())
+                if (k.equalsIgnoreCase ("location")) location = headers[k];
+            if (! location.startsWith ("https://")) return "the report service answered " + juce::String (status);
+            stream.reset();
+            int status2 = 0;
+            auto reply = juce::URL (location).createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                                                                     .withConnectionTimeoutMs (20000)
+                                                                     .withStatusCode (&status2)
+                                                                     .withNumRedirectsToFollow (3));
+            if (reply == nullptr) return "the report service did not say whether it arrived";
+            answer = reply->readEntireStreamAsString();
+            status = status2;
+        }
+        else
+            answer = stream->readEntireStreamAsString();
         const auto v = juce::JSON::parse (answer);
         if ((bool) v.getProperty ("ok", false)) return {};
         const auto why = v.getProperty ("why", juce::var()).toString();
@@ -114,6 +135,18 @@ void send (juce::PropertiesFile& s, const juce::String& title, const juce::Strin
         const auto err = post (json);
         juce::MessageManager::callAsync ([done, err] { if (done) done (err.isEmpty(), err); });
     });
+}
+
+juce::String sendNow (const juce::String& title, const juce::String& body)
+{
+    if (! canSend()) return "This build has nowhere to send reports.";
+    auto* o = new juce::DynamicObject();
+    o->setProperty ("key", kKey);
+    o->setProperty ("kind", "report");
+    o->setProperty ("title", scrubForThisComputer (title));
+    o->setProperty ("version", "check");
+    o->setProperty ("body", scrubForThisComputer (body));
+    return post (juce::JSON::toString (juce::var (o), true));
 }
 
 bool helloOn (juce::PropertiesFile& s) { return s.getBoolValue ("weeklyHello", false); }

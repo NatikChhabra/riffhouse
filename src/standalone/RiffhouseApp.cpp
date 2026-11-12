@@ -11,6 +11,7 @@
 #if JucePlugin_Build_Standalone
 
 #include <juce_audio_utils/juce_audio_utils.h>
+#include <iostream>
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
 #include "../plugin/AudioProbe.h"
@@ -120,7 +121,11 @@ public:
     const juce::String getApplicationName() override { return "Riffhouse"; }
     const juce::String getApplicationVersion() override { return versionLabel(); }
     // a test run of one sound card driver (AudioProbe) runs beside the open app
-    bool moreThanOneInstanceAllowed() override { return AudioProbe::isProbeCommandLine (getCommandLineParameters()); }
+    bool moreThanOneInstanceAllowed() override
+    {
+        const auto cl = getCommandLineParameters();
+        return AudioProbe::isProbeCommandLine (cl) || cl.contains ("--report-check");
+    }
     void anotherInstanceStarted (const juce::String&) override
     {
         if (window != nullptr) window->toFront (true);
@@ -133,6 +138,19 @@ public:
             // riffhouse --probe-audio <type> <driver>: start that driver, say whether it played, quit
             probeOnly = true;
             setApplicationReturnValue (AudioProbe::run (juce::StringArray::fromTokens (commandLine, true)));
+            quit();
+            return;
+        }
+        if (commandLine.contains ("--report-check"))
+        {
+            // riffhouse --report-check: send one test report the way the app does, say how it went, quit
+            probeOnly = true;
+            const auto err = reports::sendNow ("Report check from " + versionLabel(),
+                                               "Riffhouse: " + versionLabel() + "\nA check that this build reaches the report relay. "
+                                               "Sent from C:\\Users\\" + juce::SystemStats::getLogonName() + "\\ on " + juce::SystemStats::getComputerName()
+                                               + ": both names must arrive replaced.");
+            std::cout << (err.isEmpty() ? juce::String ("RH-REPORT ok") : "RH-REPORT failed " + err) << std::endl;
+            setApplicationReturnValue (err.isEmpty() ? 0 : 1);
             quit();
             return;
         }

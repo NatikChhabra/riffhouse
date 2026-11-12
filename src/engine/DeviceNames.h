@@ -45,6 +45,7 @@ juce::String whyAsioFailed (const juce::String& driver, const juce::String& erro
 // opens the driver's own settings.
 juce::String asioBufferAdvice (int bufferSize, double sampleRate, int sizesOffered, const juce::String& button);
 // The delay as the big figure shows it: one decimal under 10 ms, a whole number from 10 up.
+juce::String delayFeel (double ms); // one word for how the string-to-ear figure feels to play
 juce::String delayFigure (double ms);
 
 // The buffer sizes setup tries in one driver mode, smallest first, spread over the whole range.

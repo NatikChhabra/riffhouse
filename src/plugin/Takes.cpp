@@ -30,12 +30,27 @@ juce::File findCleanGuitar (const juce::File& folder, const juce::String& base)
     return old.existsAsFile() ? old : now;
 }
 
+// A file is read by its name first and by what is inside it after: a take a friend sends can
+// arrive as "riff.mp3.mpeg", which no reader claims by its name.
+static std::unique_ptr<juce::AudioFormatReader> readAnyAudio (juce::AudioFormatManager& formats, const juce::File& f)
+{
+    if (std::unique_ptr<juce::AudioFormatReader> r { formats.createReaderFor (f) }) return r;
+    if (auto in = f.createInputStream()) return std::unique_ptr<juce::AudioFormatReader> (formats.createReaderFor (std::move (in)));
+    return nullptr;
+}
+
 std::vector<Take> listTakes (const juce::File& folder)
 {
     std::vector<Take> takes;
     juce::AudioFormatManager formats;
     formats.registerBasicFormats();
-    for (const auto& f : folder.findChildFiles (juce::File::findFiles, false, "*.wav"))
+    // takes Riffhouse made are WAV; any other sound file put in the folder is listed too, unless
+    // it is a copy of a WAV beside it
+    auto files = folder.findChildFiles (juce::File::findFiles, false, "*.wav;*.flac;*.mp3;*.ogg;*.oga;*.aif;*.aiff;*.mpeg;*.mpga;*.mp2;*.m4a;*.aac;*.wma");
+    for (int i = files.size(); --i >= 0;)
+        if (! files[i].hasFileExtension ("wav") && files[i].getSiblingFile (files[i].getFileNameWithoutExtension()).withFileExtension ("wav").existsAsFile())
+            files.remove (i);
+    for (const auto& f : files)
     {
         Take t;
         t.sound = f;
@@ -47,7 +62,7 @@ std::vector<Take> listTakes (const juce::File& folder)
         t.name = base.contains (reampMark) ? base.fromFirstOccurrenceOf (reampMark, false, false)
                                            : (stamped ? first.substring (20) : first);
         t.when = f.getLastModificationTime();
-        if (std::unique_ptr<juce::AudioFormatReader> r { formats.createReaderFor (f) })
+        if (auto r = readAnyAudio (formats, f))
             t.seconds = r->sampleRate > 0.0 ? (double) r->lengthInSamples / r->sampleRate : 0.0;
         if (t.seconds > 0.05) takes.push_back (std::move (t)); // an empty file is a take that never started
     }
@@ -77,7 +92,7 @@ TakePlayer::~TakePlayer()
 bool TakePlayer::load (const Take& t, Mode m)
 {
     const auto file = m == Mode::throughRig ? t.clean : t.sound;
-    std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (file) };
+    auto reader = readAnyAudio (formats, file);
     if (reader == nullptr || reader->lengthInSamples <= 0) return false;
     const double fileRate = reader->sampleRate;
     auto next = std::make_unique<juce::AudioFormatReaderSource> (reader.release(), true);
