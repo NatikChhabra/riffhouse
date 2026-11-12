@@ -8,6 +8,7 @@
 // counted is how often the guard touches it.
 
 #include "plugin/AudioOpen.h"
+#include "plugin/AudioProbe.h"
 #include "plugin/DeviceGuard.h"
 #include "plugin/DeviceLog.h"
 
@@ -400,6 +401,95 @@ void runDeviceChecks (int& checks, int& failures)
         CHECK (devlog::lastRun() == LastRun::fine, "and the run after a clean close starts with nothing to report");
         devlog::stop();
         folder.deleteRecursively();
+    }
+    {
+        // An ASIO driver is first started in a test run outside the app. Here the test run is a
+        // shell command that answers the way Riffhouse's own does, or never answers at all.
+        std::printf ("test runs of a driver\n");
+        auto shell = [] (const juce::String& line) -> juce::StringArray
+        {
+           #if JUCE_WINDOWS
+            return { "cmd", "/c", line };
+           #else
+            return { "/bin/sh", "-c", line };
+           #endif
+        };
+        auto runProbe = [] (const juce::StringArray& cmd, double timeoutMs)
+        {
+            AudioProbe probe;
+            AudioProbe::Result got;
+            bool called = false;
+            probe.start (cmd, timeoutMs, [&] (AudioProbe::Result r) { got = r; called = true; });
+            const double began = juce::Time::getMillisecondCounterHiRes();
+            while (! called && juce::Time::getMillisecondCounterHiRes() - began < 20000.0)
+            {
+                juce::Thread::sleep (20);
+                probe.poll();
+            }
+            return std::make_pair (called, got);
+        };
+       #if JUCE_WINDOWS
+        const auto hang = shell ("ping -n 30 127.0.0.1 >nul");
+        const auto ok = shell ("echo RH-PROBE ok 48000 Hz, 256 samples");
+        const auto failed = shell ("echo RH-PROBE failed Device didn't start correctly& exit 2");
+        const auto silent = shell ("echo RH-PROBE silent It opened but sent no sound& exit 3");
+       #else
+        const auto hang = shell ("sleep 30");
+        const auto ok = shell ("echo 'RH-PROBE ok 48000 Hz, 256 samples'");
+        const auto failed = shell ("echo \"RH-PROBE failed Device didn't start correctly\"; exit 2");
+        const auto silent = shell ("echo 'RH-PROBE silent It opened but sent no sound'; exit 3");
+       #endif
+        const double began = juce::Time::getMillisecondCounterHiRes();
+        auto [calledHang, hung] = runProbe (hang, 600.0);
+        const double took = juce::Time::getMillisecondCounterHiRes() - began;
+        CHECK (calledHang && hung.outcome == AudioProbe::Outcome::timedOut, "a driver that never answers is stopped at the time limit");
+        CHECK (took < 5000.0, "and the wait ends at the limit, not when the driver is done (%.0f ms)", took);
+        auto [calledOk, played] = runProbe (ok, 10000.0);
+        CHECK (calledOk && played.ok() && played.detail == "48000 Hz, 256 samples", "a driver that played is known to work (%s)", played.detail.toRawUTF8());
+        auto [calledFail, refused] = runProbe (failed, 10000.0);
+        CHECK (calledFail && refused.outcome == AudioProbe::Outcome::failed && refused.detail.contains ("didn't start"),
+               "a driver that failed says what it said (%s)", refused.detail.toRawUTF8());
+        auto [calledSilent, quiet] = runProbe (silent, 10000.0);
+        CHECK (calledSilent && quiet.outcome == AudioProbe::Outcome::silent, "a driver that opened but stayed silent is told apart");
+        {
+            AudioProbe probe;
+            bool called = false;
+            probe.start (hang, 60000.0, [&] (AudioProbe::Result) { called = true; });
+            CHECK (probe.busy(), "a test run is under way");
+            probe.cancel();
+            CHECK (! probe.busy() && ! called, "cancelling stops it and says nothing");
+        }
+        CHECK (AudioProbe::isProbeCommandLine ("--probe-audio ASIO \"ASIO4ALL v2\"") && ! AudioProbe::isProbeCommandLine ("--snapshots out"),
+               "the app knows when it was started only to test a driver");
+        CHECK (AudioProbe::commandFor ("ASIO", "ASIO4ALL v2").joinIntoString ("|").endsWith ("|--probe-audio|ASIO|ASIO4ALL v2"),
+               "the test run is this program with the driver's name as one argument");
+
+        // what this computer showed about each driver is remembered between runs
+        const auto file = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                              .getChildFile ("riffhouse-drivers-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt()) + ".settings");
+        {
+            juce::PropertiesFile::Options o;
+            juce::PropertiesFile props (file, o);
+            AudioProbe::useSettings (&props);
+            AudioProbe::remember ("ASIO4ALL v2", false);
+            CHECK (AudioProbe::knownBad ("ASIO4ALL v2") && ! AudioProbe::knownBad ("Focusrite USB ASIO"), "a driver that failed is left out of automatic setup");
+            AudioProbe::remember ("Focusrite USB ASIO", true);
+            CHECK (AudioProbe::provedThisRun ("Focusrite USB ASIO") && ! AudioProbe::provedThisRun ("ASIO4ALL v2"), "one that played is not tested again this run");
+            AudioProbe::remember ("ASIO4ALL v2", true);
+            CHECK (! AudioProbe::knownBad ("ASIO4ALL v2"), "and picking a failed one by hand, when it then works, clears it");
+            AudioProbe::remember ("ASIO4ALL v2", false);
+            AudioProbe::useSettings (nullptr);
+        }
+        {
+            juce::PropertiesFile::Options o;
+            juce::PropertiesFile props (file, o);
+            AudioProbe::useSettings (&props);
+            CHECK (AudioProbe::knownBad ("ASIO4ALL v2"), "a failure is still known after the app is closed and opened");
+            AudioProbe::useSettings (nullptr);
+        }
+        file.deleteFile();
+        AudioProbe::Result r { AudioProbe::Outcome::timedOut, "It did not answer within 12 seconds", 12000.0 };
+        CHECK (AudioProbe::describe (r, "ASIO4ALL v2").contains ("did not answer"), "the diary says a driver was stopped");
     }
 #undef CHECK
 }

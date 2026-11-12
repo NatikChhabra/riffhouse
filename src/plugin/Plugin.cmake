@@ -59,6 +59,7 @@ target_sources(Riffhouse PRIVATE
     plugin/DeviceLog.cpp
     plugin/AudioSwitch.cpp
     plugin/AudioOpen.cpp
+    plugin/AudioProbe.cpp
     plugin/Updater.cpp
     plugin/LevelMatcher.cpp
     plugin/Version.cpp

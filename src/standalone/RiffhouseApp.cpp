@@ -13,6 +13,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 
+#include "../plugin/AudioProbe.h"
 #include "../plugin/AudioSwitch.h"
 #include "../plugin/AutoSetup.h"
 #include "../engine/DeviceNames.h"
@@ -117,7 +118,8 @@ public:
 
     const juce::String getApplicationName() override { return "Riffhouse"; }
     const juce::String getApplicationVersion() override { return versionLabel(); }
-    bool moreThanOneInstanceAllowed() override { return false; }
+    // a test run of one sound card driver (AudioProbe) runs beside the open app
+    bool moreThanOneInstanceAllowed() override { return AudioProbe::isProbeCommandLine (getCommandLineParameters()); }
     void anotherInstanceStarted (const juce::String&) override
     {
         if (window != nullptr) window->toFront (true);
@@ -125,7 +127,16 @@ public:
 
     void initialise (const juce::String& commandLine) override
     {
+        if (AudioProbe::isProbeCommandLine (commandLine))
+        {
+            // riffhouse --probe-audio <type> <driver>: start that driver, say whether it played, quit
+            probeOnly = true;
+            setApplicationReturnValue (AudioProbe::run (juce::StringArray::fromTokens (commandLine, true)));
+            quit();
+            return;
+        }
         auto* s = properties.getUserSettings();
+        AudioProbe::useSettings (s);
         // A diary of what happens with the sound card, kept beside the settings. Pictures of the
         // app (--snapshots, --motion) leave no trace.
         if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
@@ -219,6 +230,7 @@ public:
 
     void shutdown() override
     {
+        if (probeOnly) return; // nothing else was started
         stopTimer();
         healer.reset();
         guard.reset();
@@ -305,7 +317,7 @@ private:
         std::vector<AudioChoice> tries;
         if (auto* asio = [&]() -> juce::AudioIODeviceType* { for (auto* t : dm.getAvailableDeviceTypes()) if (t->getTypeName() == "ASIO") return t; return nullptr; }())
             for (const auto& d : asio->getDeviceNames (true))
-                if (! AutoSetup::isAsioWrapper (d) && sameHardware (d, now.input))
+                if (! AutoSetup::isAsioWrapper (d) && ! AudioProbe::knownBad (d) && sameHardware (d, now.input))
                 {
                     AudioChoice a;
                     a.types = { "ASIO" };
@@ -372,6 +384,7 @@ private:
     std::unique_ptr<MainWindow> window;
     std::unique_ptr<DeviceGuard> guard;
     std::unique_ptr<AudioSwitch> healer;
+    bool probeOnly = false;
     std::unique_ptr<Updater> updates;
     juce::InterProcessLock runLock { "RiffhouseRunning" };
     bool installerStarted = false;

@@ -19,6 +19,7 @@ AudioSwitch::AudioSwitch (juce::AudioDeviceManager& d, RiffhouseProcessor& p) : 
 
 AudioSwitch::~AudioSwitch()
 {
+    probe.cancel();
     if (working && search != nullptr)
     {
         // closed while finding the buffer: keep the one already proven to play
@@ -135,7 +136,32 @@ void AudioSwitch::tryNext()
                         output = juce::isPositiveAndBelow (idx, outs.size()) ? outs[idx] : outs[0];
                     }
                 }
+        if (type == "ASIO" && ! AudioProbe::provedThisRun (want.input))
+        {
+            // A test run outside the app first: an ASIO driver that takes seconds to fail, or
+            // hangs, must not freeze the window. The driver needs the sound devices free for it.
+            probing = true;
+            dm.closeAudioDevice();
+            devlog::note ("Testing " + want.input + " in a test run first");
+            probe.start (AudioProbe::commandFor (type, want.input), AudioProbe::kTimeoutMs, [this] (AudioProbe::Result r)
+            {
+                probing = false;
+                devlog::note (AudioProbe::describe (r, want.input));
+                AudioProbe::remember (want.input, r.ok());
+                if (! r.ok())
+                {
+                    // one try per driver: it is not opened in the app at any rate
+                    if (r.outcome == AudioProbe::Outcome::silent) sawSilence = true;
+                    else lastError = r.detail;
+                    ++tryIndex;
+                    rateIndex = 0;
+                }
+                tryNext();
+            });
+            return;
+        }
         // the buffer asked for belongs to the first mode; one tried in its place picks its own
+        const double openStarted = juce::Time::getMillisecondCounterHiRes();
         const auto err = openExactly (dm, { type, want.input, output, tryIndex == 0 && rateIndex == 0 ? want.bufferSize : 0, rate,
                                             type == "ASIO" ? want.outputPair : -1, want.inputPair });
         auto* dev = dm.getCurrentAudioDevice();
@@ -147,6 +173,13 @@ void AudioSwitch::tryNext()
             return;
         }
         if (err.isNotEmpty()) lastError = err;
+        if (err.isNotEmpty() && type == "ASIO" && juce::Time::getMillisecondCounterHiRes() - openStarted > 2500.0)
+        {
+            // a driver that took seconds to fail fails the same way at every rate: not again
+            ++tryIndex;
+            rateIndex = 0;
+            continue;
+        }
         if (err.isEmpty() && dev != nullptr)
         {
             // it opened with no input at all: another rate will not grow one

@@ -4,6 +4,7 @@
 
 #include "PluginProcessor.h"
 #include "AudioOpen.h"
+#include "AudioProbe.h"
 #include "../engine/DeviceNames.h"
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -84,5 +85,8 @@ private:
     int xrunsAtTry = 0;
     double triedAt = 0;
     bool tryOpened = false;
+    // an ASIO driver is first started in a test run outside the app (AudioProbe)
+    AudioProbe probe;
+    bool probing = false;
 };
 } // namespace rh

@@ -202,6 +202,15 @@ jobs:
           $p.Refresh()
           if ($p.HasExited) { throw "The app closed by itself within 25 seconds, code $($p.ExitCode)" }
           if (-not $p.Responding) { throw "The app's window does not answer 25 seconds after starting" }
+          # Switching to an ASIO driver first starts it in a test run of the same program, beside
+          # the open app. That run must start although the app is open, answer and end by itself.
+          $probe = Start-Process $app -ArgumentList '--probe-audio','ASIO','"No Such Driver"' -PassThru -RedirectStandardOutput probe.txt
+          $null = $probe.Handle
+          if (-not $probe.WaitForExit(30000)) { $probe.Kill(); throw "A driver test run did not end within 30 seconds" }
+          "Driver test run ended with code $($probe.ExitCode): $(Get-Content probe.txt -Raw)"
+          if ($probe.ExitCode -ne 2) { throw "A test run of a driver that is not there should end with code 2, not $($probe.ExitCode)" }
+          $p.Refresh()
+          if ($p.HasExited) { throw "The open app closed when a driver test run started beside it" }
           $null = $p.CloseMainWindow()
           if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "The app did not close within 30 seconds of being asked" }
           if ($p.ExitCode -ne 0) { throw "The app ended with code $($p.ExitCode)" }

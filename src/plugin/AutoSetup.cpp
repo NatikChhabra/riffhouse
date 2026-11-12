@@ -81,6 +81,7 @@ AutoSetup::AutoSetup (juce::AudioDeviceManager& d, RiffhouseProcessor& p) : dm (
 AutoSetup::~AutoSetup()
 {
     stopTimer();
+    probe.cancel();
     proc.muteOutput.store (false);
 }
 
@@ -195,6 +196,16 @@ void AutoSetup::start (const Input* only)
                 candidatePeak.assign (1, 0.0f);
                 break;
             }
+    if (only == nullptr)
+    {
+        // a driver that failed or hung on this computer before is not tried again by itself
+        std::vector<Candidate> keep;
+        for (const auto& c : candidates)
+            if (c.type != "ASIO" || ! AudioProbe::knownBad (c.name)) keep.push_back (c);
+            else devlog::note ("Setup leaves out " + c.name + ": it failed on this computer before");
+        candidates = keep;
+        candidatePeak.assign (candidates.size(), 0.0f);
+    }
     if (candidates.empty())
     {
         detailText = "No audio inputs found on this computer.";
@@ -202,6 +213,45 @@ void AutoSetup::start (const Input* only)
         return;
     }
     setPhase (Phase::listening);
+    checkNextDriver();
+}
+
+void AutoSetup::checkNextDriver()
+{
+    for (const auto& c : candidates)
+    {
+        if (c.type != "ASIO" || AudioProbe::provedThisRun (c.name)) continue;
+        const auto name = c.name;
+        detailText = "Checking " + name;
+        if (onPhaseChanged) onPhaseChanged();
+        dm.closeAudioDevice(); // the driver needs the sound devices free
+        probe.start (AudioProbe::commandFor ("ASIO", name), AudioProbe::kTimeoutMs, [this, name] (AudioProbe::Result r)
+        {
+            devlog::note (AudioProbe::describe (r, name));
+            AudioProbe::remember (name, r.ok());
+            if (! r.ok())
+            {
+                for (size_t i = 0; i < candidates.size(); ++i)
+                    if (candidates[i].type == "ASIO" && candidates[i].name == name)
+                    {
+                        candidates.erase (candidates.begin() + (long) i);
+                        candidatePeak.erase (candidatePeak.begin() + (long) i);
+                        break;
+                    }
+                if (candidates.empty())
+                {
+                    detailText = name + " would not start, and there is no other input to try.";
+                    if (original.valid()) openExactly (dm, original);
+                    proc.muteOutput.store (false);
+                    setPhase (Phase::noSignal);
+                    return;
+                }
+            }
+            checkNextDriver();
+        });
+        return;
+    }
+    // every driver left has played in a test run: listen
     openCandidate (candidates[0]);
     startTimerHz (25);
 }
@@ -209,6 +259,7 @@ void AutoSetup::start (const Input* only)
 void AutoSetup::cancel()
 {
     stopTimer();
+    probe.cancel();
     afterPause = nullptr;
     if (currentPhase != Phase::finished && currentPhase != Phase::idle)
     {
@@ -508,7 +559,12 @@ double AutoSetup::measuredLatencyMs() const
 
 void AutoSetup::finishTuning()
 {
-    if (best.buffer > 0)
+    auto* running = dm.getCurrentAudioDevice();
+    const bool alreadyBest = running != nullptr && best.buffer > 0 && ! lastOpenFailed
+                             && dm.getCurrentAudioDeviceType() == best.type && running->getCurrentBufferSizeSamples() == best.buffer;
+    if (alreadyBest)
+        devlog::note ("Setup keeps " + juce::String (best.buffer) + " samples, already open"); // a second open only stalls the window
+    else if (best.buffer > 0)
         openMode (best.type, best.buffer);
     else
         openCandidate (chosen); // nothing was perfect: keep the safe default buffer

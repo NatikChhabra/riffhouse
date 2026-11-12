@@ -37,6 +37,9 @@ WizardImageFile=wizard.bmp
 WizardSmallImageFile=wizard-small.bmp
 UninstallDisplayIcon={app}\Riffhouse.exe
 UninstallDisplayName=Riffhouse
+; Windows keeps a pinned taskbar button's picture from the version it was pinned with: telling it
+; that icons changed makes it draw the new logo after an update.
+ChangesAssociations=yes
 ; Never let the installer close other programs: a DAW with the plugin open stays open.
 CloseApplications=no
 RestartApplications=no
@@ -61,6 +64,8 @@ Name: "{userprograms}\Riffhouse"; Filename: "{app}\Riffhouse.exe"
 Name: "{userdesktop}\Riffhouse"; Filename: "{app}\Riffhouse.exe"; Tasks: desktopicon
 
 [Run]
+; the same, for Windows 10 and 11: refresh the icon pictures it keeps
+Filename: "{sys}\ie4uinit.exe"; Parameters: "-show"; Flags: runhidden nowait skipifdoesntexist
 ; a normal install: offer to start it
 Filename: "{app}\Riffhouse.exe"; Description: "Start Riffhouse"; Flags: nowait postinstall skipifsilent
 ; "Restart and update" from inside the app: start it again without asking

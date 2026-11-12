@@ -99,6 +99,11 @@ private:
 
     AudioOpen original; // what was running before setup, to return to on Cancel
 
+    // ASIO drivers are tried in a test run outside the app before setup listens on them, so a
+    // driver that hangs never freezes the window; those that fail are left out.
+    AudioProbe probe;
+    void checkNextDriver();
+
     // listening
     std::vector<Candidate> candidates;
     std::vector<float> candidatePeak;
