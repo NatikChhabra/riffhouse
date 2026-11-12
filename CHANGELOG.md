@@ -17,7 +17,7 @@ No more frozen window when you pick ASIO, a setup that goes for the lowest delay
 - The delay on the Settings plate says how it feels: instant, fine or noticeable. When the buffer is already the smallest the driver allows, it says that too.
 - Send a report (Settings, Help) sends what Riffhouse wrote down to the people who fix it, privately, with your user name and computer name taken out. After a crash, a freeze or a sound card change that did not work, Riffhouse asks once whether to send one. Nothing leaves the computer unless you say yes, and at most three a day.
 - Report in public opens a form on GitHub and puts the report on your clipboard, with your names taken out too.
-- "Count me in the weekly number of players" (Settings, Help, off unless you switch it on) adds one to a count of players each week, nothing else.
+- Riffhouse counts how many people play each week. Once a week it sends a random number made on your PC, the app version and the week, nothing about you or your PC. It is on by default, says so once, and Settings, Player count switches it off. Details in docs/PRIVACY.md.
 - The taskbar shows the new icon after an update, not the old house.
 - Takes plays any audio file you drop in its folder: MP3, FLAC, OGG, M4A and files with odd names like ".mp3.mpeg".
 - Setup's first page asks for wired headphones and says where the guitar can plug in. After an update, Riffhouse says in one line what changed.

@@ -154,7 +154,7 @@ private:
     IconButton close { icons::close() };
     juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and output..." };
     juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report in public" }, sendReport { "Send a report" };
-    juce::ToggleButton weeklyHello { "Count me in the weekly number of players (nothing about you is sent)" };
+    juce::ToggleButton weeklyHello { "Count me in the weekly number of players" };
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
     juce::ToggleButton earlyVersions { "Get new versions early, as a tester" };
@@ -174,7 +174,7 @@ private:
     juce::Viewport footView;
     std::unique_ptr<FootList> footList;
     // the words on the page, painted where the layout put them
-    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, earlyText, motionHead, helpText, aboutHead, aboutArea;
+    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, earlyText, motionHead, countHead, countText, helpText, aboutHead, aboutArea;
 };
 
 // Ask for a name and save the current tone.

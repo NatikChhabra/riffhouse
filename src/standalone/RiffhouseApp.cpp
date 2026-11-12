@@ -215,9 +215,20 @@ public:
                 if (reports::canSend()) offerReport (what);
                 else if (auto* ed = editor()) ed->showToast (what + " Settings, Save a report tells us why.");
             });
-        // the weekly count, only for players who switched it on
+        // the weekly count, on unless switched off in Settings; said once so nobody is counted unknowingly
         if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
-            juce::Timer::callAfterDelay (20000, [this] { reports::sayHelloIfDue (*properties.getUserSettings()); });
+            juce::Timer::callAfterDelay (20000, [this]
+            {
+                auto& s = *properties.getUserSettings();
+                if (reports::canSend() && reports::helloOn (s) && ! s.getBoolValue ("helloExplained", false))
+                    if (auto* ed = editor())
+                    {
+                        ed->showToast ("Riffhouse counts players once a week: a random number, nothing about you. Settings, Player count turns it off.");
+                        s.setValue ("helloExplained", true);
+                        s.saveIfNeeded();
+                    }
+                reports::sayHelloIfDue (s, versionLabel());
+            });
 
         // riffhouse --snapshots <folder> [scale]: render every screen to PNG and quit
         auto args = juce::StringArray::fromTokens (commandLine, true);

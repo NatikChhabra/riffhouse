@@ -25,9 +25,13 @@ void send (juce::PropertiesFile&, const juce::String& title, const juce::String&
 // "--report-check" run that proves a release build reaches the relay; not limited per day.
 juce::String sendNow (const juce::String& title, const juce::String& body);
 
-// The weekly hello, only when the player switched it on: adds one to this week's count. Once a week at most.
+// The weekly hello: on unless the player switches it off in Settings. Once a week at most it
+// sends the week, a random install id and the app version, and nothing else.
 bool helloOn (juce::PropertiesFile&);
 void setHelloOn (juce::PropertiesFile&, bool);
-void sayHelloIfDue (juce::PropertiesFile&);
+void sayHelloIfDue (juce::PropertiesFile&, const juce::String& version);
 juce::String weekOf (juce::Time); // "2026-W46"
+juce::String installId (juce::PropertiesFile&);  // made once from random numbers, then kept
+bool isInstallId (const juce::String&);           // 32 lowercase hex digits
+juce::String helloJson (const juce::String& week, const juce::String& id, const juce::String& version);
 } // namespace rh::reports

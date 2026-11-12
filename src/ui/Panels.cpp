@@ -704,7 +704,7 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
         if (auto* host = StandaloneHost::get())
         {
             reports::setHelloOn (host->settings(), weeklyHello.getToggleState());
-            reports::sayHelloIfDue (host->settings());
+            reports::sayHelloIfDue (host->settings(), versionLabel());
         }
     };
     page.addChildComponent (weeklyHello);
@@ -966,7 +966,7 @@ juce::String SettingsView::sectionName (Section s)
         case Section::sound:  return "Sound card";
         case Section::guitar: return "Guitar input";
         case Section::foot:   return "Foot control";
-        case Section::app:    return "Updates and motion";
+        case Section::app:    return "Updates, motion and player count";
         case Section::help:   return "Help and about";
     }
     return {};
@@ -981,7 +981,7 @@ juce::String SettingsView::sectionLead (Section s) const
         case Section::guitar: return "What happens to the guitar before it reaches the first pedal.";
         case Section::foot:   return standalone ? "Play hands free: a MIDI foot controller, expression pedal or keyboard works the moment you plug it in."
                                                 : "Send MIDI from a foot controller, expression pedal or keyboard to this plugin.";
-        case Section::app:    return "New versions, and how much the screen moves.";
+        case Section::app:    return "New versions, how much the screen moves, and the weekly player count.";
         case Section::help:   return "When something sounds wrong, or does not work at all.";
     }
     return {};
@@ -1070,7 +1070,7 @@ void SettingsView::layoutPage()
     int y = 0;
     auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
     auto gap = [&] (int g) { y += g; };
-    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = earlyText = motionHead = helpText = aboutHead = aboutArea = {};
+    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = earlyText = motionHead = countHead = countText = helpText = aboutHead = aboutArea = {};
 
     // one page: every part under its own heading, one after another
     bool firstPart = true;
@@ -1149,6 +1149,15 @@ void SettingsView::layoutPage()
             motionHead = at (26);
             gap (10);
             lessMotion.setBounds (at (30));
+            if (weeklyHello.isVisible())
+            {
+                gap (36);
+                countHead = at (26);
+                gap (10);
+                weeklyHello.setBounds (at (30));
+                gap (4);
+                countText = at (40).withTrimmedLeft (44);
+            }
             break;
         }
         case Section::help:
@@ -1165,11 +1174,6 @@ void SettingsView::layoutPage()
             }
             gap (16);
             helpText = at (66);
-            if (weeklyHello.isVisible())
-            {
-                gap (6);
-                weeklyHello.setBounds (at (30));
-            }
             gap (36);
             aboutHead = at (26);
             gap (10);
@@ -1383,6 +1387,12 @@ void SettingsView::paintPage (juce::Graphics& g)
                 small ("Test versions come out a few days before everyone gets them. They can have rough edges.", earlyText, 1);
             }
             subhead ("Motion", motionHead);
+            if (weeklyHello.isVisible())
+            {
+                subhead ("Player count", countHead);
+                small ("Once a week Riffhouse sends a random number made on this PC, the app version and the week, so we know how many "
+                       "people play. Nothing about you or your PC. Switch it off any time.", countText, 2);
+            }
             break;
         case Section::help:
         {
