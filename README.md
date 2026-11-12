@@ -124,6 +124,10 @@ From anywhere else, a star on this page helps as much.
 
 <br clear="right">
 
+## Talk guitar
+
+Come hang out in the [Guitar Discord](https://discord.gg/guitar-music), a server of 56,000 guitar players: gear, playing, theory and your own recordings.
+
 ## Share tones
 
 A tone is a small JSON file. In the tone browser, **Copy tone code** puts the current tone on your clipboard as text, and **Paste tone code** loads one. **Open tone folder** shows where your own tones live. To add a tone to the factory set, put it in `presets/` and open a pull request.
