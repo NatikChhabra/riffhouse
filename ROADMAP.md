@@ -6,9 +6,18 @@ The nicer version of this page is on the website: https://natikchhabra.github.io
 
 Updated 12 November 2026.
 
-## Out now: 0.1.3
+## Out now: 0.1.4
 
-Released 12 November 2026. Update from inside the app, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
+Released 12 November 2026, fixes from the first day of 0.1.3. Riffhouse updates itself, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
+
+- **Puts itself back on the fast way in.** If Riffhouse starts on a slow driver, it tries the fastest one your input has a few seconds later and keeps it only if the sound is clean.
+- **Clearer sound card messages.** When a driver won't start, Riffhouse says what it went back to and names the usual cause first: another program, often a voice call, holding the device.
+- **Setup finds your guitar first.** Inputs named for a guitar or an instrument come first, then audio interfaces, with USB mics and webcams last.
+- **Settings is one page.** No side list, every part under its own heading, and the delay figure reads in full.
+
+## 0.1.3
+
+Released 12 November 2026.
 
 - **A sound card that sorts itself out.** Pick Automatic, ASIO, WASAPI or DirectSound, or let Automatic choose the fastest one that plays clean. Every ASIO driver is listed. When an interface is stuck at the wrong sample rate, Riffhouse fixes it, and anything it can't fix is explained in plain words.
 - **A new look.** The new logo, a window that fits any screen shape, Settings on one simple page, and pedal names printed on the pedals.
@@ -17,7 +26,7 @@ Released 12 November 2026. Update from inside the app, or download it from the [
 - **Share a tone as a message.** Send a tone to a friend as plain text. They paste it into Riffhouse and it loads.
 - **MP3 and FLAC.** Every take you record saves as MP3 or FLAC with one button. And the app starts about twice as fast.
 
-## Next: 0.1.4 and on
+## Next: 0.1.5 and on
 
 Small fix releases come first, and each one also lays groundwork for 0.2.0.
 
