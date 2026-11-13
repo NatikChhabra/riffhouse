@@ -3,6 +3,9 @@ name: Discord bot
 # Runs the Riff House Discord bot (tools/community/discord_bot.py): posts new releases, beta builds,
 # dev log and tone of the week, answers common questions in #help and #bug-reports, and keeps #bot-log.
 # Everything it needs to remember is kept in Discord, so a skipped or late run just catches up.
+# GitHub often drops scheduled runs (it ran a few times a day instead of every 10 minutes), so each
+# run checks every 5 minutes for about 50 minutes, then starts the next run itself. The schedule
+# stays as a backup that restarts the chain if it ever breaks.
 on:
   schedule:
     - cron: '*/10 * * * *'
@@ -14,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # to start the next run
 
 concurrency:
   group: discord-bot
@@ -22,14 +26,26 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 58
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             tools/community
             community
-      - name: Run the bot
+      - name: Run the bot every 5 minutes
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        run: python3 tools/community/discord_bot.py
+        run: |
+          failed=0
+          for i in $(seq 1 10); do
+            git fetch -q origin main && git reset -q --hard origin/main || true   # pick up new reels and bot fixes
+            timeout 240 python3 tools/community/discord_bot.py || failed=1
+            [ "$i" -lt 10 ] && sleep 300
+          done
+          exit $failed
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run discord-bot.yml --ref main -R "$GITHUB_REPOSITORY"
