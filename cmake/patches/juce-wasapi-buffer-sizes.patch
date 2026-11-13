@@ -1,5 +1,5 @@
 diff --git a/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp b/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
-index 3c815cb..36f95e6 100644
+index 3c815cb..1975d48 100644
 --- a/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
 +++ b/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
 @@ -32,6 +32,9 @@
@@ -30,7 +30,13 @@ index 3c815cb..36f95e6 100644
          minBufferSize = refTimeToSamples (minPeriod, defaultSampleRate);
          defaultBufferSize = refTimeToSamples (defaultPeriod, defaultSampleRate);
      }
-@@ -966,6 +973,8 @@ public:
+@@ -961,17 +968,21 @@ public:
+ 
+     bool start (int userBufferSizeIn)
+     {
++        streamRunning = false;
+         const auto reservoirSize = nextPowerOfTwo ((int) (actualBufferSize + (UINT32) userBufferSizeIn));
+ 
          queue = SingleThreadedAbstractFifo (reservoirSize);
          reservoir.setSize ((size_t) (queue.getSize() * bytesPerFrame), true);
          xruns = 0;
@@ -39,7 +45,14 @@ index 3c815cb..36f95e6 100644
  
          if (! check (client->Start()))
              return false;
-@@ -997,10 +1006,27 @@ public:
+ 
+         purgeInputBuffers();
+         isActive = true;
++        streamRunning = true;
+ 
+         return true;
+     }
+@@ -997,10 +1008,27 @@ public:
          UINT32 numSamplesAvailable = 0;
          DWORD flags = 0;
  
@@ -58,7 +71,7 @@ index 3c815cb..36f95e6 100644
 +            {
 +                const bool jumped = devicePosition > 0 && expectedPosition > 0 && devicePosition > expectedPosition + 16;
 +                const bool flagged = (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0;
-+                if (jumped || (flagged && devicePosition == 0))
++                if (flagged && (jumped || devicePosition == 0))
 +                    xruns++;
 +            }
 +
@@ -70,7 +83,7 @@ index 3c815cb..36f95e6 100644
  
              if (numSamplesAvailable > (UINT32) queue.getRemainingSpace())
              {
-@@ -1026,6 +1052,9 @@ public:
+@@ -1026,6 +1054,9 @@ public:
  
              captureClient->ReleaseBuffer (numSamplesAvailable);
          }
@@ -80,12 +93,13 @@ index 3c815cb..36f95e6 100644
      }
  
      void copyBuffersFromReservoir (float* const* destBuffers, const int numDestBuffers, const int bufferSize)
-@@ -1055,7 +1084,46 @@ public:
+@@ -1055,7 +1086,48 @@ public:
      ComSmartPtr<IAudioCaptureClient> captureClient;
      MemoryBlock reservoir;
      SingleThreadedAbstractFifo queue;
 -    int xruns = 0;
 +    int xruns = 0, packetsSinceStart = 0;
++    std::atomic<bool> streamRunning { false }; // Riffhouse: started and purged; the audio thread reads it only then
 +    UINT64 expectedPosition = 0;
 +
 +    // Riffhouse: with a separate output running, input goes straight into a cushion that is read
@@ -122,13 +136,14 @@ index 3c815cb..36f95e6 100644
 +
 +    void pullFromElastic (float* const* dest, int numDest, int frames)
 +    {
-+        handleDeviceBuffer(); // whatever has arrived, even with no event yet
++        if (streamRunning)
++            handleDeviceBuffer(); // whatever has arrived, even with no event yet
 +        elastic.pull (dest, numDest, frames, Time::getMillisecondCounterHiRes() * 0.001);
 +    }
  
      std::unique_ptr<AudioData::Converter> converter;
  
-@@ -1116,6 +1184,8 @@ public:
+@@ -1116,6 +1188,8 @@ public:
          if (! check (client->Start()))
              return false;
  
@@ -137,7 +152,7 @@ index 3c815cb..36f95e6 100644
          isActive = true;
  
          return true;
-@@ -1137,6 +1207,50 @@ public:
+@@ -1137,6 +1211,50 @@ public:
          return (int) actualBufferSize;
      }
  
@@ -145,17 +160,17 @@ index 3c815cb..36f95e6 100644
 +    // did this in shared mode, so in Exclusive Mode input packets were lost while it waited)
 +    bool waitForOutput (WASAPIInputDevice* inputDevice, DWORD timeoutMs)
 +    {
-+        const bool alsoInput = inputDevice != nullptr && inputDevice->isActive && inputDevice->clientEvent != nullptr;
++        const bool alsoInput = inputDevice != nullptr && inputDevice->streamRunning && inputDevice->clientEvent != nullptr;
 +        HANDLE events[2] = { clientEvent, alsoInput ? inputDevice->clientEvent : nullptr };
-+        const auto deadline = Time::getMillisecondCounter() + timeoutMs;
++        const auto started = Time::getMillisecondCounter();
 +
 +        for (;;)
 +        {
-+            const auto now = Time::getMillisecondCounter();
-+            if (now >= deadline)
++            const auto waited = Time::getMillisecondCounter() - started; // unsigned: safe across the wrap
++            if (waited >= timeoutMs)
 +                return false;
 +
-+            const auto r = WaitForMultipleObjects (alsoInput ? 2 : 1, events, FALSE, deadline - now);
++            const auto r = WaitForMultipleObjects (alsoInput ? 2 : 1, events, FALSE, timeoutMs - waited);
 +
 +            if (r == WAIT_OBJECT_0)
 +                return true;
@@ -188,7 +203,7 @@ index 3c815cb..36f95e6 100644
      void copyBuffers (const float* const* srcBuffers, int numSrcBuffers, int bufferSize,
                        WASAPIInputDevice* inputDevice, Thread& thread)
      {
-@@ -1148,22 +1262,26 @@ public:
+@@ -1148,22 +1266,28 @@ public:
          while (bufferSize > 0)
          {
              // This is needed in order not to drop any input data if the output device endpoint buffer was full
@@ -202,7 +217,9 @@ index 3c815cb..36f95e6 100644
 +            int samplesToDo = jmin (sharedRoom (available), bufferSize);
 +
 +            // Riffhouse: in shared mode an empty output buffer means Windows already played silence
-+            if (! isExclusiveMode (deviceMode) && available >= (int) actualBufferSize && ++writesSinceStart > 50)
++            // (plain shared mode only, where the buffer holds two periods or more)
++            ++writesSinceStart;
++            if (sharedQueue > 0 && writesSinceStart > 50 && available >= (int) actualBufferSize)
 +                ++underruns;
  
              if (samplesToDo == 0)
@@ -220,7 +237,7 @@ index 3c815cb..36f95e6 100644
                  break;
  
              const auto numChannelsToCopy = jmin (actualNumChannels, numSrcBuffers);
-@@ -1232,6 +1350,17 @@ public:
+@@ -1232,6 +1356,17 @@ public:
                  minBufferSize = jmax (inputDevice->minBufferSize, outputDevice->minBufferSize);
                  defaultBufferSize = jmax (inputDevice->defaultBufferSize, outputDevice->defaultBufferSize);
  
@@ -238,7 +255,7 @@ index 3c815cb..36f95e6 100644
                  if (isLowLatencyMode (deviceMode))
                  {
                      lowLatencyMaxBufferSize = jmin (inputDevice->lowLatencyMaxBufferSize, outputDevice->lowLatencyMaxBufferSize);
-@@ -1343,7 +1472,15 @@ public:
+@@ -1343,7 +1478,15 @@ public:
      BigInteger getActiveOutputChannels() const override     { return outputDevice != nullptr ? outputDevice->channels : BigInteger(); }
      BigInteger getActiveInputChannels() const override      { return inputDevice  != nullptr ? inputDevice->channels  : BigInteger(); }
      String getLastError() override                          { return lastError; }
@@ -255,10 +272,45 @@ index 3c815cb..36f95e6 100644
  
      std::optional<BigInteger> getDefaultOutputChannels() const override
      {
-@@ -1355,6 +1492,21 @@ public:
+@@ -1355,6 +1498,56 @@ public:
          return inputDevice != nullptr ? inputDevice->getDefaultLayout() : std::nullopt;
      }
  
++    // Riffhouse: true when both endpoints belong to one piece of hardware (one clock), by Windows'
++    // container id; unknown counts as different, which only costs the cushion's small delay
++    static bool sameHardware (IMMDevice* a, IMMDevice* b)
++    {
++        auto containerOf = [] (IMMDevice* d) -> String
++        {
++            if (d == nullptr)
++                return {};
++
++            ComSmartPtr<IPropertyStore> properties;
++
++            if (! check (d->OpenPropertyStore (STGM_READ, properties.resetAndGetPointerAddress())))
++                return {};
++
++            PROPVARIANT value;
++            zerostruct (value);
++            const PROPERTYKEY PKEY_Device_ContainerId
++                = { { 0x8c7ed206, 0x3f8a, 0x4827, { 0xb3, 0xab, 0xae, 0x9e, 0x1f, 0xae, 0xfc, 0x6c } }, 2 };
++            String id;
++
++            if (check (properties->GetValue (PKEY_Device_ContainerId, &value)) && value.vt == VT_CLSID && value.puuid != nullptr)
++            {
++                const auto& g = *value.puuid;
++                id = String::toHexString ((int) g.Data1) + String::toHexString ((int) g.Data2) + String::toHexString ((int) g.Data3)
++                   + String::toHexString (g.Data4, 8, 0);
++            }
++
++            PropVariantClear (&value);
++            return id;
++        };
++
++        const auto ia = containerOf (a), ib = containerOf (b);
++        return ia.isNotEmpty() && ia == ib;
++    }
++
 +    // Riffhouse: the smallest buffer at the rate that will run (see the note in scan)
 +    int minBufferSizeAt (double rate) const
 +    {
@@ -277,7 +329,7 @@ index 3c815cb..36f95e6 100644
      String open (const BigInteger& inputChannels, const BigInteger& outputChannels,
                   double sampleRate, int bufferSizeSamples) override
      {
-@@ -1367,8 +1519,8 @@ public:
+@@ -1367,8 +1560,8 @@ public:
              return lastError;
          }
  
@@ -287,7 +339,7 @@ index 3c815cb..36f95e6 100644
          lastKnownInputChannels    = inputChannels;
          lastKnownOutputChannels   = outputChannels;
  
-@@ -1402,6 +1554,32 @@ public:
+@@ -1402,6 +1595,34 @@ public:
          if (inputDevice != nullptr)   ResetEvent (inputDevice->clientEvent);
          if (outputDevice != nullptr)  ResetEvent (outputDevice->clientEvent);
  
@@ -296,7 +348,9 @@ index 3c815cb..36f95e6 100644
 +        {
 +            inputDevice->useElastic = false;
 +
-+            if (outputDevice != nullptr && inputDevice->client != nullptr && outputDevice->client != nullptr)
++            // one interface runs its input and output on one clock: no cushion, no added delay
++            if (outputDevice != nullptr && inputDevice->client != nullptr && outputDevice->client != nullptr
++                && ! sameHardware (inputDevice->device, outputDevice->device))
 +            {
 +                const int outBurst = isExclusiveMode (deviceMode)  ? (int) outputDevice->actualBufferSize
 +                                   : isLowLatencyMode (deviceMode) ? currentBufferSizeSamples
@@ -320,7 +374,7 @@ index 3c815cb..36f95e6 100644
          // No lock here; background thread is not running
          flags &= ~(flagShutdown | flagSampleRateChanged);
  
-@@ -1410,7 +1588,7 @@ public:
+@@ -1410,7 +1631,7 @@ public:
  
          if (inputDevice != nullptr && inputDevice->client != nullptr)
          {
@@ -329,7 +383,7 @@ index 3c815cb..36f95e6 100644
  
              if (! inputDevice->start (currentBufferSizeSamples))
              {
-@@ -1422,7 +1600,7 @@ public:
+@@ -1422,7 +1643,7 @@ public:
  
          if (outputDevice != nullptr && outputDevice->client != nullptr)
          {
@@ -338,7 +392,7 @@ index 3c815cb..36f95e6 100644
  
              if (! outputDevice->start())
              {
-@@ -1561,13 +1739,18 @@ public:
+@@ -1561,13 +1782,25 @@ public:
                      if (inputDevice->getNumSamplesInReservoir() < bufferSize)
                          continue;
                  }
@@ -354,7 +408,14 @@ index 3c815cb..36f95e6 100644
  
 -                inputDevice->copyBuffersFromReservoir (ins.getArrayOfWritePointers(), numInputBuffers, bufferSize);
 +                if (! inputDevice->useElastic)
++                {
++                    // Riffhouse: input that had not arrived is played as silence: that is a gap
++                    if (outputDevice != nullptr && inputDevice->streamRunning && inputDevice->packetsSinceStart > 8
++                        && inputDevice->getNumSamplesInReservoir() < bufferSize)
++                        ++inputDevice->xruns;
++
 +                    inputDevice->copyBuffersFromReservoir (ins.getArrayOfWritePointers(), numInputBuffers, bufferSize);
++                }
  
                  if (inputDevice->sampleRateHasChanged)
                  {

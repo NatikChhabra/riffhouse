@@ -14,7 +14,7 @@ namespace
 {
     constexpr float kHeardThreshold = 0.0032f; // -50 dBFS: something is playing
     constexpr float kSureThreshold = 0.063f;   // -24 dBFS: that is definitely a guitar
-    constexpr float kMostLevelLossDb = 14.0f;  // a mode hearing the guitar this much quieter loses Windows' boost
+    constexpr float kMostLevelLossDb = 16.0f;  // a mode hearing the guitar this much quieter loses Windows' boost
     constexpr double kDwellMs = 1100.0;
     constexpr double kTuneMs = 1600.0;
     constexpr double kQuietMs = 2600.0;
@@ -439,8 +439,9 @@ void AutoSetup::timerCallback()
             // same hiss), and the boost that makes up for it turns the hiss into fizz. The guitar was
             // found in Windows' own mode, so a mode that hears it much quieter is not used.
             const float quieterDb = juce::Decibels::gainToDecibels (chosenPeak, -100.0f) - juce::Decibels::gainToDecibels (modePeak, -100.0f);
+            // judged only on real playing in this mode too: a pause is not a quiet input
             const bool losesLevel = ok && chosen.type == "Windows Audio" && modes[modeIndex] != "Windows Audio"
-                                    && chosenPeak > kHeardThreshold && quieterDb > kMostLevelLossDb;
+                                    && chosenPeak > kHeardThreshold && modePeak > kHeardThreshold && quieterDb > kMostLevelLossDb;
             if (losesLevel)
             {
                 devlog::note (modes[modeIndex] + " hears the guitar " + juce::String (quieterDb, 1)
@@ -552,6 +553,8 @@ void AutoSetup::beginTuning()
 
     modeIndex = 0;
     bufferIndex = 0;
+    modePeakFor = -1;
+    modePeak = 0.0f;
     while (modeIndex < modes.size() && ! (openMode (modes[modeIndex], 0) && ! buffers.isEmpty()))
         ++modeIndex;
     if (modeIndex >= modes.size()) { finishTuning(); return; }

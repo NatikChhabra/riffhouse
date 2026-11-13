@@ -265,9 +265,13 @@ AudioPicker::~AudioPicker()
     // A change still running when the window closes: it is ended here, before the boxes go, and
     // the connection guard is told the change is over (the switch no longer calls back).
     const bool wasBusy = changer != nullptr && changer->busy();
-    changer.reset();
+    changer.reset(); // puts back what worked: the proven new buffer, or the connection from before
     if (wasBusy)
-        if (auto* h = StandaloneHost::get()) h->setupRunning (false);
+        if (auto* h = StandaloneHost::get())
+        {
+            if (h->deviceManager().getCurrentAudioDevice() != nullptr) h->saveAudioState(); // the one running is the one to keep
+            h->setupRunning (false);
+        }
 }
 
 void AudioPicker::apply (Change what)

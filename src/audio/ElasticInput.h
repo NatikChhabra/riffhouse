@@ -50,6 +50,7 @@ public:
         capacity = 1;
         while (capacity < (int) (target * 4.0 + pull * 2.0 + packet * 2.0) + 64) capacity <<= 1;
         ring.assign ((size_t) capacity * (size_t) numChannels, 0.0f);
+        gaps = 0;
         reset();
     }
 
@@ -118,6 +119,7 @@ public:
             integral = 0.0;
             area = areaTime = 0.0;
             priming = false;
+            fadeIn = kFadeFrames;
         }
 
         if ((double) fill() > tooFull)
@@ -125,6 +127,7 @@ public:
             readAbs = writeAbs - (int64_t) std::lround (target);
             frac = 0.0;
             ++gaps;
+            fadeIn = kFadeFrames; // a jump in the sound: come back in softly instead of a click
         }
 
         // positions read: frac + k * ratio for k < frames, each needing 2 frames after it
@@ -138,6 +141,15 @@ public:
 
         render (dest, numDest, playable);
         advance ((double) playable * ratio);
+
+        if (fadeIn > 0 && playable > 0)
+        {
+            const int n = std::min (playable, fadeIn);
+            for (int c = 0; c < numDest; ++c)
+                for (int i = 0; i < n; ++i)
+                    dest[c][i] *= (float) (kFadeFrames - fadeIn + i + 1) / (float) kFadeFrames;
+            fadeIn -= n;
+        }
 
         if (playable < frames)
         {
@@ -160,6 +172,7 @@ private:
     static constexpr double kP = 0.5;       // 1 ms too full -> read 0.05% faster
     static constexpr double kI = 0.1;       // per second
     static constexpr double kMaxStep = 0.005;
+    static constexpr int kFadeFrames = 64;
 
     void track (double now)
     {
@@ -219,6 +232,7 @@ private:
     int64_t writeAbs = 1, readAbs = 1;
     double frac = 0.0, lastTime = 0.0, area = 0.0, areaTime = 0.0;
     double avgFill = 768.0, integral = 0.0, ratio = 1.0;
+    int fadeIn = 0;
     bool priming = true, haveTime = false;
 };
 
