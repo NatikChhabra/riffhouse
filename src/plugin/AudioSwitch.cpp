@@ -195,6 +195,11 @@ void AudioSwitch::tryNext()
 juce::String AudioSwitch::failureText() const
 {
     if (sawNoInput && lastError.isEmpty() && ! sawSilence) return want.input + " has no input to plug a guitar into. " + wentBackTo();
+    if (lastError.containsIgnoreCase ("sample rate"))
+        return "Windows runs " + want.input + " and your headphones at different rates, and "
+               + (want.types.size() == 1 ? friendlyType (want.types[0]) : juce::String ("this mode"))
+               + " needs one rate for both. In Windows sound settings, open each one's Properties, then Advanced, and set both to 48000 Hz. "
+               + wentBackTo();
     if (want.types.contains ("ASIO")) return whyAsioFailed (want.input, lastError, sawSilence && lastError.isEmpty()) + " " + wentBackTo();
     const auto on = want.types.size() == 1 ? " on " + friendlyType (want.types[0]) : juce::String();
     return want.input + on + (sawSilence ? " opened but no sound came through it. " : " would not start. ")

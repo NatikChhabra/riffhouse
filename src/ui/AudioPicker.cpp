@@ -11,6 +11,21 @@ namespace
 {
     constexpr int kRow = 36, kGap = 12, kLabel = 96;
 
+    // The whole text, wrapped to the width, never cut short: a sentence about what went wrong
+    // is the one thing in this window that has to be read to the end.
+    juce::TextLayout wrapped (const juce::String& text, const juce::Font& f, juce::Colour c, float width)
+    {
+        juce::AttributedString a;
+        a.append (text, f, c);
+        a.setJustification (juce::Justification::topLeft);
+        a.setLineSpacing (2.0f);
+        juce::TextLayout t;
+        t.createLayout (a, width);
+        return t;
+    }
+    juce::Font statusFont (bool problem) { return font (14.0f, problem ? Weight::semibold : Weight::regular); }
+    juce::Font noteFont() { return font (13.5f); }
+
     juce::AudioIODeviceType* findType (juce::AudioDeviceManager& dm, const juce::String& name)
     {
         for (auto* t : dm.getAvailableDeviceTypes())
@@ -233,9 +248,8 @@ void AudioPicker::refresh()
     // driver keeps the delay to itself and that window is the one place to change it.
     panel.setVisible (dev != nullptr && dev->hasControlPanel() && bufferSizes.size() <= 1);
     if (status.isEmpty()) status = AudioSwitch::running (dm, proc);
-    // the window has room for one row beyond the four everyone has; each further one makes it taller
     const int extra = (socket.isVisible() ? 1 : 0) + (sharing.isVisible() ? 1 : 0) + (panel.isVisible() ? 1 : 0);
-    setSize (580, 452 + std::max (0, extra - 1) * (kRow + kGap));
+    fitToText (extra);
     resized();
     repaint();
 }
@@ -390,6 +404,30 @@ void AudioPicker::showExample (bool asio)
     sharing.setToggleState (false, juce::dontSendNotification);
     panel.setVisible (false);
     filling = false;
+    fitToText ((sharing.isVisible() ? 1 : 0) + (socket.isVisible() ? 1 : 0));
+    resized();
+    repaint();
+}
+
+void AudioPicker::fitToText (int extra)
+{
+    // The window has room for one row beyond the four everyone has; each further one makes it
+    // taller, and it grows further when what it has to say needs the room
+    const float textW = 580.0f - 56.0f;
+    const int rows = 4 + extra;
+    const int words = (int) std::ceil ((status.isNotEmpty() ? wrapped (status, statusFont (statusIsProblem), colours::text, textW).getHeight() + 6.0f : 0.0f)
+                                       + (note.isNotEmpty() ? wrapped (note, noteFont(), colours::text, textW).getHeight() : 0.0f));
+    setSize (580, std::max (452 + std::max (0, extra - 1) * (kRow + kGap), 24 + 58 + rows * (kRow + kGap) + 11 + words + 24));
+}
+
+void AudioPicker::showProblemExample()
+{
+    showExample();
+    status = "Windows runs Guitar (Realtek USB Audio) and your headphones at different rates, and Windows Audio, low latency mode needs one rate for both. "
+             "In Windows sound settings, open each one's Properties, then Advanced, and set both to 48000 Hz. Riffhouse went back to Guitar (Realtek USB Audio) on "
+             "Windows Audio, exclusive mode, which works. Pick another input, another driver, or Automatic above: nothing is locked.";
+    statusIsProblem = true;
+    fitToText (sharing.isVisible() ? 1 : 0);
     resized();
     repaint();
 }
@@ -437,18 +475,17 @@ void AudioPicker::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white.withAlpha (0.10f));
     g.fillRect (r.removeFromTop (1));
     r.removeFromTop (10);
+    auto area = r.toFloat();
     if (status.isNotEmpty())
     {
-        g.setColour (statusIsProblem ? colours::warn : colours::text);
-        g.setFont (font (14.0f, statusIsProblem ? Weight::semibold : Weight::regular));
-        g.drawFittedText (status, r.removeFromTop (statusIsProblem || status.length() > 150 ? 56 : (status.length() > 76 ? 40 : 22)), juce::Justification::topLeft, 3, 1.0f);
-        r.removeFromTop (6);
+        const auto t = wrapped (status, statusFont (statusIsProblem), statusIsProblem ? colours::warn : colours::text, area.getWidth());
+        t.draw (g, area.removeFromTop (t.getHeight()));
+        area.removeFromTop (6.0f);
     }
     if (note.isNotEmpty())
     {
-        g.setColour (colours::textDim);
-        g.setFont (font (13.5f));
-        g.drawFittedText (note, r, juce::Justification::topLeft, 4, 1.0f);
+        const auto t = wrapped (note, noteFont(), colours::textDim, area.getWidth());
+        t.draw (g, area.removeFromTop (t.getHeight()));
     }
 }
 

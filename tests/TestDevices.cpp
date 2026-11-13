@@ -35,6 +35,8 @@ struct World
     bool silent = false;                  // opens, but no sound ever arrives
     bool playing = false;
     int opens = 0, scans = 0;
+    int crackleBelow = 0; // buffers smaller than this drop out while they play
+    int dropouts = 0;     // counted since the world began
     void forget() { opens = scans = 0; }
 };
 
@@ -62,6 +64,7 @@ public:
         sampleRate = rate > 0 ? rate : 48000.0;
         bufferSize = buffer > 0 ? buffer : 256;
         opened = true;
+        dropoutsAtOpen = world.dropouts;
         return {};
     }
     void close() override { stop(); opened = false; }
@@ -87,6 +90,7 @@ public:
     juce::BigInteger getActiveInputChannels() const override { return activeIn; }
     int getOutputLatencyInSamples() override { return bufferSize; }
     int getInputLatencyInSamples() override { return bufferSize; }
+    int getXRunCount() const noexcept override { return world.dropouts - dropoutsAtOpen; }
 
 private:
     World& world;
@@ -95,6 +99,7 @@ private:
     juce::AudioIODeviceCallback* callback = nullptr;
     double sampleRate = 48000.0;
     int bufferSize = 256;
+    int dropoutsAtOpen = 0;
     bool opened = false;
 };
 
@@ -143,6 +148,8 @@ struct Bench
         for (int i = 0; i < (int) (seconds * 2.0); ++i)
         {
             if (world.playing && ! world.silent && dm.getCurrentAudioDevice() != nullptr) ++beats;
+            if (world.playing && dm.getCurrentAudioDevice() != nullptr && dm.getCurrentAudioDevice()->getCurrentBufferSizeSamples() < world.crackleBelow)
+                world.dropouts += 7;
             clock += 500.0;
             guard->tick (clock);
         }
@@ -190,6 +197,37 @@ void runDeviceChecks (int& checks, int& failures)
         CHECK (b.guard->state() == State::healthy, "a card that plays is healthy");
         CHECK (b.world.opens == 0 && b.world.scans == 0, "a healthy card is left alone for an hour (%d opens, %d scans)", b.world.opens, b.world.scans);
         CHECK (! b.mute.load(), "and nothing is muted");
+    }
+    {
+        // A buffer that crackles on this computer, as 480 samples did on some starts on a real PC:
+        // the guard raises it a step at a time until it plays clean, says so once per step, and
+        // the new size is what it keeps opening.
+        Bench b;
+        std::vector<int> raised;
+        b.guard->onBufferRaised = [&] (int size) { raised.push_back (size); };
+        b.world.crackleBelow = 300;
+        b.run (20.0);
+        auto* dev = b.dm.getCurrentAudioDevice();
+        CHECK (dev != nullptr && dev->getCurrentBufferSizeSamples() == 512, "a crackling buffer goes up until it plays clean (%d)", dev != nullptr ? dev->getCurrentBufferSizeSamples() : -1);
+        CHECK (raised == std::vector<int> ({ 256, 512 }), "one step at a time, each one reported (%d steps)", (int) raised.size());
+        CHECK (b.openInput() == kGuitar && b.guard->state() == State::healthy && ! b.mute.load(), "on the same input, playing");
+        b.run (600.0);
+        CHECK (raised.size() == 2, "and it stays there once it is clean");
+        b.dm.closeAudioDevice();
+        b.run (10.0);
+        dev = b.dm.getCurrentAudioDevice();
+        CHECK (dev != nullptr && dev->getCurrentBufferSizeSamples() == 512, "a restart opens the size that plays clean (%d)", dev != nullptr ? dev->getCurrentBufferSizeSamples() : -1);
+    }
+    {
+        // one stray dropout now and then, and dropouts while the sound fades in, are let go
+        Bench b;
+        int raised = 0;
+        b.guard->onBufferRaised = [&] (int) { ++raised; };
+        b.world.dropouts += 9; // in the first moment after the card opened
+        b.run (2.0);
+        for (int i = 0; i < 20; ++i) { b.world.dropouts += 1; b.run (15.0); }
+        CHECK (raised == 0 && b.dm.getCurrentAudioDevice() != nullptr && b.dm.getCurrentAudioDevice()->getCurrentBufferSizeSamples() == 128,
+               "a stray dropout every 15 s does not change the buffer (%d raises)", raised);
     }
     {
         // a storm of "something changed" messages, which opening a device also sends: no work per message

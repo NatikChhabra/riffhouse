@@ -41,6 +41,8 @@ Pedals that behave like the real circuits, cleaner high gain, quiet mutes, no mo
 - The first time you run Riffhouse, setup ends with six sounds to start from (clean, blues, classic rock, hard rock, metal and indie), each a whole rig. Play while you click through them, or use the arrow keys, and start with the one you like.
 - Setup's first page asks for wired headphones and says where the guitar can plug in. After an update, Riffhouse says in one line what changed.
 - A driver that does not count dropouts says "not counted by this driver" instead of "-1".
+- If the sound starts crackling while you play (some computers only do it after a while, or on some starts), Riffhouse gives the sound card a bigger buffer by itself, a step at a time, and keeps it. Settings says "crackling" instead of how fast it feels.
+- When a driver change does not work, the Driver window shows the whole reason. When Windows runs the guitar input and the headphones at different rates, it says how to set both to 48000 Hz.
 - No crackle or thump when Riffhouse opens. High-gain amps made a short noise of their own while their circuits settled; the rig now settles in silence before it plays, and the sound fades in over a moment.
 
 ## 0.1.4

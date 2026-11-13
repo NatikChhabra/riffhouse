@@ -23,9 +23,11 @@ public:
     // For pictures of the app: a PC with a built-in sound card, or an interface on its ASIO driver
     // (its outputs by name, then the PC's own outputs under a heading).
     void showExample (bool asio = false);
+    void showProblemExample(); // a driver change that failed, with its whole explanation
 
 private:
     enum class Change { input, socket, output, buffer, sharing, driver };
+    void fitToText (int extraRows);
     void refresh(); // the lists and the selection, from what is running
     void apply (Change);
     const AutoSetup::Input* picked() const;

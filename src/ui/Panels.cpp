@@ -1300,7 +1300,9 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     // what the number means to someone playing, beside it
     const float msW = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), "ms");
     g.setFont (font (13.5f, Weight::medium));
-    g.drawText (delayFeel (ms), num.withTrimmedLeft (numW + 8.0f + msW + 10.0f).withTrimmedTop (19.0f), juce::Justification::centredLeft, true);
+    // a fast figure means nothing while the sound breaks up
+    if (dropouts > 0) g.setColour (colours::hot);
+    g.drawText (dropouts > 0 ? juce::String ("crackling") : delayFeel (ms), num.withTrimmedLeft (numW + 8.0f + msW + 10.0f).withTrimmedTop (19.0f), juce::Justification::centredLeft, true);
     drawCaps (g, "From string to ear", figure.removeFromBottom (20.0f), 11.0f, colours::textDim, juce::Justification::centredLeft, 0.14f);
 
     const float rowH = in.getHeight() / 4.0f;

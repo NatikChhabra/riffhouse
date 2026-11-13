@@ -14,6 +14,14 @@ namespace
     // How long to wait before each go at a sound card that will not start. After the last one it
     // is left alone until the list of devices changes or the player asks.
     constexpr double kWaitMs[] = { 1500.0, 4000.0, 10000.0, 20000.0, 30000.0 };
+    // Dropouts in the first moment after a device opens are not heard (the sound fades in), so
+    // they are not counted. After that, this many within the window raise the buffer. One stray
+    // dropout (a window being dragged, a virus scan starting) is let go.
+    constexpr double kDropSettleMs = 1000.0;
+    constexpr double kDropWindowMs = 10000.0;
+    constexpr size_t kDropsToRaise = 3;
+    constexpr int kMaxRaises = 6;      // a session never climbs further than this by itself
+    constexpr int kLargestRaise = 2048; // past this the buffer is not what is wrong
 
     double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
@@ -105,6 +113,7 @@ void DeviceGuard::adopt()
     lastMovedAt = clock;
     if (guardMuted) { mute.store (false); guardMuted = false; }
     current = State::healthy;
+    watched = nullptr;
 }
 
 // The app starts and the input it was set up with is not there (an interface that is not
@@ -135,6 +144,7 @@ void DeviceGuard::retry()
 void DeviceGuard::pause (bool p)
 {
     paused = p;
+    watched = nullptr;
     lastBeat = beats.load();
     lastMovedAt = clock;
     if (p && guardMuted) { mute.store (false); guardMuted = false; } // setup does its own muting
@@ -196,6 +206,7 @@ bool DeviceGuard::reopen()
     }
     lastBeat = beats.load();
     lastMovedAt = clock;
+    watched = nullptr;
     return err.isEmpty() && dm.getCurrentAudioDevice() != nullptr;
 }
 
@@ -266,6 +277,7 @@ void DeviceGuard::tick (double now)
             nextLookAt = 0;
             if (guardMuted) { mute.store (false); guardMuted = false; }
             setState (State::healthy);
+            watchDropouts (*dev, now);
             return;
         }
         if (now - lastMovedAt < kStallMs) return;
@@ -312,6 +324,56 @@ void DeviceGuard::tick (double now)
         return;
     }
     tryNow (now);
+}
+
+// A buffer that crackles on this computer is made bigger, a step at a time, and kept. Setup listens
+// to each size for a second or two; some computers only crackle after longer, or only on some
+// starts (two USB devices whose clocks drift apart, a busy driver), so the app keeps listening.
+void DeviceGuard::watchDropouts (juce::AudioIODevice& dev, double now)
+{
+    if (&dev != watched)
+    {
+        watched = &dev;
+        watchedSince = now;
+        lastDropouts = -1;
+        dropTimes.clear();
+    }
+    const int count = dev.getXRunCount();
+    if (count < 0) return; // this driver does not count them
+    if (now - watchedSince < kDropSettleMs || lastDropouts < 0 || count < lastDropouts) { lastDropouts = count; return; }
+    const int fresh = count - std::exchange (lastDropouts, count);
+    for (int i = 0; i < std::min (fresh, (int) kDropsToRaise); ++i) dropTimes.push_back (now);
+    while (! dropTimes.empty() && now - dropTimes.front() > kDropWindowMs) dropTimes.erase (dropTimes.begin());
+    if (dropTimes.size() < kDropsToRaise) return;
+    dropTimes.clear();
+
+    const int size = dev.getCurrentBufferSizeSamples();
+    int next = 0;
+    for (int s : dev.getAvailableBufferSizes())
+        if (s >= size + size / 8) { next = s; break; }
+    if (next == 0 || next > kLargestRaise || raises >= kMaxRaises)
+    {
+        if (raises < 1000) devlog::note ("Dropouts at " + juce::String (size) + " samples, and the buffer will not go higher by itself");
+        raises = 1000; // said once
+        return;
+    }
+    devlog::note ("Dropouts at " + juce::String (size) + " samples (" + juce::String (count) + " since it opened): going up to " + juce::String (next));
+    auto o = AudioOpen::running (dm);
+    if (! o.valid()) return;
+    o.bufferSize = next;
+    if (openExactly (dm, o).isNotEmpty() || dm.getCurrentAudioDevice() == nullptr)
+    {
+        o.bufferSize = size; // the bigger size would not open: back to what played
+        openExactly (dm, o);
+        raises = kMaxRaises;
+        return;
+    }
+    ++raises;
+    wanted.bufferSize = dm.getCurrentAudioDevice()->getCurrentBufferSizeSamples();
+    lastBeat = beats.load();
+    lastMovedAt = clock;
+    watched = nullptr;
+    if (onBufferRaised) onBufferRaised (wanted.bufferSize);
 }
 
 DeviceGuard::Notice DeviceGuard::notice() const

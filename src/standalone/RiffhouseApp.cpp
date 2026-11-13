@@ -185,6 +185,14 @@ public:
         guard = std::make_unique<DeviceGuard> (holder->deviceManager, rig.blockCounter, rig.muteOutput);
         guard->onMessage = [this] (const juce::String& m) { if (auto* ed = editor()) ed->showToast (m); };
         guard->onNeedSetup = [this] { if (auto* ed = editor()) ed->showSetupWizard(); };
+        guard->onBufferRaised = [this] (int size)
+        {
+            saveAudioState();
+            const double sr = holder->deviceManager.getCurrentAudioDevice() != nullptr ? holder->deviceManager.getCurrentAudioDevice()->getCurrentSampleRate() : 48000.0;
+            if (auto* ed = editor())
+                ed->showToast ("The sound was breaking up, so the buffer went up to " + juce::String (size) + " samples ("
+                               + juce::String (1000.0 * size / std::max (1.0, sr), 1) + " ms). Riffhouse keeps it there.");
+        };
         startTimer (30000); // autosave: a crash or a power cut never costs more than half a minute of tweaking
 
         // Updates arrive by themselves: fetched in the background, installed when the app closes.

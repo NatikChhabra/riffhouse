@@ -6,6 +6,7 @@
 #include <juce_events/juce_events.h>
 #include <atomic>
 #include <functional>
+#include <vector>
 
 namespace rh
 {
@@ -44,6 +45,9 @@ public:
 
     std::function<void()> onNeedSetup;                    // a new input appeared and there is nothing to return to
     std::function<void (const juce::String&)> onMessage;  // good news worth a toast
+    // The sound kept breaking up, so the buffer went up to this size: worth saving, so the next
+    // start opens at a size that plays clean.
+    std::function<void (int)> onBufferRaised;
 
     static bool looksLikeBluetooth (const juce::String& deviceName);
     static bool looksLikeScreen (const juce::String& deviceName);  // a TV or monitor over HDMI or DisplayPort
@@ -74,6 +78,7 @@ private:
     bool inputAvailable (const juce::String& type, const juce::String& input, bool rescan) const;
     juce::StringArray allInputs() const;
     void setState (State);
+    void watchDropouts (juce::AudioIODevice&, double now);
 
     static constexpr int kMaxAttempts = 5; // then the card is left alone
 
@@ -89,6 +94,12 @@ private:
     double lastMovedAt = 0, nextTryAt = 0, nextLookAt = 0, lastTryAt = -1.0e12;
     int attempts = 0, looks = 0;
     juce::StringArray knownInputs;
+    // dropouts: the device being watched, since when, its count at the last look, and when the
+    // recent ones came. A few in a short while means the buffer is too small for this computer.
+    juce::AudioIODevice* watched = nullptr;
+    double watchedSince = 0;
+    int lastDropouts = -1, raises = 0;
+    std::vector<double> dropTimes;
     juce::String bluetoothName;
 };
 } // namespace rh

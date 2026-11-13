@@ -1886,6 +1886,9 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
         shoot ("audio-by-hand");
         a.showExample (true);
         shoot ("audio-asio");
+        a.showProblemExample();
+        a.setCentrePosition (r.getLocalBounds().getCentre());
+        shoot ("audio-rates-differ");
         r.removeChildComponent (&a);
     }
 
