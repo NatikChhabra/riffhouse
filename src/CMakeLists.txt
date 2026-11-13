@@ -3,6 +3,7 @@ set(RIFFHOUSE_CORE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/dsp/Cabinet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dsp/NeuralCapture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/dsp/Pedals.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/dsp/Whine.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Params.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Presets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/engine/Rig.cpp

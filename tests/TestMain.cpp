@@ -538,6 +538,237 @@ int ampVsReal (const juce::File& dir)
     return 0;
 }
 
+// What a tone plays by itself with nothing coming in: every factory tone, gate on as
+// the tone has it and with the gate off (so nothing hides behind it), fed digital
+// silence for 10 s. After the first 6 s (tails gone) the output must be below
+// -100 dBFS: no hiss, hum, dither, denormal noise or ringing of the app's own. A tone
+// with the lo-fi hiss switched on is the one exception (that hiss is the effect).
+void testSelfNoise (double sr)
+{
+    std::printf ("self-noise of every tone @ %.0f Hz\n", sr);
+    const std::vector<float> silence ((size_t) (sr * 10.0), 0.0f);
+    float worst = -400.0f; juce::String worstName;
+    int checked = 0;
+    for (const auto& p : loadPresets())
+    {
+        if (p.values[(size_t) P::lofiOn] > 0.5f && p.values[(size_t) P::lofiNoise] > 0.0f) continue;
+        for (bool gateOff : { false, true })
+        {
+            auto v = p.values;
+            if (gateOff) v[(size_t) P::gateOn] = 0.0f;
+            const auto r = renderWith (v, silence, sr, 256);
+            double e = 0.0;
+            const size_t from = (size_t) (sr * 6.0);
+            for (size_t i = from; i < r.l.size(); ++i) e += 0.5 * ((double) r.l[i] * r.l[i] + (double) r.r[i] * r.r[i]);
+            const float db = (float) (10.0 * std::log10 (e / (double) (r.l.size() - from) + 1e-30));
+            if (db > worst) { worst = db; worstName = p.name + (gateOff ? " (gate off)" : ""); }
+            CHECK (db < -100.0f, "%s%s plays %.1f dBFS of its own noise with nothing coming in", p.name.toRawUTF8(), gateOff ? " (gate off)" : "", db);
+            ++checked;
+        }
+    }
+    std::printf ("  %d renders, loudest %.1f dBFS (%s)\n", checked, worst, worstName.toRawUTF8());
+}
+
+// A player for the whine tests: plucked notes, chords, bends, vibrato, a long held note
+// that fades into the quiet, palm mutes, and pauses of 1 to 5 seconds between them.
+// Returns the guitar alone; quiet = where it is silent (for the checks).
+static std::vector<float> whinePlayer (double sr, double secs, std::vector<char>& quiet)
+{
+    std::vector<float> g ((size_t) (sr * secs), 0.0f);
+    quiet.assign (g.size(), 1);
+    Noise rnd (0xBEEFu);
+    auto uni = [&] { return 0.5f * (rnd.next() + 1.0f); };
+    struct Note { double f0, bendTo, bendAt, vib, tau; float level; };
+    auto play = [&] (size_t start, double len, const std::vector<Note>& notes)
+    {
+        const size_t end = std::min (g.size(), start + (size_t) (len * sr));
+        for (const auto& nt : notes)
+        {
+            double phase[24] {};
+            for (size_t i = start; i < end; ++i)
+            {
+                const double t = (double) (i - start) / sr;
+                double f = nt.f0;
+                if (nt.bendTo > 0.0 && t > nt.bendAt) f = nt.f0 * std::pow (nt.bendTo / nt.f0, std::min (1.0, (t - nt.bendAt) / 0.3));
+                f *= std::pow (2.0, nt.vib / 1200.0 * std::sin (kTwoPi * 5.5 * t));
+                double s = 0.0;
+                for (int h = 1; h <= 24; ++h)
+                {
+                    if (f * h > 0.45 * sr) break;
+                    phase[h - 1] += kTwoPi * f * h / sr;
+                    s += std::exp (-t * (1.0 + 0.35 * h) / nt.tau) / h * std::sin (phase[h - 1]);
+                }
+                g[i] += (float) (nt.level * s);
+            }
+        }
+        for (size_t i = start; i < end; ++i) quiet[i] = 0;
+    };
+    const double E2 = 82.41;
+    auto note = [&] (int semis) { return E2 * std::pow (2.0, semis / 12.0); };
+    double t = 2.0; // starts quiet
+    int round = 0;
+    while (t < secs - 6.0)
+    {
+        const size_t at = (size_t) (t * sr);
+        double len = 0.0;
+        switch (round++ % 6)
+        {
+            case 0: // a riff of short palm-muted notes
+                for (int k = 0; k < 12; ++k)
+                    play (at + (size_t) (k * 0.18 * sr), 0.16, { { note ((k * 5) % 12), 0, 0, 0, 0.12, 0.25f } });
+                len = 12 * 0.18; break;
+            case 1: // a chord left to ring
+                play (at, 5.0, { { note (0), 0, 0, 0, 1.5, 0.12f }, { note (7), 0, 0, 0, 1.5, 0.10f }, { note (12), 0, 0, 0, 1.5, 0.10f } });
+                len = 5.0; break;
+            case 2: // a bend held with vibrato
+                play (at, 4.0, { { note (24 + (int) (uni() * 5)), note (26 + (int) (uni() * 5)), 0.4, 25.0, 2.5, 0.2f } });
+                len = 4.0; break;
+            case 3: // a lead line
+                for (int k = 0; k < 10; ++k)
+                    play (at + (size_t) (k * 0.25 * sr), 0.5, { { note (24 + (k * 3) % 10), 0, 0, 10.0, 0.6, 0.2f } });
+                len = 10 * 0.25 + 0.25; break;
+            case 4: // one note held as long as it rings, fading into the quiet
+                play (at, 12.0, { { note (17), 0, 0, 0, 4.0, 0.2f } });
+                len = 12.0; break;
+            default: // a high harmonic ringing on its own
+                play (at, 6.0, { { note (36), 0, 0, 0, 2.5, 0.1f } });
+                len = 6.0; break;
+        }
+        t += len + 1.0 + 4.0 * uni();
+    }
+    return g;
+}
+
+// Steady whines are cut and nothing else is ever touched: a clean input gets no notch at
+// all, and with whines on the input every notch sits on a real one and the playing comes
+// through as it was.
+void testWhine (double sr)
+{
+    std::printf ("whine remover @ %.0f Hz\n", sr);
+    const double secs = 90.0;
+    std::vector<char> quiet;
+    const auto guitar = whinePlayer (sr, secs, quiet);
+    const int block = 256;
+    auto runIt = [&] (std::vector<float> x, int& most, std::vector<float>& firstHz) -> std::vector<float>
+    {
+        WhineRemover w;
+        w.prepare (sr);
+        most = 0;
+        for (size_t at = 0; at < x.size(); at += (size_t) block)
+        {
+            const int n = (int) std::min ((size_t) block, x.size() - at);
+            w.process (x.data() + at, n);
+            most = std::max (most, w.removing());
+        }
+        firstHz.clear();
+        for (int i = 0; i < w.removing(); ++i) firstHz.push_back (w.removingHz (i));
+        return x;
+    };
+
+    // clean inputs: hiss at several levels (and none), the player on top; nothing may be cut
+    for (float floorDb : { -200.0f, -80.0f, -70.0f, -60.0f, -50.0f, -46.0f })
+    {
+        Noise n (0x51u + (uint32_t) -floorDb);
+        auto in = guitar;
+        const float a = std::pow (10.0f, floorDb / 20.0f) * 1.732f;
+        float tilt = 0.0f;
+        for (auto& s : in) { tilt = 0.6f * tilt + n.next(); s += floorDb < -150.0f ? 0.0f : a * 0.5f * tilt; } // a darker hiss, like a real input
+        int most = 0; std::vector<float> hz;
+        const auto out = runIt (in, most, hz);
+        CHECK (most == 0, "clean input with hiss at %.0f dBFS: %d notches were put in (first at %.0f Hz)", floorDb, most, hz.empty() ? 0.0f : hz[0]);
+        bool same = true;
+        for (size_t i = 0; i < in.size() && same; ++i) same = out[i] == in[i]; // NOLINT exact
+        CHECK (same, "clean input with hiss at %.0f dBFS comes through changed", floorDb);
+    }
+
+    // feedback: a note that grows and holds loud for 15 s, after quiet
+    {
+        auto in = std::vector<float> ((size_t) (sr * 30.0), 0.0f);
+        Noise n (0x77u);
+        double ph = 0.0;
+        for (size_t i = 0; i < in.size(); ++i)
+        {
+            const double t = (double) i / sr;
+            const double lv = t < 8.0 ? 0.0 : std::min (0.3, 0.003 * std::exp ((t - 8.0) * 3.0));
+            ph += kTwoPi * 1318.5 / sr;
+            in[i] = (float) (lv * std::sin (ph)) + 0.0003f * n.next();
+        }
+        int most = 0; std::vector<float> hz;
+        runIt (in, most, hz);
+        CHECK (most == 0, "a feedback note held 15 s was taken for a whine (%d notches)", most);
+    }
+
+    // a noisy input with whines: three fixed whines and a buzz comb far above the hum filter
+    {
+        const double whines[] = { 6837.0, 7989.0, 10255.0 };
+        std::vector<double> lines (std::begin (whines), std::end (whines));
+        for (int h = 62; h <= 94; h += 2) lines.push_back (50.0 * h + 0.3 * h / 62.0);
+        std::vector<float> hum (guitar.size(), 0.0f);
+        for (size_t k = 0; k < lines.size(); ++k)
+        {
+            const double amp = k < 3 ? 0.0011 : 0.0004;
+            const double w = kTwoPi * lines[k] / sr;
+            for (size_t i = 0; i < hum.size(); ++i) hum[i] += (float) (amp * std::sin (w * (double) i + (double) k));
+        }
+        Noise n (0x99u);
+        std::vector<float> hiss (guitar.size());
+        for (auto& s : hiss) s = 0.0017f * n.next(); // -55 dBFS
+        auto in = guitar;
+        for (size_t i = 0; i < in.size(); ++i) in[i] += hum[i] + hiss[i];
+        int most = 0; std::vector<float> hz;
+        const auto out = runIt (in, most, hz);
+        int wrong = 0, whinesFound = 0, combFound = 0;
+        for (float f : hz)
+        {
+            double nearest = 1e9; size_t which = 0;
+            for (size_t k = 0; k < lines.size(); ++k) if (std::abs (lines[k] - f) < nearest) { nearest = std::abs (lines[k] - f); which = k; }
+            if (std::getenv ("RH_WHINE_DEBUG") != nullptr) std::printf ("  notch %.2f Hz, off by %.2f\n", f, f - lines[which]);
+            if (nearest > 1.5) { ++wrong; std::printf ("  notch at %.1f Hz is on nothing\n", f); }
+            else if (which < 3) ++whinesFound; else ++combFound;
+        }
+        std::printf ("  found %d of 3 whines, %d of %d buzz lines, %d wrong\n", whinesFound, combFound, (int) lines.size() - 3, wrong);
+        CHECK (wrong == 0, "%d notches on no whine", wrong);
+        CHECK (whinesFound == 3, "found %d of the 3 whines", whinesFound);
+        CHECK (combFound >= 12, "found %d of the %d buzz lines", combFound, (int) lines.size() - 3);
+
+        // the last 25 s. Each whine, measured at its own pitch while the guitar is quiet, is
+        // far down; and in every third of an octave from 2.5 to 12 kHz, what the notches took
+        // from the playing and the hiss is too little to hear: 10 dB under it is at most 0.45 dB,
+        // in the band with nine buzz lines in it (a few Hz each of 900).
+        const size_t from = guitar.size() - (size_t) (sr * 25.0);
+        double worstLine = 1e9;
+        for (double f : lines)
+        {
+            double ir = 0, ii = 0, orr = 0, oi = 0;
+            const double w = kTwoPi * f / sr;
+            for (size_t i = from; i < guitar.size(); ++i)
+            {
+                if (! quiet[i]) continue;
+                const double c = std::cos (w * (double) i), sn = std::sin (w * (double) i);
+                ir += in[i] * c; ii += in[i] * sn; orr += out[i] * c; oi += out[i] * sn;
+            }
+            worstLine = std::min (worstLine, 10.0 * std::log10 ((ir * ir + ii * ii) / std::max (orr * orr + oi * oi, 1e-30)));
+        }
+        double worstBand = -200.0, worstAt = 0.0;
+        for (double c = 2500.0; c <= std::min (12500.0, 0.4 * sr); c *= std::pow (2.0, 1.0 / 3.0))
+        {
+            Biquad a, b; a.set (Biquad::Type::bandpass, sr, c, 4.32); b.set (Biquad::Type::bandpass, sr, c, 4.32);
+            double played = 0, taken = 0;
+            for (size_t i = 0; i < guitar.size(); ++i)
+            {
+                const float x = a.process (guitar[i] + hiss[i]);
+                const float y = b.process ((float) ((double) in[i] - out[i] - hum[i]));
+                if (i >= from && ! quiet[i]) { played += (double) x * x; taken += (double) y * y; }
+            }
+            const double r = 10.0 * std::log10 (std::max (taken, 1e-30) / std::max (played, 1e-30));
+            if (r > worstBand) { worstBand = r; worstAt = c; }
+        }
+        std::printf ("  every whine at least %.1f dB down; the playing loses at most %.1f dB under its level (%.0f Hz band)\n", worstLine, worstBand, worstAt);
+        CHECK (worstLine > 35.0, "a whine only %.1f dB down", worstLine);
+        CHECK (worstBand < -10.0, "the notches take %.1f dB (under the playing) from the %.0f Hz band", worstBand, worstAt);
+    }
+}
+
 void testHum (double sr)
 {
     std::printf ("hum detection @ %.0f Hz\n", sr);
@@ -2072,7 +2303,22 @@ int render (const juce::String& presetArg, const juce::File& out, const juce::Fi
     std::vector<float> di;
     if (in.existsAsFile()) di = readWavMono (in, sr);
     else di = test::guitarDi (sr, 12.0);
-    const auto r = renderWith (p.values, di, sr, 512);
+    // RH_CAPTURE=<file.nam>: the amp is that capture of a real amp (its tone with the rest of the chain)
+    Render r;
+    if (const auto cap = juce::SystemStats::getEnvironmentVariable ("RH_CAPTURE", {}); cap.isNotEmpty())
+    {
+        Rig rig;
+        rig.setOffline (true);
+        if (const auto e = rig.neural().load (cap.toStdString()); ! e.empty()) { std::printf ("capture: %s\n", e.c_str()); return 1; }
+        auto v = p.values;
+        v[(size_t) P::ampModel] = (float) choices::neuralCapture;
+        rig.setParams (v);
+        rig.prepare (sr, 512);
+        rig.finishPendingWork();
+        r = run (rig, v, di);
+    }
+    else
+        r = renderWith (p.values, di, sr, 512);
     writeWav (out, r, sr);
     std::printf ("%s -> %s (%.1f dB RMS)\n", p.name.toRawUTF8(), out.getFullPathName().toRawUTF8(), rmsDb (r.l));
     return 0;
@@ -3266,6 +3512,32 @@ int main (int argc, char** argv)
         }
         return 0;
     }
+    if (args[0] == "whinescan" && args.size() >= 3)
+    {
+        // whinescan <in.wav> <out.wav>: what the whine remover finds on a real recording, and its output
+        const auto inF = juce::File::getCurrentWorkingDirectory().getChildFile (args[1]);
+        double fileSr = 48000.0;
+        auto x = readWavMono (inF, fileSr); // gives the file's own rate
+        if (x.empty()) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        WhineRemover w; w.prepare (fileSr);
+        int shown = -1;
+        for (size_t at = 0; at < x.size(); at += 256)
+        {
+            w.process (x.data() + at, (int) std::min ((size_t) 256, x.size() - at));
+            if (w.removing() != shown)
+            {
+                shown = w.removing();
+                std::printf ("%6.1f s: removing %d:", (double) at / fileSr, shown);
+                for (int i = 0; i < shown; ++i) std::printf (" %.1f", w.removingHz (i));
+                std::printf ("\n");
+            }
+        }
+        Render r; r.l = x; r.r = x;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, fileSr);
+        return 0;
+    }
+    if (args[0] == "selfnoise") { testSelfNoise (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "whine") { testWhine (48000.0); testWhine (44100.0); testWhine (192000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "stress") { testStress (48000.0, 256, 30.0, 1); testStress (44100.0, 4096, 20.0, 2); testStress (48000.0, 16, 10.0, 3); testStress (96000.0, 512, 10.0, 4); testStress (192000.0, 64, 5.0, 5); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "resetcost")
@@ -3390,6 +3662,9 @@ int main (int argc, char** argv)
     testDynamics (48000.0);
     testHum (48000.0);
     testHum (44100.0);
+    testWhine (48000.0);
+    testWhine (192000.0);
+    testSelfNoise (48000.0);
     testInputFix (48000.0);
     testInputGuard();
     testGate (48000.0);

@@ -38,6 +38,8 @@ struct AmpVoicing
     // ampvsreal): a broad cut in the low mids and a shelf on the top, after the tone stack.
     // 0 dB leaves each out.
     float lowMidHz = 250.0f, lowMidDb = 0.0f, topHz = 5000.0f, topDb = 0.0f;
+    // and the weight a real amp's power section puts under the speaker's low resonance
+    float lowHz = 110.0f, lowDb = 0.0f;
 };
 
 const AmpVoicing& ampVoicing (int model);
@@ -87,7 +89,7 @@ private:
     bool dirty = true;
 
     OnePole inputHp;
-    Biquad bright, midBoost, presence, depth, outHp, outLp, antiFizz, lowMid, top;
+    Biquad bright, midBoost, presence, depth, outHp, outLp, antiFizz, lowMid, top, low;
     Biquad baxLow, baxMid, baxHigh;
     ToneStack stack;
     Stage stages[5];

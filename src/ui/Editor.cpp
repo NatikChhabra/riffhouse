@@ -773,6 +773,8 @@ public:
         const int mains = proc.meters().mains.load();
         const int humMode = juce::roundToInt (proc.value (P::humFilter));
         if (humMode != 0 && mains > 0) s.push_back ({ juce::String (mains) + " Hz hum removed", true });
+        if (const int whines = proc.meters().whines.load(); humMode != 0 && whines > 0)
+            s.push_back ({ whines == 1 ? juce::String ("Whine removed") : juce::String (whines) + " whines removed", true });
         if (proc.value (P::inputFix) > 0.5f) s.push_back ({ "Input fix on", true });
         if (proc.value (P::gateOn) > 0.5f)
         {

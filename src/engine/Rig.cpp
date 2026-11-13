@@ -538,6 +538,8 @@ void Rig::process (const float* in, float* outL, float* outR, int total)
         m.gateOpen.store (gate.isOpen());
         m.gateThreshNow.store (gate.thresholdNowDb());
         m.mains.store (input.detectedMains());
+        m.whines.store (input.whines().removing());
+        m.whineHz.store (input.whines().removingHz (0));
         offset += n;
     }
 }

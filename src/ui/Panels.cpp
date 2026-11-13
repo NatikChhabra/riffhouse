@@ -923,7 +923,8 @@ juce::String SettingsView::reportText() const
     t << "\nInput\n";
     line ("Input level", db (proc.value (P::inGain)));
     line ("Input Fix", proc.value (P::inputFix) > 0.5f ? db (proc.value (P::inputFixAmt)) : juce::String ("off"));
-    line ("Hum filter", juce::String (juce::roundToInt (proc.value (P::humFilter))) + " (0 off, 1 auto, 2 50 Hz, 3 60 Hz), mains found: " + juce::String (proc.meters().mains.load()));
+    line ("Hum filter", juce::String (juce::roundToInt (proc.value (P::humFilter))) + " (0 off, 1 auto, 2 50 Hz, 3 60 Hz), mains found: " + juce::String (proc.meters().mains.load())
+                                + ", whines removed: " + juce::String (proc.meters().whines.load()));
     line ("Gate", juce::String (proc.value (P::gateOn) > 0.5f ? "on" : "off") + ", chosen " + db (proc.value (P::gateThresh)) + ", sitting at " + db (proc.meters().gateThreshNow.load()));
     line ("Treble now against a full-range guitar", db (proc.tiltProbe().tiltDb() - TiltProbe::referenceTiltDb) + " over " + juce::String (proc.tiltProbe().secondsMeasured(), 1) + " s of playing");
     t << "\nTone\n";
@@ -1374,13 +1375,23 @@ void SettingsView::paintPage (juce::Graphics& g)
             small ("Setup measures how much treble your input loses and sets the strength (now "
                        + juce::String (juce::roundToInt (proc.value (P::inputFixAmt))) + " dB). Interfaces with a guitar (Hi-Z) input don't need it.",
                    fixText, 2);
-            subhead ("Mains hum filter", humRow);
+            subhead ("Hum and whine filter", humRow);
             const int mains = proc.meters().mains.load();
-            g.setColour (mains > 0 ? colours::good : colours::textFaint);
+            const int whines = juce::roundToInt (proc.value (P::humFilter)) != 0 ? proc.meters().whines.load() : 0;
+            juce::String found;
+            if (mains > 0) found << juce::String (mains) + " Hz hum";
+            if (whines > 0)
+            {
+                const float hz = proc.meters().whineHz.load();
+                const auto one = hz >= 1000.0f ? juce::String (hz / 1000.0f, 1) + " kHz whine" : juce::String (juce::roundToInt (hz)) + " Hz whine";
+                found << (found.isEmpty() ? "" : " and ") << (whines == 1 ? "a " + one : juce::String (whines) + " whines");
+            }
+            g.setColour (found.isNotEmpty() ? colours::good : colours::textFaint);
             g.setFont (font (13.0f));
-            g.drawText (mains > 0 ? "Found " + juce::String (mains) + " Hz hum, removing it" : "No hum heard", humRow, juce::Justification::centredRight);
-            small ("Auto listens for the 50 Hz (India, Europe, most of Asia and Africa) or 60 Hz (Americas) buzz from "
-                   "power lines and removes just that, leaving your low notes alone.", humText, 2);
+            g.drawText (found.isNotEmpty() ? "Found " + found + ", removing " + ((mains > 0 && whines > 0) || whines > 1 ? "them" : "it") : juce::String ("No hum heard"),
+                        humRow, juce::Justification::centredRight);
+            small ("Auto removes the 50 Hz (India, Europe, Asia, Africa) or 60 Hz (Americas) power line buzz, and "
+                   "steady whines from chargers or cheap pickups. Your notes stay as they are.", humText, 2);
             break;
         }
         case Section::foot:

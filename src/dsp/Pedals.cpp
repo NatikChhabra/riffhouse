@@ -160,6 +160,7 @@ void InputConditioner::prepare (double sampleRate)
     sr = sampleRate;
     dc.prepare (sr);
     hum.prepare (sr);
+    whine.prepare (sr);
     const double freqs[6] = { 50, 100, 150, 60, 120, 180 };
     for (int i = 0; i < 6; ++i)
         gz[i].coeff = 2.0 * std::cos (kTwoPi * freqs[i] / sr);
@@ -176,6 +177,7 @@ void InputConditioner::reset()
 {
     dc.reset();
     hum.reset();
+    whine.reset();
     fixShelf.reset(); fixTop.reset();
     hiss.reset();
     for (auto& g : gz) g.s1 = g.s2 = 0;
@@ -291,6 +293,9 @@ void InputConditioner::process (float* x, int n)
     if (mode != humOff && activeMains > 0)
         for (int i = 0; i < n; ++i)
             x[i] = hum.process (x[i]);
+
+    if (mode != humOff)
+        whine.process (x, n);
 
     if (fix)
         for (int i = 0; i < n; ++i)

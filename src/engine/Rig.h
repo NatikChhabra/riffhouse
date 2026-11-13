@@ -42,6 +42,8 @@ struct RigMeters
     std::atomic<float> compReduction { 0.0f };
     std::atomic<bool> gateOpen { false };
     std::atomic<int> mains { 0 };
+    std::atomic<int> whines { 0 };       // steady whines being cut out of the input
+    std::atomic<float> whineHz { 0.0f }; // the strongest of them
     std::atomic<int> clipEvents { 0 };
 };
 

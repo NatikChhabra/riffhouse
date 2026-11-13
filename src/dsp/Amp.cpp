@@ -33,7 +33,7 @@ namespace
           false, britishHot, 650.0f, 1.2f, 0.02f, 0.20f, 3000.0f, 95.0f, 70.0f, 13000.0f, -3.4f, 300.0f, -9.0f },
         { "Modern High Gain", 30.0f, 1.0f, -48.0f, 16.0f, 5,
           { 1, 22, 16, 10, 1.2f }, { 0.20f, 0.30f, 0.25f, 0.10f, 0.05f }, { 30, 70, 60, 50, 30 }, { 18000, 17000, 16000, 16000, 18000 },
-          false, modern, 550.0f, 1.6f, 0.0f, 0.40f, 3500.0f, 80.0f, 45.0f, 14000.0f, -7.6f, 230.0f, -6.0f, 5000.0f, 7.0f },
+          false, modern, 550.0f, 1.6f, 0.0f, 0.40f, 3500.0f, 80.0f, 45.0f, 14000.0f, -7.6f, 230.0f, -5.0f, 5000.0f, 7.0f, 110.0f, 4.0f },
         { "Tight Metal", 60.0f, 2.0f, -46.0f, 18.0f, 5,
           { 1, 25, 18, 10, 1.2f }, { 0.20f, 0.30f, 0.20f, 0.10f, 0.05f }, { 60, 130, 100, 70, 40 }, { 18000, 17000, 16000, 16000, 18000 },
           false, modern, 650.0f, 1.3f, 0.0f, 0.15f, 3800.0f, 90.0f, 60.0f, 14000.0f, -6.1f, 240.0f, -4.0f, 4500.0f, 6.0f },
@@ -94,7 +94,7 @@ void Amp::reset()
     updateTone();
     if (oversampler) oversampler->reset();
     inputHp.reset();
-    bright.reset(); midBoost.reset(); lowMid.reset(); top.reset(); presence.reset(); depth.reset(); outHp.reset(); outLp.reset(); antiFizz.reset();
+    bright.reset(); midBoost.reset(); lowMid.reset(); top.reset(); low.reset(); presence.reset(); depth.reset(); outHp.reset(); outLp.reset(); antiFizz.reset();
     baxLow.reset(); baxMid.reset(); baxHigh.reset();
     stack.reset();
     for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.blocking.reset(); s.last = {}; }
@@ -195,6 +195,7 @@ void Amp::updateFilters()
     antiFizz.set (Biquad::Type::lowpass, osr, std::min (16000.0, 0.45 * sr), 0.5);
     lowMid.set (Biquad::Type::peak, osr, v->lowMidHz, 0.8, v->lowMidDb);
     top.set (Biquad::Type::highShelf, osr, v->topHz, 0.7, v->topDb);
+    low.set (Biquad::Type::peak, osr, v->lowHz, 0.9, v->lowDb);
 }
 
 void Amp::updateTone()
@@ -367,6 +368,7 @@ void Amp::process (float* data, int n)
         // fingers (how it compresses and sags) stays as it was
         if (v->lowMidDb != 0.0f) s = lowMid.process (s);
         if (v->topDb != 0.0f) s = top.process (s);
+        if (v->lowDb != 0.0f) s = low.process (s);
         s = outLp.process (outHp.process (s));
         x[i] = antiFizz.process (s);
     }

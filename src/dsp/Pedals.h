@@ -4,6 +4,7 @@
 
 #include "Circuits.h"
 #include "Common.h"
+#include "Whine.h"
 
 #include <atomic>
 #include <juce_dsp/juce_dsp.h>
@@ -72,6 +73,8 @@ public:
 
     // 0 = none detected yet, otherwise 50 or 60
     int detectedMains() const noexcept { return detected.load(); }
+    // steady whines found while the guitar is quiet, and being cut out (with the hum filter on)
+    const WhineRemover& whines() const noexcept { return whine; }
 
 private:
     void setNotches (int mainsHz);
@@ -80,6 +83,7 @@ private:
     double sr = 48000.0;
     DcBlocker dc;
     HumCanceller hum;
+    WhineRemover whine;
     int activeMains = 0;
     int mode = humAuto;
     bool fix = false;
