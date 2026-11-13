@@ -25,8 +25,24 @@ namespace
         g.fillRoundedRectangle (r, radius);
     }
 
+    // Panel hardware photographed in 3D (tools/gear3d/parts.py), placed by its centre on a square canvas.
+    bool hardware (juce::Graphics& g, const juce::String& name, juce::Point<float> c, float canvas)
+    {
+        return art::draw (g, name, R (canvas, canvas).withCentre (c));
+    }
+
+    // a pilot jewel is photographed in each colour the amps use, lit and dark
+    juce::String jewelArtName (juce::uint32 colour, bool on)
+    {
+        return "hw_jewel_" + juce::String::toHexString ((juce::int64) (colour & 0xffffff)).paddedLeft ('0', 6) + (on ? "_on" : "_off");
+    }
+
     void screw (juce::Graphics& g, juce::Point<float> c, float size, float turn)
     {
+        // the slot repeats every half turn: photographed at four angles, take the nearest
+        const float q = juce::MathConstants<float>::pi * 0.25f;
+        const int frame = ((int) std::lround (turn / q) % 4 + 4) % 4;
+        if (hardware (g, "hw_screw_" + juce::String (frame), c, size * 2.0f)) return;
         const auto r = R (size, size).withCentre (c);
         g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.fillEllipse (r.translated (0.0f, 0.8f).expanded (0.6f));
@@ -218,6 +234,7 @@ namespace
     // A quarter-inch jack socket in a panel: nut, washer and the dark hole.
     void jackSocket (juce::Graphics& g, juce::Point<float> c, float radius)
     {
+        if (hardware (g, "hw_jack", c, radius * 64.0f / 13.0f)) return;
         hexNut (g, c, radius);
         const auto hole = R (radius * 0.86f, radius * 0.86f).withCentre (c);
         g.setGradientFill (juce::ColourGradient (C (0xff050505), hole.getX(), hole.getY(), C (0xff2a2b2c), hole.getRight(), hole.getBottom(), false));
@@ -1942,6 +1959,8 @@ namespace
     void lampHousing (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d)
     {
         const auto jc = l.jewel.getCentre();
+        if (d.lamp != 2 && art::has ("hw_toggle_on") && art::has (jewelArtName (d.jewel, true)))
+            return; // the photographed switch and lamp bring their own nut, bush and bezel
         if (d.lamp == 1)
         {
             hexNut (g, jc, 13.0f);
@@ -2319,6 +2338,18 @@ void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bo
         // a bat-handle toggle: up is on. Its little lamp sits above it. The lever is a turned
         // chrome rod that thickens to a ball; seen from above it leans toward the top or the bottom.
         const auto c = r.getCentre();
+        if (art::has (jewelArtName (d.jewel, on)) && hardware (g, on ? "hw_toggle_on" : "hw_toggle_off", c, 96.0f))
+        {
+            r = R (9.0f, 9.0f).withCentre ({ c.x, c.y - 32.0f }); // a touch higher: the raised lever's ball clears its bezel
+            if (on)
+            {
+                const float halo = r.getWidth() * 1.4f;
+                g.setGradientFill (juce::ColourGradient (jewel.withAlpha (0.32f), r.getCentreX(), r.getCentreY(), jewel.withAlpha (0.0f), r.getCentreX() + halo, r.getCentreY(), true));
+                g.fillEllipse (r.expanded (halo));
+            }
+            hardware (g, jewelArtName (d.jewel, on), r.getCentre(), 80.0f * r.getWidth() * 0.5f / 12.0f);
+            return;
+        }
         const float dir = on ? -1.0f : 1.0f;
         const float len = 17.0f, baseW = 4.4f, neckW = 3.3f, ball = 4.5f;
         const juce::Point<float> tip (c.x + 0.4f, c.y + dir * len);
@@ -2404,12 +2435,15 @@ void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bo
         g.drawEllipse (R (6.0f, 6.0f).withCentre ({ face.getCentreX(), face.getBottom() - 9.0f }), 1.2f);
         return;
     }
+    const bool photographed = d.lamp == 0 && art::has (jewelArtName (d.jewel, on)) && art::has ("hw_toggle_on");
     if (on)
     {
         const float halo = r.getWidth() * 1.4f;
-        g.setGradientFill (juce::ColourGradient (jewel.withAlpha (0.42f), r.getCentreX(), r.getCentreY(), jewel.withAlpha (0.0f), r.getCentreX() + halo, r.getCentreY(), true));
+        g.setGradientFill (juce::ColourGradient (jewel.withAlpha (photographed ? 0.32f : 0.42f), r.getCentreX(), r.getCentreY(), jewel.withAlpha (0.0f), r.getCentreX() + halo, r.getCentreY(), true));
         g.fillEllipse (r.expanded (halo));
     }
+    if (photographed && hardware (g, jewelArtName (d.jewel, on), r.getCentre(), 80.0f * r.getWidth() * 0.5f / 12.0f))
+        return;
     juce::ColourGradient glass (on ? hot : jewel.darker (2.0f), r.getCentreX() - r.getWidth() * 0.12f, r.getCentreY() - r.getWidth() * 0.12f,
                                 on ? jewel.darker (0.35f) : jewel.darker (3.5f), r.getRight(), r.getBottom(), true);
     if (on) glass.addColour (0.45, jewel);
