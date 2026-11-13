@@ -422,6 +422,8 @@ IconButton::IconButton (juce::Path p, juce::String text, bool filled)
 
 void IconButton::paintButton (juce::Graphics& g, bool over, bool down)
 {
+    over = over || motion::pointedAt (*this);
+    down = down || (motion::filmPress && motion::pointedAt (*this));
     auto r = getLocalBounds().toFloat();
     const bool on = getToggleState();
     auto& feel = motion::Feel::of (*this);
@@ -546,6 +548,7 @@ ChoiceSelector::ChoiceSelector (RiffhouseProcessor& proc, P id)
     }
     prev.setTooltip ("Previous");
     next.setTooltip ("Next");
+    next.getProperties().set ("control", juce::String (spec (id).key)); // a film's click steps through the choices, as a person does
     auto step = [this] (int d)
     {
         const int n = items.size();

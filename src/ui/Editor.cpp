@@ -1550,6 +1550,9 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
     folder.createDirectory();
     for (const auto& old : folder.findChildFiles (juce::File::findFiles, false, "frame_*.png")) old.deleteFile();
     stopTimer(); // the window is ticked once a frame from here, as its timer would at 30 a second
+    // the real mouse (wherever the system left it) never shows a tooltip in a film
+    tooltips.setMillisecondsBeforeTipAppears (1 << 30);
+    tooltips.hideTip();
     auto& r = *root;
     r.wizard.reset();
     r.quietNotices = true;
@@ -1578,7 +1581,7 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
         bool shown = false;
         juce::Point<float> at, from, to;
         double t0 = 0.0, t1 = 0.0;
-        juce::Component* target = nullptr;
+        juce::Component::SafePointer<juce::Component> target; // a tone change can rebuild a page under it
         int dragParam = -1;
         float dragFrom = 0.0f;
         double pressFrom = 1.0e9, pressTo = -1.0;
@@ -1638,13 +1641,15 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
     auto pointerAt = [&] (double t)
     {
         if (! ptr.shown) return;
+        // it follows its control when the layout moves (a tone change swaps the amp's face)
+        if (ptr.target != nullptr && ptr.target->isShowing()) ptr.to = aimAt (*ptr.target);
         const float k = ptr.t1 <= ptr.t0 ? 1.0f : (float) juce::jlimit (0.0, 1.0, (t - ptr.t0) / (ptr.t1 - ptr.t0));
         const float e = motion::ease (motion::Curve::inOut, k);
         const auto d = ptr.to - ptr.from;
         const juce::Point<float> bend { d.y * 0.12f, -d.x * 0.12f }; // a slight arc, never a ruler line
         const auto mid = (ptr.from + ptr.to) * 0.5f + bend;
         ptr.at = ptr.from * ((1 - e) * (1 - e)) + mid * (2 * (1 - e) * e) + ptr.to * (e * e);
-        if (k >= 1.0f) motion::filmPointer = ptr.target;
+        if (k >= 1.0f) motion::filmPointer = ptr.target.getComponent();
         if (ptr.dragParam >= 0 && k >= 1.0f)
         {
             // dragging a knob up turns it up: the hand moves with the value
@@ -1675,7 +1680,7 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
                 if (st.knobPointer && st.param >= 0)
                 {
                     auto* knob = findTarget (paramSpecs()[(size_t) st.param].key, st.t);
-                    if (knob != nullptr && ptr.target != knob) glideTo (knob, st.t, 0.25);
+                    if (knob != nullptr && ptr.target.getComponent() != knob) glideTo (knob, st.t, 0.25);
                     ptr.target = knob;
                     ptr.dragParam = st.param;
                     ptr.dragFrom = st.from;
@@ -1688,7 +1693,9 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
                 // the press lets go: a chain pedal opens its page, a switch flips
                 st.clicked = true;
                 const auto page = ptr.target->getProperties()["page"].toString();
-                if (page.isNotEmpty())
+                if (auto* b = dynamic_cast<juce::Button*> (ptr.target.getComponent()); b != nullptr && b->onClick)
+                    b->onClick(); // an arrow beside a chooser: the next choice
+                else if (page.isNotEmpty())
                 {
                     for (int i = 0; i < numModules; ++i)
                         if (page.equalsIgnoreCase (modules()[(size_t) i].id)) r.showPage (i);
