@@ -235,7 +235,12 @@ void PresetLibrary::addFactory (const char* data, int size)
 
 void PresetLibrary::scanFolder (const juce::File& folder, bool factory)
 {
-    for (const auto& f : folder.findChildFiles (juce::File::findFiles, true, "*.json"))
+    // in name order: the folder's own order differs between file systems, and the list must
+    // not depend on which computer reads it
+    auto files = folder.findChildFiles (juce::File::findFiles, true, "*.json");
+    std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b)
+               { return a.getFullPathName().compareIgnoreCase (b.getFullPathName()) < 0; });
+    for (const auto& f : files)
     {
         Preset p;
         juce::String err;
