@@ -141,7 +141,7 @@ public:
         line.removeFromLeft (4.0f);
         strokeIcon (g, icons::chevronDown(), line.withTrimmedTop (line.getHeight() - 15.0f).withSizeKeepingCentre (11.0f, 11.0f),
                     hover ? colours::text : colours::textFaint, 1.6f);
-        if (modified)
+        if (modified && ! motion::filmHideEdited)
             drawCaps (g, "Edited", juce::Rectangle<float> (line.getRight() + 8.0f, top.getY() + 4.0f, editedW, top.getHeight() - 4.0f), 10.0f,
                       colours::lamp, juce::Justification::bottomLeft);
         g.setFont (font (12.0f));
@@ -1502,6 +1502,7 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
     };
     std::vector<Step> steps;
     const juce::var list = script.isArray() ? script : script.getProperty ("steps", juce::var());
+    motion::filmHideEdited = ! script.isArray() && (bool) script.getProperty ("hideEdited", false);
     if (list.isArray())
         for (const auto& v : *list.getArray())
         {

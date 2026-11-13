@@ -15,6 +15,7 @@ namespace rh::ui::motion
 // shows its real hover look, and its pressed look while the film clicks it.
 inline const juce::Component* filmPointer = nullptr;
 inline bool filmPress = false;
+inline bool filmHideEdited = false; // a film script can keep the header clean while it turns knobs
 inline bool pointedAt (const juce::Component& c) noexcept { return filmPointer == &c; }
 // Milliseconds. A control never takes longer than `overlay`.
 constexpr int press = 90, release = 150, hover = 170, toggle = 170, ui = 200, overlay = 240, leave = 150, travel = 260;

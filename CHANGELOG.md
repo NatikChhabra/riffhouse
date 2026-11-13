@@ -46,6 +46,8 @@ Pedals that behave like the real circuits, cleaner high gain, quiet mutes, no mo
 - When a driver change does not work, the Driver window shows the whole reason. When Windows runs the guitar input and the headphones at different rates, it says how to set both to 48000 Hz.
 - Screen readers say what each icon button in the top bar does, and name every list in the Driver window.
 - No crackle or thump when Riffhouse opens. High-gain amps made a short noise of their own while their circuits settled; the rig now settles in silence before it plays, and the sound fades in over a moment.
+- A damaged or half-downloaded capture file is refused with a message to download it again, instead of loading and playing garbage. Broken IR files and broken tone files are handled safely too.
+- The mouse shows it is busy while a sound card is being opened.
 
 ## 0.1.4
 

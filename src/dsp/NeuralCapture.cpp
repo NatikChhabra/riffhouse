@@ -5,7 +5,10 @@
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
 
+#include <cmath>
 #include <filesystem>
+#include <fstream>
+#include <limits>
 
 namespace rh
 {
@@ -55,12 +58,46 @@ void NeuralCapture::setupResampling()
     }
 }
 
+// The NAM library reads a model's numbers one after another without looking where the list
+// ends, so a cut-short file would be read past its end. Built first with a long run of NaNs
+// behind its numbers, such a file reads some of them and its sound turns NaN; a whole file
+// never reaches them.
+bool NeuralCapture::isDamaged (const std::filesystem::path& file)
+{
+    std::ifstream in (file);
+    auto j = nlohmann::json::parse (in, nullptr, false);
+    if (j.is_discarded() || ! j.is_object() || ! j.contains ("weights") || ! j["weights"].is_array())
+        return false; // not this kind of damage; the library says what is wrong with it
+    auto& w = j["weights"];
+    for (int k = 0; k < (1 << 20); ++k) w.push_back (std::numeric_limits<float>::quiet_NaN());
+    try
+    {
+        auto probe = nam::get_dsp (j);
+        if (! probe) return false;
+        probe->Reset (48000.0, 256);
+        std::vector<NAM_SAMPLE> x (256), y (256);
+        for (int i = 0; i < 256; ++i) x[(size_t) i] = (NAM_SAMPLE) (0.1 * std::sin (0.05 * i));
+        NAM_SAMPLE* xs[] = { x.data() };
+        NAM_SAMPLE* ys[] = { y.data() };
+        probe->process (xs, ys, 256);
+        for (auto v : y)
+            if (! std::isfinite ((double) v)) return true;
+    }
+    catch (...) {}
+    return false;
+}
+
 std::unique_ptr<NeuralCapture::Model> NeuralCapture::makeModel (const std::string& path, std::string& error)
 {
     try
     {
         auto m = std::make_unique<Model>();
         const std::filesystem::path fsPath (std::u8string (reinterpret_cast<const char8_t*> (path.data()), path.size()));
+        if (isDamaged (fsPath))
+        {
+            error = "This capture file is damaged: it has fewer numbers than its model needs. Download it again.";
+            return nullptr;
+        }
         m->dsp = nam::get_dsp (fsPath);
         if (! m->dsp)
         {

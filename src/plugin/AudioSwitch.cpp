@@ -160,8 +160,11 @@ void AudioSwitch::tryNext()
         }
         // the buffer asked for belongs to the first mode; one tried in its place picks its own
         const double openStarted = juce::Time::getMillisecondCounterHiRes();
+        // Windows can take a second or more to hand over a sound card; the pointer says so
+        juce::MouseCursor::showWaitCursor();
         const auto err = openExactly (dm, { type, want.input, output, tryIndex == 0 && rateIndex == 0 ? want.bufferSize : 0, rate,
                                             type == "ASIO" ? want.outputPair : -1, want.inputPair });
+        juce::MouseCursor::hideWaitCursor();
         auto* dev = dm.getCurrentAudioDevice();
         if (err.isEmpty() && dev != nullptr && ! dev->getActiveInputChannels().isZero())
         {

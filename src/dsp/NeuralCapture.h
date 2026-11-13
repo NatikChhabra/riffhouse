@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include <filesystem>
+
 #include "Common.h"
 #include "Resampler.h"
 
@@ -37,6 +39,7 @@ public:
 private:
     struct Model;
     std::unique_ptr<Model> makeModel (const std::string& path, std::string& error);
+    static bool isDamaged (const std::filesystem::path&); // a file cut short, which the library would read past
     void setupResampling();
 
     double sr = 48000.0;

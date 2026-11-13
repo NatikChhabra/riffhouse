@@ -1434,6 +1434,131 @@ void testLevelMatcher()
     if (hadPhrase) aside.moveFileTo (phraseWas);
 }
 
+// Files from outside: tones pasted from chat, share codes, captures and speaker IRs people
+// download. A broken one is refused or read into something safe; none may crash the app,
+// leave a value out of its range or make the sound NaN or deafening.
+void testBadFiles (double sr)
+{
+    std::printf ("bad files and pasted text\n");
+    juce::Random rnd (1311);
+    const auto presets = loadPresets();
+    auto inRange = [] (const Preset& p)
+    {
+        for (const auto& sp : paramSpecs())
+        {
+            const float v = p.values[(size_t) sp.id];
+            if (! std::isfinite (v) || v < sp.min - 1.0e-3f || v > sp.max + 1.0e-3f) return false;
+        }
+        return true;
+    };
+    auto mangle = [&rnd] (juce::String t)
+    {
+        const juce::String nasty[] = { "1e309", "-1e309", "NaN", "null", "[[[[", "}}", "\"", "\\u0000", "999999999999", "-0", "{\"a\":", "true" };
+        switch (rnd.nextInt (5))
+        {
+            case 0: return t.substring (0, rnd.nextInt (t.length() + 1)); // cut short, as a chat app does
+            case 1: { for (int k = 0; k < 1 + rnd.nextInt (12); ++k) { const int at = rnd.nextInt (std::max (1, t.length())); t = t.replaceSection (at, 1, juce::String::charToString ((juce::juce_wchar) (1 + rnd.nextInt (0x2FF)))); } return t; }
+            case 2: { const int at = rnd.nextInt (std::max (1, t.length())); return t.substring (0, at) + nasty[rnd.nextInt (12)] + t.substring (at); }
+            case 3: { const int at = rnd.nextInt (std::max (1, t.length())); return t.replaceSection (at, rnd.nextInt (40), nasty[rnd.nextInt (12)]); }
+            default: return t + t.substring (0, rnd.nextInt (t.length() + 1)); // pasted twice, half of it
+        }
+    };
+    int read = 0, refused = 0, bad = 0;
+    for (int i = 0; i < 3000; ++i)
+    {
+        const auto& src = presets[(size_t) rnd.nextInt ((int) presets.size())];
+        Preset p;
+        juce::String err;
+        const bool ok = (i % 2 == 0) ? presetFromJson (mangle (presetToJson (src)), p, err) : presetFromShareCode (mangle (presetToShareCode (src)), p, err);
+        if (! ok) { ++refused; if (err.isEmpty()) ++bad; continue; }
+        ++read;
+        if (! inRange (p)) ++bad;
+    }
+    CHECK (bad == 0, "%d of 3000 broken tones were read out of range or refused without a reason", bad);
+    std::printf ("  3000 broken tones and share codes: %d read safely, %d refused with a reason\n", read, refused);
+
+    // captures and IRs on disk
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-badfiles");
+    dir.deleteRecursively();
+    dir.createDirectory();
+    auto bytes = [&rnd] (int n) { juce::MemoryBlock m ((size_t) n); for (int k = 0; k < n; ++k) static_cast<char*> (m.getData())[k] = (char) rnd.nextInt (256); return m; };
+    const auto di = test::guitarDi (sr, 2.0, 0.4f);
+    auto plays = [&] (Rig& rig, const ParamValues& v, const char* what)
+    {
+        const auto r = run (rig, v, di);
+        CHECK (allFinite (r), "%s: the sound went NaN", what);
+        float peak = 0.0f;
+        for (float x : r.l) peak = std::max (peak, std::abs (x));
+        CHECK (peak < 4.0f, "%s: the sound reached %.1f (deafening)", what, peak);
+    };
+    {
+        struct F { const char* name; juce::String text; };
+        const F nams[] = { { "empty.nam", "" }, { "not-json.nam", "hello" }, { "object.nam", "{}" },
+                           { "no-weights.nam", R"({"version":"0.5.4","architecture":"WaveNet","config":{"layers":[]}})" },
+                           { "wrong-weights.nam", R"({"version":"0.5.4","architecture":"WaveNet","config":{"layers":[{"input_size":1,"condition_size":1,"channels":8,"head_size":1,"kernel_size":3,"dilations":[1,2],"activation":"Tanh","gated":false,"head_bias":false}],"head_scale":0.02},"weights":[0.1,0.2,0.3]})" },
+                           { "lstm-short.nam", R"({"version":"0.5.4","architecture":"LSTM","config":{"num_layers":1,"input_size":1,"hidden_size":8},"weights":[1,2,3]})" },
+                           { "huge-dims.nam", R"({"version":"0.5.4","architecture":"LSTM","config":{"num_layers":100000,"input_size":1,"hidden_size":100000},"weights":[]})" } };
+        for (const auto& f : nams)
+        {
+            const auto file = dir.getChildFile (f.name);
+            file.replaceWithText (f.text);
+            Rig rig;
+            rig.prepare (sr, 256);
+            const auto err = rig.neural().load (file.getFullPathName().toStdString());
+            CHECK (! err.empty(), "%s was taken as a capture", f.name);
+            auto v = bare();
+            v[(size_t) P::ampOn] = 1;
+            v[(size_t) P::ampModel] = choices::neuralCapture;
+            plays (rig, v, f.name);
+        }
+        const auto noise = dir.getChildFile ("noise.nam");
+        noise.replaceWithData (bytes (65536).getData(), 65536);
+        Rig rig;
+        rig.prepare (sr, 256);
+        CHECK (! rig.neural().load (noise.getFullPathName().toStdString()).empty(), "random bytes were taken as a capture");
+    }
+    {
+        auto wav = [&] (const char* name, double rate, int chans, int bits, int length, float level)
+        {
+            const auto file = dir.getChildFile (name);
+            juce::WavAudioFormat fmt;
+            std::unique_ptr<juce::OutputStream> os (file.createOutputStream().release());
+            if (auto w = std::unique_ptr<juce::AudioFormatWriter> (fmt.createWriterFor (os.get(), rate, (unsigned) chans, bits, {}, 0)))
+            {
+                os.release();
+                juce::AudioBuffer<float> b (chans, std::max (1, length));
+                b.clear();
+                for (int c = 0; c < chans; ++c)
+                    for (int k = 0; k < length; ++k) b.setSample (c, k, level * (rnd.nextFloat() * 2.0f - 1.0f) * std::exp (-6.0f * (float) k / std::max (1, length)));
+                w->writeFromAudioSampleBuffer (b, 0, length);
+            }
+            return file;
+        };
+        const juce::File irs[] = { wav ("empty.wav", 48000, 1, 24, 0, 0.0f), wav ("one-sample.wav", 48000, 1, 16, 1, 1.0f),
+                                   wav ("silent.wav", 44100, 1, 24, 4096, 0.0f), wav ("hot-stereo-192k.wav", 192000, 2, 24, 8192, 1.0f),
+                                   wav ("thirty-seconds.wav", 48000, 1, 16, 48000 * 30, 0.5f), wav ("8-bit.wav", 22050, 1, 8, 2048, 0.9f) };
+        const auto junk = dir.getChildFile ("junk.wav");
+        junk.replaceWithData (bytes (40000).getData(), 40000);
+        std::vector<juce::File> all (std::begin (irs), std::end (irs));
+        all.push_back (junk);
+        all.push_back (dir.getChildFile ("missing.wav"));
+        for (const auto& f : all)
+        {
+            Rig rig;
+            rig.setOffline (true);
+            rig.prepare (sr, 256);
+            rig.cabinet().loadUserIr (f);
+            auto v = bare();
+            v[(size_t) P::cabOn] = 1;
+            v[(size_t) P::cabModel] = (float) choices::cabUserIr;
+            rig.setParams (v);
+            rig.finishPendingWork();
+            plays (rig, v, f.getFileName().toRawUTF8());
+        }
+    }
+    dir.deleteRecursively();
+}
+
 void testNeural (double sr)
 {
     std::printf ("neural captures @ %.0f Hz\n", sr);
@@ -3132,6 +3257,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "tuner") { testTuner (48000.0); testTuner (44100.0); testTuner (96000.0); testMetronome(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "start") { testStart (48000.0); testStart (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "badfiles") { testBadFiles (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "devices") { test::runDeviceChecks (checks, failures); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -3190,6 +3316,7 @@ int main (int argc, char** argv)
     testAliasing (48000.0);
     testNeural (48000.0);
     testNeural (44100.0);
+    testBadFiles (48000.0);
     testPresets (48000.0);
     if (! quick) testPresets (44100.0);
     testLevelMatch (48000.0);
