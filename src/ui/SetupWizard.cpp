@@ -322,10 +322,7 @@ void SetupWizard::makeSounds()
         const auto& design = ampDesign (s.amp);
         const auto name = juce::String (spec (P::ampModel).choices[(size_t) s.amp]).toLowerCase();
         // drawn at twice the size it is shown, so it stays sharp on a high density screen
-        s.thumb = ampThumb (design, name, 0.5f);
-        const auto art = soundArt();
-        const float fit = std::min (art.getWidth() / s.thumb.box.getWidth(), art.getHeight() / s.thumb.box.getHeight());
-        s.thumb = ampThumb (design, name, juce::jlimit (0.2f, 2.0f, 2.0f * fit));
+        s.thumb = ampThumb (design, name, thumbScaleFor (ampThumb (design, name, 0.1f), soundArt()));
         sounds.push_back (std::move (s));
     }
 }
@@ -818,16 +815,16 @@ void SetupWizard::paint (juce::Graphics& g)
                 }
                 auto inner = tile.reduced (12.0f, 12.0f);
                 const auto art = inner.removeFromTop (soundArt().getHeight());
+                // the amp stands on the same line in every tile, like gear on a floor; its lamp lights when picked
+                drawThumb (g, s.thumb, art);
                 if (s.thumb.image.isValid())
                 {
-                    // the amp stands on the same line in every tile, like gear on a floor
                     const auto& t = s.thumb;
                     const float fit = std::min (art.getWidth() / t.box.getWidth(), art.getHeight() / t.box.getHeight());
                     juce::Graphics::ScopedSaveState keep (g);
                     g.addTransform (juce::AffineTransform::translation (-t.box.getCentreX(), -t.box.getBottom())
                                         .scaled (fit)
                                         .translated (art.getCentreX(), art.getBottom()));
-                    g.drawImage (t.image, t.area);
                     drawAmpJewel (g, t.amp, ampDesign (s.amp), on);
                 }
                 inner.removeFromTop (12.0f);

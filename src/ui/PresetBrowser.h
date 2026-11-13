@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include "Gear.h"
 #include "Widgets.h"
 
 namespace rh::ui
@@ -51,5 +52,9 @@ private:
     std::vector<int> results;
     juce::String category = "All";
     bool ignoreSelection = false;
+    // each tone is shown by its amp, drawn once per amp and kept
+    std::map<int, GearThumb> ampArt;
+    const GearThumb& artFor (int ampModel);
+    static constexpr float kArtW = 64.0f, kArtH = 36.0f;
 };
 } // namespace rh::ui

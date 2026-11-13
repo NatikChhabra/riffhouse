@@ -3392,6 +3392,23 @@ GearThumb pedalThumb (const PedalDesign& d, int n, bool faders, float scale, con
     return t;
 }
 
+void drawThumb (juce::Graphics& g, const GearThumb& t, juce::Rectangle<float> target)
+{
+    if (! t.image.isValid() || t.box.isEmpty()) return;
+    const float fit = std::min (target.getWidth() / t.box.getWidth(), target.getHeight() / t.box.getHeight());
+    juce::Graphics::ScopedSaveState keep (g);
+    g.addTransform (juce::AffineTransform::translation (-t.box.getCentreX(), -t.box.getBottom())
+                        .scaled (fit)
+                        .translated (target.getCentreX(), target.getBottom()));
+    g.drawImage (t.image, t.area);
+}
+
+float thumbScaleFor (const GearThumb& probe, juce::Rectangle<float> target)
+{
+    if (probe.box.isEmpty()) return 0.5f;
+    return juce::jlimit (0.1f, 2.0f, 2.0f * std::min (target.getWidth() / probe.box.getWidth(), target.getHeight() / probe.box.getHeight()));
+}
+
 GearThumb ampThumb (const AmpDesign& d, const juce::String& displayText, float scale, const juce::StringArray* labels)
 {
     GearThumb t;

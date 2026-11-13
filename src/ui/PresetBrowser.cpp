@@ -242,6 +242,16 @@ void PresetBrowser::paint (juce::Graphics& g)
     }
 }
 
+const GearThumb& PresetBrowser::artFor (int model)
+{
+    auto it = ampArt.find (model);
+    if (it != ampArt.end()) return it->second;
+    const auto& design = ampDesign (model);
+    const auto name = juce::String (spec (P::ampModel).choices[(size_t) model]).toLowerCase();
+    const juce::Rectangle<float> target (0.0f, 0.0f, kArtW, kArtH);
+    return ampArt[model] = ampThumb (design, name, thumbScaleFor (ampThumb (design, name, 0.1f), target));
+}
+
 void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, bool selected)
 {
     if (! juce::isPositiveAndBelow (row, (int) results.size())) return;
@@ -258,6 +268,25 @@ void PresetBrowser::paintListBoxItem (int row, juce::Graphics& g, int w, int h, 
     g.fillRect (18.0f, (float) h - 1.0f, (float) w - 36.0f, 1.0f);
 
     auto content = r.reduced (16, 8);
+    // the tone's amp, so a list of names reads as a wall of gear
+    {
+        const int model = juce::jlimit (0, choices::numAmpModels - 1, juce::roundToInt (p.values[(size_t) P::ampModel]));
+        auto art = content.removeFromLeft ((int) kArtW).toFloat().withSizeKeepingCentre (kArtW, kArtH);
+        const bool ampOn = p.values[(size_t) P::ampOn] > 0.5f;
+        if (model != choices::neuralCapture && ampOn)
+        {
+            if (! selected) g.setOpacity (0.9f);
+            drawThumb (g, artFor (model), art);
+            g.setOpacity (1.0f);
+        }
+        else
+        {
+            // a capture or no amp: the plain outline of a box, so the names still line up
+            g.setColour (colours::line);
+            g.drawRoundedRectangle (art.reduced (6.0f, 4.0f), 4.0f, 1.0f);
+        }
+        content.removeFromLeft (16);
+    }
     // star
     auto starArea = content.removeFromRight (30).toFloat().withSizeKeepingCentre (22, 22);
     if (p.favourite) fillIcon (g, icons::star (true), starArea, colours::accent);

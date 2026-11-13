@@ -168,6 +168,10 @@ struct GearThumb
 GearThumb pedalThumb (const PedalDesign&, int numKnobs, bool faders, float scale, const juce::StringArray* labels = nullptr);
 GearThumb ampThumb (const AmpDesign&, const juce::String& displayText, float scale, const juce::StringArray* labels = nullptr);
 GearThumb cabThumb (int cabModel, float scale);
+// Draws a thumb as large as fits in `target`, standing on its bottom edge like gear on a floor.
+void drawThumb (juce::Graphics&, const GearThumb&, juce::Rectangle<float> target);
+// The scale to render a thumb at so that it is sharp at twice the size of `target`.
+float thumbScaleFor (const GearThumb& probe, juce::Rectangle<float> target);
 
 // The switch itself, for thumbnails as well as the live control.
 // style 0 round stomp switch, 1 hinged foot plate in the box's own paint, 2 low soft-touch switch
