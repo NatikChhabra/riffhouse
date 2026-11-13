@@ -364,6 +364,7 @@ void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int 
     const auto area = juce::Rectangle<float> ((float) x, (float) y, (float) w, (float) h).reduced (2.0f);
     if (const int gear = s.getProperties()["gear"]; gear > 0)
     {
+        if ((bool) s.getProperties()["ownerDraws"]) return; // a Knob draws its own picture, with room round it for the shadow
         const float sz = std::min (area.getWidth(), area.getHeight());
         drawGearKnob (g, area.withSizeKeepingCentre (sz, sz), start + pos * (end - start), start, end, (KnobStyle) (gear - 1),
                       juce::Colour ((juce::uint32) (juce::int64) s.getProperties()["cap"]),

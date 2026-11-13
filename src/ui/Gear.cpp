@@ -160,27 +160,59 @@ namespace
         return base.darker (0.8f).interpolatedWith (base.brighter (1.2f), v);
     }
 
-    // A hex nut with a washer face: each flat takes its own light.
+    // The soft shadow a round part standing on a panel throws away from the light. Drawn as a
+    // gradient, not a blurred picture, so it has no edge of its own at any size or scale.
+    void contactShadow (juce::Graphics& g, juce::Point<float> c, float radius, float strength)
+    {
+        const auto sc = c.translated (radius * 0.12f, radius * 0.2f);
+        juce::ColourGradient sh (juce::Colours::black.withAlpha (strength), sc.x, sc.y, juce::Colours::black.withAlpha (0.0f), sc.x + radius * 1.45f, sc.y, true);
+        sh.addColour (0.55, juce::Colours::black.withAlpha (strength * 0.55f));
+        sh.addColour (0.8, juce::Colours::black.withAlpha (strength * 0.15f));
+        g.setGradientFill (sh);
+        g.fillEllipse (R (radius * 2.9f, radius * 2.9f).withCentre (sc));
+    }
+
+    // A hex nut on a washer: each flat takes its own light, and the edges between flats and
+    // round the chamfered top catch it or fall into shade.
     void hexNut (juce::Graphics& g, juce::Point<float> c, float radius)
     {
+        const float hair = std::max (0.6f, radius * 0.05f);
+        contactShadow (g, c, radius * 1.1f, 0.42f);
+        // the washer, a turned ring just wider than the nut
+        const float washer = radius * 1.08f;
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.fillEllipse (R (washer * 2.0f + 1.2f, washer * 2.0f + 1.2f).withCentre (c.translated (0.2f, 0.5f)));
+        conic (g, c, washer, 0.0f, [] (float a) { return metalAt (C (0xff8f9397), a); }, 96);
         juce::Path hex;
         hex.addPolygon (c, 6, radius, 0.0f);
-        juce::DropShadow (juce::Colours::black.withAlpha (0.55f), std::max (2, (int) (radius * 0.28f)), { 1, std::max (1, (int) (radius * 0.12f)) }).drawForPath (g, hex);
-        g.setColour (C (0xff8e9296));
-        g.fillPath (hex);
+        // the flats
         for (int i = 0; i < 6; ++i)
         {
             const float a0 = juce::MathConstants<float>::twoPi * (float) i / 6.0f, a1 = juce::MathConstants<float>::twoPi * (float) (i + 1) / 6.0f;
             juce::Path f;
             f.addTriangle (c, c.getPointOnCircumference (radius, a0), c.getPointOnCircumference (radius, a1));
-            g.setColour (metalAt (C (0xffa3a7ab), (a0 + a1) * 0.5f));
+            const float v = lit ((a0 + a1) * 0.5f);
+            g.setColour (C (0xff55595d).interpolatedWith (C (0xffe9ebec), v * v * 0.9f + 0.05f));
             g.fillPath (f);
+            g.strokePath (f, juce::PathStrokeType (0.5f)); // no hairline gaps between neighbouring flats
         }
-        g.setColour (juce::Colours::black.withAlpha (0.4f));
-        g.strokePath (hex, juce::PathStrokeType (0.8f));
-        conic (g, c, radius * 0.8f, 0.0f, [] (float a) { return metalAt (C (0xffbfc3c6), a); }, 72);
-        g.setColour (juce::Colours::black.withAlpha (0.3f));
-        g.drawEllipse (R (radius * 1.6f, radius * 1.6f).withCentre (c), 0.8f);
+        // the outer edge of each flat: lit edges a bright line, shaded ones dark
+        for (int i = 0; i < 6; ++i)
+        {
+            const float a0 = juce::MathConstants<float>::twoPi * (float) i / 6.0f, a1 = juce::MathConstants<float>::twoPi * (float) (i + 1) / 6.0f;
+            const float v = lit ((a0 + a1) * 0.5f) * 2.0f - 1.0f;
+            g.setColour ((v > 0.0f ? juce::Colours::white : juce::Colours::black).withAlpha (0.55f * std::abs (v)));
+            g.drawLine ({ c.getPointOnCircumference (radius - hair * 0.5f, a0), c.getPointOnCircumference (radius - hair * 0.5f, a1) }, hair);
+        }
+        g.setColour (juce::Colours::black.withAlpha (0.45f));
+        g.strokePath (hex, juce::PathStrokeType (std::max (0.5f, hair * 0.7f)));
+        // the chamfer turned round the top, then the flat top face, spun
+        conic (g, c, radius * 0.86f, radius * 0.76f, [] (float a)
+        {
+            const float v = lit (a) * 2.0f - 1.0f;
+            return v > 0.0f ? C (0xffb9bcbf).interpolatedWith (juce::Colours::white, v) : C (0xffb9bcbf).interpolatedWith (C (0xff3b3e41), -v);
+        }, 96);
+        conic (g, c, radius * 0.77f, 0.0f, [] (float a) { return metalAt (C (0xffc4c7ca), a); }, 96);
     }
 
     // A quarter-inch jack socket in a panel: nut, washer and the dark hole.
@@ -1913,8 +1945,19 @@ namespace
         if (d.lamp == 1)
         {
             hexNut (g, jc, 13.0f);
-            g.setColour (C (0xff0a0a0a));
-            g.fillEllipse (R (11.0f, 11.0f).withCentre (jc));
+            // the threaded bush the lever comes out of: a turned collar with its threads, and the dark mouth
+            const float bush = 6.6f;
+            g.setColour (juce::Colours::black.withAlpha (0.4f));
+            g.fillEllipse (R (bush * 2.0f + 1.6f, bush * 2.0f + 1.6f).withCentre (jc.translated (0.3f, 0.7f)));
+            conic (g, jc, bush, 0.0f, [] (float a) { return metalAt (C (0xffb2b6ba), a); }, 96);
+            g.setColour (juce::Colours::black.withAlpha (0.28f));
+            for (float k : { 0.92f, 0.8f })
+                g.drawEllipse (R (bush * 2.0f * k, bush * 2.0f * k).withCentre (jc), 0.55f);
+            const auto mouth = R (7.4f, 7.4f).withCentre (jc);
+            g.setGradientFill (juce::ColourGradient (C (0xff000000), mouth.getX(), mouth.getY(), C (0xff2c2e30), mouth.getRight(), mouth.getBottom(), false));
+            g.fillEllipse (mouth);
+            g.setColour (juce::Colours::white.withAlpha (0.35f));
+            g.drawEllipse (mouth.expanded (0.5f), 0.5f);
             const auto lamp = R (11.0f, 11.0f).withCentre ({ jc.x, jc.y - 30.0f });
             conic (g, lamp.getCentre(), 8.0f, 0.0f, [] (float a) { return metalAt (C (0xffb9bdc0), a); }, 48);
             g.setColour (C (0xff0a0a0a));
@@ -2273,24 +2316,77 @@ void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bo
     }
     if (d.lamp == 1)
     {
-        // a bat-handle toggle: up is on. Its little lamp sits above it.
+        // a bat-handle toggle: up is on. Its little lamp sits above it. The lever is a turned
+        // chrome rod that thickens to a ball; seen from above it leans toward the top or the bottom.
         const auto c = r.getCentre();
-        const juce::Point<float> tip (c.x + 1.0f, c.y + (on ? -13.0f : 13.0f));
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.drawLine ({ c.translated (2.0f, 3.0f), tip.translated (3.0f, 4.0f) }, 7.0f);
-        juce::ColourGradient lever (C (0xfff4f5f5), c.x - 4.0f, 0, C (0xff6d7175), c.x + 4.0f, 0, false);
-        lever.addColour (0.4, C (0xffd0d3d5));
-        g.setGradientFill (lever);
-        juce::Path bat;
-        bat.startNewSubPath (c.x - 2.6f, c.y);
-        bat.lineTo (tip.x - 4.2f, tip.y);
-        bat.lineTo (tip.x + 4.2f, tip.y);
-        bat.lineTo (c.x + 2.6f, c.y);
-        bat.closeSubPath();
-        g.fillPath (bat);
-        g.fillEllipse (R (8.4f, 8.4f).withCentre (tip));
-        g.setColour (juce::Colours::white.withAlpha (0.7f));
-        g.fillEllipse (R (2.6f, 2.6f).withCentre (tip.translated (-1.4f, -1.4f)));
+        const float dir = on ? -1.0f : 1.0f;
+        const float len = 17.0f, baseW = 4.4f, neckW = 3.3f, ball = 4.5f;
+        const juce::Point<float> tip (c.x + 0.4f, c.y + dir * len);
+        auto rod = [&] (juce::Point<float> o)
+        {
+            juce::Path p;
+            const float ny = tip.y + o.y - dir * ball * 0.6f;
+            p.startNewSubPath (c.x + o.x - baseW * 0.5f, c.y + o.y);
+            p.lineTo (tip.x + o.x - neckW * 0.5f, ny);
+            p.lineTo (tip.x + o.x + neckW * 0.5f, ny);
+            p.lineTo (c.x + o.x + baseW * 0.5f, c.y + o.y);
+            p.closeSubPath();
+            p.addEllipse (R (ball * 2.0f, ball * 2.0f * art::squash).withCentre (tip + o));
+            p.setUsingNonZeroWinding (true);
+            return p;
+        };
+        // its shadow on the bush and the panel, soft: three widening passes of a faint shade
+        {
+            const auto sp = rod ({ 2.4f, 3.2f });
+            for (int i = 0; i < 3; ++i)
+            {
+                g.setColour (juce::Colours::black.withAlpha (0.08f));
+                g.strokePath (sp, juce::PathStrokeType (1.0f + 1.6f * (float) i, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+            g.setColour (juce::Colours::black.withAlpha (0.16f));
+            g.fillPath (sp);
+        }
+        // the rod: round across, so a bright streak toward the light and a dark edge away from it
+        {
+            juce::Path shaft;
+            const float ny = tip.y - dir * ball * 0.6f;
+            shaft.startNewSubPath (c.x - baseW * 0.5f, c.y);
+            shaft.lineTo (tip.x - neckW * 0.5f, ny);
+            shaft.lineTo (tip.x + neckW * 0.5f, ny);
+            shaft.lineTo (c.x + baseW * 0.5f, c.y);
+            shaft.closeSubPath();
+            juce::ColourGradient chrome (C (0xff4d5155), c.x - baseW * 0.5f, 0.0f, C (0xff3e4144), c.x + baseW * 0.5f, 0.0f, false);
+            chrome.addColour (0.18, C (0xffd9dcde));
+            chrome.addColour (0.3, C (0xffffffff));
+            chrome.addColour (0.45, C (0xffc3c6c9));
+            chrome.addColour (0.72, C (0xff7c8084));
+            chrome.addColour (0.88, C (0xffa1a5a8)); // light thrown back from the panel
+            g.setGradientFill (chrome);
+            g.fillPath (shaft);
+            g.setColour (juce::Colours::black.withAlpha (0.35f));
+            g.strokePath (shaft, juce::PathStrokeType (0.5f));
+            // where it comes out of the bush, a ring of shade
+            g.setColour (juce::Colours::black.withAlpha (0.5f));
+            g.fillEllipse (R (baseW + 1.4f, 2.2f).withCentre (c));
+        }
+        // the ball on the end: a polished sphere, its highlight toward the light
+        {
+            const auto bb = R (ball * 2.0f, ball * 2.0f * art::squash).withCentre (tip);
+            juce::ColourGradient sphere (C (0xffffffff), bb.getX() + bb.getWidth() * 0.34f, bb.getY() + bb.getHeight() * 0.3f,
+                                         C (0xff3f4245), bb.getRight() + ball * 0.2f, bb.getBottom() + ball * 0.2f, true);
+            sphere.addColour (0.18, C (0xffe9ebed));
+            sphere.addColour (0.5, C (0xffa7abaf));
+            sphere.addColour (0.82, C (0xff5f6367));
+            g.setGradientFill (sphere);
+            g.fillEllipse (bb);
+            // the panel's light caught low on the far side
+            g.setColour (juce::Colours::white.withAlpha (0.22f));
+            g.drawEllipse (bb.reduced (0.7f).translated (0.4f, 0.5f), 0.6f);
+            g.setColour (juce::Colours::black.withAlpha (0.45f));
+            g.drawEllipse (bb, 0.5f);
+            g.setColour (juce::Colours::white.withAlpha (0.95f));
+            g.fillEllipse (R (1.7f, 1.4f).withCentre ({ bb.getX() + bb.getWidth() * 0.33f, bb.getY() + bb.getHeight() * 0.3f }));
+        }
         r = R (9.0f, 9.0f).withCentre ({ c.x, c.y - 30.0f });
     }
     else if (d.lamp == 2)
