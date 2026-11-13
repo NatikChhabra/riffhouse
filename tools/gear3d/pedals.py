@@ -305,6 +305,7 @@ def build(p, gear_dir, out_dir, samples, scale):
         bodies.append(body)
         bore = fs * 0.5 + 3 * u
         cyl = c.prism("bore", 64, bore, H - 0.14, H + 1, parts["black"], at=st.at(fx + fw / 2, fy + fh / 2) - c.Vector((0, 0, H)), smooth=True)
+        c.grid(body, 0.35)  # small cells, so the hole leaves no hairline across the top (see common.grid)
         c.cut(body, cyl)
         mod = body.modifiers.new("chamfer", "BEVEL")
         mod.width, mod.segments, mod.limit_method, mod.angle_limit = 0.17, 1, "ANGLE", math.radians(60)

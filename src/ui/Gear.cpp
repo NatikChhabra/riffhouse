@@ -2322,29 +2322,20 @@ void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bo
         const float dir = on ? -1.0f : 1.0f;
         const float len = 17.0f, baseW = 4.4f, neckW = 3.3f, ball = 4.5f;
         const juce::Point<float> tip (c.x + 0.4f, c.y + dir * len);
-        auto rod = [&] (juce::Point<float> o)
+            // its shadow on the bush and the panel: soft round pools along the rod and under the ball,
+        // each fading to nothing, so the shadow has no edge anywhere
         {
-            juce::Path p;
-            const float ny = tip.y + o.y - dir * ball * 0.6f;
-            p.startNewSubPath (c.x + o.x - baseW * 0.5f, c.y + o.y);
-            p.lineTo (tip.x + o.x - neckW * 0.5f, ny);
-            p.lineTo (tip.x + o.x + neckW * 0.5f, ny);
-            p.lineTo (c.x + o.x + baseW * 0.5f, c.y + o.y);
-            p.closeSubPath();
-            p.addEllipse (R (ball * 2.0f, ball * 2.0f * art::squash).withCentre (tip + o));
-            p.setUsingNonZeroWinding (true);
-            return p;
-        };
-        // its shadow on the bush and the panel, soft: three widening passes of a faint shade
-        {
-            const auto sp = rod ({ 2.4f, 3.2f });
-            for (int i = 0; i < 3; ++i)
+            const juce::Point<float> off (2.6f, 3.4f);
+            for (int i = 0; i <= 6; ++i)
             {
-                g.setColour (juce::Colours::black.withAlpha (0.08f));
-                g.strokePath (sp, juce::PathStrokeType (1.0f + 1.6f * (float) i, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                const float t = (float) i / 6.0f;
+                const auto p = c + (tip - c) * t + off;
+                const float rad = (i == 6 ? ball * 1.9f : 3.6f + 1.4f * t);
+                juce::ColourGradient pool (juce::Colours::black.withAlpha (i == 6 ? 0.26f : 0.1f), p.x, p.y,
+                                           juce::Colours::black.withAlpha (0.0f), p.x + rad, p.y, true);
+                g.setGradientFill (pool);
+                g.fillEllipse (R (rad * 2.0f, rad * 2.0f).withCentre (p));
             }
-            g.setColour (juce::Colours::black.withAlpha (0.16f));
-            g.fillPath (sp);
         }
         // the rod: round across, so a bright streak toward the light and a dark edge away from it
         {
