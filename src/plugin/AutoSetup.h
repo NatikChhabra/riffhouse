@@ -61,6 +61,7 @@ public:
         bool fixHeldBack = false;         // the full fix would have brought too much hiss up with it
         bool outputFollows = false;       // the input is an interface, and the sound was put on its output too
         bool ratesDiffer = false;         // low latency mode refused: Windows runs the input and output at different rates
+        bool quieterModeSkipped = false;  // exclusive mode heard the guitar far quieter (no Windows boost), so it was not used
     };
     const Summary& summary() const noexcept { return result; }
 
@@ -123,6 +124,8 @@ private:
     int bufferIndex = 0;
     int xrunStart = 0;
     float tunePeak = 0.0f;
+    float modePeak = 0.0f; // the loudest playing heard in the mode being tried, over all its buffers
+    int modePeakFor = -1;
     double cpuMax = 0.0;
     bool lastOpenFailed = false;
     struct Best { juce::String type; int buffer = 0; double latency = 1e9; double rate = 0; } best;

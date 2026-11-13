@@ -14,6 +14,7 @@ namespace
 {
     constexpr float kHeardThreshold = 0.0032f; // -50 dBFS: something is playing
     constexpr float kSureThreshold = 0.063f;   // -24 dBFS: that is definitely a guitar
+    constexpr float kMostLevelLossDb = 14.0f;  // a mode hearing the guitar this much quieter loses Windows' boost
     constexpr double kDwellMs = 1100.0;
     constexpr double kTuneMs = 1600.0;
     constexpr double kQuietMs = 2600.0;
@@ -420,6 +421,8 @@ void AutoSetup::timerCallback()
             if (elapsed > 300.0)
             {
                 if (xrunStart < 0) xrunStart = dm.getXRunCount();
+                if (modePeakFor != modeIndex) { modePeakFor = modeIndex; modePeak = 0.0f; }
+                modePeak = std::max (modePeak, raw);
                 tunePeak = std::max (tunePeak, raw);
                 strumPeak = std::max (strumPeak, raw);
                 cpuMax = std::max (cpuMax, dm.getCpuUsage());
@@ -431,7 +434,22 @@ void AutoSetup::timerCallback()
             auto* dev = dm.getCurrentAudioDevice();
             const bool ok = ! lastOpenFailed && dev != nullptr && xr <= 0 && cpuMax < 0.7 && tunePeak > 1.0e-7f;
             bool settled = false;
-            if (ok)
+            // Some inputs come in far quieter with the sound card to ourselves: Exclusive Mode skips
+            // the level and boost Windows applies (a USB guitar input measured 20 dB down, with the
+            // same hiss), and the boost that makes up for it turns the hiss into fizz. The guitar was
+            // found in Windows' own mode, so a mode that hears it much quieter is not used.
+            const float quieterDb = juce::Decibels::gainToDecibels (chosenPeak, -100.0f) - juce::Decibels::gainToDecibels (modePeak, -100.0f);
+            const bool losesLevel = ok && chosen.type == "Windows Audio" && modes[modeIndex] != "Windows Audio"
+                                    && chosenPeak > kHeardThreshold && quieterDb > kMostLevelLossDb;
+            if (losesLevel)
+            {
+                devlog::note (modes[modeIndex] + " hears the guitar " + juce::String (quieterDb, 1)
+                              + " dB quieter than Windows Audio: not used, its boost would only add hiss");
+                result.quieterModeSkipped = true;
+                ++modeIndex;
+                bufferIndex = 0;
+            }
+            else if (ok)
             {
                 const double lat = measuredLatencyMs();
                 if (lat < best.latency)

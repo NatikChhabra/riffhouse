@@ -9,6 +9,8 @@
 //   riffhouse_tests report          print loudness/latency/CPU table
 
 #include "engine/InputGuard.h"
+#include "audio/ElasticInput.h"
+#include <random>
 #include "TestSignals.h"
 #include "engine/History.h"
 #include "engine/LevelMatch.h"
@@ -456,6 +458,98 @@ void testDynamics (double sr)
             }
         }
     }
+}
+
+// Windows Audio with a guitar input and separate headphones: two clocks, each handing over sound in
+// its own packets. 0.1.5 read the input only when the output wanted sound and played silence when
+// its packet was late (the crackle), and lost input packets in Exclusive Mode (the dropouts that
+// held setup at 1024 samples). The cushion must follow any clock difference a real pair can have,
+// with no gap and no step once settled, at every packet and buffer shape, and recover from a stall.
+struct ElasticRun { int gapsLate = 0; double maxStep = 0, ratioErrPpm = 0, wobblePpm = 0, fillErr = 0; int stallGaps = 0; };
+
+static ElasticRun runElastic (double ppm, int packet, int block, int burst, double jitterMs, double secs, bool stall)
+{
+    const double sr = 48000.0;
+    riffhouse::ElasticInput el;
+    el.prepare (1, block, packet, burst, sr);
+    std::mt19937 rng (7);
+    std::uniform_real_distribution<double> jit (0.0, jitterMs / 1000.0);
+    const double inRate = sr * (1.0 + ppm * 1e-6);
+    double tIn = 0, tOut = 0, prev1 = 0, prev2 = 0, rSum = 0, rMin = 9, rMax = 0;
+    long long inN = 0, outN = 0, space = 0, pulled = 0;
+    int rCount = 0;
+    std::vector<float> pk ((size_t) packet), ob ((size_t) block);
+    ElasticRun r;
+    while (tOut < secs)
+    {
+        if (tIn + packet / inRate <= tOut + burst / sr)
+        {
+            tIn += packet / inRate;
+            for (int i = 0; i < packet; ++i)
+                pk[(size_t) i] = 0.5f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 997.0 * (double) (inN + i) / inRate);
+            inN += packet;
+            const float* src = pk.data();
+            el.push (&src, 1, packet, tIn + jit (rng));
+            continue;
+        }
+        tOut += burst / sr;
+        const bool stalled = stall && tOut > secs * 0.5 && tOut < secs * 0.5 + 0.06;
+        if (stalled) continue;
+        space += burst;
+        const double t = tOut + jit (rng);
+        while (pulled < space)
+        {
+            pulled += block;
+            float* d = ob.data();
+            const int g0 = el.glitches();
+            el.pull (&d, 1, block, t);
+            const bool late = tOut > 3.0 && ! (stall && tOut > secs * 0.5 && tOut < secs * 0.5 + 0.5);
+            if (el.glitches() > g0) { if (late) ++r.gapsLate; else if (stall && tOut > secs * 0.5) ++r.stallGaps; }
+            for (int i = 0; i < block; ++i)
+            {
+                const double y = ob[(size_t) i];
+                if (late && outN > 2) r.maxStep = std::max (r.maxStep, std::abs (y - 2.0 * prev1 + prev2));
+                prev2 = prev1; prev1 = y; ++outN;
+            }
+            if (tOut > secs * 0.6 && ! stall)
+            {
+                rSum += el.currentRatio(); ++rCount;
+                rMin = std::min (rMin, el.currentRatio()); rMax = std::max (rMax, el.currentRatio());
+            }
+        }
+    }
+    if (rCount > 0)
+    {
+        r.ratioErrPpm = (rSum / rCount - (1.0 + ppm * 1e-6)) * 1e6;
+        r.wobblePpm = (rMax - rMin) * 1e6;
+    }
+    r.fillErr = std::abs (el.averageFill() - el.latencyFrames()) / (double) el.latencyFrames();
+    return r;
+}
+
+void testElasticInput()
+{
+    std::printf ("windows audio: two clocks through the cushion\n");
+    // {input packet, callback block, output burst}: exclusive pairs, shared mode (10 ms packets with
+    // small callbacks run back to back), 44.1 kHz packets, mismatched sizes
+    const int shapes[][3] = { { 144, 144, 144 }, { 480, 144, 480 }, { 480, 480, 480 }, { 1024, 1024, 1024 },
+                              { 441, 256, 441 }, { 96, 1024, 1024 }, { 480, 1024, 480 }, { 144, 64, 144 }, { 528, 256, 480 } };
+    const double drifts[] = { -2000.0, -500.0, -100.0, 0.0, 100.0, 500.0, 2000.0 };
+    // a 997 Hz sine at 0.5 changes its second difference by at most 0.0086 a sample: a gap or a
+    // jump in the read is several times that
+    for (const auto& s : shapes)
+        for (const double d : drifts)
+        {
+            const auto r = runElastic (d, s[0], s[1], s[2], 1.0, 40.0, false);
+            CHECK (r.gapsLate == 0, "packet %d block %d burst %d at %+.0f ppm: %d gaps after settling", s[0], s[1], s[2], d, r.gapsLate);
+            CHECK (r.maxStep < 0.012, "packet %d block %d burst %d at %+.0f ppm: a step of %.4f in the sound", s[0], s[1], s[2], d, r.maxStep);
+            CHECK (std::abs (r.ratioErrPpm) < 30.0, "packet %d block %d burst %d at %+.0f ppm: follows the clocks %.1f ppm off", s[0], s[1], s[2], d, r.ratioErrPpm);
+            CHECK (r.wobblePpm < 1200.0, "packet %d block %d burst %d at %+.0f ppm: pitch wobbles %.0f ppm (2 cents = 1160)", s[0], s[1], s[2], d, r.wobblePpm);
+            CHECK (r.fillErr < 0.1, "packet %d block %d burst %d at %+.0f ppm: the delay sits %.0f%% off the one reported", s[0], s[1], s[2], d, r.fillErr * 100.0);
+        }
+    // a 60 ms stall (a frozen window, a driver hiccup): at most one gap, then clean again
+    const auto st = runElastic (300.0, 480, 144, 480, 1.0, 30.0, true);
+    CHECK (st.stallGaps <= 1 && st.gapsLate == 0, "after a 60 ms stall: %d gaps at the stall, %d later", st.stallGaps, st.gapsLate);
 }
 
 // A clean note held on a good guitar fades slowly: 0.1.5's gate took one fading 1.7 dB a
@@ -3745,6 +3839,7 @@ int main (int argc, char** argv)
     if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "elastic") { testElasticInput(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
@@ -3805,6 +3900,7 @@ int main (int argc, char** argv)
     testAmpsMatchReal (48000.0);
     testGateHeldNote (48000.0);
     testGateHeldNote (44100.0);
+    testElasticInput();
     testTimeEffects (48000.0);
     testAliasing (48000.0);
     testNeural (48000.0);
