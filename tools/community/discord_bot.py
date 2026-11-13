@@ -783,8 +783,9 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: launch_event(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
-                 lambda: keep_on_purpose(cursor, log), lambda: triage(threads, cursor, log)):
+    # Natik, 13 Nov 2026: the bot only posts releases, dev log, tone of the week, reels and the trailer.
+    # No replies to people (help answers, chat pointers): those go through Natik's weekly review.
+    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: close_finished(threads, log)):
         try:
             step()
         except Exception as e:  # one broken part must not stop the others

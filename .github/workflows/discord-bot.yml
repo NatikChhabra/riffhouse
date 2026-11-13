@@ -6,9 +6,20 @@ name: Discord bot
 # GitHub often drops scheduled runs (it ran a few times a day instead of every 10 minutes), so each
 # run checks every 5 minutes for about 50 minutes, then starts the next run itself. The schedule
 # stays as a backup that restarts the chain if it ever breaks.
-# PAUSED (Natik, 13 Nov 2026): the bot posts nothing until he says so. Welcomer handles welcomes.
-# Manual runs only. To turn it back on, restore the schedule and the "Start the next run" step from git history.
+# Posts only (Natik, 13 Nov 2026): releases, dev log, tone of the week, reels and the trailer. No replies to people.
+# Runs when something new can be posted instead of on a fast timer:
 on:
+  # the site (and its feeds: releases, dev log, tone of the week) was just published
+  workflow_run:
+    workflows: [Website]
+    types: [completed]
+  # a reel or the trailer was queued
+  push:
+    branches: [main]
+    paths: ['community/reels.json']
+  # reels with a post_at time, and a backup if an event is missed
+  schedule:
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -21,21 +32,14 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 58
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             tools/community
             community
-      - name: Run the bot every 5 minutes
+      - name: Run the bot
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        run: |
-          failed=0
-          for i in $(seq 1 10); do
-            git fetch -q origin main && git reset -q --hard origin/main || true   # pick up new reels and bot fixes
-            timeout 240 python3 tools/community/discord_bot.py || failed=1
-            [ "$i" -lt 10 ] && sleep 300
-          done
-          exit $failed
+        run: python3 tools/community/discord_bot.py
