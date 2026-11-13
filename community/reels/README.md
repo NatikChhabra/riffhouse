@@ -20,6 +20,6 @@ Add an entry when a reel or the trailer goes live:
 - `post_at`: optional. Queue it for later: `"2026-11-15T20:00:00+05:30"` (India time if no zone is given). The bot posts it on the first run after that time.
 - `video`: optional mp4 in this folder. Under 10 MB it is uploaded so it plays right inside Discord; bigger files are skipped and only the link is posted.
 
-- `announce`: optional, for big ones like the trailer. Also posts this line in #announcements with @everyone and a link to the #content post.
+- `announce`: only for big ones like the trailer (Natik: daily reels go in #content only). Also posts the whole thing (this line, the link and the video) in #announcements with @everyone.
 
 Entries are posted oldest first. Removing an entry never deletes the Discord post.
