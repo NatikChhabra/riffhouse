@@ -501,6 +501,27 @@ def cut(body, cutter, material_from_cutter=True):
     return body
 
 
+def grid(ob, step):
+    """Cut a mesh into a grid of cells about `step` across, flat faces and all.
+
+    A hole cut through one big face leaves long thin triangles running from the hole to the far
+    corners, and the renderer shows the edge between two of them as a hairline straight across the
+    top of the box. Cut into small cells first, the hole only touches the cells round it."""
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    lo = Vector([min(v.co[k] for v in bm.verts) for k in range(3)])
+    hi = Vector([max(v.co[k] for v in bm.verts) for k in range(3)])
+    for k in (0, 1):
+        n = max(1, int((hi[k] - lo[k]) / step))
+        for i in range(1, n):
+            co = Vector((0, 0, 0)); co[k] = lo[k] + (hi[k] - lo[k]) * i / n
+            no = Vector((0, 0, 0)); no[k] = 1.0
+            bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no)
+    bm.to_mesh(ob.data)
+    bm.free()
+    return ob
+
+
 def stand(ob, point, normal, turn=0.0):
     """Stand a part built along +z on a surface at `point`, facing along `normal`."""
     q = Vector((0, 0, 1)).rotation_difference(normal)
