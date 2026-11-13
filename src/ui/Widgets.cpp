@@ -28,6 +28,67 @@ void drawCard (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour fill, f
 }
 
 //==============================================================================
+namespace
+{
+    // What each knob does, for someone who has never used an amp. Shown when the mouse rests on it.
+    juce::String knobHelp (P id)
+    {
+        switch (id)
+        {
+            case P::inGain:      return "How loud your guitar comes into the rig. Setup sets it from your playing.";
+            case P::gateThresh:  return "How quiet it has to get before the gate shuts. Higher cuts more hiss, too high cuts your notes short.";
+            case P::gateRelease: return "How fast the gate closes after a note. Slower lets long notes ring out.";
+            case P::inputFixAmt: return "How much treble Input Fix brings back to a PC mic or line input.";
+            case P::compSustain: return "How much the quiet parts are lifted. More makes notes ring longer and evens out your picking.";
+            case P::compAttack:  return "How fast it grabs a note. Slower lets the pick's snap through first.";
+            case P::compLevel:   return "Its volume. Match it so switching it on is not a jump.";
+            case P::compBlend:   return "Mixes in your untouched playing. Lower keeps more of the pick's attack.";
+            case P::wahPos:      return "Where the pedal is, from heel (dark) to toe (bright). A foot pedal can move it.";
+            case P::wahSens:     return "In Auto, how strongly your picking opens the wah.";
+            case P::wahQ:        return "How sharp and vocal the sweep sounds.";
+            case P::pitchSemis:  return "The added note, in semitones. 12 is an octave up, -12 an octave down.";
+            case P::pitchMix:    return "How loud the added note is next to your own.";
+            case P::drvGain:     return "How hard the pedal distorts. Low is a light push, high is thick distortion.";
+            case P::drvTone:     return "Darker to brighter.";
+            case P::drvLevel:    return "Its volume. Turn it up to push the amp harder.";
+            case P::ampGain:     return "How hard the amp is driven: clean at the bottom, crunch in the middle, distortion at the top.";
+            case P::ampBass:     return "Low end. More gives body, too much gets muddy with distortion.";
+            case P::ampMid:      return "The middle of the sound. More helps a solo cut through, less gives a scooped metal sound.";
+            case P::ampTreble:   return "Brightness and pick attack.";
+            case P::ampPresence: return "The very top end. More is sharper and more open, less is smoother.";
+            case P::ampDepth:    return "Low end punch from the power section. Tightens or deepens palm mutes.";
+            case P::ampMaster:   return "How hard the power section works. Higher adds warmth and compression, the way a loud amp does.";
+            case P::ampLevel:    return "The amp's volume after its tone. Use it to match tones.";
+            case P::cabMic:      return "Where the mic points: the middle of the speaker is brighter, the edge is warmer.";
+            case P::cabDistance: return "How far back the mic is. Close is full and punchy, further back lets the room in.";
+            case P::cabLowCut:   return "Takes away rumble below this. Raise it to tighten a heavy tone.";
+            case P::cabHighCut:  return "Takes away fizz above this. Lower it for a smoother, darker sound.";
+            case P::eqLevel:     return "The EQ's volume.";
+            case P::modRate:     return "How fast it moves.";
+            case P::modDepth:    return "How deep the movement goes.";
+            case P::modMix:      return "How much of the effect you hear next to your own sound.";
+            case P::dlyTime:     return "Time between echoes.";
+            case P::dlyFeedback: return "How many echoes. High keeps them going a long time.";
+            case P::dlyTone:     return "Darker echoes sit behind your playing, brighter ones stand out.";
+            case P::dlyMix:      return "How loud the echoes are.";
+            case P::revDecay:    return "How long the space rings after you stop.";
+            case P::revPreDelay: return "A short gap before the reverb starts, so your notes stay clear.";
+            case P::revTone:     return "Darker to brighter reverb.";
+            case P::revMix:      return "How much reverb you hear.";
+            case P::lofiBits:    return "Crunches the sound into fewer steps, like an old sampler.";
+            case P::lofiRate:    return "Lowers the sample rate for a gritty, digital sound.";
+            case P::lofiWobble:  return "Tape wobble: the pitch drifts like an old cassette.";
+            case P::lofiNoise:   return "Adds tape and vinyl hiss.";
+            case P::lofiFilter:  return "Narrows the sound like a small radio speaker.";
+            case P::lofiMix:     return "How much of the effect you hear.";
+            case P::doubler:     return "Makes one guitar sound like two, played left and right.";
+            case P::space:       return "A touch of room around the whole rig.";
+            case P::outLevel:    return "The final volume.";
+            default:             return {};
+        }
+    }
+}
+
 Knob::Knob (RiffhouseProcessor& proc, P id, juce::Colour colour, juce::String labelOverride)
 {
     const auto& s = spec (id);
@@ -46,6 +107,8 @@ Knob::Knob (RiffhouseProcessor& proc, P id, juce::Colour colour, juce::String la
     addAndMakeVisible (slider);
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.state(), s.key, slider);
     slider.setDoubleClickReturnValue (true, s.def);
+    if (const auto help = knobHelp (id); help.isNotEmpty())
+        slider.setTooltip (help + " Double-click to reset.");
     shown.snap ((float) slider.valueToProportionOfLength (slider.getValue()));
     setTitle (label);
 }
