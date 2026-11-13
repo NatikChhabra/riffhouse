@@ -129,7 +129,7 @@ void Knob::follow()
     shown.to (p, motion::travel, motion::Curve::inOut);
     if (! shown.moving()) { slider.getProperties().remove (id); return; }
     slider.getProperties().set (id, shown.get());
-    motion::run (slider, [this] { return shown.moving(); },
+    motion::run (*this, [this] { return shown.moving(); },
                  [this]
                  {
                      if (shown.moving()) slider.getProperties().set (id, shown.get());
@@ -152,18 +152,53 @@ void Knob::setGear (KnobStyle style, juce::Colour cap, juce::Colour ink, Face fa
     slider.getProperties().set ("gear", (int) style + 1);
     slider.getProperties().set ("cap", (juce::int64) cap.getARGB());
     slider.getProperties().set ("ink", (juce::int64) ink.getARGB());
+    slider.getProperties().set ("ownerDraws", true); // drawn by this component, which has room for the shadow
+    resized();
     repaint();
 }
 
 void Knob::resized()
 {
-    auto r = getLocalBounds();
+    // bounds from the page (anything but what it grew itself to) are the knob's own place
+    if (! growing && getBounds() != grown) place = getBounds();
+    spill = 0;
+    if (gear && ! place.isEmpty())
+    {
+        const int knobH = std::max (10, place.getHeight() - labelH);
+        const int size = std::max (0, std::min (place.getWidth(), knobH) - 4);
+        spill = (int) std::ceil ((float) size * 0.5f) + 4; // the picture is four radii wide; its shadow falls a little further
+    }
+    grown = place.expanded (spill);
+    if (getBounds() != grown)
+    {
+        const juce::ScopedValueSetter<bool> guard (growing, true);
+        setBounds (grown); // comes back here, laid out below
+        return;
+    }
+    auto r = getLocalBounds().reduced (spill);
     slider.setBounds (r.removeFromTop (std::max (10, r.getHeight() - labelH)));
 }
 
 void Knob::paint (juce::Graphics& g)
 {
-    auto r = getLocalBounds().removeFromBottom (labelH);
+    paintLabel (g);
+    if (! gear) return;
+    // the knob itself, over its lettering: its shadow falls across the print as it would on a panel
+    float pos = (float) slider.valueToProportionOfLength (slider.getValue());
+    if (const auto& v = slider.getProperties()["shown"]; ! v.isVoid()) pos = (float) (double) v;
+    const auto rp = slider.getRotaryParameters();
+    const auto area = slider.getBounds().toFloat().reduced (2.0f);
+    const float sz = std::min (area.getWidth(), area.getHeight());
+    const auto& pr = slider.getProperties();
+    drawGearKnob (g, area.withSizeKeepingCentre (sz, sz), rp.startAngleRadians + pos * (rp.endAngleRadians - rp.startAngleRadians),
+                  rp.startAngleRadians, rp.endAngleRadians, (KnobStyle) ((int) pr["gear"] - 1),
+                  juce::Colour ((juce::uint32) (juce::int64) pr["cap"]), juce::Colour ((juce::uint32) (juce::int64) pr["ink"]),
+                  slider.isEnabled(), slider.isMouseOverOrDragging(), (bool) pr["numbers"]);
+}
+
+void Knob::paintLabel (juce::Graphics& g)
+{
+    auto r = getLocalBounds().reduced (spill).removeFromBottom (labelH);
     const bool active = slider.isMouseOverOrDragging() || motion::pointedAt (*this);
     const float h = std::max (12.0f, std::min (15.0f, (float) labelH * 0.44f));
     if (gear && capsLabel && ! active)

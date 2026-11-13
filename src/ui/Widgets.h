@@ -20,6 +20,7 @@ public:
     Knob (RiffhouseProcessor&, P id, juce::Colour colour, juce::String labelOverride = {});
     void resized() override;
     void paint (juce::Graphics&) override;
+    bool hitTest (int x, int y) override { return getLocalBounds().reduced (spill).contains (x, y); }
     void setColour (juce::Colour c);
     juce::Slider& getSlider() noexcept { return slider; }
     void setLabelHeight (int h) { labelH = h; resized(); }
@@ -40,6 +41,13 @@ private:
     } slider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     void follow();
+    void paintLabel (juce::Graphics&);
+    // A gear knob is a picture standing on its own soft shadow, wider than the place it is given.
+    // The component grows by `spill` all round so nothing of it is cut off at a straight edge;
+    // the mouse still only finds it inside the place it was given.
+    int spill = 0;
+    juce::Rectangle<int> place, grown; // where the page put it, and the bounds it grew itself to
+    bool growing = false;
     motion::Glide shown;
     juce::String label;
     int labelH = 34;
