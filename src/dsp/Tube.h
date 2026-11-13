@@ -61,6 +61,11 @@ public:
             table[(size_t) i] = 0.5 * (lo + hi);
         }
         scale = kSize / (kHi - kLo);
+        // and its running integral, for the antialiased output (below)
+        area.resize (table.size());
+        area[0] = 0.0;
+        for (size_t i = 1; i < table.size(); ++i)
+            area[i] = area[i - 1] + 0.5 * (table[i - 1] + table[i]) / scale;
     }
 
     // plate voltage and its slope against the grid voltage
@@ -72,11 +77,23 @@ public:
         slope = (y1 - y0) * scale;
         return y0 + f * (y1 - y0);
     }
+    // the integral of the plate voltage from the table's low end up to vgk (beyond either end the
+    // plate stays where the table ends, so the integral carries on in a straight line)
+    double plateArea (double vgk) const noexcept
+    {
+        const double h = 1.0 / scale;
+        if (vgk <= kLo) return (vgk - kLo) * table.front();
+        if (vgk >= kHi) return area.back() + (vgk - kHi) * table.back();
+        const double x = (vgk - kLo) * scale;
+        const int i = std::min ((int) x, kSize - 1);
+        const double f = x - i, y0 = table[(size_t) i], y1 = table[(size_t) i + 1];
+        return area[(size_t) i] + h * f * (y0 + 0.5 * f * (y1 - y0));
+    }
     double supply() const noexcept { return b; }
     double plateResistor() const noexcept { return rp; }
 
 private:
-    std::vector<double> table;
+    std::vector<double> table, area;
     double b = 300.0, rp = 100000.0, scale = 1.0;
 };
 
@@ -129,10 +146,16 @@ public:
         const double hz = 1.0 / (kTwoPi * std::max (1.0, p.rStopper) * cin);
         const double g = std::tan (kPi * std::min (hz, 0.45 / dt) * dt);
         millerG = g / (1.0 + g);
+        gc = p.cCoupling / dt; gl = 1.0 / p.rGridLeak; gx = 1.0 / (p.rStopper + 1500.0);
+        gck = p.cCathode / dt; gk = 1.0 / p.rCathode;
         reset();
     }
 
-    void reset() noexcept { vc = 0.0; vk = restVk; miller = 0.0; lastA = 0.0; }
+    void reset() noexcept
+    {
+        vc = 0.0; vk = restVk; miller = 0.0; lastA = 0.0;
+        lastU = -restVk; lastArea = line != nullptr ? line->plateArea (lastU) : 0.0;
+    }
 
     double restPlate() const noexcept { return restVp; }
     double restCathode() const noexcept { return restVk; }
@@ -140,25 +163,21 @@ public:
 
     double process (double vin) noexcept
     {
-        // coupling capacitor into the grid leak, and the grid pulling current once it is above
-        // the cathode (through the stopper and the grid's own resistance, about 1.5 kOhm)
-        // The grid starts to conduct softly a little below the cathode (a diode's knee, here a
-        // smooth curve about 0.3 V wide, so the corner does not fold back as digital grit).
-        const double gc = parts.cCoupling / dt, gl = 1.0 / parts.rGridLeak;
-        const double gx = 1.0 / (parts.rStopper + 1500.0), knee = 0.3;
+        // coupling capacitor into the grid leak, and the grid pulling current once it nears the
+        // cathode
         const double drive = gc * (vin - vc);
         double a = lastA, ig = 0.0;
         for (int it = 0; it < 3; ++it)
         {
-            const double x = a - vk, r = std::sqrt (x * x + knee * knee);
+            const double x = a - vk, r = std::sqrt (x * x + kKnee * kKnee);
             ig = 0.5 * (x + r) * gx;
-            const double f = (gc + gl) * a + ig - drive;
-            const double df = gc + gl + 0.5 * (1.0 + x / r) * gx;
-            a -= f / df;
+            const double step = ((gc + gl) * a + ig - drive) / (gc + gl + 0.5 * (1.0 + x / r) * gx);
+            a -= step;
+            if (std::abs (step) < 1.0e-7) break; // from the last answer it is usually there at once
         }
         {
             const double x = a - vk;
-            ig = 0.5 * (x + std::sqrt (x * x + knee * knee)) * gx;
+            ig = 0.5 * (x + std::sqrt (x * x + kKnee * kKnee)) * gx;
         }
         lastA = a;
         vc = vin - a;
@@ -170,13 +189,20 @@ public:
 
         // the cathode: its capacitor and resistor against the plate current, one Newton step
         double slope;
-        double vp = line->plate (vg - vk, slope);
+        const double vp = line->plate (vg - vk, slope);
         const double ip0 = (supply - vp) / rPlate;
         const double gm = std::max (0.0, -slope / rPlate); // dIp/dVgk (the plate falls as the grid rises)
-        const double gck = parts.cCathode / dt;
-        vk = (ip0 + gm * vk + gck * vk) / (1.0 / parts.rCathode + gck + gm);
-        vp = line->plate (vg - vk, slope);
-        return vp - restVp;
+        vk = (ip0 + (gm + gck) * vk) / (gk + gck + gm);
+
+        // The plate, antialiased: the plate curve's average over the path the grid took since the
+        // last sample, not its value at one point (first-order antiderivative antialiasing). The
+        // hard corners where the tube cuts off or the grid conducts then fold back far less.
+        const double u = vg - vk, du = u - lastU, areaNow = line->plateArea (u);
+        double out;
+        if (std::abs (du) > 1.0e-5) out = (areaNow - lastArea) / du;
+        else { double sl; out = line->plate (0.5 * (u + lastU), sl); }
+        lastU = u; lastArea = areaNow;
+        return out - restVp;
     }
 
 private:
@@ -185,7 +211,11 @@ private:
     const LoadLine* line = nullptr;
     double supply = 300.0, rPlate = 100000.0;
     double dt = 1.0 / 384000.0;
-    double vc = 0.0, vk = 0.0, miller = 0.0, millerG = 0.5, lastA = 0.0;
+    // the grid conducts softly a little below the cathode (a diode's knee, a smooth curve about
+    // 0.3 V wide), through the stopper and the grid's own resistance, about 1.5 kOhm
+    static constexpr double kKnee = 0.3;
+    double gc = 1.0, gl = 1.0e-6, gx = 1.0e-5, gck = 1.0, gk = 1.0e-3; // conductances, from the parts
+    double vc = 0.0, vk = 0.0, miller = 0.0, millerG = 0.5, lastA = 0.0, lastU = 0.0, lastArea = 0.0;
     double restVk = 1.0, restVp = 200.0, gainAtRest = 60.0;
 };
 } // namespace rh::tube

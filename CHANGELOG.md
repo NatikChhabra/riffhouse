@@ -8,7 +8,15 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## 0.1.5
 
-No more frozen window when you pick ASIO, a setup that goes for the lowest delay by itself, and a way to send us a report in one click.
+Pedals that behave like the real circuits, cleaner high gain, quiet mutes, no more frozen window when you pick ASIO, a setup that goes for the lowest delay by itself, and a way to send us a report in one click.
+
+- Every drive and fuzz pedal is now worked out as the circuit it comes from, transistor by transistor and diode by diode, and checked against published measurements of the real pedals: how much gain it has, where it peaks and how far the tone knob reaches. They clean up when you pick softly, the way real pedals do. The big fuzz is smoother on top, as the real one is.
+- High-gain amps no longer add a harsh digital fizz to high notes: the amps' distortion is worked out in a way that keeps it away (61 dB below the notes, was 43), with no extra load on your computer.
+- The gate closes the moment your hand mutes the strings, and after the amp too, so a stop is silent instead of crunchy. It follows the room: steady hiss or hum raises it by itself, judged by the noise's loudest moments, so a buzzing hum can't hold it open.
+- Hum is learnt and taken out instead of filtered, so G, B and D notes keep their body and nothing rings after you stop. It now takes out the buzz up to 2 kHz that a ground loop or a light dimmer adds, not only the low hum, and learns it in about half a second of quiet.
+- Input Fix is gentler: setup never asks for more than 12 dB of it, and the hiss it would bring up is turned down while you are not playing. Setup also hears the whole of what you play when it measures your guitar, not only the loudest parts.
+- Eight new tones for the sounds of Indian rock and indie: Bangalore Thrash, Shillong Blues Rock, Bangla Band Jangle, Carnatic Prog Lead, Desi Djent, Post-Rock Swells, Bedroom Indie Clean and Nineties Indipop Crunch. 197 tones in all, every one level-matched again.
+- A classic rock solo tone that was meant to use the classic wah now does.
 
 - Picking an ASIO driver no longer freezes the window. A driver is first tried in a second, hidden copy of Riffhouse; one that hangs or fails there (ASIO4ALL often does when the sound devices under it are busy) is stopped from outside and never opened in the app. Automatic setup skips a driver that failed on this computer before. Picking it by hand checks it again.
 - When the computer's own Realtek chip plays the sound, setup also tries Realtek's ASIO driver, which goes lower than Windows Audio on the same jacks.

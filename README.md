@@ -2,7 +2,7 @@
 
 # Riffhouse
 
-**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 9 speaker cabinets and 189 tones. All of it is free, with no account, no ads and no paid version.
+**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 9 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
 
@@ -65,8 +65,8 @@ Every amp, pedal and cabinet is its own piece of gear, with its own face and its
 
 - **11 amps**, from glassy cleans to tight metal, plus a bass amp and a direct channel.
 - **9 speaker cabinets** with a mic you can move across the cone, and a slot for your own impulse response.
-- **29 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
-- **188 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
+- **30 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
+- **197 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
 - **Neural captures:** load any `.nam` file as the amp.
 - **Tuner** for any tuning, and a **metronome**.
 - **Undo and redo** for the whole tone, with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.
@@ -98,11 +98,11 @@ Every change runs more than 6,900 automatic checks on the sound engine before it
 
 | | |
 |---|---|
-| Delay added by the rig | 5 samples, about 0.1 ms at 48 kHz |
-| Amp oversampling | 8x below 64 kHz, 4x above |
-| Aliasing on a hot amp | 42.9 dB below the wanted harmonics |
+| Delay added by the rig | 4 samples, under 0.1 ms at 48 kHz |
+| Amp oversampling | 4x below 64 kHz, 2x above, every curve antialiased |
+| Aliasing on a hot amp | 61.2 dB below the wanted harmonics |
 | Everything switched on | about 8x faster than real time on one core of a build server |
-| Loudness across all 189 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
+| Loudness across all 197 tones with Auto level | equal on the playing it measured with; nine in ten within about 5 dB on other playing |
 
 ## What comes next
 

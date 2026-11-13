@@ -33,6 +33,6 @@
     "gate_thresh": -62,
     "gate_release": 80,
     "rev_on": false,
-    "out_level": -7.5
+    "out_level": -7.6
   }
 }

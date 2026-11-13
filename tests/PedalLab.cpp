@@ -55,7 +55,11 @@ std::unique_ptr<Original> makeOriginal (int type)
 {
     switch (type)
     {
+        case 0: return std::make_unique<Exact<c::CleanBoost>>();
+        case 1: return std::make_unique<Exact<c::TrebleBooster>>();
         case 2: return std::make_unique<Exact<c::GreenDrive>>();
+        case 3: return std::make_unique<Exact<c::BluesDrive>>();
+        case 6: return std::make_unique<Exact<c::MetalBox>>();
         case 4: return std::make_unique<Exact<c::RodentDist>>();
         case 5: return std::make_unique<Exact<c::BigFuzz>>();
         default: return {};
@@ -526,36 +530,101 @@ int main (int argc, char** argv)
         }
         return ampLab (wavDir, guitar);
     }
+    if (argc > 1 && juce::String (argv[1]) == "--sweep")
+    {
+        // Each circuit's small-signal response (a 1 mV sine, so nothing clips), to hold it
+        // against the published measurements of the real pedal: --sweep [type] [tone] [volts]
+        const int t0 = argc > 2 ? std::atoi (argv[2]) : 0, t1 = argc > 2 ? t0 : 6;
+        const double tone = argc > 3 ? std::atof (argv[3]) : 0.5;
+        const double amp = argc > 4 ? std::atof (argv[4]) : 0.001;
+        const double hzs[] = { 50, 100, 200, 400, 720, 1000, 1500, 2000, 3000, 5000, 8000 };
+        for (int type = t0; type <= t1; ++type)
+        {
+            auto o = makeOriginal (type);
+            double dcMost = 0;
+            std::printf ("%s (tone %.2f), gain in dB at %.3g V:\n        ", pedalName (type), tone, amp);
+            for (double hz : hzs) std::printf ("%7.0f", hz);
+            std::printf ("\n");
+            for (double drive : { 0.0, 0.5, 1.0 })
+            {
+                std::printf ("drive %.1f", drive);
+                for (double hz : hzs)
+                {
+                    const auto out = runOriginal (*o, sine (hz, amp, 0.6), drive, tone);
+                    // only the part at the played frequency (no DC, no harmonics)
+                    double re = 0, im = 0, dc = 0; size_t n = 0;
+                    for (size_t i = out.size() / 2; i < out.size(); ++i)
+                    {
+                        const double ph = kTwoPi * hz * (double) i / kSr;
+                        re += out[i] * std::cos (ph); im += out[i] * std::sin (ph); dc += out[i]; ++n;
+                    }
+                    dcMost = std::max (dcMost, std::abs (dc / (double) n));
+                    std::printf ("%7.1f", 20.0 * std::log10 (2.0 * std::hypot (re, im) / (double) n / amp + 1e-30));
+                }
+                std::printf ("\n");
+            }
+            std::printf ("largest DC at the output: %.2f mV\n", dcMost * 1000.0);
+        }
+        return 0;
+    }
     if (argc > 1 && juce::String (argv[1]) == "--humdebug")
     {
-        const auto riff = makeRiff (kSr, -74.0f);
+        auto riff = makeRiff (kSr, -74.0f);
+        double kSr = ::kSr; // a real recording (--humdebug file.wav) brings its own rate
+        if (argc > 2)
+        {
+            juce::AudioFormatManager fm; fm.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> rd (fm.createReaderFor (juce::File (juce::String (argv[2]))));
+            if (rd == nullptr) { std::printf ("cannot read %s\n", argv[2]); return 1; }
+            juce::AudioBuffer<float> b (1, (int) rd->lengthInSamples);
+            rd->read (&b, 0, b.getNumSamples(), 0, true, false);
+            riff.x.assign (b.getReadPointer (0), b.getReadPointer (0) + b.getNumSamples());
+            kSr = rd->sampleRate;
+        }
         HumCanceller h; h.prepare (kSr); h.setMains (50);
-        int learnt = 0; double acc = 0;
+        int learnt = 0; double acc = 0, accIn = 0, accOut = 0;
         for (size_t i = 0; i < riff.x.size(); ++i)
         {
             const float y = h.process (riff.x[i]);
             acc += (double) (riff.x[i] - y) * (riff.x[i] - y);
+            accIn += (double) riff.x[i] * riff.x[i]; accOut += (double) y * y;
             learnt += h.learning() ? 1 : 0;
-            if ((i + 1) % 4800 == 0) { std::printf ("%.1fs removed %.1f dB learning %d%% drift %.3f\n", (double) (i + 1) / kSr, 10 * std::log10 (acc / 4800 + 1e-20), learnt * 100 / 4800, h.driftHz()); acc = 0; learnt = 0; }
+            if ((i + 1) % 4800 == 0) { std::printf ("%.1fs in %.1f out %.1f removed %.1f dB learning %d%% drift %.3f\n", (double) (i + 1) / kSr, 10 * std::log10 (accIn / 4800 + 1e-20), 10 * std::log10 (accOut / 4800 + 1e-20), 10 * std::log10 (acc / 4800 + 1e-20), learnt * 100 / 4800, h.driftHz()); acc = accIn = accOut = 0; learnt = 0; }
         }
         return 0;
     }
     if (argc > 1 && juce::String (argv[1]) == "--gatedebug")
     {
-        const auto riff = makeRiff (kSr, -62.0f);
+        auto riff = makeRiff (kSr, -62.0f);
         if (argc > 2)
         {
+            // --gatedebug <preset|rig> [dry.wav] [in_gain dB]: the whole preset, every 50 ms
+            double sr = kSr;
+            if (argc > 3)
+            {
+                juce::AudioFormatManager fm; fm.registerBasicFormats();
+                std::unique_ptr<juce::AudioFormatReader> rd (fm.createReaderFor (juce::File (juce::String (argv[3]))));
+                if (rd == nullptr) { std::printf ("cannot read %s\n", argv[3]); return 1; }
+                juce::AudioBuffer<float> b (1, (int) rd->lengthInSamples);
+                rd->read (&b, 0, b.getNumSamples(), 0, true, false);
+                riff.x.assign (b.getReadPointer (0), b.getReadPointer (0) + b.getNumSamples());
+                sr = rd->sampleRate;
+            }
+            const juce::String name = juce::String (argv[2]) == "rig" ? juce::String ("Inspired by Metallica: Master of Puppets") : juce::String (argv[2]);
             PresetLibrary lib; lib.scanFolder (juce::File (RIFFHOUSE_PRESET_DIR), true);
-            auto v = lib.all()[(size_t) lib.indexOf ("Inspired by Metallica: Master of Puppets")].values;
+            if (lib.indexOf (name) < 0) { std::printf ("no preset %s\n", name.toRawUTF8()); return 1; }
+            auto v = lib.all()[(size_t) lib.indexOf (name)].values;
             v[(size_t) P::outLevel] = -24.0f;
-            Rig rig; rig.setOffline (true); rig.setParams (v); rig.prepare (kSr, 2400); rig.setParams (v); rig.finishPendingWork();
-            std::vector<float> l (2400), r (2400);
-            for (size_t i = 0; i + 2400 <= riff.x.size(); i += 2400)
+            if (argc > 4) v[(size_t) P::inGain] = (float) std::atof (argv[4]);
+            const int blk = (int) (0.05 * sr);
+            Rig rig; rig.setOffline (true); rig.setParams (v); rig.prepare (sr, blk); rig.setParams (v); rig.finishPendingWork();
+            std::vector<float> l ((size_t) blk), r ((size_t) blk);
+            for (size_t i = 0; i + (size_t) blk <= riff.x.size(); i += (size_t) blk)
             {
                 rig.setParams (v);
-                rig.process (riff.x.data() + i, l.data(), r.data(), 2400);
+                rig.process (riff.x.data() + i, l.data(), r.data(), blk);
                 double acc = 0; for (float q : l) acc += (double) q * q;
-                std::printf ("%.2fs out %.1f in-peak %.1f thr %.1f mains %d %s\n", (double) i / kSr, 10 * std::log10 (acc / 2400 + 1e-20), 20 * std::log10 (rig.meters().gateInPeak.load() + 1e-9), rig.meters().gateThreshNow.load(), rig.meters().mains.load(), rig.meters().gateOpen.load() ? "OPEN" : "-");
+                std::printf ("%.2fs out %.1f in-peak %.1f thr %.1f mains %d %s\n", (double) i / sr, 10 * std::log10 (acc / blk + 1e-20) + 24.0, 20 * std::log10 (rig.meters().gateInPeak.load() + 1e-9), rig.meters().gateThreshNow.load(), rig.meters().mains.load(), rig.meters().gateOpen.load() ? "OPEN" : "-");
             }
             return 0;
         }
@@ -587,7 +656,7 @@ int main (int argc, char** argv)
         return 0;
     }
     double sum = 0; int count = 0;
-    for (int type : { 2, 4, 5 })
+    for (int type : { 0, 1, 2, 3, 4, 5, 6 })
     {
         if (only >= 0 && type != only) continue;
         std::printf ("%s\n", pedalName (type));

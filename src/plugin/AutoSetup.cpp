@@ -23,6 +23,7 @@ namespace
     constexpr double kPlayGiveUpMs = 20000.0;
     constexpr double kWaitForQuietMs = 9000.0; // then the noise is measured whatever is heard
     constexpr float kNoisyFixDb = -48.0f;      // hiss peaks over this with Input Fix on: the fix is held back
+    constexpr float kMostSetupFixDb = 12.0f;   // the most Input Fix setup chooses by itself
 
     double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
 
@@ -655,6 +656,11 @@ void AutoSetup::setFixFromTone()
         // which is part of its sound: only a clear loss is mended there.
         result.inputFixDb = TiltProbe::fixAmountFor (result.tiltDb, onboard ? 3.0f : 5.0f);
         if (! onboard && result.inputFixDb < 9.0f) result.inputFixDb = 0.0f;
+        // Setup gives at most 12 dB. A pickup into a PC jack loses its treble faster than the
+        // fix's curve rises, and what is missing above 2.5 kHz sits close to the jack's hiss:
+        // on a real take (-29 dB tilt, asking for the full 24) 24 dB came out harsh and hissy,
+        // 12 dB measured like a recorded clean guitar. More is a turn of the knob away.
+        result.inputFixDb = std::min (result.inputFixDb, kMostSetupFixDb);
     }
     else
         result.inputFixDb = onboard ? 12.0f : 0.0f;

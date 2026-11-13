@@ -46,7 +46,7 @@ struct AmpSettings
     float levelDb = 0.0f;
 };
 
-// The DSP amp. Runs 8x oversampled (4x at high sample rates). Mono.
+// The DSP amp. Runs 4x oversampled (2x at high sample rates), its curves antialiased. Mono.
 class Amp
 {
 public:
@@ -55,20 +55,26 @@ public:
     void setSettings (const AmpSettings& s);
     void process (float* data, int n);
     float latencySamples() const;
-    // The preamp as real 12AX7 stages (the default), or the earlier curve model, kept so the
-    // lab can hold the two side by side.
+    // The preamp as real 12AX7 stages (off for now: at high gain they fold back more grit and
+    // cost three times as much), or the curve model; the lab holds the two side by side.
     void setTubeStages (bool on) noexcept { tubeStages = on; dirty = true; updateFilters(); }
 
 private:
     void updateFilters();
     static float tube (float x, float bias) noexcept;
+    // antialiased curves; each keeps where the signal was a sample ago and the curve's bend there
+    struct AaState { float u = 0.0f, bend = 0.0f; bool fresh = true; }; // fresh: no last sample yet (after a reset)
+    static float tubeAA (float x, float bias, AaState& last) noexcept;
+    static float powerAA (float x, float bias, float head, AaState& last) noexcept;
 
     struct Stage
     {
         OnePole hp, lp;
         float gain = 1.0f, bias = 0.0f;
+        AaState last; // where the stage's curve was a sample ago, for the antialiasing
         EnvelopeFollower blocking;
     };
+    AaState powerLast;
 
     double sr = 48000.0, osr = 192000.0;
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;

@@ -35,6 +35,6 @@
     "gate_release": 80,
     "rev_on": false,
     "doubler": 8,
-    "out_level": -0.0
+    "out_level": 0.0
   }
 }

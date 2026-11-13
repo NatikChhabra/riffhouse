@@ -21,7 +21,7 @@ void HumCanceller::prepare (double sampleRate)
 void HumCanceller::reset()
 {
     forget();
-    stepFill = 0; stepPower = inPower = 0.0; floorPower = inFloor = -1.0; freezeAbove = 0.0f;
+    stepFill = 0; stepPower = inPower = 0.0; floorPower = inFloor = floorPeak = -1.0; stepPeak = 0.0; freezeAbove = 0.0f;
     levelAt = levelsHeard = 0;
 }
 
@@ -62,6 +62,7 @@ float HumCanceller::process (float x) noexcept
     if (floorPower < 0.0 || std::abs (err) > freezeAbove) adaptHold = holdSamples;
     else if (adaptHold > 0) --adaptHold;
     stepPower += err * err;
+    stepPeak = std::max (stepPeak, std::abs (err));
     inPower += (double) x * x;
     if (++stepFill >= stepLength) stepDone();
     if (adaptHold == 0)
@@ -84,6 +85,10 @@ void HumCanceller::stepDone()
     stepFill = 0;
     if (floorPower < 0.0 || p < floorPower) floorPower = p;
     else floorPower *= floorRise;
+    if (floorPeak < 0.0 || stepPeak < floorPeak) floorPeak = stepPeak;
+    else floorPeak *= std::sqrt (floorRise);
+    const double peakNow = stepPeak;
+    stepPeak = 0.0;
     if (inFloor < 0.0 || pin < inFloor) inFloor = pin;
     else inFloor *= floorRise;
     // steadiness is judged on what comes in: the residual drops while it learns, the input does not
@@ -98,6 +103,7 @@ void HumCanceller::stepDone()
         // the same level for 300 ms and not loud: the room got noisier (a dimmer, a laptop on its
         // charger). A guitar note fades more than that. Take this as the new quiet.
         floorPower = p;
+        floorPeak = peakNow;
         inFloor = std::max (inFloor, pin);
         adaptHold = 0;
     }
@@ -110,7 +116,9 @@ void HumCanceller::stepDone()
         for (int k = 0; k < kHarmonics; ++k) { a[k] *= g; b[k] *= g; }
     }
     const double floorRms = std::sqrt (std::max (floorPower, 1.0e-14));
-    freezeAbove = (float) (6.0 * floorRms); // noise peaks reach 3 to 4 times its level, a note far more
+    // hiss peaks reach 3 to 4 times its level, a buzzing hum 5 or more: twice the quietest
+    // 20 ms peak lately covers both, and a note is far louder than either
+    freezeAbove = (float) std::max (6.0 * floorRms, 2.0 * floorPeak);
     if (p > 4.0 * floorPower) adaptHold = std::max (adaptHold, holdSamples);
     const double m = std::sqrt (zr * zr + zi * zi);
     zr /= m; zi /= m;
@@ -158,6 +166,7 @@ void InputConditioner::prepare (double sampleRate)
     const float amount = fixAmount < 0.0f ? 6.0f : fixAmount;
     fixAmount = -1.0f;
     setFixAmount (amount);
+    hiss.prepare (sr);
     activeMains = -1;
     setNotches (0);
     reset();
@@ -168,6 +177,7 @@ void InputConditioner::reset()
     dc.reset();
     hum.reset();
     fixShelf.reset(); fixTop.reset();
+    hiss.reset();
     for (auto& g : gz) g.s1 = g.s2 = 0;
     g50 = g60 = total = 0;
     counted = 0;
@@ -284,7 +294,70 @@ void InputConditioner::process (float* x, int n)
 
     if (fix)
         for (int i = 0; i < n; ++i)
-            x[i] = fixTop.process (fixShelf.process (x[i]));
+            x[i] = hiss.process (fixTop.process (fixShelf.process (x[i])));
+}
+
+void InputConditioner::HissReducer::prepare (double sampleRate)
+{
+    sr = sampleRate;
+    split.set (Biquad::Type::lowpass, sr, 2200.0, 0.7071);
+    envCoeff = (float) std::exp (-1.0 / (0.003 * sr));   // the band's level over about 3 ms
+    openCoeff = (float) std::exp (-1.0 / (0.001 * sr));  // opens in about a millisecond
+    closeCoeff = (float) std::exp (-1.0 / (0.040 * sr)); // closes over about 40 ms
+    stepLength = std::max (1, (int) (0.02 * sr));
+    floorPower = -1.0f; // not learnt yet: nothing is turned down
+    reset();
+}
+
+void InputConditioner::HissReducer::reset()
+{
+    split.reset();
+    env = 0.0f; gain = 1.0f;
+    stepPower = 0.0f; stepAt = 0;
+    runRef = runSum = 0.0f; runLength = 0;
+}
+
+float InputConditioner::HissReducer::floorDb() const noexcept
+{
+    return floorPower > 0.0f ? 10.0f * std::log10 (floorPower) : -200.0f;
+}
+
+float InputConditioner::HissReducer::process (float x) noexcept
+{
+    // the two halves add back to exactly the input
+    const float low = split.process (x), high = x - low;
+    const float p = high * high;
+    env = p + envCoeff * (env - p);
+
+    // Learn the floor in 20 ms steps. Hiss is steady and notes never are (they fade): 400 ms
+    // in which the band stays within a decibel is the floor, up or down. Any quieter step
+    // shows the floor is lower, at once.
+    stepPower += p;
+    if (++stepAt >= stepLength)
+    {
+        const float step = std::max (stepPower / (float) stepLength, 1.0e-20f);
+        stepPower = 0.0f; stepAt = 0;
+        if (floorPower > 0.0f && step < floorPower) floorPower = step;
+        if (step < runRef * 1.26f && step > runRef * 0.794f)
+        {
+            runSum += step;
+            if (++runLength % 20 == 0) floorPower = runSum / (float) runLength;
+        }
+        else
+        {
+            runRef = step; runSum = step; runLength = 1;
+        }
+    }
+
+    // within 12 dB of the floor, one dB less treble for each dB nearer it (1:2), at most 18 dB
+    float target = 1.0f;
+    if (floorPower > 0.0f)
+    {
+        const float knee = floorPower * 15.85f; // +12 dB
+        if (env < knee) target = std::max (0.126f, std::sqrt (std::max (env, 1.0e-20f) / knee));
+    }
+    gain = target + (target > gain ? openCoeff : closeCoeff) * (gain - target);
+    return low + gain * high;
 }
 
 //==============================================================================
@@ -307,7 +380,8 @@ void TiltProbe::process (const float* x, int n)
 {
     if (restartRequested.exchange (false))
     {
-        lowE = highE = 0;
+        lowAt.fill (0.0); highAt.fill (0.0); secondsAt.fill (0.0);
+        loudest = -1; quietest = kLevels;
         seconds.store (0.0);
         tilt.store (0.0f);
     }
@@ -324,12 +398,28 @@ void TiltProbe::process (const float* x, int n)
         hi += (double) b * b;
         pk = std::max (pk, std::abs (s));
     }
-    // only count blocks where something is being played, and skip clipped ones
-    const double rms = std::sqrt (sum / std::max (1, n));
-    if (rms < 0.004 || pk > 0.97f) return; // about -48 dBFS
-    lowE += lo;
-    highE += hi;
-    seconds.store (seconds.load() + n / sr);
+    // Only blocks where something is being played count, and never clipped ones. Playing is
+    // judged against this input itself, not a fixed level: a guitar into a PC jack can peak
+    // at -35 dBFS, and a fixed -48 dBFS bar left one second of a three-minute take. A block
+    // counts when it stands 15 dB over the quietest heard and within 30 dB of the loudest,
+    // judged over everything heard so far.
+    if (pk > 0.97f || n <= 0) return;
+    const double rmsDb = 10.0 * std::log10 (std::max (sum / n, 1.0e-14));
+    const int level = std::clamp ((int) std::lround (rmsDb) + kLevels - 1, 0, kLevels - 1);
+    lowAt[(size_t) level] += lo;
+    highAt[(size_t) level] += hi;
+    secondsAt[(size_t) level] += n / sr;
+    quietest = std::min (quietest, level);
+    loudest = std::max (loudest, level);
+    const int from = std::max ({ kLevels - 1 - 80, quietest + 15, loudest - 30 });
+    double lowE = 0, highE = 0, secs = 0;
+    for (int l = from; l <= loudest; ++l)
+    {
+        lowE += lowAt[(size_t) l];
+        highE += highAt[(size_t) l];
+        secs += secondsAt[(size_t) l];
+    }
+    seconds.store (secs);
     if (lowE > 1e-12)
         tilt.store ((float) (10.0 * std::log10 (std::max (highE, 1e-20) / lowE)));
 }
@@ -372,7 +462,8 @@ void NoiseGate::prepare (double sampleRate)
     windowLength = std::max (1, (int) (0.1 * sr));
     stepLength = std::max (1, (int) (0.0025 * sr));
     reopenDecay = dbToGain (-0.3f); // per step: what a stop asked for is forgotten in about 100 ms
-    floorDb = -120.0f; // as if just built: what an earlier run heard is forgotten
+    floorDb = floorPeakDb = -120.0f; // as if just built: what an earlier run heard is forgotten
+    windowPeak = 0.0f;
     windowsHeard = windowAt = windowFill = 0;
     windowPower = 0.0;
     set (-62.0f, 80.0f);
@@ -400,25 +491,40 @@ void NoiseGate::applyThreshold()
 {
     float t = userThrDb;
     if (follows && floorDb > -119.0f)
-        t = std::max (t, std::min (floorDb + kAboveFloorDb, kHighestFollowDb));
+    {
+        const float cap = std::clamp (userThrDb + kMostFollowAboveDb, kFollowCapLowDb, kFollowCapHighDb);
+        t = std::max (t, std::min (std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb), cap));
+    }
     thrNowDb = t;
     thrOpen = dbToGain (t);
     thrClose = dbToGain (t - 4.0f); // hysteresis stops chattering
 }
 
-void NoiseGate::windowDone (float levelDb)
+void NoiseGate::windowDone (float levelDb, float peakDb)
 {
     windows[windowAt] = levelDb;
+    windowPeaks[windowAt] = peakDb;
     windowAt = (windowAt + 1) % kWindows;
-    if (windowsHeard < kWindows) { ++windowsHeard; return; }
-    float lo = windows[0], hi = windows[0], sum = 0.0f;
-    for (float w : windows) { lo = std::min (lo, w); hi = std::max (hi, w); sum += w; }
-    // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do
+    windowsHeard = std::min (windowsHeard + 1, kWindows);
+    // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do.
+    // The very first floor needs only 0.8 s, so a noisy room is gated almost from the start
+    // (a quieter floor heard later is believed at once anyway).
+    const int need = floorDb < -119.0f ? kFirstWindows : kWindows;
+    if (windowsHeard < need) return;
+    float lo = 1000.0f, hi = -1000.0f, sum = 0.0f, peak = -1000.0f;
+    for (int k = 1; k <= need; ++k)
+    {
+        const int i = (windowAt - k + kWindows) % kWindows;
+        lo = std::min (lo, windows[i]); hi = std::max (hi, windows[i]); sum += windows[i];
+        peak = std::max (peak, windowPeaks[i]);
+    }
     if (hi - lo > 1.5f) return;
-    const float heard = sum / (float) kWindows;
+    const float heard = sum / (float) need;
     if (heard > -40.0f) return;                 // that loud and steady is a sound, not a floor
     if (heard < floorDb) floorDb = std::max (-120.0f, heard); // quieter now: believed at once
     else floorDb = std::min (heard, floorDb < -119.0f ? heard : floorDb + 1.0f);
+    if (peak < floorPeakDb) floorPeakDb = std::max (-120.0f, peak);
+    else floorPeakDb = std::min (peak, floorPeakDb < -119.0f ? peak : floorPeakDb + 1.0f);
     applyThreshold();
 }
 
@@ -453,11 +559,13 @@ void NoiseGate::process (float* x, int n, float* gainsOut)
         for (int i = 0; i < n; ++i)
         {
             windowPower += (double) x[i] * x[i];
+            windowPeak = std::max (windowPeak, std::abs (x[i]));
             if (++windowFill >= windowLength)
             {
-                windowDone ((float) (10.0 * std::log10 (windowPower / (double) windowLength + 1.0e-12)));
+                windowDone ((float) (10.0 * std::log10 (windowPower / (double) windowLength + 1.0e-12)), gainToDb (windowPeak));
                 windowFill = 0;
                 windowPower = 0.0;
+                windowPeak = 0.0f;
             }
         }
     for (int i = 0; i < n; ++i)
@@ -685,9 +793,10 @@ static constexpr int kNewtonSteps = 8;
 void DrivePedal::prepare (double sampleRate, int maxBlock)
 {
     sr = sampleRate;
-    // 8x below 64 kHz: the diodes make harmonics far above the guitar, and at 4x they fold back
-    // as a digital grit the real pedals never had (the pedal lab measures it). The rodent and the
-    // fuzz clip hard enough to need 16x: at 8x their fold-back sat 60 dB down, at 16x 75 dB.
+    // Every pedal is its circuit (Circuits.h). 8x below 64 kHz: the diodes and transistors make
+    // harmonics far above the guitar, and at 4x they fold back as a digital grit the real pedals
+    // never had (the pedal lab measures it). The rodent, the fuzz and the metal box clip hard
+    // enough to need 16x: at 8x their fold-back sat 40 to 60 dB down, at 16x 61 to 75 dB.
     const int st = sampleRate < 64000.0 ? 3 : 2;
     os = std::make_unique<juce::dsp::Oversampling<float>> (1, (size_t) st, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false);
     os->initProcessing ((size_t) maxBlock);
@@ -697,12 +806,14 @@ void DrivePedal::prepare (double sampleRate, int maxBlock)
     green.prepare (osr, kNewtonSteps);
     rodent.prepare (2.0 * osr, kNewtonSteps);
     fuzz.prepare (2.0 * osr, kNewtonSteps);
-    dc.prepare (osr);
-    gainS.prepare (osr, 30.0f);
+    boost.prepare (osr, kNewtonSteps);
+    trebleBoost.prepare (osr, kNewtonSteps);
+    blues.prepare (osr, kNewtonSteps);
+    metal.prepare (2.0 * osr, kNewtonSteps);
     levelS.prepare (osr, 30.0f);
     dirty = true;
     update();
-    gainS.reset (gainS.getTarget());
+    levelS.reset (levelS.getTarget());
     reset();
 }
 
@@ -710,9 +821,8 @@ void DrivePedal::reset()
 {
     if (os) os->reset();
     if (osHigh) osHigh->reset();
-    preHp.reset(); preLp.reset(); midHump.reset(); toneLp.reset(); toneHp.reset(); postLp.reset(); scoop.reset();
-    clipHp.reset(); gbwLp.reset(); dc.reset();
     green.reset(); rodent.reset(); fuzz.reset();
+    boost.reset(); trebleBoost.reset(); blues.reset(); metal.reset();
 }
 
 float DrivePedal::latencySamples() const { return active() != nullptr ? active()->getLatencyInSamples() : 0.0f; }
@@ -733,71 +843,30 @@ void DrivePedal::update()
 {
     if (! dirty) return;
     dirty = false;
-    float gainDb = 0.0f, outDb = 0.0f;
+    green.set (drive, tone);
+    rodent.set (drive, tone);
+    fuzz.set (drive, tone);
+    boost.set (drive, tone);
+    trebleBoost.set (drive, tone);
+    blues.set (drive, tone);
+    metal.set (drive, tone);
+    // each circuit sets its own level, as the real pedal's volume at noon; the level knob
+    // gives 15 dB either side of that
+    levelS.setTarget (dbToGain ((level - 0.5f) * 30.0f));
+}
+
+double DrivePedal::runCircuit (double v) noexcept
+{
     switch (type)
     {
-        case 0: // clean boost
-            gainDb = lerp (0.0f, 22.0f, drive);
-            preHp.set (Biquad::Type::highpass, osr, 25.0, 0.7);
-            toneLp.set (Biquad::Type::highShelf, osr, 3000.0, 0.7, (tone - 0.5f) * 12.0f);
-            outDb = -3.0f;
-            break;
-        case 1: // treble booster
-            gainDb = lerp (6.0f, 30.0f, drive);
-            preHp.set (Biquad::Type::highpass, osr, lerp (400.0f, 1200.0f, 1.0f - tone), 0.6);
-            toneLp.set (Biquad::Type::lowpass, osr, 9000.0, 0.7);
-            outDb = -6.0f;
-            break;
-        case 2: // green mid-hump overdrive
-            gainDb = lerp (8.0f, 40.0f, drive);
-            clipHp.setCutoff (osr, 720.0);
-            preHp.set (Biquad::Type::highpass, osr, 120.0, 0.7);
-            toneLp.set (Biquad::Type::lowpass, osr, expMap (tone, 700.0f, 6000.0f), 0.7);
-            midHump.set (Biquad::Type::peak, osr, 750.0, 0.8, 4.0);
-            clean = 0.35f;
-            outDb = -2.0f;
-            break;
-        case 3: // transparent blues drive
-            gainDb = lerp (4.0f, 34.0f, drive);
-            preHp.set (Biquad::Type::highpass, osr, 80.0, 0.7);
-            toneLp.set (Biquad::Type::highShelf, osr, 2000.0, 0.7, (tone - 0.5f) * 14.0f);
-            clean = 0.25f;
-            outDb = -3.0f;
-            break;
-        case 4: // rodent op-amp distortion
-            gainDb = lerp (20.0f, 62.0f, drive);
-            preHp.set (Biquad::Type::highpass, osr, 60.0, 0.7);
-            // op-amp bandwidth shrinks as gain rises
-            gbwLp.setCutoff (osr, expMap (1.0f - drive, 3500.0f, 30000.0f));
-            toneLp.set (Biquad::Type::lowpass, osr, expMap (1.0f - tone, 475.0f, 18000.0f), 0.7);
-            outDb = -10.0f;
-            break;
-        case 5: // big fuzz
-            gainDb = lerp (24.0f, 54.0f, drive);
-            preHp.set (Biquad::Type::highpass, osr, 90.0, 0.7);
-            toneLp.set (Biquad::Type::lowpass, osr, 1000.0, 0.7);
-            toneHp.set (Biquad::Type::highpass, osr, 400.0, 0.7);
-            outDb = -6.0f;
-            break;
-        default: // metal box
-            gainDb = lerp (26.0f, 60.0f, drive);
-            preHp.set (Biquad::Type::highpass, osr, 150.0, 0.7);
-            midHump.set (Biquad::Type::peak, osr, 1200.0, 0.9, 6.0);
-            scoop.set (Biquad::Type::peak, osr, 650.0, 0.7, lerp (2.0f, -14.0f, tone));
-            toneLp.set (Biquad::Type::highShelf, osr, 3500.0, 0.6, lerp (-6.0f, 8.0f, tone));
-            outDb = -12.0f;
-            break;
+        case 0: return boost.process (v);
+        case 1: return trebleBoost.process (v);
+        case 2: return green.process (v);
+        case 3: return blues.process (v);
+        case 4: return rodent.process (v);
+        case 5: return fuzz.process (v);
+        default: return metal.process (v);
     }
-    postLp.set (Biquad::Type::lowpass, osr, 12000.0, 0.6);
-    if (isCircuit())
-    {
-        green.set (drive, tone);
-        rodent.set (drive, tone);
-        fuzz.set (drive, tone);
-        outDb = 0.0f; // the circuit sets its own level, as the real pedal's volume at noon
-    }
-    gainS.setTarget (dbToGain (gainDb));
-    levelS.setTarget (dbToGain (outDb + (level - 0.5f) * 30.0f));
 }
 
 void DrivePedal::process (float* data, int n)
@@ -809,87 +878,9 @@ void DrivePedal::process (float* data, int n)
     auto up = over->processSamplesUp (block);
     float* x = up.getChannelPointer (0);
     const int on = (int) up.getNumSamples();
-
-    if (isCircuit())
-    {
-        constexpr double toVolts = circuit::kVoltsPerUnit, fromVolts = 1.0 / circuit::kVoltsPerUnit;
-        for (int i = 0; i < on; ++i)
-        {
-            const double v = (double) x[i] * toVolts;
-            const double out = type == 2 ? green.process (v) : (type == 4 ? rodent.process (v) : fuzz.process (v));
-            x[i] = (float) (out * fromVolts) * levelS.next();
-        }
-        over->processSamplesDown (block);
-        return;
-    }
-
+    constexpr double toVolts = circuit::kVoltsPerUnit, fromVolts = 1.0 / circuit::kVoltsPerUnit;
     for (int i = 0; i < on; ++i)
-    {
-        const float in = preHp.process (x[i]);
-        const float g = gainS.next();
-        float y = 0.0f;
-        switch (type)
-        {
-            case 0:
-            {
-                const float v = in * g;
-                y = toneLp.process (v / (1.0f + 0.15f * std::abs (v))); // op-amp rail softness
-                break;
-            }
-            case 1:
-            {
-                // germanium transistor: asymmetric and soft
-                const float v = in * g;
-                y = v > 0 ? fastTanh (v) : fastTanh (1.6f * v) / 1.6f;
-                y = toneLp.process (dc.process (y));
-                break;
-            }
-            case 2:
-            {
-                // diodes in the feedback loop clip only the boosted highpassed part,
-                // the clean signal passes alongside it
-                const float boosted = clipHp.highpass (in) * g;
-                const float clipped = boosted / std::sqrt (1.0f + boosted * boosted);
-                y = toneLp.process (midHump.process (in * clean + clipped));
-                break;
-            }
-            case 3:
-            {
-                const float v = in * g;
-                const float c = v > 0 ? fastTanh (v) : fastTanh (0.8f * v) / 0.8f;
-                y = toneLp.process (dc.process (c + in * clean * 2.0f));
-                break;
-            }
-            case 4:
-            {
-                const float v = gbwLp.lowpass (in * g);
-                // silicon diodes to ground: hard-ish knee
-                const float v2 = v * v;
-                y = v / std::sqrt (std::sqrt (1.0f + v2 * v2));
-                y = toneLp.process (y);
-                break;
-            }
-            case 5:
-            {
-                float v = fastTanh (in * g * 0.3f);
-                v = fastTanh (v * 6.0f);
-                // tone: blend of a lowpass and a highpass leaves a mid scoop
-                const float lo = toneLp.process (v), hi = toneHp.process (v);
-                y = lerp (lo, hi, tone) * 1.4f;
-                break;
-            }
-            default:
-            {
-                float v = midHump.process (in) * g;
-                const float v2 = v * v;
-                v = v / std::sqrt (std::sqrt (1.0f + v2 * v2));
-                v = fastTanh (v * 2.0f);
-                y = toneLp.process (scoop.process (v));
-                break;
-            }
-        }
-        x[i] = postLp.process (y) * levelS.next();
-    }
+        x[i] = (float) (runCircuit ((double) x[i] * toVolts) * fromVolts) * levelS.next();
     over->processSamplesDown (block);
 }
 

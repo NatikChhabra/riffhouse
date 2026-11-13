@@ -292,6 +292,38 @@ void testCabs (double sr)
 void testHum (double sr)
 {
     std::printf ("hum detection @ %.0f Hz\n", sr);
+    // A buzzing ground loop as a friend's real recording had it: the hum plus harmonics up to
+    // 2 kHz (the 35th as loud as the 5th), peaks 13 dB over its level, a little hiss under it.
+    // The canceller learns it inside a second and takes the buzz out, not only the low hum;
+    // the gate then closes over what is left.
+    {
+        Noise n;
+        std::vector<float> buzz ((size_t) (sr * 4));
+        const int harm[] = { 1, 2, 3, 5, 9, 11, 13, 20, 33, 35, 37 };
+        const float amp[] = { 0.0020f, 0.0010f, 0.0007f, 0.0009f, 0.0006f, 0.0006f, 0.0007f, 0.0003f, 0.0004f, 0.0008f, 0.0006f };
+        for (size_t i = 0; i < buzz.size(); ++i)
+        {
+            const double t = (double) i / sr;
+            double s = 0.0;
+            for (int k = 0; k < 11; ++k) s += amp[k] * std::sin (kTwoPi * 49.97 * harm[k] * t + k);
+            buzz[i] = (float) s + 0.0003f * n.next();
+        }
+        HumCanceller h;
+        h.prepare (sr);
+        h.setMains (50);
+        auto y = buzz;
+        for (auto& s : y) s = h.process (s);
+        const size_t from = (size_t) (sr * 3);
+        const float before = rmsDb (std::vector<float> (buzz.begin() + (long) from, buzz.end()));
+        const float after = rmsDb (std::vector<float> (y.begin() + (long) from, y.end()));
+        CHECK (after < before - 9.0f, "a buzzing hum is taken out: %.1f dB before, %.1f after", before, after);
+        NoiseGate g;
+        g.prepare (sr);
+        g.set (-58.0f, 80.0f);
+        auto gated = buzz;
+        for (size_t at = 0; at < gated.size(); at += 256) g.process (gated.data() + at, (int) std::min<size_t> (256, gated.size() - at));
+        CHECK (rmsDb (std::vector<float> (gated.begin() + (long) from, gated.end())) < -90.0f, "the gate closes over a buzzing hum (it sits at %.1f dB)", g.thresholdNowDb());
+    }
     for (int mains : { 50, 60 })
     {
         auto di = test::guitarDi (sr, 8.0, 0.2f);
@@ -465,7 +497,7 @@ void testGate (double sr)
         const std::vector<float> tail (out.end() - (long) sr, out.end());
         CHECK (rmsDb (tail) < -100.0f, "steady hiss above the chosen threshold still comes through: %.1f dB", rmsDb (tail));
         CHECK (g.noiseFloorDb() > -58.0f && g.noiseFloorDb() < -48.0f, "the floor reads %.1f dB for hiss at about -53", g.noiseFloorDb());
-        CHECK (g.thresholdNowDb() <= NoiseGate::kHighestFollowDb + 0.01f && g.thresholdNowDb() > -45.0f, "the gate sits at %.1f dB over a floor of %.1f", g.thresholdNowDb(), g.noiseFloorDb());
+        CHECK (g.thresholdNowDb() <= NoiseGate::kFollowCapLowDb + 0.01f && g.thresholdNowDb() > -45.0f, "the gate sits at %.1f dB over a floor of %.1f", g.thresholdNowDb(), g.noiseFloorDb());
         // the room goes quiet: the gate comes back down at once
         std::vector<float> quiet ((size_t) (sr * 2.5));
         for (auto& s : quiet) s = 0.0002f * n.next();
@@ -831,7 +863,9 @@ void testLevelMatch (double sr)
         CHECK (spread (matched) < 0.1f, "matched tones differ by %.2f dB", spread (matched));
         // 4.8 dB with GCC and 5.2 dB with MSVC on the same tones: their maths differ in the last digits and a
         // high-gain amp makes that audible in the numbers. The bound leaves room for that and still catches a real loss.
-        CHECK (most (played) < 0.6f * most (unmatched) && most (played) < 6.0f, "on other playing nine in ten matched tones are within %.1f dB, unmatched %.1f dB", most (played), most (unmatched));
+        // With the real-circuit pedals and antialiased amps (0.1.5): 5.2 of 9.4 dB at 48 kHz, 5.6 of 8.9 dB on the
+        // 44.1 kHz subset, so the share is 0.65; the 6 dB ceiling is unchanged.
+        CHECK (most (played) < 0.65f * most (unmatched) && most (played) < 6.0f, "on other playing nine in ten matched tones are within %.1f dB, unmatched %.1f dB", most (played), most (unmatched));
     }
 
     // the player's phrase is their guitar off the cable: a clean tone follows the input level
@@ -1077,7 +1111,8 @@ void testNeural (double sr)
 }
 
 // Measured 3.6 with every pedal on (GCC, November 2026), then 4.9 to 5.5 once the default
-// drive pedal became its real circuit, solved at 8x (0.1.5). The budget leaves room for a
+// drive pedal became its real circuit, solved at 8x (0.1.5), and 4.0 to 5.7 with the amp at 4x
+// and its curves antialiased. The budget leaves room for a
 // different compiler and a noisy machine, and still catches a rig that got a fifth slower.
 constexpr double kRigCostBudget = 6.0;
 
@@ -2225,7 +2260,8 @@ int main (int argc, char** argv)
     if (args[0] == "play" && args.size() >= 4)
     {
         // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB]
-        // Plays a recorded clean guitar through a preset, for listening checks.
+        // Plays a recorded clean guitar through a preset, for listening checks, with Auto level
+        // as the app applies it (measured on this guitar) unless auto_level=0.
         juce::AudioFormatManager fm; fm.registerBasicFormats();
         std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
         if (reader == nullptr && args[1] != "@ref") { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
@@ -2259,8 +2295,23 @@ int main (int argc, char** argv)
             if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
             v[(size_t) id] = value;
         }
+        // Auto level, as the app does it once it has heard the player: this tone measured on
+        // this very guitar, then trimmed to the house loudness (auto_level=0 leaves it alone)
+        float autoTrim = 0.0f;
+        if (v[(size_t) P::autoLevel] > 0.5f)
+        {
+            LevelPhrase phrase;
+            phrase.samples = di;
+            phrase.sampleRate = sr;
+            phrase.fromPlayer = true;
+            Rig meter;
+            meter.setOffline (true);
+            const float loud = measureLoudnessDb (meter, toneForMeasuring (v, true), phrase);
+            if (loud > kSilentDb) autoTrim = std::clamp (kHouseLoudnessDb - loud, kMostCutDb, kMostBoostDb);
+            std::printf ("auto level: %.1f dB\n", autoTrim);
+        }
         auto r = renderWith (v, di, sr, 256);
-        const float g = dbToGain (trim);
+        const float g = dbToGain (trim + autoTrim);
         for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
         std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));

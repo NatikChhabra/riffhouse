@@ -1,0 +1,39 @@
+{
+  "name": "Desi Djent",
+  "category": "Metal",
+  "genres": [
+    "Indian Prog Metal",
+    "Djent"
+  ],
+  "inspiredBy": "",
+  "description": "Tight, percussive low-tuned chug with a boosted front end and clear chords on top.",
+  "params": {
+    "amp_on": true,
+    "amp_model": "Tight Metal",
+    "amp_gain": 7,
+    "amp_bass": 6,
+    "amp_mid": 5,
+    "amp_treble": 6.5,
+    "amp_presence": 6,
+    "amp_depth": 6.5,
+    "amp_master": 5,
+    "amp_level": 0.0,
+    "cab_on": true,
+    "cab_model": "4x12 Modern",
+    "cab_mic": 2.5,
+    "cab_distance": 1.5,
+    "cab_lowcut": 60,
+    "cab_highcut": 12000,
+    "drv_on": true,
+    "drv_type": "Metal Box",
+    "drv_gain": 1,
+    "drv_tone": 5.5,
+    "drv_level": 5,
+    "gate_on": true,
+    "gate_thresh": -54,
+    "gate_release": 45,
+    "rev_on": false,
+    "doubler": 6,
+    "out_level": 0.1
+  }
+}

@@ -57,9 +57,11 @@ int numAmpVoicings() { return (int) (sizeof (voicings) / sizeof (voicings[0])); 
 void Amp::prepare (double sampleRate, int maxBlock)
 {
     sr = sampleRate;
-    // 8x oversampling below 64 kHz, 4x above. Five gain stages in a row make harmonics far past
-    // what 4x can hold: at full gain 8x measures 10 dB less aliasing for one extra sample of delay.
-    const int stagesOs = sampleRate < 64000.0 ? 3 : 2;
+    // 4x oversampling below 64 kHz, 2x above, with every curve antialiased (below). Measured at
+    // full gain on the high-gain models: less fold-back than the plain curves at 8x (0.1.4) for
+    // the same CPU and one sample less delay. Plain 8x with the antialiasing would take 20 dB
+    // more off but doubles the amp's CPU, too much for a modest laptop.
+    const int stagesOs = sampleRate < 64000.0 ? 2 : 1;
     oversampler = std::make_unique<juce::dsp::Oversampling<float>> (1, (size_t) stagesOs,
                                                                     juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,
                                                                     true, false);
@@ -89,7 +91,8 @@ void Amp::reset()
     bright.reset(); midBoost.reset(); presence.reset(); depth.reset(); outHp.reset(); outLp.reset(); antiFizz.reset();
     baxLow.reset(); baxMid.reset(); baxHigh.reset();
     stack.reset();
-    for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.blocking.reset(); }
+    for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.blocking.reset(); s.last = {}; }
+    powerLast = {};
     for (auto& t : tubes) t.reset();
     supply.reset();
     dcPre.reset(); dcPost.reset();
@@ -199,6 +202,58 @@ inline float Amp::tube (float x, float bias) noexcept
     return -(f (x + bias) - f (bias));
 }
 
+// The same curve, antialiased (first-order antiderivative): the average of the curve over the
+// path the signal took since the last sample, rather than its value at one point. Where a
+// stage bends hard, that takes most of the fold-back (the digital fizz on high notes) away.
+namespace
+{
+    // log cosh u = |u| + log (1 + e^-2|u|) - log 2, kept as its straight part and its small
+    // bend, so the difference of two nearby values stays exact in single precision
+    inline float bend (float a) noexcept { return std::log1p (std::exp (-2.0f * a)) - 0.693147181f; }
+    inline float tubeCurve (float u) noexcept { return u >= 0.0f ? fastTanh (u) : fastTanh (0.6f * u) * (1.0f / 0.6f); }
+    constexpr float kAaStep = 1.0e-3f; // smaller steps than this are near enough straight
+}
+
+// Both take the curve's input (bias included) as the path: a bias that moves with the grid
+// blocking or the supply sag is part of where the signal went. The bend at the last sample is
+// kept, so each sample costs one exp and one log, not two of each.
+float Amp::tubeAA (float x, float bias, AaState& last) noexcept
+{
+    const float u = x + bias, u0 = last.fresh ? u : last.u;
+    const float bendU = u >= 0.0f ? bend (u) : bend (-0.6f * u) * (1.0f / 0.36f);
+    const float d = u - u0;
+    float y;
+    if (std::abs (d) > kAaStep)
+    {
+        const bool same = (u >= 0.0f) == (u0 >= 0.0f);
+        auto straight = [] (float v) { return v >= 0.0f ? v : -v * (1.0f / 0.6f); };
+        const float lin = same ? (u >= 0.0f ? d : -d * (1.0f / 0.6f)) : straight (u) - straight (u0);
+        y = (lin + (bendU - last.bend)) / d;
+    }
+    else
+        y = tubeCurve (0.5f * (u + u0));
+    last = { u, bendU, false };
+    return -(y - tubeCurve (bias));
+}
+
+float Amp::powerAA (float x, float bias, float head, AaState& last) noexcept
+{
+    // head * tanh ((x + bias) / head), averaged the same way (in the curve's own units)
+    const float u = (x + bias) / head, u0 = last.fresh ? u : last.u;
+    const float bendU = bend (std::abs (u));
+    const float d = u - u0;
+    float y;
+    if (std::abs (d) * head > kAaStep)
+    {
+        const float lin = (u >= 0.0f) == (u0 >= 0.0f) ? (u >= 0.0f ? d : -d) : std::abs (u) - std::abs (u0);
+        y = head * (lin + (bendU - last.bend)) / d;
+    }
+    else
+        y = head * fastTanh (0.5f * (u + u0));
+    last = { u, bendU, false };
+    return y - head * fastTanh (bias / head);
+}
+
 void Amp::process (float* data, int n)
 {
     if (v == nullptr || oversampler == nullptr) return;
@@ -249,7 +304,7 @@ void Amp::process (float* data, int n)
             // grid blocking: big positive swings shift the bias, which gives the
             // squashy, dynamic feel when you dig in
             const float env = st.blocking.process (std::max (0.0f, s));
-            s = tube (s, st.bias - 0.25f * std::min (env, 2.0f));
+            s = tubeAA (s, st.bias - 0.25f * std::min (env, 2.0f), st.last);
             s = st.hp.highpass (s);
             s = st.lp.lowpass (s);
         }
@@ -266,7 +321,7 @@ void Amp::process (float* data, int n)
         s *= 0.35f * v->powerDrive * masterGain.next();
         const float env = supply.process (s);
         const float head = 1.0f / (1.0f + sag * std::min (env, 4.0f));
-        s = head * (fastTanh ((s + pBias) / head) - fastTanh (pBias / head));
+        s = powerAA (s, pBias, head, powerLast);
         s = dcPost.process (s);
         s = outLp.process (outHp.process (s));
         x[i] = antiFizz.process (s);

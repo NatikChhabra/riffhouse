@@ -21,7 +21,7 @@ namespace rh
 class HumCanceller
 {
 public:
-    static constexpr int kHarmonics = 6;
+    static constexpr int kHarmonics = 40; // up to 2 kHz at 50 Hz mains: a ground loop or a dimmer buzzes far above the hum itself
     void prepare (double sampleRate);
     void reset();
     void setMains (int hz);
@@ -43,6 +43,7 @@ private:
     // when it may learn: the last 20 ms against the quietest it has been lately
     int stepLength = 960, stepFill = 0;
     double stepPower = 0.0, floorPower = -1.0, floorRise = 1.0;
+    double stepPeak = 0.0, floorPeak = -1.0; // the loudest moment of each 20 ms, and the quietest of those lately
     float freezeAbove = 0.0f;
     int adaptHold = 0, holdSamples = 0, frozenFor = 0, letGoAfter = 0;
     double use = 0.0, useStep = 0.0; // how much of the model is subtracted (fades out when it cannot learn)
@@ -102,6 +103,28 @@ private:
     Shelf fixShelf;
     Biquad fixTop;
 
+    // With Input Fix on, the hiss of a PC input comes up with the treble. A note's own treble
+    // stands well above it and covers it; as the note fades, or between notes, it does not.
+    // So the treble (above about 2.2 kHz) is split off and turned down while it is near the
+    // hiss, the way tape noise reduction worked: the noise floor of that band is learnt from
+    // steady quiet moments, and within 12 dB of it the band is expanded down, up to 18 dB.
+    // Playing never waits for it: it opens in about a millisecond.
+    struct HissReducer
+    {
+        void prepare (double sampleRate);
+        void reset();
+        float process (float x) noexcept;
+        float floorDb() const noexcept;
+        Biquad split;
+        double sr = 48000.0;
+        float env = 0.0f, gain = 1.0f;
+        float envCoeff = 0.0f, openCoeff = 0.0f, closeCoeff = 0.0f;
+        // the band's floor, learnt from steady 20 ms steps
+        float stepPower = 0.0f, floorPower = -1.0f, runRef = 0.0f, runSum = 0.0f;
+        int stepLength = 960, stepAt = 0, runLength = 0;
+    };
+    HissReducer hiss;
+
     // Goertzel accumulators for 50/60 Hz families
     double g50 = 0, g60 = 0, total = 0;
     int counted = 0;
@@ -141,7 +164,12 @@ public:
 private:
     double sr = 48000.0;
     Biquad lowBand, highBand[4];
-    double lowE = 0, highE = 0;
+    // What was heard since the restart, kept by block level (1 dB steps): which levels count as
+    // playing is decided afresh over everything heard, so a take that starts on a ringing chord
+    // is judged by the quiet that comes later too.
+    static constexpr int kLevels = 121; // -120 .. 0 dBFS
+    std::array<double, kLevels> lowAt {}, highAt {}, secondsAt {};
+    int loudest = -1, quietest = kLevels;
     std::atomic<bool> restartRequested { true };
     std::atomic<double> seconds { 0.0 };
     std::atomic<float> tilt { 0.0f };
@@ -164,8 +192,12 @@ private:
 class NoiseGate
 {
 public:
-    static constexpr float kAboveFloorDb = 17.0f;   // threshold over the floor's level (its peaks sit about 10 dB up; it closes 4 dB lower)
-    static constexpr float kHighestFollowDb = -36.0f; // following never asks for more than this: notes must still ring out
+    static constexpr float kAboveFloorDb = 17.0f;   // threshold over the floor's level (hiss peaks sit about 10 dB up; it closes 4 dB lower)
+    static constexpr float kAbovePeaksDb = 6.0f;    // ... and over the floor's own loudest peaks: buzzy hum peaks far above its level
+    // following never asks for more than the tone's own threshold plus this, kept between -40
+    // and -30 dB: notes must still ring out, and a clean tone (set low for soft playing) is let
+    // hum a little before it cuts quiet notes
+    static constexpr float kMostFollowAboveDb = 28.0f, kFollowCapLowDb = -40.0f, kFollowCapHighDb = -30.0f;
     static constexpr float kStopDropDb = 18.0f;     // this much down inside about 30 ms is a hand on the strings
     static constexpr float kStopRangeDb = 24.0f;    // ... when it lands within this of the threshold
 
@@ -180,15 +212,17 @@ public:
     float noiseFloorDb() const noexcept { return floorDb; } // -120 until one has been heard
 
 private:
-    void windowDone (float levelDb);
+    void windowDone (float levelDb, float peakDb);
     void applyThreshold();
     void stepDone();
 
     double sr = 48000.0;
-    float userThrDb = -62.0f, thrNowDb = -62.0f, floorDb = -120.0f;
+    float userThrDb = -62.0f, thrNowDb = -62.0f, floorDb = -120.0f, floorPeakDb = -120.0f;
     bool follows = true;
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
-    float windows[kWindows] {};
+    static constexpr int kFirstWindows = 8;         // 0.8 s for the very first floor
+    float windows[kWindows] {}, windowPeaks[kWindows] {};
+    float windowPeak = 0.0f;
     int windowAt = 0, windowsHeard = 0, windowLength = 4800, windowFill = 0;
     double windowPower = 0.0;
     // the detector: peaks of 2.5 ms steps, the last 16 of them
@@ -272,21 +306,21 @@ public:
 private:
     void update();
     double sr = 48000.0, osr = 192000.0;
-    std::unique_ptr<juce::dsp::Oversampling<float>> os, osHigh; // 8x, and 16x for the hard clippers
-    juce::dsp::Oversampling<float>* active() const noexcept { return (type == 4 || type == 5) && osHigh ? osHigh.get() : os.get(); }
+    std::unique_ptr<juce::dsp::Oversampling<float>> os, osHigh; // 8x, and 16x for the hard clippers (rodent, fuzz, metal)
+    juce::dsp::Oversampling<float>* active() const noexcept { return (type == 4 || type == 5 || type == 6) && osHigh ? osHigh.get() : os.get(); }
     int type = 2;
     float drive = 0.4f, tone = 0.5f, level = 0.5f;
     bool dirty = true;
-    Biquad preHp, preLp, midHump, toneLp, toneHp, postLp, scoop;
-    OnePole clipHp, gbwLp;
-    DcBlocker dc;
-    Smoother gainS, levelS;
-    float clean = 0.0f;
-    // the pedals built as their circuits (see Circuits.h and the pedal lab)
+    Smoother levelS;
+    // the pedals, each built as its circuit (see Circuits.h and the pedal lab)
     circuit::GreenDrive green;
     circuit::RodentDist rodent;
     circuit::BigFuzz fuzz;
-    bool isCircuit() const noexcept { return type == 2 || type == 4 || type == 5; }
+    circuit::CleanBoost boost;
+    circuit::TrebleBooster trebleBoost;
+    circuit::BluesDrive blues;
+    circuit::MetalBox metal;
+    double runCircuit (double v) noexcept;
 };
 
 class GraphicEq

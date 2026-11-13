@@ -26,12 +26,17 @@ Released 12 November 2026.
 - **Share a tone as a message.** Send a tone to a friend as plain text. They paste it into Riffhouse and it loads.
 - **MP3 and FLAC.** Every take you record saves as MP3 or FLAC with one button. And the app starts about twice as fast.
 
-## Next: 0.1.5 and on
+## Next: 0.1.5
 
-Small fix releases come first, and each one also lays groundwork for 0.2.0.
+The polish release: sound you can trust, tested end to end before it ships.
 
-- **Fixes from your reports.** Something broke? In Settings, press **Save a report**. Every report gets read, and fixes go out as soon as they are ready.
+- **Pedals that behave like the real circuits.** Every drive and fuzz is now solved as the circuit it comes from, checked against published measurements of the real pedals: how much gain each has, where it peaks and how far the tone knob reaches.
+- **Cleaner high gain.** The amps' distortion is worked out in a way that keeps the harsh digital fizz off high notes, without costing your computer more.
+- **Quiet when you stop.** The gate closes the moment your hand mutes the strings, and hum is taken out without the ringing the old filters left after every stop.
+- **Setup that doesn't over-brighten.** The treble fix for laptop mic jacks is gentler, and hiss on that band is turned down while you're not playing.
+- **Indian rock and indie tones.** A pack of new tones for the sounds of Indian rock and indie.
 - **A weekly player count.** An anonymous count of how many people play each week, so we know what to fix first: a random number, the version and the week, nothing about you. One switch in Settings turns it off.
+- **Fixes from your reports.** Something broke? In Settings, press **Save a report**. Every report gets read.
 
 ## The big one: 0.2.0
 
@@ -46,19 +51,22 @@ One big update with the things players ask for most. Work starts once 0.1.3 has 
 - **A daily practice goal.** Five minutes a day if you want it, with a week view of the days you played. Missing a day never wipes anything.
 - **New tones every Friday.** Five new free tones each week, waiting on a New this week shelf.
 - **Tap tempo and starting sounds.** Tap the beat for delays and drums. New players pick one of six starting sounds, each a full rig that is ready to play.
+- **Hindi and Hinglish.** The whole app in Hindi or Hinglish, as well as English.
 
 Everything you have now comes with you. Saved tones and settings carry over and sound exactly the same, and nothing you know moves.
 
-## Later
+## Toward 1.0
 
-In this order, once 0.2.0 is out.
+In this order, once 0.2.0 is out. The aim for 1.0: the free guitar app most players reach for, on the computer and on the phone.
 
-1. A library of free community tones, inside the app.
-2. Tone match: help getting close to a sound you hear on a record.
-3. Mac. It needs someone with a Mac to test it. If that's you, [say so in an issue](https://github.com/NatikChhabra/riffhouse/issues/new).
-4. Setlists and A/B compare: tones in order for a gig, and two tones side by side.
-5. A free phone app for practice, Android first.
-6. An open base to build on: an open tone format and code that anyone can build their own pedals and tones on.
+1. **0.3: a library of free community tones, inside the app.** Browse, hear it with your own guitar, load it in one click and share yours.
+2. **0.4: tone match.** Help getting close to a sound you hear on a record, built from Riffhouse's own amps and pedals.
+3. **0.5: Mac.** It needs someone with a Mac to test it. If that's you, [say so in an issue](https://github.com/NatikChhabra/riffhouse/issues/new).
+4. **0.6: setlists and A/B compare.** Tones in order for a gig, and two tones side by side.
+5. **0.7: a free phone app for practice, Android first.** Amp, pedals, tuner, looper, recording and songs, with a cheap cable.
+6. **0.8: an open base to build on.** An open tone format and code that anyone can build their own pedals and tones on.
+7. **0.9: more languages and classrooms.** More Indian languages after Hindi, and a way for a teacher to share tones and songs with a class.
+8. **1.0.** Computer and phone at the same level, and a month with no new crash in any report before it ships.
 
 ## Three promises
 

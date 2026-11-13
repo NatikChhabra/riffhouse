@@ -263,6 +263,9 @@ P("Disco Strut", "Funk", ["Disco", "Funk"], "Bright, choppy, compressed rhythm."
   A("Glass Clean", 4.5, 4, 5.5, 6.5, 6.5), C("2x12 American", 2, 1), COMP(7, 2, 5.5), REV("Room", 2, 5, 5, 0.6), G(-68))
 P("Envelope Funk", "Funk", ["Funk"], "Quacky auto-wah funk.",
   A("Glass Clean", 4.5, 5, 5, 5.5), C("2x12 American", 3, 2), COMP(6, 3), WAH("Auto", 5, 6, 7), REV("Room", 2, 5, 5, 0.8), G(-68))
+P("Rocked Wah Soul", "Funk", ["Funk", "Soul"], "The classic 60s wah, rocked by foot: half-down for a throaty rhythm, heel to toe for the 'wacka' strum.",
+  A("Glass Clean", gain=4.5, treble=5.5), C("2x12 American"), COMP(sustain=6, attack=3), WAH("Classic", pos=4.5),
+  REV("Room", decay=2, pre=5, mix=0.8), G(-68))
 P("R&B Ballad Clean", "Funk", ["R&B", "Soul"], "Warm, smooth, with a gentle vibe.",
   A("Glass Clean", 3.5, 5.5, 5, 5), C("1x12 Open Back", 4, 2.5), COMP(4, 6), MOD("Vibe", 3, 4, 4), REV("Plate", 4.5, 20, 4.5, 2.4), G(-72))
 P("Pop Radio Clean", "Funk", ["Pop"], "Modern, compressed, wide and bright.",
@@ -325,6 +328,24 @@ P("Sufi Rock Drive", "Rock", ["Sufi Rock", "Fusion"], "Soaring overdriven tone f
   A("Brit Plexi", 6.5, 5, 6.5, 5.5), C("4x12 Vintage", 3.5, 2), D("Green Drive", 2.5, 5.5, 6.5), DLY("Analog", 450, "Off", 3, 4.5, 2.2), REV("Hall", 5, 25, 5, 2), G(-62))
 P("Raga Drone Pad", "Ambient", ["Indian Classical Fusion", "Ambient"], "Sustained, shimmering pad for drones and slides.",
   A("Glass Clean", 3.5, 5, 5, 5), C("2x12 American", 4, 3), COMP(5, 6), REV("Shimmer", 7, 40, 5, 4.5), DLY("Digital", 600, "Off", 4, 5, 2.5), G(-74))
+
+# Indian rock and indie pack (0.1.5): the sounds of the scenes, named for styles and cities only
+P("Bangalore Thrash", "Metal", ["Indian Metal", "Thrash"], "Fast, dry thrash rhythm from the old-school metal scene. Tight lows, bright pick.",
+  A("Brit 800", 7.5, 5.5, 6, 6.5, 6), C("4x12 Vintage", 3, 1.5), D("Green Drive", 1.5, 6, 7), G(-56, 50), NOREV())
+P("Shillong Blues Rock", "Blues", ["Indian Blues", "Blues Rock"], "Warm, singing blues-rock crunch that cleans up when you play softly.",
+  A("Tweed Edge", 6.5, 5, 6, 5.5), C("1x12 Open Back", 3.5, 2), D("Green Drive", 3, 5, 6), REV("Spring", 4, 8, 5, 1.8), G(-64))
+P("Bangla Band Jangle", "Crunch", ["Bangla Rock", "Indian Rock"], "Bright, jangly edge-of-breakup strum for band songs with big choruses.",
+  A("Chime Top", 5.5, 4.5, 5.5, 6), C("2x12 Blue", 3, 2), COMP(4, 5), MOD("Chorus", 2, 3, 2.5), REV("Room", 4, 12, 5, 2), G(-66))
+P("Carnatic Prog Lead", "Lead", ["Indian Prog", "Carnatic Fusion"], "Smooth, articulate lead for fast gamakas and slides, with a short echo.",
+  A("Hot Rod Lead", 6.5, 5, 6.5, 5.5, 5.5), C("4x12 Vintage", 3.5, 2), D("Clean Boost", 3, 5, 6), DLY("Digital", 320, "Off", 2.5, 5, 1.8), REV("Plate", 4, 15, 5, 1.6), G(-60))
+P("Desi Djent", "Metal", ["Indian Prog Metal", "Djent"], "Tight, percussive low-tuned chug with a boosted front end and clear chords on top.",
+  A("Tight Metal", 7, 6, 5, 6.5, 6, 6.5), C("4x12 Modern", 2.5, 1.5), D("Metal Box", 1, 5.5, 5), G(-54, 45), NOREV(), double=6)
+P("Post-Rock Swells", "Ambient", ["Indian Post-Rock", "Post-Rock"], "Clean, wide and long for tremolo-picked builds and swelling chords.",
+  A("Glass Clean", 4, 5, 5, 5.5), C("2x12 American", 3.5, 2.5), COMP(4, 6), DLY("Tape", 480, "Off", 4.5, 4.5, 3), REV("Cloud", 7, 30, 5, 4), G(-72))
+P("Bedroom Indie Clean", "Clean", ["Desi Indie", "Bedroom Pop"], "Soft, rounded clean with a slow chorus, for quiet songs recorded at home.",
+  A("Glass Clean", 3.5, 5.5, 5, 4.5), C("1x12 Open Back", 4.5, 2.5), COMP(4, 5), MOD("Chorus", 1.5, 4, 3), REV("Plate", 3.5, 12, 4, 2), G(-72))
+P("Nineties Indipop Crunch", "Crunch", ["Indipop", "Pop Rock"], "Glossy mid crunch with a chorus shimmer, made for the riff before the chorus.",
+  A("Brit Plexi", 5.5, 5, 6, 6), C("2x12 Blue", 3, 2), MOD("Chorus", 2.5, 3.5, 2.5), DLY("Digital", 360, "Off", 2.5, 6, 1.5), REV("Room", 4, 12, 5, 1.8), G(-64))
 
 # ================================================================ Inspired by
 # Rock legends
@@ -556,7 +577,7 @@ S("Dream Theater", "Wither", "Verse", ["Progressive Metal", "Progressive Rock"],
 S("Guns N' Roses", "Sweet Child O' Mine", "", ["Hard Rock", "Classic Rock"], "Warm, round crunch for the opening riff. Use the neck pickup.",
   A("Brit 800", 5.5, 5.5, 7, 5, 4.5), C("4x12 Vintage", 3.5, 2), DLY("Analog", 380, "Off", 2, 4.5, 1.2), REV("Room", 3.5, 10, 5, 1.6), G(-62))
 S("Guns N' Roses", "Sweet Child O' Mine", "Solo", ["Hard Rock", "Classic Rock"], "Singing neck-pickup lead. Switch the wah on for the second half of the solo.",
-  A("Hot Rod Lead", 7, 5.5, 7, 5.5, 5), C("4x12 Vintage", 3.5, 2), WAH("Auto", 5, 6.5, 5.5), FIX(wah_on=False), DLY("Analog", 400, "Off", 2.5, 4.5, 1.8), REV("Room", 3.5, 10, 5, 1.5), G(-60))
+  A("Hot Rod Lead", 7, 5.5, 7, 5.5, 5), C("4x12 Vintage", 3.5, 2), WAH("Classic", 5, 6.5, 5.5), FIX(wah_on=False), DLY("Analog", 400, "Off", 2.5, 4.5, 1.8), REV("Room", 3.5, 10, 5, 1.5), G(-60))
 S("Avenged Sevenfold", "Nightmare", "", ["Heavy Metal", "Metalcore"], "Thick, tight rhythm. The song is in drop D.",
   A("Modern High Gain", 7, 6, 4.5, 6.5, 6.5, 6.5), C("4x12 Modern", 2.5, 1.5), D("Green Drive", 1, 6, 7), G(-54, 50), NOREV(), double=7)
 P("Big Fuzz Wall", "Rock", ["Alternative", "Shoegaze", "Stoner Rock"], "The Big Fuzz pedal into a loud, nearly clean stack. Thick and endless.",
