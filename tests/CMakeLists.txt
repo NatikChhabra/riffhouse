@@ -1,7 +1,7 @@
 juce_add_console_app(riffhouse_tests PRODUCT_NAME "riffhouse_tests")
 target_sources(riffhouse_tests PRIVATE ${RIFFHOUSE_CORE_SOURCES} ${CMAKE_SOURCE_DIR}/src/plugin/Takes.cpp ${CMAKE_SOURCE_DIR}/src/plugin/Export.cpp ${CMAKE_SOURCE_DIR}/src/plugin/LevelMatcher.cpp
     ${CMAKE_SOURCE_DIR}/src/plugin/DeviceGuard.cpp ${CMAKE_SOURCE_DIR}/src/plugin/AudioOpen.cpp ${CMAKE_SOURCE_DIR}/src/plugin/AudioProbe.cpp ${CMAKE_SOURCE_DIR}/src/plugin/Reports.cpp ${CMAKE_SOURCE_DIR}/src/plugin/DeviceLog.cpp
-    ${CMAKE_SOURCE_DIR}/src/plugin/Tuner.cpp TestMain.cpp TestSignals.cpp TestDevices.cpp)
+    ${CMAKE_SOURCE_DIR}/src/plugin/Tuner.cpp ${CMAKE_SOURCE_DIR}/src/plugin/Version.cpp TestMain.cpp TestSignals.cpp TestDevices.cpp)
 target_include_directories(riffhouse_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(riffhouse_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_USE_MP3AUDIOFORMAT=1 JUCE_USE_FLAC=1 RIFFHOUSE_PRESET_DIR="${CMAKE_SOURCE_DIR}/presets")
 target_link_libraries(riffhouse_tests PRIVATE

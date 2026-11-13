@@ -27,6 +27,7 @@
 #include "plugin/Takes.h"
 #include "plugin/Export.h"
 #include "plugin/Tuner.h"
+#include "plugin/Version.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <chrono>
@@ -2519,6 +2520,8 @@ void testUpdates()
     CHECK (compareVersions ("v0.2.0", "0.1.9") > 0, "v prefix and a higher minor");
     CHECK (compareVersions ("0.1.10", "0.1.9") > 0, "numbers compare as numbers, not text");
     CHECK (compareVersions ("0.2", "0.2.0") == 0, "missing parts count as zero");
+    CHECK (compareVersions ("0.1.5.1", "0.1.5") > 0 && compareVersions ("0.1.6", "0.1.5.1") > 0 && compareVersions ("0.1.5.2", "0.1.5.1") > 0, "a hotfix (fourth number) is newer than its release and older than the next one");
+    CHECK (spokenVersion ("0.1.5.1") == "0.1.5 Hotfix 1" && spokenVersion ("0.1.5") == "0.1.5" && spokenVersion ("0.1.5.2-rc1") == "0.1.5 Hotfix 2-rc1", "a hotfix is said as one (%s)", spokenVersion ("0.1.5.1").toRawUTF8());
     CHECK (compareVersions ("1.0.0", "0.9.9") > 0 && compareVersions ("0.9.9", "1.0.0") < 0, "major wins");
     CHECK (compareVersions ("0.2.0-beta", "0.2.0") < 0, "a pre-release is older than its release");
     CHECK (compareVersions ("0.2.0-beta", "0.1.9") > 0, "a pre-release is newer than the version before");
@@ -2545,6 +2548,13 @@ void testUpdates()
         // publishing comes first and the installer is attached minutes later: until then the release is not out
         CHECK (parseRelease (entry ("v0.1.1", false, false, false), "-windows-setup.exe").version.isEmpty(), "a release with no installer attached yet is not offered");
         CHECK (parseRelease (entry ("v0.1.1", false, false), "-windows-setup.exe").version == "0.1.1", "and is offered once the installer is there");
+        {
+            // a follow-up (fourth number) reaches players of the release it follows, by itself
+            const auto hot = parseRelease (entry ("v0.1.5.1", false, false), "-windows-setup.exe");
+            CHECK (hot.version == "0.1.5.1" && compareVersions (hot.version, "0.1.5") > 0, "0.1.5 is offered v0.1.5.1 (%s)", hot.version.toRawUTF8());
+            const auto newest = newestRelease ("[" + entry ("v0.1.5", false, false) + "," + entry ("v0.1.5.1", false, false) + "," + entry ("v0.1.4", false, false) + "]", "-windows-setup.exe");
+            CHECK (newest.version == "0.1.5.1", "the newest of 0.1.4, 0.1.5 and 0.1.5.1 is 0.1.5.1 (%s)", newest.version.toRawUTF8());
+        }
         const auto building = "[" + entry ("v0.1.0-rc3", true, false) + "," + entry ("v0.1.0", false, false, false) + "]";
         CHECK (newestRelease (building, "").version == "0.1.0-rc3", "a test build waits for the release's installer too");
     }
@@ -3734,6 +3744,7 @@ int main (int argc, char** argv)
     if (args[0] == "devices") { test::runDeviceChecks (checks, failures); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));

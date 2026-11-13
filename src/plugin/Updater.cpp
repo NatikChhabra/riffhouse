@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Updater.h"
+#include "Version.h"
 
 namespace rh
 {
@@ -256,9 +257,9 @@ juce::String Updater::statusText() const
         case State::idle:        return "Version " + current;
         case State::checking:    return "Version " + current + ". Checking for a newer one";
         case State::upToDate:    return "Version " + current + " is the latest";
-        case State::downloading: return "Downloading version " + info.version + " (" + juce::String (juce::roundToInt (downloadProgress.load() * 100.0f)) + "%)";
-        case State::ready:       return "Version " + info.version + " is ready. It installs when you close Riffhouse";
-        case State::available:   return "Version " + info.version + " is out. You have " + current;
+        case State::downloading: return "Downloading version " + spokenVersion (info.version) + " (" + juce::String (juce::roundToInt (downloadProgress.load() * 100.0f)) + "%)";
+        case State::ready:       return "Version " + spokenVersion (info.version) + " is ready. It installs when you close Riffhouse";
+        case State::available:   return "Version " + spokenVersion (info.version) + " is out. You have " + spokenVersion (current);
         case State::failed:      return "Version " + current + ". Couldn't reach the update server";
     }
     return {};

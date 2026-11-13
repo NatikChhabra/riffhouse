@@ -6,9 +6,9 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
-## 0.1.6
+## 0.1.5.1 (0.1.5 Hotfix 1)
 
-A hotfix for 0.1.5. The gate no longer cuts held notes, and Tight Metal gets its low end back.
+The first hotfix for 0.1.5. The gate no longer cuts held notes, and Tight Metal gets its low end back.
 
 - The gate that follows the room's hiss could take a clean note you let ring for the hiss itself: a note on a good guitar fades so slowly that after a second it looked steady, and the gate closed on it. On a clean take with the gate on, up to a quarter of the playing was cut. It now needs the level to hold still for a second and a half without fading at all, as hiss and hum do; held notes ring out, and steady hiss is still found and gated.
 - Tight Metal, the amp in Heavy Starter and ten other heavy tones, kept the thin low end of the old voicing when 0.1.5 gave it the bite of a real amp, so light strumming came out thin and fizzy and the hiss of a PC input sat on top. It now has the weight under the low strings that real high-gain amps have (within 1 dB at 125 Hz, still a little tighter at 80 Hz, as a tight amp should be), and on a real player's guitar its balance from the lows to the top is within about 1 dB of two real high-gain amps. Every tone that uses it is level-matched again.

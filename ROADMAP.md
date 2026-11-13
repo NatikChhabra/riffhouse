@@ -6,9 +6,9 @@ The nicer version of this page is on the website: https://natikchhabra.github.io
 
 Updated 13 November 2026.
 
-## Out now: 0.1.6
+## Out now: 0.1.5 Hotfix 1
 
-Released 13 November 2026 (0.1.6, the 0.1.5 hotfix, the same day: the gate no longer cuts held notes, and the Tight Metal amp gets its low end back). The polish release: sound you can trust, tested end to end before it ships. Riffhouse updates itself, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
+Released 13 November 2026 (Hotfix 1 the same day: the gate no longer cuts held notes, and the Tight Metal amp gets its low end back). The polish release: sound you can trust, tested end to end before it ships. Riffhouse updates itself, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
 
 - **Pedals that behave like the real circuits.** Every drive and fuzz is now solved as the circuit it comes from, checked against published measurements of the real pedals: how much gain each has, where it peaks and how far the tone knob reaches.
 - **Cleaner high gain.** The amps' distortion is worked out in a way that keeps the harsh digital fizz off high notes, without costing your computer more.

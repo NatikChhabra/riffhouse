@@ -115,7 +115,10 @@ def release_items(prerelease: bool) -> list[dict]:
                 "your stable version around. Post what broke and what felt better in #beta-feedback."
             )
         else:
-            title = f"Riff House {tag} is out"
+            # a follow-up release (v0.1.5.1) is named on its release page: "Riffhouse 0.1.5 Hotfix 1"
+            name = (r.get("name") or "").strip()
+            said = name.split(" ", 1)[1] if name.lower().startswith("riffhouse ") and len(tag.split(".")) == 4 else tag
+            title = f"Riff House {said} is out"
             text = f"{notes}\n\nThe app updates itself. New here? Download: {SITE}"
         items.append({
             "category": "beta" if prerelease else "release",

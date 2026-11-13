@@ -12,7 +12,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TAG = re.compile(r"^v(\d+\.\d+\.\d+)(-(rc|beta)\d+)?$")
+TAG = re.compile(r"^v(\d+\.\d+\.\d+(?:\.\d+)?)(-(rc|beta)\d+)?$")  # a fourth number is a hotfix: v0.1.5.1
 
 
 def fail(msg):
