@@ -12,7 +12,7 @@
   "description": "Compressed, chorused, layered arena crunch.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 6,
     "amp_bass": 4.5,
     "amp_mid": 6.5,
@@ -47,6 +47,6 @@
     "gate_thresh": -60,
     "gate_release": 80,
     "doubler": 8,
-    "out_level": -1.4
+    "out_level": -2.1
   }
 }

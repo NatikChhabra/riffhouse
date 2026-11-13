@@ -17,7 +17,14 @@ Pedals that behave like the real circuits, cleaner high gain, quiet mutes, no mo
 - Input Fix is gentler: setup never asks for more than 12 dB of it, and the hiss it would bring up is turned down while you are not playing. Setup also hears the whole of what you play when it measures your guitar, not only the loudest parts.
 - Eight new tones for the sounds of Indian rock and indie: Bangalore Thrash, Shillong Blues Rock, Bangla Band Jangle, Carnatic Prog Lead, Desi Djent, Post-Rock Swells, Bedroom Indie Clean and Nineties Indipop Crunch. 197 tones in all, every one level-matched again.
 - A classic rock solo tone that was meant to use the classic wah now does.
+- The speaker cabinets are built from the real speakers' published measurements: each one follows its speaker's response within 2 dB from 250 Hz to 5 kHz (they were up to 17 dB off). The box shapes the lows, and the mic does what a close mic does: brighter on the dust cap, much darker at the cone edge, more bass as it moves in.
+- No clicks: switching any pedal, changing tones and swinging any knob fast are click-free, checked on every pedal, tone and knob. Knobs glide instead of stepping, and a tone change dips for a moment so it never pops.
+- Delay and reverb tails ring on over a tone change instead of cutting off.
+- Three amps have new names of our own: Brit Plexi is now Brit 68, Brit 800 is Brit 81 and Hot Rod Lead is Redline Lead. Tones saved or shared before load as they did.
+- The tuner is accurate to half a cent from a five-string bass's low B to the top of the guitar neck, and settles in a quarter of a second. The metronome keeps time to the sample, at every sample rate and tempo.
 
+- Windows exclusive mode can run much smaller buffers. A guitar input that Windows sets to 192 kHz used to hold every computer at 12 ms buffers; now it goes down to about 3 ms.
+- When Windows runs the guitar input and the headphones at different rates, setup says how to set both to 48 kHz so the fastest mode works.
 - Picking an ASIO driver no longer freezes the window. A driver is first tried in a second, hidden copy of Riffhouse; one that hangs or fails there (ASIO4ALL often does when the sound devices under it are busy) is stopped from outside and never opened in the app. Automatic setup skips a driver that failed on this computer before. Picking it by hand checks it again.
 - When the computer's own Realtek chip plays the sound, setup also tries Realtek's ASIO driver, which goes lower than Windows Audio on the same jacks.
 - Setup no longer opens the sound card a second time at the end when the buffer it found is already running, so each step lags less.

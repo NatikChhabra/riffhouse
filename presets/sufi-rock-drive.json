@@ -9,7 +9,7 @@
   "description": "Soaring overdriven tone for melodic fusion lines.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 6.5,
     "amp_bass": 5,
     "amp_mid": 6.5,
@@ -45,6 +45,6 @@
     "gate_on": true,
     "gate_thresh": -62,
     "gate_release": 80,
-    "out_level": -4.8
+    "out_level": -5.1
   }
 }

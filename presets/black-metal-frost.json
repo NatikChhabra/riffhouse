@@ -8,7 +8,7 @@
   "description": "Thin, cold and trebly with a dark hall.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 8.5,
     "amp_bass": 3.5,
     "amp_mid": 4.5,
@@ -32,6 +32,6 @@
     "rev_predelay": 30,
     "rev_tone": 3.5,
     "rev_mix": 2.5,
-    "out_level": -3.9
+    "out_level": -5.4
   }
 }

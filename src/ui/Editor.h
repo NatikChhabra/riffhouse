@@ -46,7 +46,7 @@ public:
     void applyLook (ui::Look, bool reopenSettings);
 
     // Renders every screen to PNG files (used for docs and visual checks).
-    void saveSnapshots (const juce::File& folder, float scale);
+    void saveSnapshots (const juce::File& folder, float scale, float cutouts = 1.0f);
     // Every move in the app as a strip of frames, with the motion clock driven by hand: riffhouse --motion <folder>
     void saveFilmstrips (const juce::File& folder);
 

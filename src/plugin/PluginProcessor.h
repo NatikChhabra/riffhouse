@@ -2,6 +2,8 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #pragma once
 
+#include "../engine/Metronome.h"
+
 #include "../engine/FootControl.h"
 #include "../engine/History.h"
 #include "../engine/Looper.h"
@@ -191,10 +193,7 @@ private:
     Tuner tun;
     std::atomic<int> countInRemaining { 0 };
     std::atomic<bool> startAfterCountIn { false };
-    double clickPhase = 0.0;
-    double samplesPerBeat = 24000.0, beatCounter = 0.0;
-    int beatIndex = 0;
-    float clickEnv = 0.0f, clickFreq = 1000.0f;
+    Metronome metronome;
 
     juce::File captureFile, irFile;
     std::shared_ptr<std::atomic<bool>> alive = std::make_shared<std::atomic<bool>> (true);

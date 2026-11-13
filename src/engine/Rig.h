@@ -121,6 +121,11 @@ private:
     Cabinet cab;
     GraphicEq eq;
     Modulation mod;
+    // A new mod type crossfades from the old one (a copy that plays on for 20 ms) instead of
+    // cutting its ringing off, which clicked.
+    Modulation modOld;
+    int modXfade = 0, modXfadeLen = 1, modTypeNow = -1;
+    std::vector<float> modTmpL, modTmpR;
     // Two of each, so the old tone's echoes and room ring on while the new tone starts afresh.
     Delay delayA, delayB;
     Reverb reverbA, reverbB;

@@ -9,7 +9,7 @@
   "description": "8-bit video game crunch.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 5,
     "amp_bass": 5,
     "amp_mid": 5,
@@ -35,6 +35,6 @@
     "gate_thresh": -62,
     "gate_release": 80,
     "rev_on": false,
-    "out_level": 2.7
+    "out_level": -0.1
   }
 }

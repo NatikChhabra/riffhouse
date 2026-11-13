@@ -292,6 +292,7 @@ private:
     double sr = 48000.0;
     int mode = 0;
     float ratio = 0.5f, mix = 0.5f;
+    Smoother mixS; // the blend glides: a fast turn of Mix must not click
     // sub octave
     OnePole trackLp, subLp1, subLp2, upHp;
     EnvelopeFollower subEnv;
@@ -318,6 +319,10 @@ private:
     juce::dsp::Oversampling<float>* active() const noexcept { return (type == 4 || type == 5 || type == 6) && osHigh ? osHigh.get() : os.get(); }
     int type = 2;
     float drive = 0.4f, tone = 0.5f, level = 0.5f;
+    // where the circuit's drive and tone pots are on the way to the knobs: a fast turn glides
+    // (about 20 ms) instead of stepping the circuit once a block, which clicked
+    double driveNow = -1.0, toneNow = -1.0;
+    void setPots (double d, double t, bool all);
     bool dirty = true;
     Smoother levelS;
     // the pedals, each built as its circuit (see Circuits.h and the pedal lab)

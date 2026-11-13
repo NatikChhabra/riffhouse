@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Cabinet.h"
+#include "CabCurves.h"
 
 #include <complex>
 
@@ -8,25 +9,19 @@ namespace rh
 {
 namespace
 {
-    // name, fres, Q, rolloff, order, closedBack, peaks{hz,db,q}x6, brightness, tweeter, seed
+    // name, box resonance Hz and Q, closed back (0 open .. 1 sealed), dust cap lift dB, horn dB, seed
+    // The speaker's own response is its row in CabCurves.h, in the same order.
     const CabDescription cabs[] = {
-        { "1x12 Open Back", 95.0f, 0.75f, 6000.0f, 4, 0.0f,
-          { { 140, -3.0f, 2.0f }, { 220, 1.5f, 1.0f }, { 1150, 2.0f, 1.4f }, { 2600, 4.0f, 2.0f }, { 4100, 2.0f, 3.0f }, { 0, 0, 1 } }, 3.0f, 0.0f, 11u },
-        { "2x12 Blue", 88.0f, 0.85f, 6200.0f, 4, 0.3f,
-          { { 160, -1.5f, 2.0f }, { 1300, 3.0f, 1.5f }, { 3200, 5.0f, 2.5f }, { 4900, 2.5f, 3.0f }, { 700, -1.5f, 1.2f }, { 0, 0, 1 } }, 4.0f, 0.0f, 23u },
-        { "4x12 Vintage", 92.0f, 1.2f, 5600.0f, 4, 1.0f,
-          { { 120, 2.0f, 1.2f }, { 450, -1.5f, 1.0f }, { 1600, 4.0f, 1.6f }, { 2700, 3.0f, 2.0f }, { 3900, -2.0f, 3.0f }, { 0, 0, 1 } }, 2.0f, 0.0f, 37u },
-        { "4x12 Modern", 85.0f, 1.35f, 6100.0f, 4, 1.0f,
-          { { 110, 3.0f, 1.0f }, { 600, -3.0f, 1.2f }, { 1500, 2.0f, 1.2f }, { 2400, 5.0f, 1.4f }, { 4200, -4.0f, 3.0f }, { 5300, 2.0f, 4.0f } }, 2.5f, 0.0f, 41u },
-        { "2x12 American", 80.0f, 0.9f, 6600.0f, 4, 0.2f,
-          { { 150, -2.0f, 2.0f }, { 800, -2.0f, 1.0f }, { 2500, 3.0f, 1.5f }, { 5000, 2.5f, 2.0f }, { 0, 0, 1 }, { 0, 0, 1 } }, 3.5f, 0.0f, 53u },
-        { "1x8 Tiny Combo", 180.0f, 1.3f, 4000.0f, 4, 0.5f,
-          { { 900, 5.0f, 1.2f }, { 2200, 4.0f, 2.0f }, { 400, -2.0f, 1.5f }, { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0, 1 } }, 1.0f, 0.0f, 67u },
-        { "4x10 Bass", 62.0f, 1.0f, 5000.0f, 4, 1.0f,
-          { { 200, 2.0f, 1.0f }, { 800, -2.0f, 1.0f }, { 2000, 3.0f, 1.5f }, { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0, 1 } }, 1.5f, -14.0f, 71u },
-        { "1x15 Bass", 45.0f, 0.9f, 2600.0f, 4, 1.0f,
-          { { 100, 3.0f, 1.0f }, { 700, 2.0f, 1.2f }, { 1600, 1.5f, 2.0f }, { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0, 1 } }, 0.5f, 0.0f, 83u },
+        { "1x12 Open Back", 95.0f, 0.75f, 0.0f, 3.0f, 0.0f, 11u },
+        { "2x12 Blue", 88.0f, 0.85f, 0.3f, 3.0f, 0.0f, 23u },
+        { "4x12 Vintage", 92.0f, 1.2f, 1.0f, 3.0f, 0.0f, 37u },
+        { "4x12 Modern", 85.0f, 1.35f, 1.0f, 3.0f, 0.0f, 41u },
+        { "2x12 American", 80.0f, 0.9f, 0.2f, 3.0f, 0.0f, 53u },
+        { "1x8 Tiny Combo", 180.0f, 1.3f, 0.5f, 2.0f, 0.0f, 67u },
+        { "4x10 Bass", 62.0f, 1.0f, 1.0f, 1.5f, -14.0f, 71u },
+        { "1x15 Bass", 45.0f, 0.9f, 1.0f, 1.0f, 0.0f, 83u },
     };
+    static_assert (sizeof (cabs) / sizeof (cabs[0]) == sizeof (kCabCurves) / sizeof (kCabCurves[0]), "a curve for every cab");
 
     using cd = std::complex<double>;
 
@@ -99,34 +94,37 @@ std::vector<float> generateCabIr (int cabIndex, float mic, float distance, doubl
     const int N = sampleRate > 100000.0 ? 32768 : 16384;
     std::vector<double> logMag ((size_t) N / 2 + 1);
 
-    // a little deterministic ripple, as real cones break up unevenly
-    Noise rnd (c.seed * 2654435761u + 7u);
-    struct Rip { double f, db, q; };
-    std::vector<Rip> ripples;
-    for (int k = 0; k < 14; ++k)
+    // The speaker itself is its published curve (CabCurves.h). Below about 200 Hz that curve
+    // shows the maker's test baffle, not a cabinet, so the box takes over there: a sealed
+    // back gives the tight resonance hump, an open back loses more of the deep lows.
+    const auto speakerDb = [&] (double f)
     {
-        const double f = 900.0 * std::pow (7.0, 0.5 + 0.5 * rnd.next());
-        ripples.push_back ({ f, 1.6 * rnd.next(), 6.0 + 4.0 * (0.5 + 0.5 * rnd.next()) });
-    }
+        const auto& row = kCabCurves[std::clamp (cabIndex, 0, numCabs() - 1)];
+        const double k = std::clamp (12.0 * std::log2 (f / kCabCurveLowHz), 0.0, (double) (kCabCurvePoints - 1));
+        const int i = std::min ((int) k, kCabCurvePoints - 2);
+        const double t = k - i;
+        return (double) row[i] + t * (double) (row[i + 1] - row[i]);
+    };
+    const double joinHz = 200.0;
+    const double boxAtJoin = hp2Db (joinHz, c.resonanceHz, c.resonanceQ) - speakerDb (joinHz);
 
-    // the mic moving off the dust cap darkens the top end and softens the presence
-    const double rolloff = c.rolloffHz * (1.0 - 0.35 * mic);
-    const double capDb = c.brightness * (1.0 - mic) - 2.5 * mic;
-    const double proximityDb = 4.5 * (1.0 - distance) * (1.0 - distance);
+    // The published curve is on axis at a metre, which sits about where the mic knob starts
+    // (0.3). Toward the dust cap the top gets brighter; toward the cone edge it rolls off,
+    // about 10 dB down at 5 kHz at the very edge, as a close mic does.
+    const double toCap = std::max (0.0, (0.3 - mic) / 0.3);
+    const double toEdge = std::max (0.0, ((double) mic - 0.3) / 0.7);
+    // A directional mic's bass lift grows fast as it nears the grille: about 3 dB where the
+    // distance knob starts (0.2), near 6 dB touching, gone a couple of feet back.
+    const double proximityDb = 2.9 * std::pow ((1.0 - distance) / 0.8, 3.0);
 
     for (int i = 0; i <= N / 2; ++i)
     {
         const double f = std::max (1.0, (double) i * sampleRate / N);
-        double db = hp2Db (f, c.resonanceHz, c.resonanceQ);
-        // open-backed cabs lose a bit more of the deep lows
+        const double box = hp2Db (f, c.resonanceHz, c.resonanceQ) - boxAtJoin;
+        const double w = std::clamp ((std::log2 (f) - std::log2 (120.0)) / (std::log2 (250.0) - std::log2 (120.0)), 0.0, 1.0);
+        const double ws = w * w * (3.0 - 2.0 * w);
+        double db = ws * speakerDb (f) + (1.0 - ws) * box;
         db += (1.0 - c.closedBack) * shelfDb (f, c.resonanceHz * 1.3, -3.0, false);
-        for (int o = 0; o < c.rolloffOrder; o += 2)
-            db += lp2Db (f, rolloff, o == 0 ? 0.9 : 0.6);
-        for (const auto& p : c.peaks)
-            if (p.hz > 0) db += peakDb (f, p.hz, p.db, p.q);
-        for (const auto& r : ripples)
-            db += peakDb (f, r.f, r.db, r.q);
-        db += peakDb (f, 3600.0, capDb, 1.2);
         db += shelfDb (f, 180.0, proximityDb, false);
         if (c.tweeterDb != 0.0f)
         {
@@ -135,6 +133,8 @@ std::vector<float> generateCabIr (int cabIndex, float mic, float distance, doubl
             const double cone = db;
             db = 10.0 * std::log10 (std::pow (10.0, cone / 10.0) + std::pow (10.0, horn / 10.0));
         }
+        db += toCap * (peakDb (f, 4500.0, c.brightness, 0.9));
+        db += toEdge * 0.6 * lp2Db (f, 1800.0, 0.7);
         // gentle infrasonic and ultrasonic limits
         db += hp2Db (f, 30.0, 0.7) + lp2Db (f, std::min (18000.0, 0.45 * sampleRate), 0.7);
         logMag[(size_t) i] = std::max (db, -120.0) * std::log (10.0) / 20.0;

@@ -36,7 +36,7 @@ private:
     int decimation = 2;
     juce::AbstractFifo fifo { 1 << 15 };
     std::vector<float> ring = std::vector<float> (1 << 15);
-    std::vector<float> window = std::vector<float> (4096), diff = std::vector<float> (2048);
+    std::vector<float> window = std::vector<float> (4096), diff = std::vector<float> (2048), raw = std::vector<float> (2048);
     float lpState = 0.0f;
     int decimCounter = 0;
     float smoothedHz = 0.0f;

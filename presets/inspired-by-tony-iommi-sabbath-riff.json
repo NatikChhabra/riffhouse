@@ -10,7 +10,7 @@
   "description": "Treble booster into a cranked British head. Tune down.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 6.5,
     "amp_bass": 5,
     "amp_mid": 6.5,
@@ -39,6 +39,6 @@
     "gate_on": true,
     "gate_thresh": -60,
     "gate_release": 80,
-    "out_level": -3.1
+    "out_level": -3.7
   }
 }

@@ -9,7 +9,7 @@
   "description": "Big, mid-boosted squealing rhythm.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 7.5,
     "amp_bass": 6,
     "amp_mid": 7,
@@ -38,6 +38,6 @@
     "rev_predelay": 5,
     "rev_tone": 5,
     "rev_mix": 0.8,
-    "out_level": -3.7
+    "out_level": -4.1
   }
 }

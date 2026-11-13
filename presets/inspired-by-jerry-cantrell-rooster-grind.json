@@ -11,7 +11,7 @@
   "description": "Thick, sludgy, mid-heavy grunge.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 7,
     "amp_bass": 6,
     "amp_mid": 6.5,
@@ -40,6 +40,6 @@
     "rev_predelay": 5,
     "rev_tone": 4.5,
     "rev_mix": 1,
-    "out_level": -2.0
+    "out_level": -2.2
   }
 }

@@ -230,7 +230,7 @@ public:
                 reports::sayHelloIfDue (s, versionLabel());
             });
 
-        // riffhouse --snapshots <folder> [scale]: render every screen to PNG and quit
+        // riffhouse --snapshots <folder> [scale] [--cutouts <times>] [--tone "<name>"]: render every screen to PNG and quit
         auto args = juce::StringArray::fromTokens (commandLine, true);
         if (const int m = args.indexOf ("--motion"); m >= 0 && m + 1 < args.size())
         {
@@ -253,11 +253,15 @@ public:
                         proc->loadPreset (i);
             const juce::File folder (juce::File::getCurrentWorkingDirectory().getChildFile (args[at + 1].unquoted()));
             const float scale = at + 2 < args.size() ? (float) args[at + 2].getDoubleValue() : 1.0f;
-            juce::Timer::callAfterDelay (1500, [this, folder, scale]
+            // --cutouts <times>: the gear cutouts that many times their usual size (for print and film)
+            float cutouts = 1.0f;
+            if (const int c = args.indexOf ("--cutouts"); c >= 0 && c + 1 < args.size())
+                cutouts = juce::jlimit (0.25f, 8.0f, (float) args[c + 1].getDoubleValue());
+            juce::Timer::callAfterDelay (1500, [this, folder, scale, cutouts]
             {
                 if (auto* ed = dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()))
                 {
-                    ed->saveSnapshots (folder, scale > 0.0f ? scale : 1.0f);
+                    ed->saveSnapshots (folder, scale > 0.0f ? scale : 1.0f, cutouts);
                     ed->rehearseSetup();
                     folder.getChildFile ("rehearsed.txt").replaceWithText ("The end of a real setup ran through.\n");
                 }

@@ -73,9 +73,16 @@ bool presetFromJson (const juce::String& json, Preset& out, juce::String& error)
             float value = 0.0f;
             if (s.kind == ParamKind::choice && prop.value.isString())
             {
+                // names the amps had before 0.1.5, still in players' saved tones and shared codes
+                static const std::pair<const char*, const char*> renamed[] = {
+                    { "Brit Plexi", "Brit 68" }, { "Brit 800", "Brit 81" }, { "Hot Rod Lead", "Redline Lead" },
+                };
+                juce::String name = prop.value.toString();
+                for (const auto& [was, now] : renamed)
+                    if (name.equalsIgnoreCase (was)) name = now;
                 int found = -1;
                 for (size_t c = 0; c < s.choices.size(); ++c)
-                    if (prop.value.toString().equalsIgnoreCase (s.choices[c]))
+                    if (name.equalsIgnoreCase (s.choices[c]))
                         found = (int) c;
                 if (found < 0)
                 {

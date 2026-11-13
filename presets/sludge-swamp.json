@@ -9,7 +9,7 @@
   "description": "Thick, murky and loud.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 8,
     "amp_bass": 7,
     "amp_mid": 5.5,
@@ -38,6 +38,6 @@
     "rev_predelay": 5,
     "rev_tone": 4,
     "rev_mix": 0.8,
-    "out_level": -2.0
+    "out_level": -1.1
   }
 }

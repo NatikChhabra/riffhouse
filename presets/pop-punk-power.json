@@ -9,7 +9,7 @@
   "description": "Bright, tight and loud power chords.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 6.5,
     "amp_bass": 5.5,
     "amp_mid": 6,
@@ -29,6 +29,6 @@
     "gate_release": 80,
     "rev_on": false,
     "doubler": 6,
-    "out_level": -1.2
+    "out_level": -2.1
   }
 }

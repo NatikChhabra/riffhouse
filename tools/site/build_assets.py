@@ -34,7 +34,7 @@ PEDALS = [
     ("reverb-3", "Spring Tank", "Reverb"), ("reverb-4", "Shimmer", "Reverb"), ("reverb-5", "Cloud", "Reverb"),
     ("lofi-0", "Dusty Tape", "Lo-fi"),
 ]
-AMPS = ["Glass Clean", "Tweed Edge", "Chime Top", "Brit Plexi", "Brit 800", "Hot Rod Lead",
+AMPS = ["Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline Lead",
         "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture"]
 CABS = ["1x12 Open Back", "2x12 Blue", "4x12 Vintage", "4x12 Modern", "2x12 American",
         "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR"]

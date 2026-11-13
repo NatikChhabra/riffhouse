@@ -9,7 +9,7 @@
   "description": "Expressive auto-wah lead.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 7,
     "amp_bass": 5,
     "amp_mid": 6,
@@ -39,6 +39,6 @@
     "gate_on": true,
     "gate_thresh": -60,
     "gate_release": 80,
-    "out_level": -3.6
+    "out_level": -4.9
   }
 }

@@ -10,7 +10,7 @@
   "description": "Pure downstroke buzzsaw.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 7.5,
     "amp_bass": 5,
     "amp_mid": 6.5,
@@ -29,6 +29,6 @@
     "gate_thresh": -58,
     "gate_release": 80,
     "rev_on": false,
-    "out_level": -3.7
+    "out_level": -4.7
   }
 }

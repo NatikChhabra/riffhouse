@@ -12,6 +12,7 @@ void Tuner::prepare (double sampleRate)
     decimation = sampleRate > 60000.0 ? 4 : 2;
     window.assign (4096, 0.0f);
     diff.assign (2048, 0.0f);
+    raw.assign (2048, 0.0f);
     fifo.reset();
 }
 
@@ -101,6 +102,7 @@ Tuner::Reading Tuner::analyse()
                 d += delta * delta;
             }
             running += d;
+            raw[(size_t) tau] = d;
             diff[(size_t) tau] = running > 0.0f ? d * (float) tau / running : 1.0f;
         }
         int best = -1;
@@ -117,7 +119,25 @@ Tuner::Reading Tuner::analyse()
             const float a = diff[(size_t) (best - 1)], b = diff[(size_t) best], c = diff[(size_t) (best + 1)];
             const float denom = a - 2.0f * b + c;
             const float shift = std::abs (denom) > 1e-9f ? 0.5f * (a - c) / denom : 0.0f;
-            hz = (float) (rate / ((float) best + shift));
+            double period = (double) best + shift;
+            // The same dip comes back at every whole number of periods, and an error of a
+            // fraction of a sample there is that fraction over the count: measured at the
+            // farthest repeat in reach, a high note is read to a tenth of a cent, where one
+            // period at a time left it two cents out.
+            const int k = (int) std::floor ((double) (tauMax - 3) / period);
+            if (k >= 2)
+            {
+                const int centre = (int) std::lround (period * k);
+                int at = centre;
+                for (int t = std::max (2, centre - 2); t <= std::min (tauMax - 2, centre + 2); ++t)
+                    if (raw[(size_t) t] < raw[(size_t) at]) at = t;
+                const float ra = raw[(size_t) (at - 1)], rb = raw[(size_t) at], rc = raw[(size_t) (at + 1)];
+                const float rd = ra - 2.0f * rb + rc;
+                const double fine = ((double) at + (std::abs (rd) > 1e-12f ? 0.5 * (ra - rc) / rd : 0.0)) / k;
+                // only if it agrees with the first look (a wrong repeat would pick another note)
+                if (std::abs (fine / period - 1.0) < 0.01) period = fine;
+            }
+            hz = (float) (rate / period);
         }
     }
 

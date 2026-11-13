@@ -9,7 +9,7 @@
   "description": "Smooth, mid-heavy, endless sustain.",
   "params": {
     "amp_on": true,
-    "amp_model": "Hot Rod Lead",
+    "amp_model": "Redline Lead",
     "amp_gain": 7,
     "amp_bass": 5,
     "amp_mid": 7.5,
@@ -33,6 +33,6 @@
     "gate_on": true,
     "gate_thresh": -62,
     "gate_release": 80,
-    "out_level": -2.1
+    "out_level": -2.0
   }
 }

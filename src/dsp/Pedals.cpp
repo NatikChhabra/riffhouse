@@ -594,10 +594,10 @@ void NoiseGate::process (float* x, int n, float* gainsOut)
 void Compressor::prepare (double sampleRate)
 {
     sr = sampleRate;
-    makeupSmooth.prepare (sr, 60.0f);
+    makeupSmooth.prepare (sr, 100.0f);
     mixSmooth.prepare (sr, 20.0f);
-    threshSmooth.prepare (sr, 60.0f);
-    ratioSmooth.prepare (sr, 60.0f);
+    threshSmooth.prepare (sr, 100.0f);
+    ratioSmooth.prepare (sr, 100.0f);
     set (5, 4, 5, 10);
     reset();
 }
@@ -754,6 +754,7 @@ void PitchPedal::prepare (double sampleRate)
     subEnv.prepare (sr, 3.0f, 60.0f);
     window = (int) (0.022 * sr); // 22 ms grains: about 11 ms of shifter latency
     line.prepare (window * 2 + 8);
+    mixS.prepare (sr, 30.0f);
     reset();
 }
 
@@ -763,6 +764,7 @@ void PitchPedal::reset()
     flip = 1.0f; lastSign = 0.0f;
     line.reset();
     phase = 0.0f;
+    mixS.reset (mix);
 }
 
 void PitchPedal::set (int m, float semitones, float mixKnob)
@@ -770,15 +772,22 @@ void PitchPedal::set (int m, float semitones, float mixKnob)
     mode = m;
     ratio = std::pow (2.0f, semitones / 12.0f);
     mix = clamp01 (mixKnob / 10.0f);
+    mixS.setTarget (mix);
 }
 
 void PitchPedal::process (float* x, int n)
 {
-    const float dryG = mode == 2 ? std::cos (mix * 1.5707963f) : 1.0f;
-    const float wetG = mode == 2 ? std::sin (mix * 1.5707963f) : mix * 1.6f;
-
+    float m = mixS.get();
+    float dryG = mode == 2 ? std::cos (m * 1.5707963f) : 1.0f;
+    float wetG = mode == 2 ? std::sin (m * 1.5707963f) : m * 1.6f;
     for (int i = 0; i < n; ++i)
     {
+        if (mixS.isSmoothing())
+        {
+            m = mixS.next();
+            dryG = mode == 2 ? std::cos (m * 1.5707963f) : 1.0f;
+            wetG = mode == 2 ? std::sin (m * 1.5707963f) : m * 1.6f;
+        }
         const float in = x[i];
         float wet = 0.0f;
         if (mode == 0)
@@ -850,6 +859,7 @@ void DrivePedal::reset()
     if (osHigh) osHigh->reset();
     green.reset(); rodent.reset(); fuzz.reset();
     boost.reset(); trebleBoost.reset(); blues.reset(); metal.reset();
+    setPots (drive, tone, true); // a fresh start is already where the knobs are
     // A circuit starts with every capacitor empty and charges to where its bias holds it, and
     // that charging comes out as a thump (-49 dB from the blues drive and the metal box; the
     // others start where they rest). Run those on silence for 10 ms first, which leaves under
@@ -870,6 +880,7 @@ void DrivePedal::set (int t, float d, float tn, float lv)
     {
         const bool typeChanged = t != type;
         type = t; drive = clamp01 (d / 10.0f); tone = clamp01 (tn / 10.0f); level = clamp01 (lv / 10.0f);
+        if (typeChanged) driveNow = -1.0; // another pedal: its pots start where the knobs are
         dirty = true;
         update();
         if (typeChanged) reset();
@@ -880,16 +891,24 @@ void DrivePedal::update()
 {
     if (! dirty) return;
     dirty = false;
-    green.set (drive, tone);
-    rodent.set (drive, tone);
-    fuzz.set (drive, tone);
-    boost.set (drive, tone);
-    trebleBoost.set (drive, tone);
-    blues.set (drive, tone);
-    metal.set (drive, tone);
+    // the first setting, or a new pedal type, lands at once; a knob on the same pedal glides
+    if (driveNow < 0.0) setPots (drive, tone, true);
     // each circuit sets its own level, as the real pedal's volume at noon; the level knob
     // gives 15 dB either side of that
     levelS.setTarget (dbToGain ((level - 0.5f) * 30.0f));
+}
+
+void DrivePedal::setPots (double d, double t, bool all)
+{
+    driveNow = d;
+    toneNow = t;
+    if (all || type == 0) boost.set (d, t);
+    if (all || type == 1) trebleBoost.set (d, t);
+    if (all || type == 2) green.set (d, t);
+    if (all || type == 3) blues.set (d, t);
+    if (all || type == 4) rodent.set (d, t);
+    if (all || type == 5) fuzz.set (d, t);
+    if (all || type == 6) metal.set (d, t);
 }
 
 double DrivePedal::runCircuit (double v) noexcept
@@ -916,8 +935,19 @@ void DrivePedal::process (float* data, int n)
     float* x = up.getChannelPointer (0);
     const int on = (int) up.getNumSamples();
     constexpr double toVolts = circuit::kVoltsPerUnit, fromVolts = 1.0 / circuit::kVoltsPerUnit;
+    const double rate = over == osHigh.get() ? 2.0 * osr : osr;
+    const double k = 1.0 - std::exp (-32.0 / (0.020 * rate)); // per 32 oversampled samples
     for (int i = 0; i < on; ++i)
+    {
+        if ((i & 31) == 0 && (driveNow != (double) drive || toneNow != (double) tone))
+        {
+            double d = driveNow + ((double) drive - driveNow) * k, t = toneNow + ((double) tone - toneNow) * k;
+            if (std::abs (d - drive) < 1.0e-4) d = drive;
+            if (std::abs (t - tone) < 1.0e-4) t = tone;
+            setPots (d, t, false);
+        }
         x[i] = (float) (runCircuit ((double) x[i] * toVolts) * fromVolts) * levelS.next();
+    }
     over->processSamplesDown (block);
 }
 
@@ -1019,7 +1049,9 @@ void Modulation::wake()
 
 void Modulation::set (int t, float rate, float d, float m)
 {
-    if (t != type) { type = t; reset(); }
+    // a new type starts with nothing ringing but the delay lines still full, so a chorus
+    // picked while playing has its voices at once (the rig crossfades from the old type)
+    if (t != type) { type = t; wake(); }
     // vibe and tremolo like faster top speeds
     rateHz = expMap (rate / 10.0f, 0.05f, type == 3 ? 14.0f : 10.0f);
     lfo.setRate (rateHz);

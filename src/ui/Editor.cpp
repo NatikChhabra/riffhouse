@@ -1468,7 +1468,7 @@ void RiffhouseEditor::saveFilmstrips (const juce::File& folder)
     motion::freeze (true);
 }
 
-void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
+void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, float cutouts)
 {
     folder.createDirectory();
     motion::freeze (true); // pictures show finished states, never something half way
@@ -1742,7 +1742,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
             f.deleteFile();
             if (auto out = f.createOutputStream()) png.writeImageToStream (img, *out);
         };
-        const float big = 3.0f;
+        const float big = 3.0f * cutouts;
         struct Family { int module; int types; const char* name; };
         for (auto fam : { Family { mGate, 1, "gate" }, Family { mComp, 1, "comp" }, Family { mWah, 3, "wah" }, Family { mPitch, 1, "pitch" },
                           Family { mDrive, 7, "drive" }, Family { mEq, 1, "eq" }, Family { mMod, 6, "mod" }, Family { mDelay, 4, "delay" },
@@ -1766,14 +1766,14 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale)
             for (auto k : { P::ampGain, P::ampBass, P::ampMid, P::ampTreble, P::ampPresence, P::ampDepth, P::ampMaster })
                 names.add (spec (k).name);
             names.add ("Volume");
-            auto thumb = ampThumb (d, m == choices::neuralCapture ? juce::String ("your capture") : juce::String (spec (P::ampModel).choices[(size_t) m]).toLowerCase(), 1.6f, &names);
+            auto thumb = ampThumb (d, m == choices::neuralCapture ? juce::String ("your capture") : juce::String (spec (P::ampModel).choices[(size_t) m]).toLowerCase(), 1.6f * cutouts, &names);
             juce::Graphics tg (thumb.image);
-            tg.addTransform (juce::AffineTransform::translation (-thumb.area.getX(), -thumb.area.getY()).scaled (1.6f));
+            tg.addTransform (juce::AffineTransform::translation (-thumb.area.getX(), -thumb.area.getY()).scaled (1.6f * cutouts));
             drawAmpJewel (tg, thumb.amp, d, true);
             write ("amp-" + juce::String (m).paddedLeft ('0', 2), thumb.image);
         }
         for (int m = 0; m < 8; ++m)
-            write ("cab-" + juce::String (m), cabThumb (m, 2.0f).image);
+            write ("cab-" + juce::String (m), cabThumb (m, 2.0f * cutouts).image);
     }
 
     // what the 3D renderer needs to build each pedal: its design, where its parts sit, and its print

@@ -10,7 +10,7 @@
   "description": "Massive, saturated fuzz wall.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 5,
     "amp_bass": 6,
     "amp_mid": 5,
@@ -35,6 +35,6 @@
     "gate_release": 80,
     "rev_on": false,
     "doubler": 8,
-    "out_level": 0.0
+    "out_level": 0.2
   }
 }

@@ -9,7 +9,7 @@
   "description": "Thick, dark, singing lead with the treble rolled off.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 8,
     "amp_bass": 6,
     "amp_mid": 7,
@@ -38,6 +38,6 @@
     "gate_on": true,
     "gate_thresh": -62,
     "gate_release": 80,
-    "out_level": -2.7
+    "out_level": -2.0
   }
 }

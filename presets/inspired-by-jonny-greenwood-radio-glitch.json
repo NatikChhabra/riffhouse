@@ -10,7 +10,7 @@
   "description": "Spiky, glitchy, lo-fi attack.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 6,
     "amp_bass": 5,
     "amp_mid": 6,
@@ -41,6 +41,6 @@
     "rev_predelay": 5,
     "rev_tone": 5,
     "rev_mix": 1,
-    "out_level": -0.5
+    "out_level": -0.7
   }
 }

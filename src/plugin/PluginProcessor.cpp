@@ -343,38 +343,17 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 void RiffhouseProcessor::renderClick (float* l, float* r, int n)
 {
     const bool counting = countInRemaining.load() > 0;
-    if (! metronomeOn.load() && ! counting) { beatCounter = 0; beatIndex = 0; return; }
-    samplesPerBeat = sampleRate * 60.0 / juce::jlimit (30.0, 300.0, (double) metronomeBpm.load());
+    if (! metronomeOn.load() && ! counting) { metronome.restart(); return; }
     const float level = counting ? std::max (0.5f, metronomeLevel.load()) : metronomeLevel.load();
-    for (int i = 0; i < n; ++i)
+    metronome.render (l, r, n, sampleRate, (double) metronomeBpm.load(), level, [this, counting] (int)
     {
-        if (beatCounter <= 0.0)
+        // count-in: one bar of four, then recording starts
+        if (counting && countInRemaining.fetch_sub (1) == 1 && startAfterCountIn.exchange (false))
         {
-            beatCounter += samplesPerBeat;
-            clickEnv = 1.0f;
-            clickFreq = (beatIndex % 4 == 0) ? 2000.0f : 1400.0f;
-            clickPhase = 0.0;
-            ++beatIndex;
-            if (counting)
-            {
-                // count-in: one bar of four, then recording starts
-                if (countInRemaining.fetch_sub (1) == 1 && startAfterCountIn.exchange (false))
-                {
-                    writeTake.store (true);
-                    triggerAsyncUpdate();
-                }
-            }
+            writeTake.store (true);
+            triggerAsyncUpdate();
         }
-        beatCounter -= 1.0;
-        if (clickEnv > 0.0005f)
-        {
-            const float s = (float) std::sin (clickPhase) * clickEnv * 0.25f * level;
-            clickPhase += juce::MathConstants<double>::twoPi * clickFreq / sampleRate;
-            clickEnv *= 0.9985f;
-            l[i] += s;
-            r[i] += s;
-        }
-    }
+    });
 }
 
 void RiffhouseProcessor::refreshLatency()
@@ -548,8 +527,7 @@ bool RiffhouseProcessor::startRecording (bool countIn)
 {
     if (countIn)
     {
-        beatCounter = 0;
-        beatIndex = 0;
+        metronome.restart();
         startAfterCountIn.store (true);
         countInRemaining.store (4);
         return true;

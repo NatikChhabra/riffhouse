@@ -9,7 +9,7 @@
   "description": "Hot-rodded British rhythm with bite.",
   "params": {
     "amp_on": true,
-    "amp_model": "Hot Rod Lead",
+    "amp_model": "Redline Lead",
     "amp_gain": 5.5,
     "amp_bass": 5.5,
     "amp_mid": 6.5,
@@ -33,6 +33,6 @@
     "rev_predelay": 8,
     "rev_tone": 5,
     "rev_mix": 1.2,
-    "out_level": -2.6
+    "out_level": -3.2
   }
 }

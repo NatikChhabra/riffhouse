@@ -64,7 +64,7 @@ namespace
 
         s.push_back (tog (P::ampOn, "amp_on", "Amp", true));
         s.push_back (pick (P::ampModel, "amp_model", "Amp Model",
-                           { "Glass Clean", "Tweed Edge", "Chime Top", "Brit Plexi", "Brit 800", "Hot Rod Lead",
+                           { "Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline Lead",
                              "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture" }, 3));
         s.push_back (knob (P::ampGain, "amp_gain", "Gain", 5.0f));
         s.push_back (knob (P::ampBass, "amp_bass", "Bass", 5.0f));

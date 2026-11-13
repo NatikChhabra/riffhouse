@@ -10,7 +10,7 @@
   "description": "Huge, fuzzy and slow. Tune low.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 7,
     "amp_bass": 7,
     "amp_mid": 5,
@@ -39,6 +39,6 @@
     "rev_predelay": 5,
     "rev_tone": 4,
     "rev_mix": 1.2,
-    "out_level": -3.4
+    "out_level": -2.6
   }
 }

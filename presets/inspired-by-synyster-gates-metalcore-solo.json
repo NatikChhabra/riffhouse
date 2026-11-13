@@ -10,7 +10,7 @@
   "description": "Saturated, polished lead with delay.",
   "params": {
     "amp_on": true,
-    "amp_model": "Hot Rod Lead",
+    "amp_model": "Redline Lead",
     "amp_gain": 7.5,
     "amp_bass": 5,
     "amp_mid": 6.5,
@@ -46,6 +46,6 @@
     "gate_on": true,
     "gate_thresh": -58,
     "gate_release": 80,
-    "out_level": -3.1
+    "out_level": -2.5
   }
 }

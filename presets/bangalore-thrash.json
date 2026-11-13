@@ -9,7 +9,7 @@
   "description": "Fast, dry thrash rhythm from the old-school metal scene. Tight lows, bright pick.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 7.5,
     "amp_bass": 5.5,
     "amp_mid": 6,
@@ -33,6 +33,6 @@
     "gate_thresh": -56,
     "gate_release": 50,
     "rev_on": false,
-    "out_level": -3.3
+    "out_level": -4.3
   }
 }

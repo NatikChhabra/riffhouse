@@ -11,7 +11,7 @@
   "description": "Hot, crunchy British punk rhythm.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit 800",
+    "amp_model": "Brit 81",
     "amp_gain": 7,
     "amp_bass": 5.5,
     "amp_mid": 6.5,
@@ -31,6 +31,6 @@
     "gate_release": 80,
     "rev_on": false,
     "doubler": 6,
-    "out_level": -1.2
+    "out_level": -1.9
   }
 }

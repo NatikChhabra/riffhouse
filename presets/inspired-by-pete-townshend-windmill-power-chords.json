@@ -10,7 +10,7 @@
   "description": "Loud, open British power chords.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 7,
     "amp_bass": 5,
     "amp_mid": 5.5,
@@ -34,6 +34,6 @@
     "gate_on": true,
     "gate_thresh": -62,
     "gate_release": 80,
-    "out_level": -3.6
+    "out_level": -4.4
   }
 }

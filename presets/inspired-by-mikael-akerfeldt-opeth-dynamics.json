@@ -9,7 +9,7 @@
   "description": "Dark, warm high gain that still has detail.",
   "params": {
     "amp_on": true,
-    "amp_model": "Hot Rod Lead",
+    "amp_model": "Redline Lead",
     "amp_gain": 6.5,
     "amp_bass": 6,
     "amp_mid": 6,
@@ -33,6 +33,6 @@
     "rev_predelay": 8,
     "rev_tone": 4.5,
     "rev_mix": 1.2,
-    "out_level": -0.6
+    "out_level": -0.7
   }
 }

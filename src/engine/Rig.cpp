@@ -59,6 +59,9 @@ void Rig::prepare (double sampleRate, int block)
     nam.prepare (sr, maxBlock);
     eq.prepare (sr);
     mod.prepare (sr);
+    modOld.prepare (sr);
+    modXfadeLen = std::max (1, (int) (0.020 * sr));
+    modXfade = 0;
     for (Delay* d : { &delayA, &delayB }) d->prepare (sr);
     for (Reverb* r : { &reverbA, &reverbB }) r->prepare (sr);
     dlyTailBusy = revTailBusy = false;
@@ -87,6 +90,8 @@ void Rig::prepare (double sampleRate, int block)
     dryR.assign ((size_t) maxBlock, 0.0f);
     tailL.assign ((size_t) maxBlock, 0.0f);
     tailR.assign ((size_t) maxBlock, 0.0f);
+    modTmpL.assign ((size_t) maxBlock, 0.0f);
+    modTmpR.assign ((size_t) maxBlock, 0.0f);
     firstParams = true;
     setParams (p);
     cab.prepare (sr, maxBlock);
@@ -96,7 +101,7 @@ void Rig::prepare (double sampleRate, int block)
 void Rig::reset()
 {
     input.reset(); gate.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
-    eq.reset(); mod.reset(); lofi.reset(); doubler.reset(); limiter.reset();
+    eq.reset(); mod.reset(); modOld.reset(); modXfade = 0; lofi.reset(); doubler.reset(); limiter.reset();
     for (Delay* d : { &delayA, &delayB }) d->reset();
     for (Reverb* r : { &reverbA, &reverbB }) r->reset();
     dlyTailBusy = revTailBusy = false;
@@ -210,7 +215,16 @@ void Rig::applyParams (const ParamValues& v, bool toneChange)
 
     const float eqGains[7] = { get (P::eq100), get (P::eq200), get (P::eq400), get (P::eq800), get (P::eq1k6), get (P::eq3k2), get (P::eq6k4) };
     eq.set (eqGains, get (P::eqLevel));
-    mod.set (choice (p, P::modType), get (P::modRate), get (P::modDepth), get (P::modMix));
+    {
+        const int type = choice (p, P::modType);
+        if (! firstParams && modTypeNow >= 0 && type != modTypeNow && ! fMod.idle())
+        {
+            modOld = mod; // same sizes as prepared, so this copies and never allocates
+            modXfade = modXfadeLen;
+        }
+        modTypeNow = type;
+        mod.set (type, get (P::modRate), get (P::modDepth), get (P::modMix));
+    }
 
     const float space = get (P::space);
     if (toneChange)
@@ -348,7 +362,22 @@ void Rig::processMono (float* x, int n)
 void Rig::processStereo (float* l, float* r, int n)
 {
     if (fMod.idle()) mod.listen (l, r, n);
-    runFadedStereo (fMod, l, r, n, dry, dryR, [&] (float* a, float* b, int k) { mod.process (a, b, k); });
+    runFadedStereo (fMod, l, r, n, dry, dryR, [&] (float* a, float* b, int k)
+    {
+        if (modXfade <= 0) { mod.process (a, b, k); return; }
+        std::copy (a, a + k, modTmpL.begin());
+        std::copy (b, b + k, modTmpR.begin());
+        modOld.process (modTmpL.data(), modTmpR.data(), k);
+        mod.process (a, b, k);
+        for (int i = 0; i < k; ++i)
+        {
+            const float t = modXfade > 0 ? (float) modXfade / (float) modXfadeLen : 0.0f; // old one's share
+            const float g = t * t * (3.0f - 2.0f * t);
+            a[i] += (modTmpL[(size_t) i] - a[i]) * g;
+            b[i] += (modTmpR[(size_t) i] - b[i]) * g;
+            if (modXfade > 0) --modXfade;
+        }
+    });
 
     auto timeFx = [&] (bool enabled, bool& active, int& quiet, auto& fx)
     {

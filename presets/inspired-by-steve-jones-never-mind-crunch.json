@@ -9,7 +9,7 @@
   "description": "Thick, cranked British punk rhythm.",
   "params": {
     "amp_on": true,
-    "amp_model": "Brit Plexi",
+    "amp_model": "Brit 68",
     "amp_gain": 8,
     "amp_bass": 5.5,
     "amp_mid": 6.5,
@@ -29,6 +29,6 @@
     "gate_release": 80,
     "rev_on": false,
     "doubler": 6,
-    "out_level": -2.2
+    "out_level": -2.6
   }
 }
