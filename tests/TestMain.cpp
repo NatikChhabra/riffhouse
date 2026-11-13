@@ -1151,6 +1151,252 @@ double referenceSeconds (double sr, double seconds)
     return best;
 }
 
+// Thousands of random changes while it plays: every knob, switch, model and tone at random,
+// blocks of any size up to the most the host asked for, and an input that turns hostile now
+// and then (full-scale square, DC, near-denormal dust, silence, clicks). It must never make a
+// NaN, never go past the safety limiter, never get stuck making sound once everything is off,
+// and silence must not get slow (denormals).
+void testStress (double sr, int maxBlock, double seconds, juce::int64 seed)
+{
+    std::printf ("stress @ %.0f Hz, blocks up to %d, %.0f s\n", sr, maxBlock, seconds);
+    juce::Random rnd (seed);
+    const auto presets = loadPresets();
+    const auto& specs = paramSpecs();
+    auto in = test::guitarDi (sr, seconds, 0.3f);
+    // hostile stretches, each half a second, at random places
+    const size_t half = (size_t) (sr * 0.5);
+    for (int k = 0; k < (int) seconds; ++k)
+    {
+        const size_t at = (size_t) rnd.nextInt ((int) (in.size() - half));
+        const int kind = rnd.nextInt (5);
+        for (size_t i = at; i < at + half; ++i)
+        {
+            if (kind == 0) in[i] = ((i / 40) % 2) != 0 ? 1.0f : -1.0f;  // full-scale square
+            else if (kind == 1) in[i] = 0.5f;                          // DC
+            else if (kind == 2) in[i] = 1.0e-30f * (float) ((int) (i % 3) - 1); // dust
+            else if (kind == 3) in[i] = 0.0f;                          // silence
+            else in[i] = (i - at) % 4800 == 0 ? 1.0f : 0.0f;           // clicks
+        }
+    }
+    Rig rig;
+    rig.prepare (sr, maxBlock);
+    auto v = defaultParamValues();
+    std::vector<float> l ((size_t) maxBlock), r ((size_t) maxBlock);
+    auto randomise = [&] (const ParamSpec& sp)
+    {
+        if (sp.kind == ParamKind::toggle) v[(size_t) sp.id] = rnd.nextBool() ? 1.0f : 0.0f;
+        else if (sp.kind == ParamKind::choice) v[(size_t) sp.id] = (float) rnd.nextInt ((int) sp.choices.size());
+        else v[(size_t) sp.id] = sp.min + (sp.max - sp.min) * rnd.nextFloat();
+    };
+    bool finite = true;
+    float loudest = 0.0f;
+    int changes = 0;
+    for (size_t pos = 0; pos < in.size();)
+    {
+        const int n = (int) std::min<size_t> ((size_t) (1 + rnd.nextInt (maxBlock)), in.size() - pos);
+        const float roll = rnd.nextFloat();
+        if (roll < 0.002f && ! presets.empty()) { v = presets[(size_t) rnd.nextInt ((int) presets.size())].values; ++changes; }
+        else if (roll < 0.01f) { for (const auto& sp : specs) randomise (sp); ++changes; }
+        else if (roll < 0.3f) { for (int c = 1 + rnd.nextInt (4); c > 0; --c) randomise (specs[(size_t) rnd.nextInt ((int) specs.size())]); ++changes; }
+        rig.setParams (v);
+        rig.process (in.data() + pos, l.data(), r.data(), n);
+        for (int i = 0; i < n; ++i)
+        {
+            if (! std::isfinite (l[(size_t) i]) || ! std::isfinite (r[(size_t) i])) finite = false;
+            loudest = std::max ({ loudest, std::abs (l[(size_t) i]), std::abs (r[(size_t) i]) });
+        }
+        pos += (size_t) n;
+    }
+    std::printf ("  %d changes, loudest sample %.3f\n", changes, loudest);
+    CHECK (finite, "random changes made a NaN or infinity");
+    CHECK (loudest <= 1.0f, "random changes got past the safety limiter: %.3f", loudest);
+
+    // everything off and nothing coming in: the sound dies away, and silence stays fast
+    const auto off = bare();
+    std::vector<float> quiet ((size_t) maxBlock, 0.0f);
+    const size_t tail = (size_t) (sr * 15.0);
+    double lastPower = 0.0;
+    size_t lastCount = 0;
+    const auto t0 = std::chrono::steady_clock::now();
+    for (size_t pos = 0; pos < tail; pos += (size_t) maxBlock)
+    {
+        rig.setParams (off);
+        rig.process (quiet.data(), l.data(), r.data(), maxBlock);
+        if (pos > tail - (size_t) sr)
+            for (int i = 0; i < maxBlock; ++i) { lastPower += (double) l[(size_t) i] * l[(size_t) i]; ++lastCount; }
+    }
+    const double silentSecs = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+    const float lastDb = (float) (10.0 * std::log10 (lastPower / (double) std::max<size_t> (1, lastCount) + 1.0e-30));
+    CHECK (lastDb < -90.0f, "after everything was switched off it still makes sound: %.1f dB", lastDb);
+    // 15 s of silence through a bare rig takes a sliver of real time unless denormals crept in
+    CHECK (silentSecs < 15.0 * 0.05, "silence got slow (denormals?): %.2f s for 15 s", silentSecs);
+}
+
+// Clicks. A player switches pedals, changes tones and turns knobs fast while playing; none of
+// it may click. Two ways to hear one:
+//  - silence in: anything that comes out is the click itself (a DC step, a filter kicked);
+//  - a held note in: a click is a burst of top end, so the output above 4 kHz in the 30 ms
+//    after a change is held against the same band just before and well after it.
+// A change that gives no more top end than either settled state, or stays under -60 dB, passes.
+struct ClickResult { float worstDb = -200.0f; juce::String what; };
+
+static float peakDb (const std::vector<float>& x, size_t from, size_t to)
+{
+    float pk = 0.0f;
+    for (size_t i = from; i < std::min (to, x.size()); ++i) pk = std::max (pk, std::abs (x[i]));
+    return 20.0f * std::log10 (pk + 1.0e-12f);
+}
+
+// Each change is a list of values applied at its sample. Returns the output's left side.
+static std::vector<float> renderChanges (const ParamValues& start, const std::vector<std::pair<size_t, ParamValues>>& changes,
+                                         const std::vector<float>& in, double sr, int block = 64)
+{
+    Rig rig;
+    rig.setOffline (true);
+    rig.startFresh (start, sr, block);
+    rig.snapParams (start);
+    std::vector<float> l (in.size()), r (in.size());
+    size_t next = 0;
+    auto v = start;
+    for (size_t pos = 0; pos < in.size(); pos += (size_t) block)
+    {
+        while (next < changes.size() && changes[next].first <= pos) v = changes[next++].second;
+        const int n = (int) std::min<size_t> ((size_t) block, in.size() - pos);
+        rig.setParams (v);
+        rig.process (in.data() + pos, l.data() + pos, r.data() + pos, n);
+        rig.finishPendingWork();
+    }
+    return l;
+}
+
+static void highpass4k (std::vector<float>& x, double sr)
+{
+    Biquad a, b;
+    a.set (Biquad::Type::highpass, sr, 4000.0, 0.54);
+    b.set (Biquad::Type::highpass, sr, 4000.0, 1.31);
+    for (auto& s : x) s = b.process (a.process (s));
+}
+
+// Judge each change: the click is how far the burst after it rises over the louder settled side.
+static void judgeChanges (const std::vector<float>& out, const std::vector<size_t>& at, double sr, bool silentIn,
+                          const juce::String& label, ClickResult& worst, const juce::StringArray& each = {})
+{
+    auto hf = out;
+    if (! silentIn) highpass4k (hf, sr);
+    const auto ms = [&] (double m) { return (size_t) (m * sr / 1000.0); };
+    for (size_t k = 0; k < at.size(); ++k)
+    {
+        const size_t t = at[k];
+        if (t < ms (80) || t + ms (260) > hf.size()) continue;
+        const float burst = peakDb (hf, t, t + ms (30));
+        float over = burst;
+        if (! silentIn)
+        {
+            const float before = peakDb (hf, t - ms (70), t - ms (5));
+            const float after = peakDb (hf, t + ms (150), t + ms (250));
+            over = burst - std::max (before, after) > 3.0f ? burst : -200.0f;
+        }
+        if (over > worst.worstDb)
+        {
+            worst.worstDb = over;
+            worst.what = label + (k < (size_t) each.size() ? each[(int) k] : juce::String()) + juce::String::formatted (" at %.2f s", (double) t / sr);
+        }
+    }
+}
+
+void testClicks (double sr, bool quick)
+{
+    std::printf ("clicks @ %.0f Hz\n", sr);
+    const auto presets = loadPresets();
+    const auto& specs = paramSpecs();
+    const double secs = 3.0;
+    const size_t len = (size_t) (sr * secs);
+    std::vector<float> silence (len, 0.0f), note (len);
+    for (size_t i = 0; i < len; ++i) note[i] = 0.08f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 196.0 * (double) i / sr);
+    const auto keepSetup = [&] (ParamValues to, const ParamValues& from)
+    {
+        for (const auto& s : specs) if (belongsToSetup (s.id)) to[(size_t) s.id] = from[(size_t) s.id];
+        to[(size_t) P::lofiNoise] = 0.0f; // the lo-fi pedal's hiss is meant to be heard
+        to[(size_t) P::gateOn] = 0.0f;    // a gate would hide a click from the test
+        return to;
+    };
+    std::vector<size_t> at;
+    for (double t = 0.3; t < secs - 0.3; t += 0.3) at.push_back ((size_t) (t * sr));
+
+    // the rigs the switches are tried on: a clean tone, a crunch, a high gain one, and everything on
+    std::vector<std::pair<juce::String, ParamValues>> bases;
+    for (const char* name : { "First Light Clean", "Warm Crunch", "Thrash Machine" })
+        for (const auto& q : presets) if (q.name == name) bases.push_back ({ name, keepSetup (q.values, defaultParamValues()) });
+    {
+        auto all = keepSetup (defaultParamValues(), defaultParamValues());
+        for (const auto& s : specs) if (s.kind == ParamKind::toggle && ! belongsToSetup (s.id)) all[(size_t) s.id] = 1.0f;
+        all[(size_t) P::gateOn] = 0.0f;
+        all[(size_t) P::lofiNoise] = 0.0f;
+        bases.push_back ({ "everything on", all });
+    }
+
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const bool silentIn = pass == 0;
+        const auto& in = silentIn ? silence : note;
+        ClickResult toggles, tones, knobs;
+        // 1. every pedal switched on and off
+        for (const auto& [bname, base] : bases)
+            for (const auto& s : specs)
+            {
+                if (s.kind != ParamKind::toggle || belongsToSetup (s.id) || s.id == P::gateOn) continue;
+                std::vector<std::pair<size_t, ParamValues>> ch;
+                auto v = base;
+                for (size_t k = 0; k < at.size(); ++k) { v[(size_t) s.id] = v[(size_t) s.id] > 0.5f ? 0.0f : 1.0f; ch.push_back ({ at[k], v }); }
+                judgeChanges (renderChanges (base, ch, in, sr), at, sr, silentIn, bname + ": " + s.name, toggles);
+            }
+        // 2. tone changes, through every factory tone in turn
+        {
+            const size_t step = quick ? 7 : 1;
+            for (size_t first = 0; first < presets.size(); first += at.size() * step)
+            {
+                std::vector<std::pair<size_t, ParamValues>> ch;
+                juce::StringArray names;
+                const auto start = keepSetup (presets[first].values, defaultParamValues());
+                for (size_t k = 0; k < at.size(); ++k)
+                {
+                    const size_t from = k == 0 ? first : (first + k * step) % presets.size();
+                    const size_t idx = (first + (k + 1) * step) % presets.size();
+                    ch.push_back ({ at[k], keepSetup (presets[idx].values, defaultParamValues()) });
+                    names.add (presets[from].name + " to " + presets[idx].name);
+                }
+                judgeChanges (renderChanges (start, ch, in, sr), at, sr, silentIn, "", tones, names);
+            }
+        }
+        // 3. every knob swung end to end in 10 ms
+        for (const auto& [bname, base] : bases)
+            for (const auto& s : specs)
+            {
+                if (s.kind != ParamKind::continuous || belongsToSetup (s.id) || s.id == P::lofiNoise) continue;
+                std::vector<std::pair<size_t, ParamValues>> ch;
+                auto v = base;
+                const size_t sweep = (size_t) (0.010 * sr);
+                for (size_t k = 0; k < at.size(); ++k)
+                {
+                    const float from = k % 2 == 0 ? s.min : s.max, to = k % 2 == 0 ? s.max : s.min;
+                    for (size_t j = 0; j <= sweep; j += 64)
+                    {
+                        v[(size_t) s.id] = from + (to - from) * (float) j / (float) sweep;
+                        ch.push_back ({ at[k] + j, v });
+                    }
+                }
+                judgeChanges (renderChanges (base, ch, in, sr), at, sr, silentIn, bname + ": " + s.name, knobs);
+            }
+        const char* how = silentIn ? "silence in" : "held note in";
+        std::printf ("  %s: worst pedal switch %.1f dB (%s)\n", how, toggles.worstDb, toggles.what.toRawUTF8());
+        std::printf ("  %s: worst tone change %.1f dB (%s)\n", how, tones.worstDb, tones.what.toRawUTF8());
+        std::printf ("  %s: worst fast knob %.1f dB (%s)\n", how, knobs.worstDb, knobs.what.toRawUTF8());
+        CHECK (toggles.worstDb < -60.0f, "%s: a pedal switch clicks at %.1f dB (%s)", how, toggles.worstDb, toggles.what.toRawUTF8());
+        CHECK (tones.worstDb < -60.0f, "%s: a tone change clicks at %.1f dB (%s)", how, tones.worstDb, tones.what.toRawUTF8());
+        CHECK (knobs.worstDb < -60.0f, "%s: a fast knob clicks at %.1f dB (%s)", how, knobs.worstDb, knobs.what.toRawUTF8());
+    }
+}
+
 void testCpu (double sr)
 {
     std::printf ("cpu @ %.0f Hz\n", sr);
@@ -2383,6 +2629,8 @@ int main (int argc, char** argv)
         return 0;
     }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "stress") { testStress (48000.0, 256, 30.0, 1); testStress (44100.0, 4096, 20.0, 2); testStress (48000.0, 16, 10.0, 3); testStress (96000.0, 512, 10.0, 4); testStress (192000.0, 64, 5.0, 5); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "clicks") { testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "cpu") { testCpu (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "profile")
     {
@@ -2440,6 +2688,14 @@ int main (int argc, char** argv)
     testLevelMatch (48000.0);
     if (! quick) testLevelMatch (44100.0);
     testLevelMatcher();
+    testStress (48000.0, 256, 30.0, 1);
+    if (! quick)
+    {
+        testStress (44100.0, 4096, 20.0, 2);
+        testStress (48000.0, 16, 10.0, 3);
+        testStress (96000.0, 512, 10.0, 4);
+        testStress (192000.0, 64, 5.0, 5);
+    }
     testCpu (48000.0);
 
     std::printf ("\n%d checks, %d failures\n", checks, failures);
