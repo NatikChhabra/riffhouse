@@ -740,7 +740,7 @@ int ampVsReal (const juce::File& dir)
         rig.finishPendingWork();
         show ("REAL " + f.getFileNameWithoutExtension(), spectrum (run (rig, v, in).l));
     }
-    for (int m = choices::brit800; m <= choices::tightMetal; ++m)
+    for (int m = choices::glassClean; m <= choices::tightMetal; ++m)
         for (float g : { 4.0f, 6.0f, 8.0f })
         {
             auto v = bare();
@@ -3670,6 +3670,97 @@ int main (int argc, char** argv)
         for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
         std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));
+        return 0;
+    }
+    if (args[0] == "di" && args.size() >= 2)
+    {
+        // di <out.wav>: the reference guitar with a recorded guitar's treble, for listening and spectra
+        const auto g = playedGuitar (48000.0, 12.0, 0.32f, true);
+        Render r; r.l = g; r.r = g;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]), r, 48000.0);
+        return 0;
+    }
+    if (args[0] == "wash")
+    {
+        // wash [filter]: for each tone, how much of what is heard is room (reverb + delay), how
+        // long the sound hangs on after the playing stops, and how much of a held note's ring
+        // the gate takes away (a note left to fade, on a quiet interface and on a hissy one)
+        const double sr = 48000.0;
+        auto played = playedGuitar (sr, 12.0, 0.32f, true);
+        const size_t playEnd = played.size();
+        played.resize (playEnd + (size_t) (3.0 * sr), 0.0f);
+        // a note left to ring: 2 s of hiss for the gate to learn the floor, then a G3 peaking at
+        // noteDb whose fundamental fades 10 dB a second (a real string's sustain), upper
+        // harmonics faster
+        auto heldNote = [&] (float noteDb, float noiseDb, bool withNote, bool withNoise)
+        {
+            std::vector<float> x ((size_t) (10.0 * sr), 0.0f);
+            uint32_t seed = 12345u;
+            const float nAmp = dbToGain (noiseDb) * 1.7320508f;
+            if (withNoise) for (auto& s : x) { seed = seed * 1664525u + 1013904223u; s = nAmp * ((float) (seed >> 8) / 8388608.0f - 1.0f); }
+            if (withNote)
+            {
+                const size_t at = (size_t) (2.0 * sr);
+                const float peak = dbToGain (noteDb);
+                for (size_t i = 0; at + i < x.size(); ++i)
+                {
+                    const double t = (double) i / sr;
+                    double v = 0.0;
+                    for (int h = 1; h <= 12; ++h)
+                        v += std::exp (-t * 1.15 * (1.0 + 0.25 * (h - 1))) * std::sin (2.0 * 3.14159265 * 196.0 * h * t) / h;
+                    x[at + i] += (float) (peak * 0.6 * v * std::min (1.0, t * 2000.0));
+                }
+            }
+            return x;
+        };
+        // how far above the hiss the note still was when the gate began to take it (6 dB under
+        // the same tone with no gate); 99 = it never did before the note sank into the hiss
+        auto closesAbove = [&] (const ParamValues& v, const ParamValues& noGate, float noteDb, float noiseDb)
+        {
+            const auto in = heldNote (noteDb, noiseDb, true, true), clean = heldNote (noteDb, noiseDb, true, false);
+            const auto on = renderWith (v, in, sr), off = renderWith (noGate, in, sr);
+            const size_t w = (size_t) (0.05 * sr);
+            for (size_t i = (size_t) (2.1 * sr); i + w <= in.size(); i += w)
+            {
+                const float noteNow = rmsDb (clean, i, i + w);
+                if (noteNow < noiseDb + 3.0f) break;
+                const float a = 0.5f * (rmsDb (on.l, i, i + w) + rmsDb (on.r, i, i + w)), b = 0.5f * (rmsDb (off.l, i, i + w) + rmsDb (off.r, i, i + w));
+                if (a < b - 6.0f) return noteNow - noiseDb;
+            }
+            return 99.0f;
+        };
+        std::printf ("%-28s %7s %7s %6s %6s %6s %6s %6s\n", "tone", "room dB", "tail s", "rev", "dly", "dbl", "hiss62", "quiet62", "hiss78");
+        for (const auto& p : loadPresets())
+        {
+            if (args.size() > 1 && args[1] != "-" && ! p.name.containsIgnoreCase (args[1])) continue;
+            auto v = p.values;
+            v[(size_t) P::autoLevel] = 0.0f;
+            auto dry = v;
+            dry[(size_t) P::revOn] = 0.0f; dry[(size_t) P::dlyOn] = 0.0f;
+            const auto full = renderWith (v, played, sr), plain = renderWith (dry, played, sr);
+            double eDiff = 0.0, eDry = 0.0;
+            for (size_t i = 0; i < playEnd; ++i)
+            {
+                const double dl = full.l[i] - plain.l[i], dr = full.r[i] - plain.r[i];
+                eDiff += dl * dl + dr * dr;
+                eDry += (double) plain.l[i] * plain.l[i] + (double) plain.r[i] * plain.r[i];
+            }
+            const float roomDb = (float) (10.0 * std::log10 ((eDiff + 1e-20) / (eDry + 1e-20)));
+            // tail: how long until the sound after the last note is 40 dB under the playing
+            const float playDb = 0.5f * (rmsDb (full.l, 0, playEnd) + rmsDb (full.r, 0, playEnd));
+            double tail = 0.0;
+            for (size_t i = playEnd; i + 2400 <= full.l.size(); i += 2400)
+                if (0.5f * (rmsDb (full.l, i, i + 2400) + rmsDb (full.r, i, i + 2400)) > playDb - 40.0f) tail = (double) (i + 2400 - playEnd) / sr;
+            // the gate's toll on a ringing note, against the same tone with the gate off
+            auto noGate = v; noGate[(size_t) P::gateOn] = 0.0f;
+            const bool gateToo = args.size() > 2 && args[2] == "gate";
+            const float c1 = gateToo ? closesAbove (v, noGate, -12.0f, -62.0f) : 0.0f, c2 = gateToo ? closesAbove (v, noGate, -26.0f, -62.0f) : 0.0f, c3 = gateToo ? closesAbove (v, noGate, -12.0f, -78.0f) : 0.0f;
+            std::printf ("%-28s %7.1f %7.2f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f\n", p.name.substring (0, 28).toRawUTF8(), roomDb, tail,
+                         v[(size_t) P::revOn] > 0.5f ? v[(size_t) P::revMix] : 0.0f, v[(size_t) P::dlyOn] > 0.5f ? v[(size_t) P::dlyMix] : 0.0f,
+                         v[(size_t) P::doubler], c1, c2, c3);
+            std::fflush (stdout);
+
+        }
         return 0;
     }
     if (args[0] == "fresh")
