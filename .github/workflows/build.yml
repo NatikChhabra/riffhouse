@@ -167,6 +167,14 @@ jobs:
             dist/BUILD.txt
           if-no-files-found: error
 
+      # The debug symbols of exactly this build: a player's crash dump read with them names the function.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: riffhouse-windows-symbols
+          path: build/src/Riffhouse_artefacts/Release/Standalone/*.pdb
+          if-no-files-found: warn
+          retention-days: 90
+
       # A player who already has 0.1.4: their own tones, favourites, recordings and songs, and the
       # settings 0.1.4 writes. The new installer goes over that copy, and later the uninstaller
       # takes it off. Neither may touch a file the player made (plan-0.1.5 lines 12 and 13).
