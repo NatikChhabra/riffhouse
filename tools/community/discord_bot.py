@@ -11,6 +11,8 @@ Each run it:
      (see community/reels/README.md for how to add one).
   1c. Runs the release-day event in community/launch.json: a #general thread where the first 50
       people get the Day One role. Starts itself when that release appears.
+  1d. Welcomes new members by name in #welcome once they're past the rules screen
+      (one message per run for everyone new; who was welcomed is read back from #welcome).
   2. Answers common questions in the #help and #bug-reports forums when a new post
      clearly matches one (sound, delay, crackles, ASIO, install warning, ...), with the fix
      and a link to the full help page. Posts it can't match are left for a person.
@@ -63,6 +65,7 @@ CH = {
     "gear-talk": "1570506861869015161",
     "off-topic": "1570506873050890350",
     "showcase": "1570506850963816468",
+    "welcome": "1570506374117597265",
 }
 ROLE = {"release-pings": "1570506134857711637", "beta-tester": "1570505782259089549"}
 FORUMS = {CH[k]: k for k in ("help", "bug-reports", "ideas", "beta-feedback", "tone-lab")}
@@ -382,6 +385,41 @@ def launch_event(log: list[str]):
                                                          "allowed_mentions": {"parse": []}})
         call("PATCH", f"/channels/{th['id']}", {"locked": True, "archived": True}, reason="Launch event full")
         log.append(f"Launch event full, thread closed")
+
+
+# ---------------------------------------------------------------- 1d. welcome
+
+def welcome(log: list[str]):
+    """Say hi by name to everyone who joined in the last 3 days and isn't welcomed yet."""
+    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=3)
+    done = set()
+    for m in my_messages(CH["welcome"]):
+        done |= {u["id"] for u in m.get("mentions", [])}
+    new, after = [], "0"
+    while True:
+        page = call("GET", f"/guilds/{GUILD}/members?limit=1000&after={after}")
+        for m in page:
+            u = m["user"]
+            if (u.get("bot") or m.get("pending") or FOUNDER in m["roles"] or u["id"] in done
+                    or dt.datetime.fromisoformat(m["joined_at"]) < since):
+                continue
+            new.append((m["joined_at"], u["id"]))
+        if len(page) < 1000:
+            break
+        after = page[-1]["user"]["id"]
+    if not new:
+        return
+    ids = [i for _, i in sorted(new)][:25]
+    names = " ".join(f"<@{i}>" for i in ids)
+    text = (f"hey {names}, welcome to Riff House\n\n"
+            "it's a free guitar amp app for Windows. amps, pedals, cabs, no paywall on tone\n\n"
+            "get it here: https://natikchhabra.github.io/riffhouse/\n"
+            f"stuck on anything? make a post in <#{CH['help']}>\n"
+            "want builds before everyone else? grab the Beta tester role in <id:customize>\n\n"
+            f"then say hi in <#{CH['general']}> and tell us what you play")
+    call("POST", f"/channels/{CH['welcome']}/messages",
+         {"content": text, "allowed_mentions": {"parse": [], "users": ids}})
+    log.append(f"Welcomed {names} in <#{CH['welcome']}>")
 
 
 # ---------------------------------------------------------------- 2. FAQ answers
@@ -739,7 +777,7 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: launch_event(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
+    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: launch_event(log), lambda: welcome(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
                  lambda: keep_on_purpose(cursor, log), lambda: triage(threads, cursor, log)):
         try:
             step()
