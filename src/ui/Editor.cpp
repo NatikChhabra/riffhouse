@@ -1468,6 +1468,187 @@ void RiffhouseEditor::saveFilmstrips (const juce::File& folder)
     motion::freeze (true);
 }
 
+juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::File& input, const juce::var& script,
+                                       int fps, float scale, double seconds)
+{
+    // the recording
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (input));
+    if (reader == nullptr) return "Can't read " + input.getFullPathName();
+    const double sr = reader->sampleRate;
+    const int length = (int) std::min<juce::int64> (reader->lengthInSamples, (juce::int64) (sr * 600.0));
+    juce::AudioBuffer<float> di (2, std::max (1, length));
+    di.clear();
+    reader->read (&di, 0, length, 0, true, true); // a mono file lands on both sides, which the input reads as one guitar
+    const int total = seconds > 0.0 ? juce::roundToInt (seconds * sr) : length;
+    if (total <= 0) return "The recording is empty";
+    fps = juce::jlimit (1, 120, fps);
+
+    // the script: {"steps": [...]} or the list itself
+    struct Step
+    {
+        double t = 0.0, over = 0.0;
+        juce::String tone;
+        int page = -1;
+        int param = -1;
+        float to = 0.0f;  // where the knob goes, 0 to 1 along its travel
+        float from = -1.0f;
+        bool started = false;
+    };
+    std::vector<Step> steps;
+    const juce::var list = script.isArray() ? script : script.getProperty ("steps", juce::var());
+    if (list.isArray())
+        for (const auto& v : *list.getArray())
+        {
+            Step st;
+            st.t = (double) v.getProperty ("t", 0.0);
+            st.over = std::max (0.0, (double) v.getProperty ("over", 0.0));
+            if (v.hasProperty ("tone"))
+            {
+                st.tone = v["tone"].toString();
+                if (proc.presets().indexOf (st.tone) < 0) return "No tone called \"" + st.tone + "\"";
+            }
+            if (v.hasProperty ("page"))
+            {
+                const auto id = v["page"].toString();
+                for (int i = 0; i < numModules; ++i)
+                    if (id.equalsIgnoreCase (modules()[(size_t) i].id)) st.page = i;
+                if (st.page < 0) return "No page called \"" + id + "\"";
+            }
+            const auto knob = v.getProperty ("knob", v.getProperty ("param", juce::var())).toString();
+            if (knob.isNotEmpty())
+            {
+                for (const auto& sp : paramSpecs())
+                    if (knob == sp.key) st.param = (int) sp.id;
+                if (st.param < 0) return "No control called \"" + knob + "\" (use the names in a tone file, like drv_gain)";
+                if (v.hasProperty ("value")) st.to = proc.param ((P) st.param)->convertTo0to1 ((float) v["value"]);
+                else st.to = juce::jlimit (0.0f, 1.0f, (float) v.getProperty ("to", 0.5));
+            }
+            steps.push_back (st);
+        }
+    std::stable_sort (steps.begin(), steps.end(), [] (const Step& a, const Step& b) { return a.t < b.t; });
+
+    folder.createDirectory();
+    for (const auto& old : folder.findChildFiles (juce::File::findFiles, false, "frame_*.png")) old.deleteFile();
+    stopTimer(); // the window is ticked once a frame from here, as its timer would at 30 a second
+    auto& r = *root;
+    r.wizard.reset();
+    r.quietNotices = true;
+    r.demoLevels = false;
+    r.noticeBar.set ({});
+    r.closeOverlays();
+    motion::freeze (false);
+    motion::setReduced (false);
+    const double clock0 = 100000.0;
+    motion::setClock (clock0);
+
+    const int block = 128;
+    proc.releaseResources();
+    proc.prepareToPlay (sr, block);
+    juce::AudioBuffer<float> out (2, total), work (2, block);
+    juce::MidiBuffer midi;
+    float inMax = 0.0f, outMax = 0.0f;
+    int doneSamples = 0;
+
+    auto takeSteps = [&] (double t)
+    {
+        for (auto& st : steps)
+        {
+            if (st.t > t) break;
+            if (! st.started)
+            {
+                st.started = true;
+                if (st.tone.isNotEmpty()) proc.loadPreset (proc.presets().indexOf (st.tone));
+                if (st.page >= 0) r.showPage (st.page);
+                if (st.param >= 0) st.from = proc.param ((P) st.param)->getValue();
+            }
+            if (st.param >= 0)
+            {
+                const float k = st.over <= 0.0 ? 1.0f : (float) juce::jlimit (0.0, 1.0, (t - st.t) / st.over);
+                const float eased = motion::ease (motion::Curve::inOut, k);
+                auto* p = proc.param ((P) st.param);
+                const float v = st.from + (st.to - st.from) * eased;
+                if (std::abs (p->getValue() - v) > 1.0e-6f) p->setValueNotifyingHost (v);
+            }
+        }
+    };
+
+    const int frames = (int) std::ceil ((double) total * fps / sr);
+    juce::PNGImageFormat png;
+    for (int f = 0; f < frames; ++f)
+    {
+        const double t = (double) f / fps;
+        const int until = std::min (total, juce::roundToInt (t * sr));
+        while (doneSamples < until)
+        {
+            takeSteps ((double) doneSamples / sr);
+            const int n = std::min (block, until - doneSamples);
+            work.setSize (2, n, false, false, true);
+            for (int c = 0; c < 2; ++c)
+            {
+                if (doneSamples + n <= length) work.copyFrom (c, 0, di, c, doneSamples, n);
+                else
+                {
+                    work.clear (c, 0, n);
+                    if (doneSamples < length) work.copyFrom (c, 0, di, c, doneSamples, length - doneSamples);
+                }
+            }
+            midi.clear();
+            proc.processBlock (work, midi);
+            for (int c = 0; c < 2; ++c) out.copyFrom (c, doneSamples, work, c, 0, n);
+            inMax = std::max (inMax, proc.meters().gateInPeak.load());
+            outMax = std::max (outMax, proc.meters().outPeak.load());
+            doneSamples += n;
+        }
+        takeSteps (t);
+        // the meters read what this frame's audio did, the way the window reads the last block
+        if (f > 0)
+        {
+            proc.meters().gateInPeak.store (inMax);
+            proc.meters().outPeak.store (outMax);
+        }
+        inMax = outMax = 0.0f;
+        motion::setClock (clock0 + t * 1000.0);
+        motion::step();
+        r.tick();
+        const auto img = createComponentSnapshot (getLocalBounds(), true, scale);
+        auto file = folder.getChildFile ("frame_" + juce::String (f).paddedLeft ('0', 5) + ".png");
+        if (auto stream = file.createOutputStream()) png.writeImageToStream (img, *stream);
+        else return "Can't write " + file.getFullPathName();
+    }
+    // whatever is left after the last frame, so the sound runs to the end of the recording
+    while (doneSamples < total)
+    {
+        takeSteps ((double) doneSamples / sr);
+        const int n = std::min (block, total - doneSamples);
+        work.setSize (2, n, false, false, true);
+        for (int c = 0; c < 2; ++c)
+        {
+            work.clear (c, 0, n);
+            if (doneSamples < length) work.copyFrom (c, 0, di, c, doneSamples, std::min (n, length - doneSamples));
+        }
+        midi.clear();
+        proc.processBlock (work, midi);
+        for (int c = 0; c < 2; ++c) out.copyFrom (c, doneSamples, work, c, 0, n);
+        doneSamples += n;
+    }
+    auto wav = folder.getChildFile ("audio.wav");
+    wav.deleteFile();
+    juce::WavAudioFormat format;
+    std::unique_ptr<juce::OutputStream> stream (wav.createOutputStream());
+    if (stream == nullptr) return "Can't write " + wav.getFullPathName();
+    std::unique_ptr<juce::AudioFormatWriter> writer (format.createWriterFor (stream.get(), sr, 2, 24, {}, 0));
+    if (writer == nullptr) return "Can't write " + wav.getFullPathName();
+    stream.release(); // the writer owns it now
+    writer->writeFromAudioSampleBuffer (out, 0, total);
+    writer.reset();
+    folder.getChildFile ("film.txt").replaceWithText (juce::String (frames) + " frames at " + juce::String (fps) + " fps, "
+                                                     + juce::String (getWidth()) + "x" + juce::String (getHeight()) + " at " + juce::String (scale)
+                                                     + "x, audio.wav " + juce::String (sr, 0) + " Hz, " + juce::String ((double) total / sr, 2) + " s\n");
+    return {};
+}
+
 void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, float cutouts)
 {
     folder.createDirectory();

@@ -49,6 +49,13 @@ public:
     void saveSnapshots (const juce::File& folder, float scale, float cutouts = 1.0f);
     // Every move in the app as a strip of frames, with the motion clock driven by hand: riffhouse --motion <folder>
     void saveFilmstrips (const juce::File& folder);
+    // The real window as film: a guitar recording (DI) goes through the rig offline while the
+    // window is painted at `fps`, with the meters fed by that very audio and the script's steps
+    // (tones, pages, knob moves) taken at their times. Writes frame_00000.png ... and audio.wav,
+    // the processed sound of the same render. Returns an error, or nothing when it worked.
+    // riffhouse --film <folder> --input <di.wav> [--script <json>] [--fps 30] [--scale 2] [--size WxH] [--seconds s]
+    juce::String saveFilm (const juce::File& folder, const juce::File& input, const juce::var& script,
+                           int fps, float scale, double seconds);
 
 private:
     class Root;

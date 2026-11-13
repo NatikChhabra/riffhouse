@@ -158,7 +158,7 @@ public:
         AudioProbe::useSettings (s);
         // A diary of what happens with the sound card, kept beside the settings. Pictures of the
         // app (--snapshots, --motion) leave no trace.
-        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+        if (! picturesOnly (commandLine))
             devlog::start (s->getFile().getParentDirectory(), versionLabel());
         // The guitar must be heard. JUCE's default mutes the input to avoid
         // feedback; Riffhouse instead asks for headphones in the setup.
@@ -191,7 +191,7 @@ public:
         runLock.enter (0); // lets the installer see that the app is still open
         updates = std::make_unique<Updater> (*s, versionLabel());
         updates->onChange = [this] { if (auto* ed = editor()) ed->repaint(); };
-        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+        if (! picturesOnly (commandLine))
         {
             updates->start();
             const auto fresh = updates->justUpdatedTo();
@@ -204,7 +204,7 @@ public:
 
         // A start on a slow way in (DirectSound, or a huge buffer) tries the fastest way the
         // same input has, once the window is up. It only stays if sound proves to come through.
-        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+        if (! picturesOnly (commandLine))
             juce::Timer::callAfterDelay (3000, [this] { healSlowStart(); });
 
         // A run that crashed or froze says so once, and offers to send what it wrote down.
@@ -216,7 +216,7 @@ public:
                 else if (auto* ed = editor()) ed->showToast (what + " Settings, Save a report tells us why.");
             });
         // the weekly count, on unless switched off in Settings; said once so nobody is counted unknowingly
-        if (! commandLine.contains ("--snapshots") && ! commandLine.contains ("--motion"))
+        if (! picturesOnly (commandLine))
             juce::Timer::callAfterDelay (20000, [this]
             {
                 auto& s = *properties.getUserSettings();
@@ -240,6 +240,43 @@ public:
             {
                 if (auto* ed = dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()))
                     ed->saveFilmstrips (folder);
+                systemRequestedQuit();
+            });
+        }
+        if (const int fm = args.indexOf ("--film"); fm >= 0 && fm + 1 < args.size())
+        {
+            // riffhouse --film <folder> --input <di.wav> [--script <json file or text>] [--fps 30] [--scale 2]
+            //           [--size WxH] [--seconds s] [--tone "<name>"]: the window as frames, with the real sound
+            auto value = [&] (const char* flag) { const int i = args.indexOf (flag); return i >= 0 && i + 1 < args.size() ? args[i + 1].unquoted() : juce::String(); };
+            const auto here = juce::File::getCurrentWorkingDirectory();
+            const juce::File folder (here.getChildFile (args[fm + 1].unquoted()));
+            const juce::File input (here.getChildFile (value ("--input")));
+            juce::var script;
+            if (const auto s = value ("--script"); s.isNotEmpty())
+                script = juce::JSON::parse (here.getChildFile (s).existsAsFile() ? here.getChildFile (s).loadFileAsString() : s);
+            const int fps = value ("--fps").isNotEmpty() ? value ("--fps").getIntValue() : 30;
+            const float scale = value ("--scale").isNotEmpty() ? (float) value ("--scale").getDoubleValue() : 2.0f;
+            const double seconds = value ("--seconds").getDoubleValue();
+            const auto size = value ("--size");
+            const auto tone = value ("--tone");
+            // the sound card is let go: the rig is played by the film alone
+            guard.reset();
+            holder->stopPlaying();
+            holder->deviceManager.closeAudioDevice();
+            juce::Timer::callAfterDelay (1500, [this, folder, input, script, fps, scale, seconds, size, tone]
+            {
+                juce::String error = "No window";
+                if (auto* ed = dynamic_cast<RiffhouseEditor*> (holder->processor->getActiveEditor()))
+                {
+                    if (size.containsChar ('x'))
+                        ed->setSize (juce::jmax (320, size.upToFirstOccurrenceOf ("x", false, true).getIntValue()),
+                                     juce::jmax (240, size.fromFirstOccurrenceOf ("x", false, true).getIntValue()));
+                    if (auto* proc = dynamic_cast<RiffhouseProcessor*> (holder->processor.get()); proc != nullptr && tone.isNotEmpty())
+                        if (const int i = proc->presets().indexOf (tone); i >= 0) proc->loadPreset (i);
+                    error = ed->saveFilm (folder, input, script, fps, juce::jlimit (0.25f, 4.0f, scale), seconds);
+                }
+                std::cout << (error.isEmpty() ? juce::String ("RH-FILM ok ") + folder.getFullPathName() : "RH-FILM failed: " + error) << std::endl;
+                setApplicationReturnValue (error.isEmpty() ? 0 : 1);
                 systemRequestedQuit();
             });
         }
@@ -268,6 +305,12 @@ public:
                 systemRequestedQuit();
             });
         }
+    }
+
+    // pictures and films of the app: nothing is kept, nothing is fetched, the sound card is not healed
+    static bool picturesOnly (const juce::String& commandLine)
+    {
+        return commandLine.contains ("--snapshots") || commandLine.contains ("--motion") || commandLine.contains ("--film");
     }
 
     void shutdown() override
