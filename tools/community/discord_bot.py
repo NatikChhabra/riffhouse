@@ -11,8 +11,7 @@ Each run it:
      (see community/reels/README.md for how to add one).
   1c. Runs the release-day event in community/launch.json: a #general thread where the first 50
       people get the Day One role. Starts itself when that release appears.
-  1d. Welcomes new members by name in #welcome once they're past the rules screen
-      (one message per run for everyone new; who was welcomed is read back from #welcome).
+  1d. (welcome() is kept but off: Welcomer, an always-on bot, greets new members instantly in #welcome)
   2. Answers common questions in the #help and #bug-reports forums when a new post
      clearly matches one (sound, delay, crackles, ASIO, install warning, ...), with the fix
      and a link to the full help page. Posts it can't match are left for a person.
@@ -784,7 +783,7 @@ def main() -> int:
         print(f"error: can't read #bot-log: {e}", file=sys.stderr)
         cursor, failed = None, True
     threads = call("GET", f"/guilds/{GUILD}/threads/active").get("threads", [])
-    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: launch_event(log), lambda: welcome(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
+    for step in (lambda: post_feeds(log), lambda: post_reels(log), lambda: launch_event(log), lambda: answer_forums(threads, log), lambda: close_finished(threads, log),
                  lambda: keep_on_purpose(cursor, log), lambda: triage(threads, cursor, log)):
         try:
             step()
