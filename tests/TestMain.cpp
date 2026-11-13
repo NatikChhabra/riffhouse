@@ -1973,6 +1973,80 @@ void testCpu (double sr)
     CHECK (rt > 3.0, "too slow to play live: %.1fx realtime", rt);
 }
 
+// The slowest single blocks, not the average: one late block is a click the player hears.
+// Plays every tone in turn at a small live buffer, the way the app runs (cab rebuilds on
+// their own thread), with knob moves on a third of the blocks and silence between tones,
+// and times every block. Each kind of block is judged against the time the block lasts.
+void testWorstBlock (double sr)
+{
+    const int block = 128;
+    const double period = block / sr;
+    std::printf ("worst block @ %.0f Hz, %d samples (%.2f ms)\n", sr, block, 1000.0 * period);
+    const auto presets = loadPresets();
+    const auto& specs = paramSpecs();
+    const auto di = test::guitarDi (sr, 2.0);
+    juce::Random rnd (7);
+    Rig rig;
+    rig.setParams (presets.front().values);
+    rig.prepare (sr, block);
+    std::vector<float> l ((size_t) block), r ((size_t) block), quiet ((size_t) block, 0.0f);
+    std::vector<double> steady, knob, change, silent;
+    std::vector<std::pair<double, juce::String>> slowest;
+    juce::String where;
+    auto timeBlock = [&] (const float* in, std::vector<double>& into)
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        rig.process (in, l.data(), r.data(), block);
+        const double t = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count() / period;
+        into.push_back (t);
+        if (t > 1.0) slowest.push_back ({ t, where + " #" + juce::String ((int) into.size()) });
+    };
+    for (const auto& p : presets)
+    {
+        where = p.name;
+        auto v = p.values;
+        rig.setParams (v);
+        timeBlock (di.data(), change);
+        for (size_t pos = (size_t) block; pos + (size_t) block <= di.size(); pos += (size_t) block)
+        {
+            if (rnd.nextFloat() < 0.33f)
+            {
+                const auto& sp = specs[(size_t) rnd.nextInt ((int) specs.size())];
+                if (sp.kind == ParamKind::continuous)
+                {
+                    v[(size_t) sp.id] = sp.min + (sp.max - sp.min) * rnd.nextFloat();
+                    rig.setParams (v);
+                    timeBlock (di.data() + pos, knob);
+                    continue;
+                }
+            }
+            timeBlock (di.data() + pos, steady);
+        }
+        for (int k = 0; k < 40; ++k) timeBlock (quiet.data(), silent);
+    }
+    auto report = [] (const char* what, std::vector<double> x)
+    {
+        std::sort (x.begin(), x.end());
+        // with few blocks (tone changes), the third slowest, so one hiccup of the machine's own
+        // does not count
+        const double p999 = x.size() < 3000 ? x[x.size() - std::min<size_t> (3, x.size())] : x[(size_t) (0.999 * (double) (x.size() - 1))];
+        std::printf ("  %-12s %7zu blocks: median %5.1f%%, 99.9%% %5.1f%%, slowest %6.1f%% of the block\n",
+                     what, x.size(), 100.0 * x[x.size() / 2], 100.0 * p999, 100.0 * x.back());
+        return p999;
+    };
+    const double s = report ("playing", steady);
+    const double k = report ("knob moves", knob);
+    const double c = report ("tone change", change);
+    const double q = report ("silence", silent);
+    std::sort (slowest.rbegin(), slowest.rend());
+    for (size_t i = 0; i < slowest.size() && i < 5; ++i)
+        std::printf ("  over its time: %.0f%% in %s\n", 100 * slowest[i].first, slowest[i].second.toRawUTF8());
+    // the slowest single block wanders with the machine's own hiccups (the same tone timed on
+    // its own has no slow block), so the checks use the 99.9th slowest
+    CHECK (s < 0.7 && k < 0.7 && q < 0.7, "one block in a thousand takes over 70%% of its time: playing %.0f%%, knobs %.0f%%, silence %.0f%%", 100 * s, 100 * k, 100 * q);
+    CHECK (c < 0.8, "a tone change takes %.0f%% of a %d-sample block", 100 * c, block);
+}
+
 int render (const juce::String& presetArg, const juce::File& out, const juce::File& in, double sr)
 {
     Preset p;
@@ -3263,6 +3337,7 @@ int main (int argc, char** argv)
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
     if (args[0] == "cabs") { testCabs (48000.0); testCabs (44100.0); testCabs (96000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "worstblock") { testWorstBlock (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "cpu") { testCpu (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "profile")
     {
@@ -3338,6 +3413,7 @@ int main (int argc, char** argv)
     testStart (44100.0);
     testClicks (48000.0, true);
     testCpu (48000.0);
+    testWorstBlock (48000.0);
 
     std::printf ("\n%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;

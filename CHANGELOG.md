@@ -48,6 +48,7 @@ Pedals that behave like the real circuits, cleaner high gain, quiet mutes, no mo
 - No crackle or thump when Riffhouse opens. High-gain amps made a short noise of their own while their circuits settled; the rig now settles in silence before it plays, and the sound fades in over a moment.
 - A damaged or half-downloaded capture file is refused with a message to download it again, instead of loading and playing garbage. Broken IR files and broken tone files are handled safely too.
 - The mouse shows it is busy while a sound card is being opened.
+- Riffhouse opens about twice as fast: the amp was being drawn three times while the window opened, and is now drawn once, at your screen's own sharpness.
 
 ## 0.1.4
 

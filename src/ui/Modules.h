@@ -150,6 +150,8 @@ private:
     juce::Rectangle<float> ampArea;
     AmpLayout layout;
     juce::Image ampImage;
+    juce::String ampImageKey, ampDisplay;
+    float ampImageScale = 0.0f;
     void visibilityChanged() override { lampModel = -1; }
     motion::Glide lamp { 1.0f }; // the power light warming up or dying down
     int lampModel = -1;

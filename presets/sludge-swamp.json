@@ -38,6 +38,6 @@
     "rev_predelay": 5,
     "rev_tone": 4,
     "rev_mix": 0.8,
-    "out_level": -1.1
+    "out_level": 0.7
   }
 }

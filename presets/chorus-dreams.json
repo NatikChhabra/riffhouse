@@ -52,6 +52,6 @@
     "gate_thresh": -70,
     "gate_release": 80,
     "doubler": 3,
-    "out_level": -3.0
+    "out_level": -3.7
   }
 }

@@ -1131,7 +1131,10 @@ void AmpPage::resized()
     layout = ampLayout (ampArea, d);
     const juce::String display = current == choices::neuralCapture ? (proc.captureName().isNotEmpty() ? proc.captureName() : juce::String ("no capture"))
                                                                     : juce::String (spec (P::ampModel).choices[(size_t) current]).toLowerCase();
-    ampImage = renderAmp (d, layout, ampArtArea (ampArea), 2.0f, display);
+    // Drawing the amp is the slowest picture in the app, and the window is laid out several
+    // times while it opens: so it is drawn once, the first time it is shown at this size.
+    const auto key = juce::String (current) + "|" + display + "|" + ampArea.toString();
+    if (key != ampImageKey) { ampImageKey = key; ampImage = {}; ampDisplay = display; }
     // the whole switch is the target: the lamp, and the lever or rocker under it
     jewel.setBounds ((d.lamp == 1 ? layout.jewel.expanded (10.0f, 22.0f).translated (0.0f, -10.0f) : layout.jewel.expanded (d.lamp == 2 ? 6.0f : 8.0f, d.lamp == 2 ? 12.0f : 8.0f)).toNearestInt());
 
@@ -1180,6 +1183,15 @@ void AmpPage::paint (juce::Graphics& g)
     g.setFont (font (13.5f));
     g.drawText (status.isNotEmpty() ? status : describeChoice (P::ampModel, current), descArea, juce::Justification::centred, true);
 
+    // drawn at the screen's own pixel size: sharp on a high-DPI screen, and not four times the
+    // work on an ordinary one. It is drawn again only when it would come out soft, or when the
+    // window has shrunk a lot, so dragging the window's size does not redraw it every frame.
+    const float px = std::clamp (std::ceil (g.getInternalContext().getPhysicalPixelScaleFactor() * 4.0f) / 4.0f, 1.0f, 4.0f);
+    if (! ampArea.isEmpty() && (! ampImage.isValid() || px > ampImageScale || px < 0.6f * ampImageScale))
+    {
+        ampImage = renderAmp (ampDesign (current), layout, ampArtArea (ampArea), px, ampDisplay);
+        ampImageScale = px;
+    }
     if (ampImage.isValid())
     {
         g.setOpacity (0.55f + 0.45f * lit);
