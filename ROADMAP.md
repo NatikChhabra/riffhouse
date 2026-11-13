@@ -4,11 +4,24 @@ Everything coming to Riffhouse, in the order it lands. Every release stays free 
 
 The nicer version of this page is on the website: https://natikchhabra.github.io/riffhouse/roadmap.html
 
-Updated 12 November 2026.
+Updated 13 November 2026.
 
-## Out now: 0.1.4
+## Out now: 0.1.5
 
-Released 12 November 2026, fixes from the first day of 0.1.3. Riffhouse updates itself, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
+Released 13 November 2026. The polish release: sound you can trust, tested end to end before it ships. Riffhouse updates itself, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
+
+- **Pedals that behave like the real circuits.** Every drive and fuzz is now solved as the circuit it comes from, checked against published measurements of the real pedals: how much gain each has, where it peaks and how far the tone knob reaches.
+- **Cleaner high gain.** The amps' distortion is worked out in a way that keeps the harsh digital fizz off high notes, without costing your computer more.
+- **Quiet when you stop.** The gate closes the moment your hand mutes the strings, and hum is taken out without the ringing the old filters left after every stop.
+- **Whines gone.** A steady whine from a charger, a laptop or a cheap pickup is found while you rest and cut out with notches a few Hz wide. A clean input is never touched.
+- **Setup that doesn't over-brighten.** The treble fix for laptop mic jacks is gentler, and hiss on that band is turned down while you're not playing.
+- **Indian rock and indie tones.** A pack of new tones for the sounds of Indian rock and indie.
+- **A weekly player count.** An anonymous count of how many people play each week, so we know what to fix first: a random number, the version and the week, nothing about you. One switch in Settings turns it off.
+- **Fixes from your reports.** Something broke? In Settings, press **Save a report**. Every report gets read.
+
+## 0.1.4
+
+Released 12 November 2026, fixes from the first day of 0.1.3.
 
 - **Puts itself back on the fast way in.** If Riffhouse starts on a slow driver, it tries the fastest one your input has a few seconds later and keeps it only if the sound is clean.
 - **Clearer sound card messages.** When a driver won't start, Riffhouse says what it went back to and names the usual cause first: another program, often a voice call, holding the device.
@@ -25,18 +38,6 @@ Released 12 November 2026.
 - **Chords and tabs.** Paste a song from any site. Change its key, make the text bigger and let it scroll while you play.
 - **Share a tone as a message.** Send a tone to a friend as plain text. They paste it into Riffhouse and it loads.
 - **MP3 and FLAC.** Every take you record saves as MP3 or FLAC with one button. And the app starts about twice as fast.
-
-## Next: 0.1.5
-
-The polish release: sound you can trust, tested end to end before it ships.
-
-- **Pedals that behave like the real circuits.** Every drive and fuzz is now solved as the circuit it comes from, checked against published measurements of the real pedals: how much gain each has, where it peaks and how far the tone knob reaches.
-- **Cleaner high gain.** The amps' distortion is worked out in a way that keeps the harsh digital fizz off high notes, without costing your computer more.
-- **Quiet when you stop.** The gate closes the moment your hand mutes the strings, and hum is taken out without the ringing the old filters left after every stop.
-- **Setup that doesn't over-brighten.** The treble fix for laptop mic jacks is gentler, and hiss on that band is turned down while you're not playing.
-- **Indian rock and indie tones.** A pack of new tones for the sounds of Indian rock and indie.
-- **A weekly player count.** An anonymous count of how many people play each week, so we know what to fix first: a random number, the version and the week, nothing about you. One switch in Settings turns it off.
-- **Fixes from your reports.** Something broke? In Settings, press **Save a report**. Every report gets read.
 
 ## The big one: 0.2.0
 
