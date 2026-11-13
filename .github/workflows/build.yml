@@ -167,6 +167,59 @@ jobs:
             dist/BUILD.txt
           if-no-files-found: error
 
+      # A player who already has 0.1.4: their own tones, favourites, recordings and songs, and the
+      # settings 0.1.4 writes. The new installer goes over that copy, and later the uninstaller
+      # takes it off. Neither may touch a file the player made (plan-0.1.5 lines 12 and 13).
+      - name: Put 0.1.4 and a player's own files on this machine
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $docs = [Environment]::GetFolderPath('MyDocuments')
+          $music = [Environment]::GetFolderPath('MyMusic')
+          $tone = Get-Content presets\80s-arena-lead.json -Raw | ConvertFrom-Json
+          $tone.name = 'Upgrade Check Tone'
+          $files = @{
+            (Join-Path $docs 'Riffhouse\Presets\Upgrade Check Tone.json') = ($tone | ConvertTo-Json -Depth 10)
+            (Join-Path $docs 'Riffhouse\Songs\Upgrade Check Song.txt') = "[Verse]`nA5 D5 E5`n"
+          }
+          foreach ($f in $files.Keys) { New-Item -ItemType Directory -Force (Split-Path $f) | Out-Null; Set-Content -Path $f -Value $files[$f] -Encoding utf8 -NoNewline }
+          # a real take: one second of a quiet 220 Hz tone, 48 kHz, 16-bit mono
+          $take = Join-Path $music 'Riffhouse Recordings\Upgrade Check Take.wav'
+          New-Item -ItemType Directory -Force (Split-Path $take) | Out-Null
+          $n = 48000; $ms = New-Object IO.MemoryStream; $w = New-Object IO.BinaryWriter($ms)
+          $w.Write([Text.Encoding]::ASCII.GetBytes('RIFF')); $w.Write([int](36 + 2 * $n)); $w.Write([Text.Encoding]::ASCII.GetBytes('WAVEfmt '))
+          $w.Write([int]16); $w.Write([int16]1); $w.Write([int16]1); $w.Write([int]48000); $w.Write([int]96000); $w.Write([int16]2); $w.Write([int16]16)
+          $w.Write([Text.Encoding]::ASCII.GetBytes('data')); $w.Write([int](2 * $n))
+          for ($i = 0; $i -lt $n; $i++) { $w.Write([int16](3000 * [Math]::Sin(2 * [Math]::PI * 220 * $i / 48000))) }
+          [IO.File]::WriteAllBytes($take, $ms.ToArray())
+          $files[$take] = ''
+          # what each file must still hold at the end
+          $files.Keys | ForEach-Object { "$_|$((Get-FileHash $_ -Algorithm SHA256).Hash)" } | Out-File player-files.txt -Encoding utf8
+          Get-Content player-files.txt
+
+          # the real 0.1.4 installer from the releases page, installed and run the way a player has it
+          $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/NatikChhabra/riffhouse/releases/tags/v0.1.4' -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+          $asset = $rel.assets | Where-Object { $_.name -like '*windows-setup.exe' } | Select-Object -First 1
+          if (-not $asset) { throw "The 0.1.4 release has no Windows installer" }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile old-setup.exe
+          $p = Start-Process old-setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/LOG=$PWD\old-install.log" -PassThru
+          $null = $p.Handle
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "The 0.1.4 installer did not finish in 5 minutes" }
+          if ($p.ExitCode -ne 0) { Get-Content old-install.log -Tail 40; throw "The 0.1.4 installer ended with code $($p.ExitCode)" }
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\Riffhouse\Riffhouse.exe'
+          "Installed $((Get-Item $app).VersionInfo.ProductVersion) from the releases page"
+          $p = Start-Process $app -PassThru
+          $null = $p.Handle
+          Start-Sleep -Seconds 15
+          $null = $p.CloseMainWindow()
+          if (-not $p.WaitForExit(30000)) { $p.Kill() }
+          # 0.1.4 updates itself as it closes once a newer release is out: let that finish too
+          foreach ($i in 1..180) { if (-not (Get-Process | Where-Object { $_.ProcessName -like '*windows-setup*' })) { break }; Start-Sleep -Seconds 1 }
+          $settings = Join-Path $env:APPDATA 'Riffhouse\Riffhouse.settings'
+          if (-not (Test-Path $settings)) { throw "0.1.4 kept no settings file" }
+          "0.1.4 ran and wrote its settings ($((Get-Item $settings).Length) bytes)"
+
       # The installer is what people get, so it is what gets tested: put it on this machine
       # the way an update does, start the app, have it draw every screen, and take it off again.
       - name: Install it, start it, remove it
@@ -234,6 +287,20 @@ jobs:
           $now = (Get-Item $app).VersionInfo.ProductVersion
           if ("$now" -ne "$installed") { "Updated itself on close: $installed to $now" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append }
 
+          $player = Get-Content player-files.txt | ForEach-Object { $f, $h = $_ -split '\|'; [pscustomobject]@{ File = $f; Hash = $h } }
+          function Test-PlayerFiles ($when)
+          {
+            foreach ($x in $player)
+            {
+              if (-not (Test-Path $x.File)) { throw "$when, the player's $($x.File) is gone" }
+              if ((Get-FileHash $x.File -Algorithm SHA256).Hash -ne $x.Hash) { throw "$when, the player's $($x.File) was changed" }
+            }
+            $settings = Join-Path $env:APPDATA 'Riffhouse\Riffhouse.settings'
+            if (-not (Test-Path $settings) -or (Get-Item $settings).Length -lt 100) { throw "$when, the settings file is gone or empty" }
+            "$when, every file the player made is there, unchanged, and so are the settings"
+          }
+          Test-PlayerFiles "After installing over 0.1.4 and playing"
+
           $remove = Join-Path (Split-Path $app) 'unins000.exe'
           if (-not (Test-Path $remove)) { throw "No uninstaller next to the app" }
           Start-Process $remove -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$PWD\uninstall.log" -Wait
@@ -247,6 +314,7 @@ jobs:
             if (Test-Path uninstall.log) { Get-Content uninstall.log -Tail 60 }
             throw "Riffhouse.exe is still there after the uninstaller ran"
           }
+          Test-PlayerFiles "After uninstalling"
           "Installed $installed, started, drew its screens, removed."
 
       # The pictures are only there to look at when something went wrong. A build that passed
