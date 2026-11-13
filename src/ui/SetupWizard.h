@@ -3,6 +3,7 @@
 #pragma once
 
 #include "../plugin/AutoSetup.h"
+#include "Gear.h"
 #include "Widgets.h"
 
 namespace rh::ui
@@ -25,18 +26,22 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
     void mouseWheelMove (const juce::MouseEvent&, const juce::MouseWheelDetails&) override;
+    bool keyPressed (const juce::KeyPress&) override;
     // For pictures of the app: a step as it looks half way through, with nothing running.
-    // 0-3 the four steps, 4 the pause after the first, 5 the summary.
+    // 0-3 the four steps, 4 the pause after the first, 5 the summary, 6 the summary on two
+    // USB devices, 7 the sounds to start with.
     // `moving`: get there from the example shown before, the way the real thing would.
     void showExample (int which, bool moving = false);
     // For the checks: a setup that ran for real has just finished with this result.
     void finishedWith (const AutoSetup::Summary&);
-    void startPlaying() { complete (true); } // what the summary's button does
+    void startPlaying() { complete (true); } // setup is over, whatever step it is on
     std::function<void()> onFinished;
     bool ranToTheEnd = false; // closed from the summary: setup really did its work
 
 private:
-    enum class Step { welcome, running, done, failed };
+    // sound: the first time only, after the summary (or after skipping setup), a handful of
+    // whole rigs to start from, so a player who has never used an amp sim hears a good tone at once
+    enum class Step { welcome, running, done, failed, sound };
     // what the running step shows, from the setup at work or made up for a picture
     struct View
     {
@@ -83,5 +88,25 @@ private:
     int listRows() const { return inputs.empty() ? 0 : std::min (kRowsShown, (int) inputs.size() + 1); }
     juce::Rectangle<int> listArea() const;
     int rowAt (juce::Point<int>) const; // which line of the list, -1 for none
+
+    // The sounds to start with: one factory tone for each kind of playing, shown by its amp.
+    struct Sound
+    {
+        juce::String style, tone;
+        int preset = -1;
+        int amp = 0;
+        GearThumb thumb;
+    };
+    std::vector<Sound> sounds;
+    int hoverSound = -1, chosenSound = -1;
+    bool firstRun = false, reachedDone = false;
+    void makeSounds();
+    bool offerSounds() const { return firstRun && ! sounds.empty(); }
+    void toSounds(); // the step after the summary, or after skipping setup, on the first run
+    void choose (int which);
+    static constexpr int kSoundW = 173, kSoundH = 160, kSoundGap = 12; // three across the card's 544
+    static juce::Rectangle<float> soundArt(); // where the amp is drawn in a tile
+    juce::Rectangle<int> soundArea (int which) const;
+    int soundAt (juce::Point<int>) const;
 };
 } // namespace rh::ui

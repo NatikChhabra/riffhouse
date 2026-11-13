@@ -47,6 +47,10 @@ void SetupWizard::begin (bool again, const std::vector<AutoSetup::Input>* preten
     picked = hoverRow = -1;
     firstRow = 0;
     offeredAgain = again;
+    // the sounds to start with are offered once: to someone who has never been through setup
+    firstRun = pretend == nullptr && host != nullptr && ! host->settings().getBoolValue ("setupDone", false);
+    reachedDone = false;
+    hoverSound = chosenSound = -1;
     step = Step::welcome;
     cardH.snap ((float) heightFor (step));
     layoutButtons();
@@ -159,6 +163,15 @@ void SetupWizard::showExample (int which, bool moving)
         }
         shownSummary.inputGainDb = 1.5f; shownSummary.inputFix = true; shownSummary.inputFixDb = 21.0f; shownSummary.gateDb = -52.0f;
         if (moving) go (Step::done); else step = Step::done;
+        reachedDone = true;
+        if (which >= 7)
+        {
+            // the sounds to start with: the second one picked, the mouse over the fourth
+            makeSounds();
+            chosenSound = std::min (1, (int) sounds.size() - 1);
+            hoverSound = std::min (3, (int) sounds.size() - 1);
+            if (moving) go (Step::sound); else step = Step::sound;
+        }
     }
     else
     {
@@ -197,7 +210,7 @@ void SetupWizard::finishedWith (const AutoSetup::Summary& s)
 
 void SetupWizard::complete (bool keep)
 {
-    ranToTheEnd = keep && step == Step::done;
+    ranToTheEnd = keep && (step == Step::done || (step == Step::sound && reachedDone));
     if (! keep && setup != nullptr) setup->cancel();
     setup.reset();
     stopTimer();
@@ -227,7 +240,7 @@ void SetupWizard::layoutButtons()
             primary.onClick = [this] { startSetup(); };
             secondary.setButtonText (offeredAgain ? "Not now" : "Skip for now");
             secondary.setVisible (true);
-            secondary.onClick = [this] { complete (true); };
+            secondary.onClick = [this] { if (firstRun) toSounds(); else complete (true); };
             break;
         case Step::running:
             primary.setButtonText ("Cancel");
@@ -238,8 +251,8 @@ void SetupWizard::layoutButtons()
         case Step::done:
             primary.setColour (juce::TextButton::buttonColourId, colours::accent);
             primary.setColour (juce::TextButton::textColourOffId, colours::bg);
-            primary.setButtonText ("Start playing");
-            primary.onClick = [this] { complete (true); };
+            primary.setButtonText (firstRun ? "Next" : "Start playing");
+            primary.onClick = [this] { if (firstRun) toSounds(); else complete (true); };
             secondary.setButtonText ("Run it again");
             secondary.setVisible (true);
             secondary.onClick = [this] { startSetup(); };
@@ -275,13 +288,109 @@ void SetupWizard::layoutButtons()
             tertiary.onClick = [] { juce::URL ("ms-settings:privacy-microphone").launchInDefaultBrowser(); };
            #endif
             break;
+        case Step::sound:
+            primary.setColour (juce::TextButton::buttonColourId, colours::accent);
+            primary.setColour (juce::TextButton::textColourOffId, colours::bg);
+            primary.setButtonText ("Start playing");
+            primary.onClick = [this] { complete (true); };
+            break;
     }
     resized();
+}
+
+void SetupWizard::makeSounds()
+{
+    if (! sounds.empty()) return;
+    // one for each kind of playing a beginner asks for, all factory tones that hold up on any guitar
+    static const char* const picks[][2] = { { "Clean", "First Light Clean" },
+                                            { "Blues", "Shillong Blues Rock" },
+                                            { "Classic rock", "Classic Rock Crunch" },
+                                            { "Hard rock", "Hard Rock Anthem" },
+                                            { "Metal", "Thrash Machine" },
+                                            { "Indie", "Bangla Band Jangle" } };
+    const auto& all = proc.presets().all();
+    for (const auto& pick : picks)
+    {
+        const int index = proc.presets().indexOf (pick[1]);
+        if (! juce::isPositiveAndBelow (index, (int) all.size())) continue;
+        Sound s;
+        s.style = pick[0];
+        s.tone = pick[1];
+        s.preset = index;
+        s.amp = juce::jlimit (0, choices::numAmpModels - 1, juce::roundToInt (all[(size_t) index].values[(size_t) P::ampModel]));
+        if (s.amp == choices::neuralCapture) continue; // a capture needs a file this computer may not have
+        const auto& design = ampDesign (s.amp);
+        const auto name = juce::String (spec (P::ampModel).choices[(size_t) s.amp]).toLowerCase();
+        // drawn at twice the size it is shown, so it stays sharp on a high density screen
+        s.thumb = ampThumb (design, name, 0.5f);
+        const auto art = soundArt();
+        const float fit = std::min (art.getWidth() / s.thumb.box.getWidth(), art.getHeight() / s.thumb.box.getHeight());
+        s.thumb = ampThumb (design, name, juce::jlimit (0.2f, 2.0f, 2.0f * fit));
+        sounds.push_back (std::move (s));
+    }
+}
+
+void SetupWizard::toSounds()
+{
+    makeSounds();
+    if (sounds.empty()) { complete (true); return; }
+    chosenSound = -1;
+    for (size_t i = 0; i < sounds.size(); ++i)
+        if (sounds[i].preset == proc.currentPresetIndex()) chosenSound = (int) i;
+    hoverSound = -1;
+    go (Step::sound);
+    layoutButtons();
+    repaint();
+}
+
+void SetupWizard::choose (int which)
+{
+    if (! juce::isPositiveAndBelow (which, (int) sounds.size())) return;
+    chosenSound = which;
+    proc.loadPreset (sounds[(size_t) which].preset);
+    repaint();
+}
+
+juce::Rectangle<float> SetupWizard::soundArt()
+{
+    return { 0.0f, 0.0f, (float) kSoundW - 24.0f, 92.0f };
+}
+
+juce::Rectangle<int> SetupWizard::soundArea (int which) const
+{
+    if (step != Step::sound || ! juce::isPositiveAndBelow (which, (int) sounds.size())) return {};
+    // under the title (52) and the line under it (48), then a gap of 14
+    const auto r = cardBounds().reduced (48, 40).withTrimmedTop (52 + 48 + 14);
+    const int col = which % 3, row = which / 3;
+    return { r.getX() + col * (kSoundW + kSoundGap), r.getY() + row * (kSoundH + kSoundGap), kSoundW, kSoundH };
+}
+
+int SetupWizard::soundAt (juce::Point<int> p) const
+{
+    for (int i = 0; i < (int) sounds.size(); ++i)
+        if (soundArea (i).contains (p)) return i;
+    return -1;
+}
+
+bool SetupWizard::keyPressed (const juce::KeyPress& k)
+{
+    if (step != Step::sound || sounds.empty()) return false;
+    if (k == juce::KeyPress::returnKey) { complete (true); return true; }
+    const int n = (int) sounds.size(), at = std::max (0, chosenSound);
+    int to = -1;
+    if (k == juce::KeyPress::rightKey) to = std::min (n - 1, chosenSound < 0 ? 0 : at + 1);
+    else if (k == juce::KeyPress::leftKey) to = std::max (0, at - 1);
+    else if (k == juce::KeyPress::downKey) to = std::min (n - 1, chosenSound < 0 ? 0 : at + 3);
+    else if (k == juce::KeyPress::upKey) to = std::max (0, at - 3);
+    if (to < 0) return false;
+    if (to != chosenSound) choose (to);
+    return true;
 }
 
 int SetupWizard::heightFor (Step s) const
 {
     const int list = listRows() > 0 ? 44 + listRows() * kRowH : 0;
+    if (s == Step::sound) return 40 + 52 + 48 + 14 + 2 * kSoundH + kSoundGap + 26 + 44 + 36;
     return s == Step::welcome ? 372 + list : s == Step::running ? 504 : s == Step::failed ? 470 : 560;
 }
 
@@ -301,6 +410,11 @@ int SetupWizard::rowAt (juce::Point<int> p) const
 
 void SetupWizard::mouseDown (const juce::MouseEvent& e)
 {
+    if (step == Step::sound)
+    {
+        choose (soundAt (e.getPosition()));
+        return;
+    }
     const int row = rowAt (e.getPosition());
     if (row < 0 || row > (int) inputs.size()) return;
     picked = row - 1;
@@ -309,6 +423,15 @@ void SetupWizard::mouseDown (const juce::MouseEvent& e)
 
 void SetupWizard::mouseMove (const juce::MouseEvent& e)
 {
+    if (step == Step::sound)
+    {
+        const int over = soundAt (e.getPosition());
+        if (over == hoverSound) return;
+        hoverSound = over;
+        setMouseCursor (over >= 0 ? juce::MouseCursor::PointingHandCursor : juce::MouseCursor::NormalCursor);
+        repaint();
+        return;
+    }
     const int row = rowAt (e.getPosition());
     if (row == hoverRow) return;
     hoverRow = row;
@@ -318,7 +441,7 @@ void SetupWizard::mouseMove (const juce::MouseEvent& e)
 
 void SetupWizard::mouseExit (const juce::MouseEvent&)
 {
-    hoverRow = -1;
+    hoverRow = hoverSound = -1;
     repaint();
 }
 
@@ -345,7 +468,7 @@ void SetupWizard::go (Step s)
     contentIn.snap (0.0f);
     contentIn.to (1.0f, motion::ui, motion::Curve::out, true);
     cardH.to ((float) heightFor (s), motion::overlay, motion::Curve::inOut);
-    if (s == Step::done) doneAt = motion::now();
+    if (s == Step::done) { doneAt = motion::now(); reachedDone = true; }
     animate();
 }
 
@@ -675,6 +798,46 @@ void SetupWizard::paint (juce::Graphics& g)
                 bullet (false, "Hearing the guitar twice? Switch off Direct Monitor on your interface.");
             else if (s.exclusive)
                 bullet (false, "Other apps' sound pauses while Riffhouse is open. Use Play along for songs.");
+            break;
+        }
+        case Step::sound:
+        {
+            title ("Pick a sound to start with");
+            body ("Play while you try them. Each one is a whole rig, from the pedals to the speaker, and you can change any of it later.", 48);
+            for (int i = 0; i < (int) sounds.size(); ++i)
+            {
+                const auto& s = sounds[(size_t) i];
+                const auto tile = soundArea (i).toFloat();
+                const bool on = i == chosenSound, over = i == hoverSound;
+                g.setColour (over && ! on ? colours::raisedHi : colours::raised);
+                g.fillRoundedRectangle (tile, 12.0f);
+                if (on)
+                {
+                    g.setColour (colours::accent);
+                    g.drawRoundedRectangle (tile.reduced (1.0f), 11.0f, 2.0f);
+                }
+                auto inner = tile.reduced (12.0f, 12.0f);
+                const auto art = inner.removeFromTop (soundArt().getHeight());
+                if (s.thumb.image.isValid())
+                {
+                    // the amp stands on the same line in every tile, like gear on a floor
+                    const auto& t = s.thumb;
+                    const float fit = std::min (art.getWidth() / t.box.getWidth(), art.getHeight() / t.box.getHeight());
+                    juce::Graphics::ScopedSaveState keep (g);
+                    g.addTransform (juce::AffineTransform::translation (-t.box.getCentreX(), -t.box.getBottom())
+                                        .scaled (fit)
+                                        .translated (art.getCentreX(), art.getBottom()));
+                    g.drawImage (t.image, t.area);
+                    drawAmpJewel (g, t.amp, ampDesign (s.amp), on);
+                }
+                inner.removeFromTop (12.0f);
+                g.setColour (colours::text);
+                g.setFont (font (16.0f, Weight::semibold));
+                g.drawText (s.style, inner.removeFromTop (22.0f), juce::Justification::centredLeft);
+                g.setColour (on ? colours::text : colours::textDim);
+                g.setFont (font (13.5f));
+                g.drawFittedText (s.tone, inner.removeFromTop (18.0f).toNearestInt(), juce::Justification::centredLeft, 1, 0.9f);
+            }
             break;
         }
         case Step::failed:

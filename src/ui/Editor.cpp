@@ -1663,6 +1663,8 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
         for (int i = 0; i < 6; ++i) { w.showExample (i); shoot (names[i]); }
         w.showExample (6);
         shoot ("setup-done-shared");
+        w.showExample (7);
+        shoot ("setup-sound");
         r.removeChildComponent (&w);
     }
     {

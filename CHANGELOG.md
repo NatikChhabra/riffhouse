@@ -35,6 +35,7 @@ Pedals that behave like the real circuits, cleaner high gain, quiet mutes, no mo
 - Riffhouse counts how many people play each week. Once a week it sends a random number made on your PC, the app version and the week, nothing about you or your PC. It is on by default, says so once, and Settings, Player count switches it off. Details in docs/PRIVACY.md.
 - The taskbar shows the new icon after an update, not the old house.
 - Takes plays any audio file you drop in its folder: MP3, FLAC, OGG, M4A and files with odd names like ".mp3.mpeg".
+- The first time you run Riffhouse, setup ends with six sounds to start from (clean, blues, classic rock, hard rock, metal and indie), each a whole rig. Play while you click through them, or use the arrow keys, and start with the one you like.
 - Setup's first page asks for wired headphones and says where the guitar can plug in. After an update, Riffhouse says in one line what changed.
 - A driver that does not count dropouts says "not counted by this driver" instead of "-1".
 
