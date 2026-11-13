@@ -159,6 +159,13 @@ void RiffhouseProcessor::prepareToPlay (double sr, int block)
     latencyAmp.store ((int) std::lround (v[(size_t) P::ampModel]));
     matcher.start (sr);
     tun.prepare (sr);
+    // Only the app holds back: in a DAW the host owns the start, and an offline bounce must
+    // keep its first notes.
+    const bool app = wrapperType == wrapperType_Standalone;
+    warmLeft = app ? (int) (0.35 * sr) : 0;
+    outGain = app ? 0.0f : 1.0f;
+    gainUp = (float) (1.0 / (0.15 * sr));
+    gainDown = (float) (1.0 / (0.01 * sr));
     // a song played faster than it was recorded asks for more than a block of it at a time
     const int songBlock = SongStretch::most (std::max (block, 16));
     jam.prepareToPlay (songBlock, sr);
@@ -290,7 +297,7 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         float* out = buffer.getWritePointer (0);
         rig.process (mono.data(), out, monoOut.data(), n);
         for (int i = 0; i < n; ++i) out[i] = 0.5f * (out[i] + monoOut[(size_t) i]);
-        if (muteOutput.load()) buffer.clear();
+        fadeOutput (buffer, n);
         return;
     }
 
@@ -337,7 +344,23 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
         }
     }
     renderClick (buffer.getWritePointer (0), buffer.getWritePointer (1), n);
-    if (muteOutput.load()) buffer.clear();
+    fadeOutput (buffer, n);
+}
+
+void RiffhouseProcessor::fadeOutput (juce::AudioBuffer<float>& buffer, int n)
+{
+    const bool silent = muteOutput.load();
+    if (! silent && warmLeft <= 0 && outGain >= 1.0f) return; // playing: nothing to do
+    const int chans = buffer.getNumChannels();
+    for (int i = 0; i < n; ++i)
+    {
+        const bool hold = silent || warmLeft > 0;
+        if (warmLeft > 0) --warmLeft;
+        outGain = hold ? std::max (0.0f, outGain - gainDown) : std::min (1.0f, outGain + gainUp);
+        // an S-curve over the straight ramp: no corner where it starts or ends
+        const float g = outGain * outGain * (3.0f - 2.0f * outGain);
+        for (int c = 0; c < chans; ++c) buffer.getWritePointer (c)[i] *= g;
+    }
 }
 
 void RiffhouseProcessor::renderClick (float* l, float* r, int n)

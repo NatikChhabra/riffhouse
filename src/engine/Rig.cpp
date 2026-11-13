@@ -96,6 +96,24 @@ void Rig::prepare (double sampleRate, int block)
     setParams (p);
     cab.prepare (sr, maxBlock);
     setParams (p);
+
+    // A rig made from nothing has empty capacitors and filters: the drive circuits charge to their
+    // bias, and a high-gain amp after them turns that into a thump (up to -40 dB) the moment the app
+    // opens. Here there is time, so the whole rig runs on silence for a third of a second first, as
+    // real gear is already warm when you start playing. The meters are left as they were.
+    {
+        std::vector<float> quiet ((size_t) maxBlock, 0.0f), l ((size_t) maxBlock), r ((size_t) maxBlock);
+        const float inWas = meters().inPeak.load(), outWas = meters().outPeak.load(), gateWas = meters().gateInPeak.load();
+        for (int done = 0, n = (int) (0.33 * sr); done < n; done += maxBlock)
+        {
+            std::fill (quiet.begin(), quiet.end(), 0.0f);
+            setParams (p);
+            process (quiet.data(), l.data(), r.data(), maxBlock);
+        }
+        meters().inPeak.store (inWas);
+        meters().outPeak.store (outWas);
+        meters().gateInPeak.store (gateWas);
+    }
 }
 
 void Rig::reset()

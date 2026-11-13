@@ -792,7 +792,7 @@ public:
 
     juce::String latencyText() const
     {
-        if (demoLevels) return {}; // pictures of the app show no figure that belongs to one computer
+        if (demoLevels || noFigures) return {}; // pictures of the app show no figure that belongs to one computer
         if (auto* host = StandaloneHost::get())
             if (auto* dev = host->deviceManager().getCurrentAudioDevice())
             {
@@ -1006,6 +1006,7 @@ public:
 
     juce::String lastStatus;
     bool demoLevels = false;
+    bool noFigures = false; // films of the app: live meters, but no delay figure in the bottom bar
     int frame = 0;
     bool wasRecording = false;
 };
@@ -1494,7 +1495,7 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
         int param = -1;
         float to = 0.0f;  // where the knob goes, 0 to 1 along its travel
         float from = -1.0f;
-        bool started = false;
+        bool started = false, finished = false;
     };
     std::vector<Step> steps;
     const juce::var list = script.isArray() ? script : script.getProperty ("steps", juce::var());
@@ -1536,11 +1537,12 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
     r.wizard.reset();
     r.quietNotices = true;
     r.demoLevels = false;
+    r.noFigures = true;
     r.noticeBar.set ({});
     r.closeOverlays();
     motion::freeze (false);
     motion::setReduced (false);
-    const double clock0 = 100000.0;
+    const double clock0 = 100000.0; // frame 0; the unseen settling second runs just before it
     motion::setClock (clock0);
 
     const int block = 128;
@@ -1563,9 +1565,11 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
                 if (st.page >= 0) r.showPage (st.page);
                 if (st.param >= 0) st.from = proc.param ((P) st.param)->getValue();
             }
-            if (st.param >= 0)
+            if (st.param >= 0 && ! st.finished)
             {
+                // a move ends where it was sent, once: after that the knob is free again for a new tone or a new move
                 const float k = st.over <= 0.0 ? 1.0f : (float) juce::jlimit (0.0, 1.0, (t - st.t) / st.over);
+                if (k >= 1.0f) st.finished = true;
                 const float eased = motion::ease (motion::Curve::inOut, k);
                 auto* p = proc.param ((P) st.param);
                 const float v = st.from + (st.to - st.from) * eased;
@@ -1573,6 +1577,31 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
             }
         }
     };
+
+    // The film starts settled on its first state: the steps at time 0 are taken, then a second of
+    // quiet runs through the rig and the window (tone change dip, lamps, auto level), unseen.
+    {
+        for (auto& st : steps)
+            if (st.t <= 0.0 && st.param < 0) { st.started = true; if (st.tone.isNotEmpty()) proc.loadPreset (proc.presets().indexOf (st.tone)); if (st.page >= 0) r.showPage (st.page); }
+        juce::AudioBuffer<float> quiet (2, block);
+        for (int i = 0; i < juce::roundToInt (sr / block); ++i)
+        {
+            quiet.clear();
+            midi.clear();
+            proc.processBlock (quiet, midi);
+        }
+        for (int i = 0; i < 30; ++i)
+        {
+            motion::setClock (clock0 - 1000.0 + i * (1000.0 / 30.0));
+            motion::step();
+            r.tick();
+        }
+        (void) createComponentSnapshot (getLocalBounds(), true, 1.0f); // whatever that painting starts is over by frame 0
+        motion::setClock (clock0 - 1.0);
+        motion::step();
+        proc.meters().gateInPeak.store (0.0f);
+        proc.meters().outPeak.store (0.0f);
+    }
 
     const int frames = (int) std::ceil ((double) total * fps / sr);
     juce::PNGImageFormat png;

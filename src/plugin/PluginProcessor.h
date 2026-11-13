@@ -226,6 +226,11 @@ private:
     bool loopReady = false;
 
     std::vector<float> mono, di, monoOut;
+    // The sound comes in gently: silent for a moment after the sound card starts (its first blocks
+    // and the rig's first moments can stutter), then up over a fraction of a second. Muting fades too.
+    int warmLeft = 0;
+    float outGain = 0.0f, gainUp = 0.0f, gainDown = 0.0f;
+    void fadeOutput (juce::AudioBuffer<float>&, int n);
     std::atomic<int> latencyAmp { -1 };
     double sampleRate = 48000.0;
     int blockSize = 512;

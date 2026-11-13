@@ -1669,6 +1669,56 @@ static void judgeChanges (const std::vector<float>& out, const std::vector<size_
     }
 }
 
+// Opening the app must not crackle. The sound card side is softened by the app's own start fade;
+// this holds the rig itself to it: with every factory tone, a rig made from nothing makes no sound of
+// its own in its first moments (no thump from filters, convolution or oversampling waking up), and its
+// first blocks take no unusual time (a slow first block would be a dropout on a small buffer).
+void testStart (double sr)
+{
+    std::printf ("start @ %.0f Hz\n", sr);
+    const auto presets = loadPresets();
+    const int block = 64;
+    const int blocks = (int) (0.4 * sr) / block;
+    std::vector<float> in ((size_t) block, 0.0f), l ((size_t) block), r ((size_t) block);
+    float worst = 0.0f;
+    juce::String worstName;
+    double worstFirst = 0.0;
+    juce::String slowName;
+    for (const auto& p : presets)
+    {
+        auto v = p.values;
+        v[(size_t) P::lofiNoise] = 0.0f; // the lo-fi pedal's hiss is meant to be heard
+        v[(size_t) P::gateOn] = 0.0f;    // a gate would hide a thump
+        Rig rig;
+        rig.setParams (v);
+        rig.prepare (sr, block);
+        float peak = 0.0f;
+        int peakBlock = -1;
+        std::vector<double> times;
+        for (int b = 0; b < blocks; ++b)
+        {
+            const auto t0 = juce::Time::getMillisecondCounterHiRes();
+            rig.setParams (v);
+            rig.process (in.data(), l.data(), r.data(), block);
+            times.push_back (juce::Time::getMillisecondCounterHiRes() - t0);
+            for (int i = 0; i < block; ++i)
+                if (const float x = std::max (std::abs (l[(size_t) i]), std::abs (r[(size_t) i])); x > peak) { peak = x; peakBlock = b; }
+        }
+        if (peak > worst) { worst = peak; worstName = p.name; }
+        if (std::getenv ("RIFFHOUSE_START") != nullptr && peak > 1.0e-3f)
+            std::printf ("    %-28s %.1f dB  peak at block %d\n", p.name.toRawUTF8(), juce::Decibels::gainToDecibels (peak), peakBlock);
+        auto sorted = times;
+        std::sort (sorted.begin(), sorted.end());
+        const double median = std::max (1.0e-3, sorted[sorted.size() / 2]);
+        const double first = *std::max_element (times.begin(), times.begin() + 4) / median;
+        if (first > worstFirst) { worstFirst = first; slowName = p.name; }
+    }
+    const float db = juce::Decibels::gainToDecibels (worst, -200.0f);
+    std::printf ("  %d tones from cold, silence in: loudest %.1f dB (%s)\n", (int) presets.size(), db, worstName.toRawUTF8());
+    std::printf ("  slowest of the first four blocks: %.1fx a usual block (%s)\n", worstFirst, slowName.toRawUTF8());
+    CHECK (db < -65.0f, "a rig from cold makes a sound of its own: %.1f dB (%s)", db, worstName.toRawUTF8());
+}
+
 void testClicks (double sr, bool quick)
 {
     std::printf ("clicks @ %.0f Hz\n", sr);
@@ -3081,6 +3131,7 @@ int main (int argc, char** argv)
         return 0;
     }
     if (args[0] == "tuner") { testTuner (48000.0); testTuner (44100.0); testTuner (96000.0); testMetronome(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "start") { testStart (48000.0); testStart (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
@@ -3155,6 +3206,8 @@ int main (int argc, char** argv)
         testStress (192000.0, 64, 5.0, 5);
     }
     // the quick round of the click test (every switch and knob, every seventh tone); `clicks` runs all
+    testStart (48000.0);
+    testStart (44100.0);
     testClicks (48000.0, true);
     testCpu (48000.0);
 
