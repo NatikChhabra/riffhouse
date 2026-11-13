@@ -248,12 +248,12 @@ UPLOAD_LIMIT = 10 * 1024 * 1024
 
 
 def send_file(channel: str, content: str, path: str | None, name: str, data: bytes | None = None,
-              mime: str = "video/mp4", embeds=None, ping_roles=()):
+              mime: str = "video/mp4", embeds=None, ping_roles=(), everyone: bool = False):
     if DRY:
         print(f"[dry] upload {name} to {channel}: {content[:200]}")
         return {}
     boundary = "riffhouse" + str(int(time.time() * 1000))
-    body_json = {"content": content, "allowed_mentions": {"parse": [], "roles": list(ping_roles)},
+    body_json = {"content": content, "allowed_mentions": {"parse": ["everyone"] if everyone else [], "roles": list(ping_roles)},
                  "attachments": [{"id": 0, "filename": name}]}
     if embeds:
         body_json["embeds"] = embeds
@@ -323,17 +323,20 @@ def post_reels(log: list[str]):
             except RuntimeError as e:
                 print(f"warning: crosspost: {e}", file=sys.stderr)
         log.append(f"Posted reel **{rid}** in <#{chan}>")
-        # a big one (the trailer) also gets a short @everyone pointer in #announcements
+        # a big one (the trailer) is also posted in full in #announcements, with @everyone
         if r.get("announce") and msg.get("id"):
-            text = f"@everyone {r['announce'].strip()}\nhttps://discord.com/channels/{GUILD}/{chan}/{msg['id']}"
-            a = call("POST", f"/channels/{CH['announcements']}/messages",
-                     {"content": text, "allowed_mentions": {"parse": ["everyone"]}})
+            ann = CH["announcements"]
+            text = f"@everyone {r['announce'].strip()}" + ("\n" + link if link else "")
+            if video and os.path.exists(video) and os.path.getsize(video) <= UPLOAD_LIMIT:
+                a = send_file(ann, text, video, name, everyone=True)
+            else:
+                a = call("POST", f"/channels/{ann}/messages", {"content": text, "allowed_mentions": {"parse": ["everyone"]}})
             if a.get("id"):
                 try:
-                    call("POST", f"/channels/{CH['announcements']}/messages/{a['id']}/crosspost")
+                    call("POST", f"/channels/{ann}/messages/{a['id']}/crosspost")
                 except RuntimeError as e:
                     print(f"warning: crosspost: {e}", file=sys.stderr)
-            log.append(f"Pointed #announcements to **{rid}** with @everyone")
+            log.append(f"Also posted **{rid}** in #announcements with @everyone")
 
 
 # ---------------------------------------------------------------- 1c. launch event
