@@ -6,18 +6,13 @@ name: Discord bot
 # GitHub often drops scheduled runs (it ran a few times a day instead of every 10 minutes), so each
 # run checks every 5 minutes for about 50 minutes, then starts the next run itself. The schedule
 # stays as a backup that restarts the chain if it ever breaks.
+# PAUSED (Natik, 13 Nov 2026): the bot posts nothing until he says so. Welcomer handles welcomes.
+# Manual runs only. To turn it back on, restore the schedule and the "Start the next run" step from git history.
 on:
-  schedule:
-    - cron: '*/10 * * * *'
-  # a new reel posts right away instead of waiting for the next 10 minutes
-  push:
-    branches: [main]
-    paths: ['community/reels.json']
   workflow_dispatch:
 
 permissions:
   contents: read
-  actions: write   # to start the next run
 
 concurrency:
   group: discord-bot
@@ -44,8 +39,3 @@ jobs:
             [ "$i" -lt 10 ] && sleep 300
           done
           exit $failed
-      - name: Start the next run
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run discord-bot.yml --ref main -R "$GITHUB_REPOSITORY"
