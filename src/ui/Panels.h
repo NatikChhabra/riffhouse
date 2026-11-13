@@ -154,6 +154,7 @@ private:
     IconButton close { icons::close() };
     juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and output..." };
     juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report in public" }, sendReport { "Send a report" };
+    juce::TextButton support { "Support Riffhouse" };
     juce::ToggleButton weeklyHello { "Count me in the weekly number of players" };
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };

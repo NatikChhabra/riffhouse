@@ -664,6 +664,10 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     website.setTooltip ("Opens the page of common problems and how to fix them.");
     website.onClick = [] { juce::URL ("https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md").launchInDefaultBrowser(); };
     page.addAndMakeVisible (website);
+    // a thank-you, never a purchase: everyone gets the same app
+    support.setTooltip ("Opens the website's support page. Everyone gets the same app; supporting is a thank-you, not a purchase.");
+    support.onClick = [] { juce::URL ("https://natikchhabra.github.io/riffhouse/#support").launchInDefaultBrowser(); };
+    page.addAndMakeVisible (support);
     problem.setTooltip ("Copies the report, with your user name and computer name taken out, and opens the public page where "
                         "problems are reported. Paste it there and say what went wrong. Nothing is sent by itself.");
     problem.onClick = [this]
@@ -999,7 +1003,7 @@ void SettingsView::show (Section s)
     autoUpdate.setVisible (hasUpdater);
     earlyVersions.setVisible (hasUpdater);
     for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get(), &teachControl, &teachJob,
-                                                             &footView, &lessMotion, &website, &problem, &report })
+                                                             &footView, &lessMotion, &website, &problem, &report, &support })
         c->setVisible (true);
     layoutPage();
     scroller.setViewPosition (0, s == sections().getFirst() ? 0 : sectionTop[(size_t) s] - 8);
@@ -1177,7 +1181,9 @@ void SettingsView::layoutPage()
             gap (36);
             aboutHead = at (26);
             gap (10);
-            aboutArea = at (150);
+            aboutArea = at (130);
+            gap (4);
+            support.setBounds (at (42).withWidth (200));
             break;
         }
     }
