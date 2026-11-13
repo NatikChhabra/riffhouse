@@ -594,11 +594,23 @@ void NoiseGate::process (float* x, int n, float* gainsOut)
 void Compressor::prepare (double sampleRate)
 {
     sr = sampleRate;
+    makeupSmooth.prepare (sr, 60.0f);
+    mixSmooth.prepare (sr, 20.0f);
+    threshSmooth.prepare (sr, 60.0f);
+    ratioSmooth.prepare (sr, 60.0f);
     set (5, 4, 5, 10);
     reset();
 }
 
-void Compressor::reset() { envDb = -120.0f; grDb = 0.0f; }
+void Compressor::reset()
+{
+    envDb = -120.0f;
+    grDb = 0.0f;
+    makeupSmooth.reset (makeupDb);
+    mixSmooth.reset (mix);
+    threshSmooth.reset (thresholdDb);
+    ratioSmooth.reset (ratio);
+}
 
 void Compressor::set (float sustain, float attack, float level, float blend)
 {
@@ -608,11 +620,26 @@ void Compressor::set (float sustain, float attack, float level, float blend)
     // auto makeup: about 60% of the reduction a typical note gets
     const float typical = -18.0f;
     const float reduction = std::max (0.0f, (typical - thresholdDb) * (1.0f - 1.0f / ratio));
-    makeup = dbToGain (0.6f * reduction + (level / 10.0f - 0.5f) * 24.0f);
+    makeupDb = 0.6f * reduction + (level / 10.0f - 0.5f) * 24.0f;
     const float atMs = expMap (attack / 10.0f, 0.5f, 40.0f);
     att = (float) std::exp (-1.0 / (0.001 * atMs * sr));
     rel = (float) std::exp (-1.0 / (0.180 * sr));
     mix = clamp01 (blend / 10.0f);
+    makeupSmooth.setTarget (makeupDb);
+    mixSmooth.setTarget (mix);
+    threshSmooth.setTarget (thresholdDb);
+    ratioSmooth.setTarget (ratio);
+}
+
+void Compressor::follow (float in) noexcept
+{
+    const float lvl = gainToDb (std::abs (in));
+    envDb = lvl > envDb ? lvl + (envDb - lvl) * att : lvl + (envDb - lvl) * rel;
+}
+
+void Compressor::listen (const float* x, int n)
+{
+    for (int i = 0; i < n; ++i) follow (x[i]);
 }
 
 void Compressor::process (float* x, int n)
@@ -620,16 +647,16 @@ void Compressor::process (float* x, int n)
     for (int i = 0; i < n; ++i)
     {
         const float in = x[i];
-        const float lvl = gainToDb (std::abs (in));
-        envDb = lvl > envDb ? lvl + (envDb - lvl) * att : lvl + (envDb - lvl) * rel;
+        follow (in);
+        const float th = threshSmooth.next(), ra = ratioSmooth.next();
         // soft knee of 6 dB
-        const float over = envDb - thresholdDb;
+        const float over = envDb - th;
         float gr = 0.0f;
-        if (over > 3.0f) gr = over * (1.0f - 1.0f / ratio);
-        else if (over > -3.0f) gr = (1.0f - 1.0f / ratio) * (over + 3.0f) * (over + 3.0f) / 12.0f;
+        if (over > 3.0f) gr = over * (1.0f - 1.0f / ra);
+        else if (over > -3.0f) gr = (1.0f - 1.0f / ra) * (over + 3.0f) * (over + 3.0f) / 12.0f;
         grDb = gr;
-        const float wet = in * dbToGain (-gr) * makeup;
-        x[i] = lerp (in, wet, mix);
+        const float wet = in * dbToGain (makeupSmooth.next() - gr);
+        x[i] = lerp (in, wet, mixSmooth.next());
     }
 }
 
@@ -823,6 +850,16 @@ void DrivePedal::reset()
     if (osHigh) osHigh->reset();
     green.reset(); rodent.reset(); fuzz.reset();
     boost.reset(); trebleBoost.reset(); blues.reset(); metal.reset();
+    // A circuit starts with every capacitor empty and charges to where its bias holds it, and
+    // that charging comes out as a thump (-49 dB from the blues drive and the metal box; the
+    // others start where they rest). Run those on silence for 10 ms first, which leaves under
+    // -84 dB, as a real pedal is already powered when it is stepped on. Costs 0.3 to 0.7 ms.
+    if (type == 3 || type == 6)
+    {
+        const double rate = active() == osHigh.get() ? 2.0 * osr : osr;
+        for (int i = 0, n = (int) (0.010 * rate); i < n; ++i)
+            runCircuit (0.0);
+    }
 }
 
 float DrivePedal::latencySamples() const { return active() != nullptr ? active()->getLatencyInSamples() : 0.0f; }
@@ -889,35 +926,61 @@ void DrivePedal::process (float* data, int n)
 void GraphicEq::prepare (double sampleRate)
 {
     sr = sampleRate;
+    glide = (float) std::exp (-16.0 / (0.020 * sr));
+    levelS.prepare (sr, 20.0f);
     const float z[7] {};
     initialised = false;
     set (z, 0.0f);
     reset();
 }
 
-void GraphicEq::reset() { for (auto& b : bands) b.reset(); }
+void GraphicEq::reset()
+{
+    for (auto& b : bands) b.reset();
+    // a fresh start lands on the sliders: nothing to glide from
+    snap = true;
+    for (int b = 0; b < 7; ++b) if (gainsNow[b] != gains[b]) setBand (b, gains[b]);
+    levelS.reset (level);
+}
+
+void GraphicEq::setBand (int b, float db)
+{
+    static const double freqs[7] = { 100, 200, 400, 800, 1600, 3200, 6400 };
+    // a band that was out of the path comes in from silence, not from what it held long ago
+    if (gainsNow[b] == 0.0f && db != 0.0f) bands[b].reset();
+    gainsNow[b] = db;
+    bands[b].set (Biquad::Type::peak, sr, freqs[b], 1.4, db);
+}
 
 void GraphicEq::set (const float* g, float levelDb)
 {
-    static const double freqs[7] = { 100, 200, 400, 800, 1600, 3200, 6400 };
     for (int i = 0; i < 7; ++i)
         if (g[i] != gains[i] || ! initialised)
         {
             gains[i] = g[i];
-            bands[i].set (Biquad::Type::peak, sr, freqs[i], 1.4, g[i]);
+            if (snap || ! initialised) setBand (i, g[i]);
         }
     initialised = true;
     level = dbToGain (levelDb);
+    levelS.setTarget (level);
 }
 
 void GraphicEq::process (float* x, int n)
 {
-    for (int i = 0; i < n; ++i)
+    snap = false;
+    for (int i = 0; i < n;)
     {
-        float s = x[i];
         for (int b = 0; b < 7; ++b)
-            if (gains[b] != 0.0f) s = bands[b].process (s);
-        x[i] = s * level;
+            if (gainsNow[b] != gains[b])
+                setBand (b, std::abs (gainsNow[b] - gains[b]) < 0.01f ? gains[b] : gains[b] + (gainsNow[b] - gains[b]) * glide);
+        const int end = std::min (n, i + 16);
+        for (; i < end; ++i)
+        {
+            float s = x[i];
+            for (int b = 0; b < 7; ++b)
+                if (gainsNow[b] != 0.0f) s = bands[b].process (s);
+            x[i] = s * levelS.next();
+        }
     }
 }
 
@@ -937,6 +1000,18 @@ void Modulation::prepare (double sampleRate)
 void Modulation::reset()
 {
     dl.reset(); dr.reset();
+    fbL = fbR = 0.0f;
+    std::fill (std::begin (apL), std::end (apL), 0.0f);
+    std::fill (std::begin (apR), std::end (apR), 0.0f);
+}
+
+void Modulation::listen (const float* l, const float* r, int n)
+{
+    for (int i = 0; i < n; ++i) { dl.push (l[i]); dr.push (r[i]); }
+}
+
+void Modulation::wake()
+{
     fbL = fbR = 0.0f;
     std::fill (std::begin (apL), std::end (apL), 0.0f);
     std::fill (std::begin (apR), std::end (apR), 0.0f);
@@ -1056,6 +1131,7 @@ void Delay::prepare (double sampleRate)
     dr.prepare ((int) (2.2 * sr));
     timeS.prepare (sr, 120.0f);
     timeS.reset ((float) (0.38 * sr));
+    xfStep = (float) (1.0 / (0.050 * sr));
     mixS.prepare (sr, 30.0f);
     wow.prepare (sr); wow.setRate (0.55f);
     flutter.prepare (sr); flutter.setRate (6.3f);
@@ -1067,6 +1143,7 @@ void Delay::reset()
 {
     dl.reset(); dr.reset();
     lpL.reset(); lpR.reset(); hpL.reset(); hpR.reset();
+    headA = -1.0f; crossing = false; // the next block starts at the time that is set
 }
 
 void Delay::set (int t, float timeMs, float fbKnob, float toneKnob, float mixKnob)
@@ -1087,11 +1164,31 @@ void Delay::process (float* l, float* r, int n)
     for (int i = 0; i < n; ++i)
     {
         float t = timeS.next();
-        if (type == 1) t *= 1.0f + 0.0015f * wow.sine();
-        if (type == 2) t *= 1.0f + 0.0025f * wow.sine() + 0.0008f * flutter.sine();
+        float wl, wr;
+        if (type == 0 || type == 3)
+        {
+            const float goal = timeS.getTarget();
+            if (headA < 0.0f) headA = goal;
+            if (! crossing && std::abs (goal - headA) > 0.5f) { headB = goal; xf = 0.0f; crossing = true; }
+            wl = dl.read (headA); wr = dr.read (headA);
+            if (crossing)
+            {
+                xf = std::min (1.0f, xf + xfStep);
+                const float g = xf * xf * (3.0f - 2.0f * xf);
+                wl += (dl.read (headB) - wl) * g;
+                wr += (dr.read (headB) - wr) * g;
+                if (xf >= 1.0f) { headA = headB; crossing = false; }
+            }
+        }
+        else
+        {
+            if (type == 1) t *= 1.0f + 0.0015f * wow.sine();
+            if (type == 2) t *= 1.0f + 0.0025f * wow.sine() + 0.0008f * flutter.sine();
+            wl = dl.read (t); wr = dr.read (t);
+            headA = -1.0f; crossing = false;
+        }
         wow.advance(); flutter.advance();
 
-        float wl = dl.read (t), wr = dr.read (t);
         // keep the repeats musical and bounded
         auto loop = [this] (float s, OnePole& lp, OnePole& hp)
         {
@@ -1134,8 +1231,11 @@ void Reverb::prepare (double sampleRate)
     mod.prepare (sr);
     mod.setRate (0.31f);
     mixS.prepare (sr, 30.0f);
+    glideK = 1.0f - (float) std::exp (-1.0 / (0.040 * sr));
     dirty = true;
     configure();
+    std::copy (std::begin (lineGain), std::end (lineGain), std::begin (gainNow));
+    preNow = -1.0f;
     reset();
 }
 
@@ -1151,6 +1251,9 @@ void Reverb::reset()
     std::fill (std::begin (lastOut), std::end (lastOut), 0.0f);
     bandwidth.reset(); springLp.reset(); springHp.reset();
     shimPhase = 0.0f; // the shimmer's octave shifter starts each time from the same place
+    // a fresh start has nothing to glide from
+    std::copy (std::begin (lineGain), std::end (lineGain), std::begin (gainNow));
+    preNow = -1.0f;
 }
 
 void Reverb::set (int t, float d, float p, float tn, float m)
@@ -1158,10 +1261,12 @@ void Reverb::set (int t, float d, float p, float tn, float m)
     const float dd = clamp01 (d / 10.0f), tt = clamp01 (tn / 10.0f);
     if (t != type || dd != decay || p != preMs || tt != tone)
     {
-        if (t != type) { type = t; reset(); }
+        const bool fresh = t != type;
+        if (fresh) { type = t; reset(); }
         decay = dd; preMs = p; tone = tt;
         dirty = true;
         configure();
+        if (fresh) std::copy (std::begin (lineGain), std::end (lineGain), std::begin (gainNow));
     }
     mixS.setTarget (clamp01 (m / 10.0f));
 }
@@ -1200,7 +1305,9 @@ void Reverb::configure()
 
 void Reverb::process (float* l, float* r, int n)
 {
+    // A turned Pre-delay knob slides the read point there (a jump would click); Decay glides too.
     const float preSamples = std::max (1.0f, preMs * 0.001f * (float) sr);
+    if (preNow < 0.0f) preNow = preSamples;
     const float modAmt = modDepth * 0.0008f * (float) sr;
     const int shimWin = (int) (0.08 * sr);
 
@@ -1208,7 +1315,8 @@ void Reverb::process (float* l, float* r, int n)
     {
         float in = 0.5f * (l[i] + r[i]);
         pre.push (in);
-        float s = bandwidth.lowpass (pre.read (preSamples));
+        preNow += (preSamples - preNow) * glideK;
+        float s = bandwidth.lowpass (pre.read (preNow));
 
         if (type == 3)
         {
@@ -1268,7 +1376,8 @@ void Reverb::process (float* l, float* r, int n)
         sum *= 2.0f / (float) N;
         for (int k = 0; k < N; ++k)
         {
-            float fb = (y[k] - sum) * lineGain[k];
+            gainNow[k] += (lineGain[k] - gainNow[k]) * glideK;
+            float fb = (y[k] - sum) * gainNow[k];
             fb = damp[k].lowpass (fb);
             fb = lowCut[k].highpass (fb);
             const float sign = (k & 1) ? -1.0f : 1.0f;
@@ -1298,7 +1407,19 @@ void LoFi::prepare (double sampleRate)
     noise = Noise { 0xBEEF };
     drift = 0.0f;
     hissLp.reset(); crackleLp.reset();
+    wobS.prepare (sr, 30.0f);
+    radioS.prepare (sr, 20.0f);
+    mixS.prepare (sr, 20.0f);
+    bitsS.prepare (sr, 30.0f);
     reset();
+}
+
+void LoFi::setRadio (float rd)
+{
+    radioNow = rd;
+    const float hp = expMap (rd, 20.0f, 700.0f), lp = expMap (1.0f - rd, 2500.0f, 20000.0f);
+    radioHpL.set (Biquad::Type::highpass, sr, hp, 0.8); radioHpR.set (Biquad::Type::highpass, sr, hp, 0.8);
+    radioLpL.set (Biquad::Type::lowpass, sr, lp, 0.8);  radioLpR.set (Biquad::Type::lowpass, sr, lp, 0.8);
 }
 
 void LoFi::reset()
@@ -1306,6 +1427,22 @@ void LoFi::reset()
     dl.reset(); dr.reset();
     radioHpL.reset(); radioHpR.reset(); radioLpL.reset(); radioLpR.reset(); preLpL.reset(); preLpR.reset();
     holdCounter = 0; heldL = heldR = 0;
+    wobS.reset (wobble); mixS.reset (mix); bitsS.reset (bits);
+    if (radioNow >= 0.0f) { radioS.reset (radioTarget); setRadio (radioTarget); }
+}
+
+void LoFi::listen (const float* l, const float* r, int n)
+{
+    for (int i = 0; i < n; ++i) { dl.push (l[i]); dr.push (r[i]); }
+}
+
+void LoFi::wake()
+{
+    radioHpL.reset(); radioHpR.reset(); radioLpL.reset(); radioLpR.reset(); preLpL.reset(); preLpR.reset();
+    holdCounter = 0; heldL = heldR = 0;
+    // switched on, the knobs are where they are
+    wobS.reset (wobble); mixS.reset (mix); bitsS.reset (bits);
+    if (radioNow >= 0.0f) { radioS.reset (radioTarget); setRadio (radioTarget); }
 }
 
 void LoFi::set (float crush, float downsample, float wob, float nz, float radio, float m)
@@ -1318,30 +1455,49 @@ void LoFi::set (float crush, float downsample, float wob, float nz, float radio,
     wobble = clamp01 (wob / 10.0f);
     noiseAmt = clamp01 (nz / 10.0f);
     const float rd = clamp01 (radio / 10.0f);
-    const float hp = expMap (rd, 20.0f, 700.0f), lp = expMap (1.0f - rd, 2500.0f, 20000.0f);
-    radioHpL.set (Biquad::Type::highpass, sr, hp, 0.8); radioHpR.set (Biquad::Type::highpass, sr, hp, 0.8);
-    radioLpL.set (Biquad::Type::lowpass, sr, lp, 0.8);  radioLpR.set (Biquad::Type::lowpass, sr, lp, 0.8);
+    radioTarget = rd;
+    if (radioNow < 0.0f) { radioS.reset (rd); setRadio (rd); }
+    radioS.setTarget (rd);
     mix = clamp01 (m / 10.0f);
+    wobS.setTarget (wobble);
+    mixS.setTarget (mix);
+    bitsS.setTarget (bits);
 }
 
 void LoFi::process (float* l, float* r, int n)
 {
-    const float q = std::pow (2.0f, bits - 1.0f);
+    float q = std::pow (2.0f, bitsS.get() - 1.0f);
     const float msToS = (float) (0.001 * sr);
     for (int i = 0; i < n; ++i)
     {
         const float inL = l[i], inR = r[i];
         float sl = inL, sr2 = inR;
 
-        // tape wow and flutter with a slow random drift
+        // the Radio knob's filters follow it in steps of 16 samples
+        if ((i & 15) == 0)
+        {
+            const float rd = radioS.get();
+            if (std::abs (rd - radioNow) > 1e-4f) setRadio (rd);
+            q = std::pow (2.0f, bitsS.get() - 1.0f); // Crush glides through the bit depths too
+        }
+        radioS.next();
+        const float bitsNow = bitsS.next();
+
+        // tape wow and flutter with a slow random drift; the whole delay, its 6 ms base too,
+        // grows with the knob, so turning it up from nothing slides in instead of jumping
         drift = 0.9995f * drift + 0.0005f * noise.next();
-        const float wob = wobble * (2.5f * wow.sine() + 0.35f * flutter.sine() + 30.0f * drift);
+        const float w = wobS.next();
+        const float wobL = w * (6.0f + 2.5f * wow.sine() + 0.35f * flutter.sine() + 30.0f * drift);
+        const float wobR = w * (6.0f + 0.9f * (2.5f * wow.sine() + 0.35f * flutter.sine() + 30.0f * drift));
         wow.advance(); flutter.advance();
         dl.push (sl); dr.push (sr2);
-        if (wobble > 0.0f)
+        if (w > 1e-5f)
         {
-            sl = dl.read ((6.0f + wob) * msToS);
-            sr2 = dr.read ((6.0f + wob * 0.9f) * msToS);
+            // three samples is the least the interpolation reads cleanly; under a twentieth of
+            // the knob the plain signal is blended out, so nothing steps at either end
+            const float blend = std::min (1.0f, w * 20.0f);
+            sl = lerp (sl, dl.read (3.0f + std::max (0.0f, wobL) * msToS), blend);
+            sr2 = lerp (sr2, dr.read (3.0f + std::max (0.0f, wobR) * msToS), blend);
         }
 
         // sample-rate reduction (sample and hold) and bit crushing
@@ -1352,7 +1508,7 @@ void LoFi::process (float* l, float* r, int n)
             if (holdCounter >= holdRatio) { holdCounter -= holdRatio; heldL = sl; heldR = sr2; }
             sl = heldL; sr2 = heldR;
         }
-        if (bits < 15.9f)
+        if (bitsNow < 15.9f)
         {
             sl = std::round (sl * q) / q;
             sr2 = std::round (sr2 * q) / q;
@@ -1371,8 +1527,9 @@ void LoFi::process (float* l, float* r, int n)
             sr2 += hiss * 0.9f + crackle;
         }
 
-        l[i] = lerp (inL, sl, mix);
-        r[i] = lerp (inR, sr2, mix);
+        const float m = mixS.next();
+        l[i] = lerp (inL, sl, m);
+        r[i] = lerp (inR, sr2, m);
     }
 }
 

@@ -78,6 +78,8 @@ void Amp::prepare (double sampleRate, int maxBlock)
     preGain.prepare (osr, 30.0f);
     masterGain.prepare (osr, 30.0f);
     outGain.prepare (sr, 30.0f);
+    toneGlide = (float) std::exp (-32.0 / (0.020 * osr));
+    toneSnap = true;
     dirty = true;
     updateFilters();
     preGain.reset (preGain.getTarget());
@@ -86,6 +88,10 @@ void Amp::prepare (double sampleRate, int maxBlock)
 
 void Amp::reset()
 {
+    // a fresh start: the knobs are where they are, nothing to glide from
+    toneSnap = true;
+    std::copy (std::begin (toneGoal), std::end (toneGoal), std::begin (toneNow));
+    updateTone();
     if (oversampler) oversampler->reset();
     inputHp.reset();
     bright.reset(); midBoost.reset(); presence.reset(); depth.reset(); outHp.reset(); outLp.reset(); antiFizz.reset();
@@ -130,8 +136,6 @@ void Amp::updateFilters()
     outGain.setTarget (dbToGain (v->trimDb + settings.levelDb));
 
     inputHp.setCutoff (osr, v->inputHpHz);
-    // The bright cap matters most at low gain settings, as on a real amp.
-    bright.set (Biquad::Type::highShelf, osr, 1800.0, 0.6, v->brightDb * (1.0f - g01));
 
     for (int i = 0; i < 5; ++i)
     {
@@ -163,17 +167,8 @@ void Amp::updateFilters()
         into[i] = i == 0 ? 2.0 * kPlateUnit / g : v->stageGain[i] / g;
     }
 
-    const float b = settings.bass / 10.0f, m = settings.mid / 10.0f, t = settings.treble / 10.0f;
-    if (v->baxandall)
+    if (! v->baxandall)
     {
-        baxLow.set (Biquad::Type::lowShelf, osr, 110.0, 0.7, (b - 0.5f) * 24.0f);
-        baxMid.set (Biquad::Type::peak, osr, v->midBoostHz, 0.8, (m - 0.5f) * 20.0f);
-        baxHigh.set (Biquad::Type::highShelf, osr, 2800.0, 0.7, (t - 0.5f) * 24.0f);
-        stackMakeup = 1.0f;
-    }
-    else
-    {
-        stack.set (v->stack, t, m, b);
         // Make up the passive stack's insertion loss, measured with the knobs at noon
         // so turning knobs still changes the level the way a real amp does.
         ToneStack probe;
@@ -183,14 +178,42 @@ void Amp::updateFilters()
         const double freqs[] = { 150.0, 400.0, 1000.0, 2500.0 };
         for (double f : freqs) sum += probe.magnitude (f);
         stackMakeup = (float) (4.0 / sum);
-        midBoost.set (Biquad::Type::peak, osr, v->midBoostHz, 0.7, (m - 0.5f) * 8.0f);
     }
+    else
+        stackMakeup = 1.0f;
 
-    presence.set (Biquad::Type::highShelf, osr, v->presenceHz, 0.6, (settings.presence / 10.0f - 0.5f) * 12.0f);
-    depth.set (Biquad::Type::peak, osr, v->depthHz, 0.8, (settings.depth / 10.0f - 0.5f) * 12.0f);
+    toneGoal[kBass] = settings.bass / 10.0f;
+    toneGoal[kMid] = settings.mid / 10.0f;
+    toneGoal[kTreble] = settings.treble / 10.0f;
+    toneGoal[kPresence] = settings.presence / 10.0f;
+    toneGoal[kDepth] = settings.depth / 10.0f;
+    toneGoal[kGain] = g01;
+    if (toneSnap) std::copy (std::begin (toneGoal), std::end (toneGoal), std::begin (toneNow));
+    updateTone();
     outHp.set (Biquad::Type::highpass, osr, v->outputHpHz, 0.6);
     outLp.set (Biquad::Type::lowpass, osr, v->outputLpHz, 0.6);
     antiFizz.set (Biquad::Type::lowpass, osr, std::min (16000.0, 0.45 * sr), 0.5);
+}
+
+void Amp::updateTone()
+{
+    if (v == nullptr) return;
+    const float b = toneNow[kBass], m = toneNow[kMid], t = toneNow[kTreble];
+    // The bright cap matters most at low gain settings, as on a real amp.
+    bright.set (Biquad::Type::highShelf, osr, 1800.0, 0.6, v->brightDb * (1.0f - toneNow[kGain]));
+    if (v->baxandall)
+    {
+        baxLow.set (Biquad::Type::lowShelf, osr, 110.0, 0.7, (b - 0.5f) * 24.0f);
+        baxMid.set (Biquad::Type::peak, osr, v->midBoostHz, 0.8, (m - 0.5f) * 20.0f);
+        baxHigh.set (Biquad::Type::highShelf, osr, 2800.0, 0.7, (t - 0.5f) * 24.0f);
+    }
+    else
+    {
+        stack.set (v->stack, t, m, b);
+        midBoost.set (Biquad::Type::peak, osr, v->midBoostHz, 0.7, (m - 0.5f) * 8.0f);
+    }
+    presence.set (Biquad::Type::highShelf, osr, v->presenceHz, 0.6, (toneNow[kPresence] - 0.5f) * 12.0f);
+    depth.set (Biquad::Type::peak, osr, v->depthHz, 0.8, (toneNow[kDepth] - 0.5f) * 12.0f);
 }
 
 // Asymmetric triode-style transfer curve: the positive side (grid conduction)
@@ -269,8 +292,21 @@ void Amp::process (float* data, int n)
     const float sag = v->sag;
     const float pBias = v->powerBias;
 
+    toneSnap = false;
     for (int i = 0; i < on; ++i)
     {
+        if ((i & 31) == 0)
+        {
+            bool moving = false;
+            for (int k = 0; k < kTone; ++k)
+                if (std::abs (toneNow[k] - toneGoal[k]) > 1e-4f)
+                {
+                    toneNow[k] = toneGoal[k] + (toneNow[k] - toneGoal[k]) * toneGlide;
+                    moving = true;
+                }
+                else toneNow[k] = toneGoal[k];
+            if (moving) updateTone();
+        }
         float s = x[i];
         s = inputHp.highpass (s);
         s = bright.process (s);

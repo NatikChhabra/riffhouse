@@ -246,6 +246,11 @@ public:
         const int at = args.indexOf ("--snapshots");
         if (at >= 0 && at + 1 < args.size())
         {
+            // --tone "<name>": the pictures show that factory tone, loaded as a player would
+            if (const int t = args.indexOf ("--tone"); t >= 0 && t + 1 < args.size())
+                if (auto* proc = dynamic_cast<RiffhouseProcessor*> (holder->processor.get()))
+                    if (const int i = proc->presets().indexOf (args[t + 1].unquoted()); i >= 0)
+                        proc->loadPreset (i);
             const juce::File folder (juce::File::getCurrentWorkingDirectory().getChildFile (args[at + 1].unquoted()));
             const float scale = at + 2 < args.size() ? (float) args[at + 2].getDoubleValue() : 1.0f;
             juce::Timer::callAfterDelay (1500, [this, folder, scale]

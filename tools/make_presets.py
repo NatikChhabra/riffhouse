@@ -3,8 +3,11 @@
 
 Presets are written as short recipes here, so the whole library can be
 reviewed in one file and regenerated after DSP changes. After generating,
-run `riffhouse_tests levels presets` and this script's --calibrate step to
-level-match every preset (see docs/CONTRIBUTING.md).
+run `riffhouse_tests levels levels.json` and this script's
+`--calibrate levels.json` step to level-match every preset. A plain run keeps
+each preset's output level from the file already in presets/, so regenerating
+never loses the calibration; the levels are measured as if each output level
+were 0 dB, so calibrating gives the same answer however often it is run.
 
 "Inspired by" presets are fan-made approximations of a player's general
 style using Riffhouse's own models. Riffhouse is not affiliated with or
@@ -588,8 +591,25 @@ def slug(name):
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
+def existing_levels():
+    """Output levels the presets on disk already carry, by preset name."""
+    kept = {}
+    if not os.path.isdir(OUT):
+        return kept
+    for f in os.listdir(OUT):
+        if f.endswith(".json"):
+            try:
+                with open(os.path.join(OUT, f)) as fh:
+                    p = json.load(fh)
+                kept[p["name"]] = p["params"]["out_level"]
+            except (ValueError, KeyError, OSError):
+                pass
+    return kept
+
+
 def write_all(levels=None):
     os.makedirs(OUT, exist_ok=True)
+    kept = existing_levels()
     for f in os.listdir(OUT):
         if f.endswith(".json"):
             os.remove(os.path.join(OUT, f))
@@ -597,6 +617,8 @@ def write_all(levels=None):
     for p in PRESETS:
         assert p["name"] not in names, "duplicate " + p["name"]
         names.add(p["name"])
+        if p["name"] in kept:
+            p["params"]["out_level"] = kept[p["name"]]
         if levels and p["name"] in levels:
             # level-match every preset to -18 dBFS RMS, but keep peaks under
             # -2 dBFS so the safety limiter never has to work on the test DI

@@ -663,6 +663,10 @@ void SetupWizard::paint (juce::Graphics& g)
                 bullet (false, "Your input is clipping. Turn the guitar volume down a little.");
             else if (shared.isNotEmpty())
                 bullet (false, shared);
+            else if (s.ratesDiffer && s.latencyMs >= 15.0)
+                bullet (false, "Windows runs your guitar input and your headphones at different sample rates, so the lowest delay "
+                               "mode can't start. Set both to 48000 Hz (Windows sound settings, More sound settings, Properties, "
+                               "Advanced), then run setup again.");
             else if (s.fixHeldBack)
                 bullet (false, "This input hisses, so a little of the Input Fix was held back.");
             else if (s.latencyMs >= 15.0)

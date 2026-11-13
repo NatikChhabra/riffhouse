@@ -792,6 +792,7 @@ public:
 
     juce::String latencyText() const
     {
+        if (demoLevels) return {}; // pictures of the app show no figure that belongs to one computer
         if (auto* host = StandaloneHost::get())
             if (auto* dev = host->deviceManager().getCurrentAudioDevice())
             {

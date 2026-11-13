@@ -90,6 +90,41 @@ private:
 };
 
 // RBJ biquad in transposed direct form II, double precision state.
+// A low or high pass that can be swept while it plays: the state-variable form keeps its
+// energy where it is when the cutoff moves, where a biquad's stored sums jump and click.
+class SweepFilter
+{
+public:
+    enum class Type { lowpass, highpass };
+    void set (Type t, double sampleRate, double freq, double q) noexcept
+    {
+        type = t;
+        freq = std::clamp (freq, 5.0, 0.49 * sampleRate);
+        const double g = std::tan (kPi * freq / sampleRate);
+        k = 1.0 / std::max (q, 0.05);
+        a1 = 1.0 / (1.0 + g * (g + k));
+        a2 = g * a1;
+        a3 = g * a2;
+    }
+    void reset() noexcept { ic1 = ic2 = 0.0; }
+    float process (float xf) noexcept
+    {
+        const double x = xf;
+        const double v3 = x - ic2;
+        const double v1 = a1 * ic1 + a2 * v3;
+        const double v2 = ic2 + a2 * ic1 + a3 * v3;
+        ic1 = 2.0 * v1 - ic1;
+        ic2 = 2.0 * v2 - ic2;
+        if (std::abs (ic1) < 1e-25) ic1 = 0;
+        if (std::abs (ic2) < 1e-25) ic2 = 0;
+        return (float) (type == Type::lowpass ? v2 : x - k * v1 - v2);
+    }
+
+private:
+    Type type = Type::lowpass;
+    double k = 1.414, a1 = 1, a2 = 0, a3 = 0, ic1 = 0, ic2 = 0;
+};
+
 class Biquad
 {
 public:

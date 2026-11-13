@@ -59,8 +59,18 @@ void Rig::prepare (double sampleRate, int block)
     nam.prepare (sr, maxBlock);
     eq.prepare (sr);
     mod.prepare (sr);
-    delay.prepare (sr);
-    reverb.prepare (sr);
+    for (Delay* d : { &delayA, &delayB }) d->prepare (sr);
+    for (Reverb* r : { &reverbA, &reverbB }) r->prepare (sr);
+    dlyTailBusy = revTailBusy = false;
+    tailFadeStep = (float) (1.0 / (0.020 * sr));
+    dlyTailGain = revTailGain = 1.0f;
+    dlyTailFading = revTailFading = false;
+    swapOutStep = (float) (1.0 / (0.006 * sr));
+    swapInStep = (float) (1.0 / (0.012 * sr));
+    swapHoldLen = (int) (0.010 * sr);
+    swap = Swap::none;
+    swapWanted = false;
+    swapGain = 1.0f;
     lofi.prepare (sr);
     doubler.prepare (sr);
     limiter.prepare (sr);
@@ -86,7 +96,12 @@ void Rig::prepare (double sampleRate, int block)
 void Rig::reset()
 {
     input.reset(); gate.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
-    eq.reset(); mod.reset(); delay.reset(); reverb.reset(); lofi.reset(); doubler.reset(); limiter.reset();
+    eq.reset(); mod.reset(); lofi.reset(); doubler.reset(); limiter.reset();
+    for (Delay* d : { &delayA, &delayB }) d->reset();
+    for (Reverb* r : { &reverbA, &reverbB }) r->reset();
+    dlyTailBusy = revTailBusy = false;
+    if (swap != Swap::none) { swap = Swap::none; applyParams (swapTo, false); }
+    swapGain = 1.0f;
     std::fill (std::begin (gateDelay), std::end (gateDelay), 1.0f);
     gateDelayAt = 0;
 }
@@ -125,7 +140,45 @@ void Rig::startFresh (const ParamValues& v, double sampleRate, int block)
     finishPendingWork();
 }
 
+bool Rig::needsSwap (const ParamValues& next) const
+{
+    // Changes the rig can only make with a hard restart of that part: an amp model, a pedal
+    // circuit, a delay or reverb type. Only where that part can be heard.
+    auto moved = [&] (P id) { return choice (p, id) != choice (next, id); };
+    auto heard = [&] (P onId) { return on (p, onId) || on (next, onId); };
+    return (heard (P::ampOn) && moved (P::ampModel))
+        || (heard (P::drvOn) && moved (P::drvType))
+        || (heard (P::wahOn) && moved (P::wahMode))
+        || (heard (P::pitchOn) && moved (P::pitchMode))
+        || (heard (P::modOn) && moved (P::modType))
+        || ((heard (P::dlyOn) || delayActive) && moved (P::dlyType))
+        || ((heard (P::revOn) || reverbActive) && moved (P::revType));
+}
+
 void Rig::setParams (const ParamValues& v)
+{
+    if (firstParams) { applyParams (v, false); return; }
+    if (swap == Swap::out || swapWanted || needsSwap (v))
+    {
+        swapTo = v;
+        swapWanted = false;
+        if (swap != Swap::out)
+        {
+            swap = Swap::out;
+            // from wherever a fade back in had got to, so the dip never jumps
+            swapOutLeft = (int) std::ceil (swapGain / swapOutStep);
+            // a tail still ringing from the change before makes way, faded, before the swap
+            if (dlyTailBusy) dlyTailFading = true;
+            if (revTailBusy) revTailFading = true;
+            if (dlyTailBusy || revTailBusy)
+                swapOutLeft = std::max (swapOutLeft, (int) std::ceil (std::max (dlyTailGain, revTailGain) / tailFadeStep) + 1);
+        }
+        return;
+    }
+    applyParams (v, false);
+}
+
+void Rig::applyParams (const ParamValues& v, bool toneChange)
 {
     const ParamValues old = p;
     p = v;
@@ -160,8 +213,32 @@ void Rig::setParams (const ParamValues& v)
     mod.set (choice (p, P::modType), get (P::modRate), get (P::modDepth), get (P::modMix));
 
     const float space = get (P::space);
-    delay.set (choice (p, P::dlyType), delayTimeMs(), get (P::dlyFeedback), get (P::dlyTone), std::min (10.0f, get (P::dlyMix) * space));
-    reverb.set (choice (p, P::revType), get (P::revDecay), get (P::revPreDelay), get (P::revTone), std::min (10.0f, get (P::revMix) * space));
+    if (toneChange)
+    {
+        // The old tone's echoes and room go on ringing in the spare pair, with the old
+        // settings, while the new tone starts with empty ones. A tail still ringing from the
+        // change before was faded out during the dip.
+        auto spill = [&] (bool& active, bool& tailBusy, int& tailQuiet, float& tailGain, bool& tailFading, auto*& now, auto*& tail, std::initializer_list<P> ids)
+        {
+            bool same = true;
+            for (P id : ids) same = same && old[(size_t) id] == p[(size_t) id];
+            if (! active || same) return;
+            tail->reset();
+            std::swap (now, tail);
+            now->reset();
+            tailBusy = true;
+            tailQuiet = 0;
+            tailGain = 1.0f;
+            tailFading = false;
+            active = false;
+        };
+        spill (delayActive, dlyTailBusy, dlyTailQuiet, dlyTailGain, dlyTailFading, dly, dlyTail,
+               { P::dlyOn, P::dlyType, P::dlyTime, P::dlySync, P::dlyFeedback, P::dlyTone, P::dlyMix, P::space });
+        spill (reverbActive, revTailBusy, revTailQuiet, revTailGain, revTailFading, rev, revTail,
+               { P::revOn, P::revType, P::revDecay, P::revPreDelay, P::revTone, P::revMix, P::space });
+    }
+    dly->set (choice (p, P::dlyType), delayTimeMs(), get (P::dlyFeedback), get (P::dlyTone), std::min (10.0f, get (P::dlyMix) * space));
+    rev->set (choice (p, P::revType), get (P::revDecay), get (P::revPreDelay), get (P::revTone), std::min (10.0f, get (P::revMix) * space));
     lofi.set (get (P::lofiBits), get (P::lofiRate), get (P::lofiWobble), get (P::lofiNoise), get (P::lofiFilter), get (P::lofiMix));
     doubler.set (get (P::doubler));
 
@@ -170,22 +247,34 @@ void Rig::setParams (const ParamValues& v)
         const bool want = on (p, id);
         if (firstParams) { f.snap (want); return; }
         if (want && f.idle()) onStart();
+        // during a tone change the sound is down, so a pedal goes straight to where it is wanted
+        if (toneChange) { f.snap (want); return; }
+        f.setOn (want);
+    };
+    // Modulation and lo-fi sit after the dip, and their delay lines still hold the sound from
+    // before it: snapped on, that sound jumps in at full level (a click), snapped off it stops
+    // dead. They always fade.
+    auto setFadeAfterDip = [&] (Fade& f, P id, auto&& onStart)
+    {
+        const bool want = on (p, id);
+        if (firstParams) { f.snap (want); return; }
+        if (want && f.idle()) onStart();
         f.setOn (want);
     };
     setFade (fGate, P::gateOn, [&] { gate.reset(); });
-    setFade (fComp, P::compOn, [&] { comp.reset(); });
+    setFade (fComp, P::compOn, [&] { comp.wake(); });
     setFade (fWah, P::wahOn, [&] { wah.reset(); });
     setFade (fPitch, P::pitchOn, [&] { pitch.reset(); });
     setFade (fDrive, P::drvOn, [&] { drive.reset(); });
     setFade (fAmp, P::ampOn, [&] { amp.reset(); });
     setFade (fCab, P::cabOn, [&] {});
     setFade (fEq, P::eqOn, [&] { eq.reset(); });
-    setFade (fMod, P::modOn, [&] { mod.reset(); });
-    setFade (fLofi, P::lofiOn, [&] { lofi.reset(); });
+    setFadeAfterDip (fMod, P::modOn, [&] { mod.wake(); });
+    setFadeAfterDip (fLofi, P::lofiOn, [&] { lofi.wake(); });
 
     // delay and reverb keep ringing after they are switched off
-    if (on (p, P::dlyOn) && ! delayActive) { delay.reset(); delayActive = true; }
-    if (on (p, P::revOn) && ! reverbActive) { reverb.reset(); reverbActive = true; }
+    if (on (p, P::dlyOn) && ! delayActive) { dly->reset(); delayActive = true; }
+    if (on (p, P::revOn) && ! reverbActive) { rev->reset(); reverbActive = true; }
     if (firstParams)
     {
         delayActive = on (p, P::dlyOn);
@@ -219,6 +308,7 @@ void Rig::processMono (float* x, int n)
                 x[i] = dry[(size_t) i] * g;
             }
     }
+    if (fComp.idle()) comp.listen (x, n);
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });
     runFaded (fWah, x, n, dry, [&] (float* b, int k) { wah.process (b, k); });
     runFaded (fPitch, x, n, dry, [&] (float* b, int k) { pitch.process (b, k); });
@@ -257,6 +347,7 @@ void Rig::processMono (float* x, int n)
 
 void Rig::processStereo (float* l, float* r, int n)
 {
+    if (fMod.idle()) mod.listen (l, r, n);
     runFadedStereo (fMod, l, r, n, dry, dryR, [&] (float* a, float* b, int k) { mod.process (a, b, k); });
 
     auto timeFx = [&] (bool enabled, bool& active, int& quiet, auto& fx)
@@ -282,9 +373,31 @@ void Rig::processStereo (float* l, float* r, int n)
         quiet = peak < 1.0e-5f ? quiet + n : 0;
         if (quiet > (int) sr) { active = false; fx.reset(); }
     };
-    timeFx (on (p, P::dlyOn), delayActive, delayQuiet, delay);
-    timeFx (on (p, P::revOn), reverbActive, reverbQuiet, reverb);
+    // the last tone's echoes and room, ringing on with its own settings (see applyParams)
+    auto spillTail = [&] (bool& busy, int& quiet, float& gain, bool fading, auto& fx)
+    {
+        if (! busy) return;
+        std::fill (tailL.begin(), tailL.begin() + n, 0.0f);
+        std::fill (tailR.begin(), tailR.begin() + n, 0.0f);
+        fx.process (tailL.data(), tailR.data(), n);
+        float peak = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            if (fading) gain = std::max (0.0f, gain - tailFadeStep);
+            const float g = gain;
+            l[i] += tailL[(size_t) i] * g;
+            r[i] += tailR[(size_t) i] * g;
+            peak = std::max (peak, g * std::max (std::abs (tailL[(size_t) i]), std::abs (tailR[(size_t) i])));
+        }
+        quiet = peak < 1.0e-5f ? quiet + n : 0;
+        if (quiet > (int) sr / 4 || gain <= 0.0f) { busy = false; fx.reset(); gain = 1.0f; }
+    };
+    timeFx (on (p, P::dlyOn), delayActive, delayQuiet, *dly);
+    timeFx (on (p, P::revOn), reverbActive, reverbQuiet, *rev);
+    spillTail (dlyTailBusy, dlyTailQuiet, dlyTailGain, dlyTailFading, *dlyTail);
+    spillTail (revTailBusy, revTailQuiet, revTailGain, revTailFading, *revTail);
 
+    if (fLofi.idle()) lofi.listen (l, r, n);
     runFadedStereo (fLofi, l, r, n, dry, dryR, [&] (float* a, float* b, int k) { lofi.process (a, b, k); });
     doubler.process (l, r, n);
 }
@@ -298,7 +411,20 @@ void Rig::process (const float* in, float* outL, float* outR, int total)
     int offset = 0;
     while (offset < total)
     {
-        const int n = std::min (maxBlock, total - offset);
+        // the dip of a tone change: at its bottom, everything changes at once
+        if (swap == Swap::out && swapOutLeft <= 0)
+        {
+            applyParams (swapTo, true);
+            // held down 10 ms more while the new tone's own followers (the amp's sag, a
+            // compressor, a wah) settle on what is playing, so it comes up already steady
+            swap = Swap::hold;
+            swapHoldLeft = swapHoldLen;
+            swapGain = 0.0f;
+        }
+        if (swap == Swap::hold && swapHoldLeft <= 0) swap = Swap::in;
+        int n = std::min (maxBlock, total - offset);
+        if (swap == Swap::out) n = std::min (n, swapOutLeft); // stop exactly at the bottom
+        if (swap == Swap::hold) n = std::min (n, swapHoldLeft);
         float* l = outL + offset;
         float* r = outR + offset;
 
@@ -312,6 +438,28 @@ void Rig::process (const float* in, float* outL, float* outR, int total)
         }
 
         processMono (l, n);
+        if (swap != Swap::none)
+        {
+            // down in 6 ms (or as long as an old tail takes to fade), back up in 12 ms, on a
+            // smooth curve; delay and reverb come after this, so their tails go on
+            if (swap == Swap::hold)
+            {
+                std::fill (l, l + n, 0.0f);
+                swapHoldLeft -= n;
+            }
+            else
+            {
+                for (int i = 0; i < n; ++i)
+                {
+                    if (swap == Swap::out) swapGain = std::max (0.0f, swapGain - swapOutStep);
+                    else swapGain = std::min (1.0f, swapGain + swapInStep);
+                    const float s = swapGain * swapGain * (3.0f - 2.0f * swapGain);
+                    l[i] *= s;
+                }
+                if (swap == Swap::out) swapOutLeft -= n;
+                else if (swapGain >= 1.0f) swap = Swap::none;
+            }
+        }
         std::copy (l, l + n, r);
         processStereo (l, r, n);
 

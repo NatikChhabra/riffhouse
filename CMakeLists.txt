@@ -13,11 +13,14 @@ set(RIFFHOUSE_ASIO_SDK_DIR "" CACHE PATH "Path to the Steinberg ASIO SDK (Window
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
-# JUCE (AGPLv3)
+# JUCE (AGPLv3). One patch: Windows Audio counted the smallest buffer at each device's own
+# Windows rate, so a guitar input set to 192 kHz held every PC at 12 ms buffers (cmake/patches).
 FetchContent_Declare(juce
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
     GIT_TAG 8.0.10
-    GIT_SHALLOW ON)
+    GIT_SHALLOW ON
+    PATCH_COMMAND ${CMAKE_COMMAND} -DPATCH=${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/juce-wasapi-buffer-sizes.patch
+                  -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake)
 FetchContent_MakeAvailable(juce)
 
 # Neural Amp Modeler core (MIT)

@@ -94,5 +94,13 @@ private:
     DcBlocker dcPre, dcPost;
     Smoother preGain, masterGain, outGain;
     float stackMakeup = 1.0f;
+
+    // The tone knobs (bass, mid, treble, presence, depth, and gain for the bright cap) glide to
+    // where they are turned, the filters following every 32 samples: a filter that jumps clicks.
+    enum { kBass, kMid, kTreble, kPresence, kDepth, kGain, kTone };
+    float toneNow[kTone] {}, toneGoal[kTone] {};
+    float toneGlide = 0.0f;
+    bool toneSnap = true; // until sound runs, the knobs land at once
+    void updateTone();
 };
 } // namespace rh

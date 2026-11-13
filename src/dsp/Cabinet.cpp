@@ -226,6 +226,8 @@ void Cabinet::prepare (double sampleRate, int maxBlock)
     // whatever played before, and the next tone began on top of the last one's final samples.
     reset();
     lowHz = highHz = 0;
+    glide = std::exp (-16.0 / (0.020 * sr)); // about 20 ms to most of the way
+    cutsSnap = true;
     set (model.load(), mic.load(), distance.load(), 60.0f, 12000.0f);
     if (! offline) startThread (juce::Thread::Priority::low);
 }
@@ -235,6 +237,9 @@ void Cabinet::reset()
     conv.reset();
     lowCut.reset();
     highCut.reset();
+    // Until sound runs again, the cut knobs land where they are set: nothing to glide from.
+    cutsSnap = true;
+    if (lowHz > 0) { lowNow = lowHz; highNow = highHz; setCuts(); }
 }
 
 void Cabinet::set (int m, float mc, float dist, float lowCutHz, float highCutHz)
@@ -251,9 +256,15 @@ void Cabinet::set (int m, float mc, float dist, float lowCutHz, float highCutHz)
     if (lowCutHz != lowHz || highCutHz != highHz)
     {
         lowHz = lowCutHz; highHz = highCutHz;
-        lowCut.set (Biquad::Type::highpass, sr, lowCutHz, 0.707);
-        highCut.set (Biquad::Type::lowpass, sr, std::min ((double) highCutHz, 0.45 * sr), 0.707);
+        // A turned cut knob glides there: a filter that jumps clicks on a held note.
+        if (cutsSnap) { lowNow = lowHz; highNow = highHz; setCuts(); }
     }
+}
+
+void Cabinet::setCuts()
+{
+    lowCut.set (SweepFilter::Type::highpass, sr, lowNow, 0.707);
+    highCut.set (SweepFilter::Type::lowpass, sr, std::min (highNow, 0.45 * sr), 0.707);
 }
 
 void Cabinet::installIr (std::vector<float> ir)
@@ -295,6 +306,16 @@ void Cabinet::rebuildNow()
     else
         installIr (generateCabIr (m, mic.load(), distance.load(), sr));
     if (prepared) conv.prepare (spec);
+}
+
+void Cabinet::rebuildCrossfaded()
+{
+    pending.store (false);
+    const int m = model.load();
+    lastModel = m; lastMic = mic.load(); lastDist = distance.load();
+    if (m < numCabs()) installIr (generateCabIr (m, mic.load(), distance.load(), sr));
+    else installUserIr();
+    juce::Thread::sleep (60);
 }
 
 void Cabinet::run()
@@ -353,7 +374,20 @@ void Cabinet::process (float* x, int n)
     juce::dsp::AudioBlock<float> block (chans, 1, (size_t) n);
     juce::dsp::ProcessContextReplacing<float> ctx (block);
     conv.process (ctx);
-    for (int i = 0; i < n; ++i)
-        x[i] = highCut.process (lowCut.process (x[i]));
+    cutsSnap = false;
+    for (int i = 0; i < n;)
+    {
+        const bool lowMoving = std::abs (std::log (lowNow / lowHz)) > 1e-4;
+        const bool highMoving = std::abs (std::log (highNow / highHz)) > 1e-4;
+        if (lowMoving || highMoving)
+        {
+            lowNow = lowMoving ? lowHz * std::pow (lowNow / lowHz, glide) : (double) lowHz;
+            highNow = highMoving ? highHz * std::pow (highNow / highHz, glide) : (double) highHz;
+            setCuts();
+        }
+        const int end = std::min (n, i + 16);
+        for (; i < end; ++i)
+            x[i] = highCut.process (lowCut.process (x[i]));
+    }
 }
 } // namespace rh

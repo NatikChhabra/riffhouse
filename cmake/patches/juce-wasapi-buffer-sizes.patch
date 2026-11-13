@@ -1,0 +1,72 @@
+diff --git a/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp b/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
+index 3c815cb..d79f480 100644
+--- a/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
++++ b/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
+@@ -541,6 +541,8 @@ public:
+     int numChannels = 0, actualNumChannels = 0, maxNumChannels = 0, defaultNumChannels = 0;
+     int minBufferSize = 0, defaultBufferSize = 0, latencySamples = 0;
+     int lowLatencyBufferSizeMultiple = 0, lowLatencyMaxBufferSize = 0;
++    // Riffhouse: the device periods as times, so the sizes can be counted at the rate that runs
++    REFERENCE_TIME minPeriodTime = 0, defaultPeriodTime = 0;
+     DWORD defaultFormatChannelMask = 0;
+     Array<double> rates;
+     HANDLE clientEvent = {};
+@@ -676,6 +678,8 @@ private:
+         if (! check (audioClient->GetDevicePeriod (&defaultPeriod, &minPeriod)))
+             return;
+ 
++        minPeriodTime = minPeriod;
++        defaultPeriodTime = defaultPeriod;
+         minBufferSize = refTimeToSamples (minPeriod, defaultSampleRate);
+         defaultBufferSize = refTimeToSamples (defaultPeriod, defaultSampleRate);
+     }
+@@ -1232,6 +1236,17 @@ public:
+                 minBufferSize = jmax (inputDevice->minBufferSize, outputDevice->minBufferSize);
+                 defaultBufferSize = jmax (inputDevice->defaultBufferSize, outputDevice->defaultBufferSize);
+ 
++                // Riffhouse: each device counted its sizes at its own Windows rate, so an input
++                // set to 192 kHz turned a 3 ms period into 576 samples, which at the 48 kHz both
++                // run at is 12 ms. Count them from the periods at the rate they run at instead.
++                if (! isLowLatencyMode (deviceMode) && inputDevice->minPeriodTime > 0 && outputDevice->minPeriodTime > 0)
++                {
++                    minBufferSize = jmax (refTimeToSamples (inputDevice->minPeriodTime, defaultSampleRate),
++                                          refTimeToSamples (outputDevice->minPeriodTime, defaultSampleRate));
++                    defaultBufferSize = jmax (refTimeToSamples (inputDevice->defaultPeriodTime, defaultSampleRate),
++                                              refTimeToSamples (outputDevice->defaultPeriodTime, defaultSampleRate));
++                }
++
+                 if (isLowLatencyMode (deviceMode))
+                 {
+                     lowLatencyMaxBufferSize = jmin (inputDevice->lowLatencyMaxBufferSize, outputDevice->lowLatencyMaxBufferSize);
+@@ -1355,6 +1370,21 @@ public:
+         return inputDevice != nullptr ? inputDevice->getDefaultLayout() : std::nullopt;
+     }
+ 
++    // Riffhouse: the smallest buffer at the rate that will run (see the note in scan)
++    int minBufferSizeAt (double rate) const
++    {
++        if (isLowLatencyMode (deviceMode) || rate <= 0)
++            return minBufferSize;
++
++        int m = 0;
++
++        for (auto* d : { static_cast<WASAPIDeviceBase*> (inputDevice.get()), static_cast<WASAPIDeviceBase*> (outputDevice.get()) })
++            if (d != nullptr && d->minPeriodTime > 0)
++                m = jmax (m, refTimeToSamples (d->minPeriodTime, rate));
++
++        return m > 0 ? m : minBufferSize;
++    }
++
+     String open (const BigInteger& inputChannels, const BigInteger& outputChannels,
+                  double sampleRate, int bufferSizeSamples) override
+     {
+@@ -1367,8 +1397,8 @@ public:
+             return lastError;
+         }
+ 
+-        currentBufferSizeSamples  = bufferSizeSamples <= 0 ? defaultBufferSize : jmax (bufferSizeSamples, minBufferSize);
+         currentSampleRate         = sampleRate > 0 ? sampleRate : defaultSampleRate;
++        currentBufferSizeSamples  = bufferSizeSamples <= 0 ? defaultBufferSize : jmax (bufferSizeSamples, minBufferSizeAt (currentSampleRate));
+         lastKnownInputChannels    = inputChannels;
+         lastKnownOutputChannels   = outputChannels;
+ 

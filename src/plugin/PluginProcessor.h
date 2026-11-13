@@ -98,6 +98,9 @@ public:
     std::atomic<bool> metronomeOn { false };
     std::atomic<float> metronomeBpm { 100.0f }, metronomeLevel { 0.5f };
     std::atomic<bool> saveDi { true };
+    // set just before a whole tone is written into the controls; the audio thread then dips
+    // the rig for the swap (Rig::beginToneChange) so the change never clicks
+    std::atomic<bool> toneChangeQueued { false };
     juce::File recordingFolder;
 
     // Jam track (play along with a song)

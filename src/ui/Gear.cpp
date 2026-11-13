@@ -307,7 +307,7 @@ namespace
         g.setColour (ink);
         g.drawText (text, area, j, false);
     }
-    juce::String titled (const juce::String& s) // "hot rod" becomes "Hot Rod"
+    juce::String titled (const juce::String& s) // "bass station" becomes "Bass Station"
     {
         juce::StringArray words;
         words.addTokens (s.toLowerCase(), " ", "");
@@ -383,6 +383,7 @@ const PedalDesign* pedalDesignFor (int module, int type)
 
 const AmpDesign& ampDesign (int m)
 {
+    // Badges are our own names, never a maker's model or its nickname.
     // badge, tolex, tolex colour, panel, ink, weave, piping, knob, cap, jewel, face, plate, upper, display, form, groups, lamp, width
     static const AmpDesign d[] = {
         { "glass",     Tolex::levant, 0xff151617, Panel::black,    0xffeeeeea, Weave::silver,     0xffc9ccd0, KnobStyle::skirted, 0xff141516, 0xfff2351f, Face::shoulders,      false, false, false, 0, 1, 0, 1.0f,
@@ -391,11 +392,11 @@ const AmpDesign& ampDesign (int m)
           { "volume", "bass", "middle", "treble", "presence", "body", "loud", "output" }, { 4, 2, 1, 3, 0, 6, 5, 7 }, 0xa0 },
         { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffcbb48a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false, false, 0, 3, 1, 0.94f,
           { "drive", "bass", "middle", "treble", "brilliance", "weight", "master", "output" }, { 0, 1, 2, 3, 4, 5, 6, 7 }, 0x30 },
-        { "PLEXI",     Tolex::levant, 0xff131313, Panel::gold,     0xff17130c, Weave::none,       0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffec2f1b, Face::shoulders,      false, true,  false, 1, 0, 2, 1.0f,
+        { "SOVEREIGN", Tolex::levant, 0xff131313, Panel::gold,     0xff17130c, Weave::none,       0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffec2f1b, Face::shoulders,      false, true,  false, 1, 0, 2, 1.0f,
           { "VOLUME I", "BASS", "MIDDLE", "TREBLE", "PRESENCE", "RESONANCE", "VOLUME II", "OUTPUT" }, { 4, 1, 2, 3, 0, 6, 5, 7 }, 0xa0 },
-        { "EIGHT HUNDRED", Tolex::levant, 0xff121212, Panel::gold, 0xff17130c, Weave::black,      0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffec2f1b, Face::shoulders,      true,  true,  false, 1, 0, 2, 1.0f,
+        { "SOVEREIGN 800", Tolex::levant, 0xff121212, Panel::gold, 0xff17130c, Weave::black,      0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffec2f1b, Face::shoulders,      true,  true,  false, 1, 0, 2, 1.0f,
           { "PREAMP", "BASS", "MIDDLE", "TREBLE", "PRESENCE", "RESONANCE", "MASTER", "OUTPUT" }, { 4, 1, 2, 3, 6, 0, 5, 7 }, 0xa0 },
-        { "hot rod",   Tolex::levant, 0xff141414, Panel::chrome,   0xff111214, Weave::black,      0xffb9bdc2, KnobStyle::chicken, 0xffe9e7e2, 0xfff2351f, Face::shoulders,      false, false, false, 2, 0, 0, 0.84f,
+        { "redline",   Tolex::levant, 0xff141414, Panel::chrome,   0xff111214, Weave::black,      0xffb9bdc2, KnobStyle::chicken, 0xffe9e7e2, 0xfff2351f, Face::shoulders,      false, false, false, 2, 0, 0, 0.84f,
           { "drive", "bass", "middle", "treble", "presence", "thump", "master", "volume" }, { 7, 0, 3, 1, 2, 6, 4, 5 }, 0x30 },
         { "MODERN",    Tolex::levant, 0xff101010, Panel::plate,    0xffe9e7e2, Weave::mesh,       0,          KnobStyle::skirted, 0xff101112, 0xff7dffa0, Face::shoulders,      true,  true,  false, 1, 2, 1, 1.0f },
         { "TIGHT",     Tolex::smooth, 0xff0d0d0e, Panel::anodised, 0xfff4a524, Weave::mesh,       0,          KnobStyle::pedal,   0xfff4a524, 0xfff4a524, Face::shoulders,      false, true,  false, 3, 3, 2, 0.84f,
@@ -1661,8 +1662,8 @@ namespace
         const juce::String b (d.badge);
         if (b == "glass")        return Logo::script;
         if (b == "chime")        return Logo::rules;
-        if (b == "PLEXI")        return Logo::moulded;
-        if (b == "hot rod")      return Logo::pennant;
+        if (b == "SOVEREIGN")    return Logo::moulded;
+        if (b == "redline")      return Logo::pennant;
         if (b == "MODERN")       return Logo::milled;
         if (b == "TIGHT")        return Logo::printed;
         if (b == "bass station") return Logo::enamel;

@@ -1,0 +1,2 @@
+# Patches for fetched code keep their line endings exactly (JUCE stores CRLF files)
+cmake/patches/*.patch -text

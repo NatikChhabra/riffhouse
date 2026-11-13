@@ -56,6 +56,12 @@ public:
 
     // Offline use: build and install the current IR right now.
     void rebuildNow();
+    // Builds the current IR the way the live worker does: the convolver crossfades into it on
+    // the next blocks instead of starting over. Waits a moment for JUCE's loader to have it
+    // ready, so a test hears the change where a player would.
+    void rebuildCrossfaded();
+    // Whether set() has asked for something rebuildNow() has not built yet.
+    bool workPending() const noexcept { return pending.load(); }
     // A cabinet nobody listens to live (a render, a measurement) needs no worker: its owner
     // calls rebuildNow() when the settings changed. Call before prepare().
     void setOffline (bool o) noexcept { offline = o; }
@@ -78,8 +84,12 @@ private:
     juce::AudioBuffer<float> userIr;
     double userIrRate = 48000.0;
     int installedModel = -1;
-    Biquad lowCut, highCut;
-    float lowHz = 0, highHz = 0;
+    SweepFilter lowCut, highCut;
+    float lowHz = 0, highHz = 0;        // where the cut knobs are
+    double lowNow = 0, highNow = 0;     // where the filters are on the way there (log glide)
+    double glide = 0;                   // per 16-sample step
+    bool cutsSnap = true;               // the first setting after prepare() lands at once
+    void setCuts();
     bool prepared = false, offline = false;
     juce::CriticalSection userLock;
 };

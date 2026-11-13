@@ -566,6 +566,10 @@ bool AutoSetup::openMode (const juce::String& type, int bufferSize)
         dev = dm.getCurrentAudioDevice();
     }
     lastOpenFailed = err.isNotEmpty() || dev == nullptr;
+    // Windows runs the guitar's device and the headphones at different rates (192 and 48 kHz,
+    // say): the low latency mode needs one rate for both, and the player can set that
+    if (lastOpenFailed && type == "Windows Audio (Low Latency Mode)" && err.containsIgnoreCase ("sample rate"))
+        result.ratesDiffer = true;
     if (lastOpenFailed)
     {
         dwellStart = nowMs() - kTuneMs; // judge it right away as a failure

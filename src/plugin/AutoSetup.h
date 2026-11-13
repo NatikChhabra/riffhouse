@@ -60,6 +60,7 @@ public:
         double playedSeconds = 0;         // how much hard playing the level was taken from
         bool fixHeldBack = false;         // the full fix would have brought too much hiss up with it
         bool outputFollows = false;       // the input is an interface, and the sound was put on its output too
+        bool ratesDiffer = false;         // low latency mode refused: Windows runs the input and output at different rates
     };
     const Summary& summary() const noexcept { return result; }
 

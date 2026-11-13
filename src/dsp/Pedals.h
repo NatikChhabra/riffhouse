@@ -244,12 +244,20 @@ public:
     void reset();
     void set (float sustain, float attack, float level, float blend); // 0..10 knobs
     void process (float* x, int n);
+    // While switched off: follow the guitar's level, so switching on squeezes from the first
+    // sample instead of letting a loud note through for an attack time and then clamping down.
+    void listen (const float* x, int n);
+    // Switching on: the knobs land where they are, the level it followed is kept.
+    void wake() noexcept { makeupSmooth.reset (makeupDb); mixSmooth.reset (mix); threshSmooth.reset (thresholdDb); ratioSmooth.reset (ratio); }
     float gainReductionDb() const noexcept { return grDb; }
 
 private:
     double sr = 48000.0;
-    float thresholdDb = -20, ratio = 4, makeup = 1, mix = 1;
+    float thresholdDb = -20, ratio = 4, makeupDb = 0, mix = 1;
     float envDb = -120.0f, att = 0, rel = 0, grDb = 0;
+    Smoother makeupSmooth, mixSmooth, threshSmooth, ratioSmooth; // turned knobs glide, never step;
+    // the makeup glides in dB, as the squeeze does, so the two keep step and nothing overshoots
+    void follow (float in) noexcept;
 };
 
 class Wah
@@ -334,9 +342,12 @@ public:
 private:
     double sr = 48000.0;
     Biquad bands[7];
-    float gains[7] {};
-    float level = 1.0f;
-    bool initialised = false;
+    float gains[7] {};    // where the sliders are, dB
+    float gainsNow[7] {}; // where the bands are on the way there: a jumped band clicks
+    float level = 1.0f, glide = 0.0f;
+    Smoother levelS;
+    bool initialised = false, snap = true;
+    void setBand (int b, float db);
 };
 
 // Everything from here on is stereo.
@@ -347,6 +358,11 @@ public:
     void reset();
     void set (int type, float rate, float depth, float mix);
     void process (float* l, float* r, int n);
+    // While switched off: keep the delay lines full of what is playing, so a chorus switched on
+    // starts with its voices already sounding instead of entering a few milliseconds late as a click.
+    void listen (const float* l, const float* r, int n);
+    // Switched on again: clear what rings, keep the delay lines (see listen).
+    void wake();
 
 private:
     double sr = 48000.0;
@@ -376,6 +392,10 @@ private:
     OnePole lpL, lpR, hpL, hpR;
     Lfo wow, flutter;
     float toneHz = 8000.0f;
+    // Digital and ping-pong move to a new time by crossfading two read heads, as digital
+    // delays do; analog and tape glide there, pitch bend and all, as the real ones do.
+    float headA = -1.0f, headB = 0.0f, xf = 0.0f, xfStep = 0.0f;
+    bool crossing = false;
 };
 
 class Reverb
@@ -399,6 +419,7 @@ private:
     float diffLen[4] {};
     DelayLine lines[N];
     float lineLen[N] {}, lineGain[N] {};
+    float gainNow[N] {}, preNow = -1.0f, glideK = 0.0f; // Decay and Pre-delay glide there
     OnePole damp[N];
     OnePole lowCut[N];
     Lfo mod;
@@ -422,6 +443,8 @@ public:
     void reset();
     void set (float crush, float downsample, float wobble, float noise, float radio, float mix);
     void process (float* l, float* r, int n);
+    void listen (const float* l, const float* r, int n); // as Modulation::listen, for the tape wobble
+    void wake();
 
 private:
     double sr = 48000.0;
@@ -433,6 +456,10 @@ private:
     OnePole hissLp, crackleLp;
     Biquad radioHpL, radioHpR, radioLpL, radioLpR, preLpL, preLpR;
     float drift = 0.0f;
+    // Wobble, Radio and Mix glide to a turned knob: jumped, each one clicks on a held note
+    Smoother wobS, radioS, mixS, bitsS;
+    float radioNow = -1.0f, radioTarget = 0.0f;
+    void setRadio (float rd);
 };
 
 class Doubler

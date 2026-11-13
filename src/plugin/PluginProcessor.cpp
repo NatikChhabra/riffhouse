@@ -269,6 +269,7 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     // A bounce runs faster than the clock: auto level answers here and now, so that the same
     // project always renders the same file.
     if (isNonRealtime()) matcher.matchNow (v);
+    if (toneChangeQueued.exchange (false)) rig.beginToneChange();
     rig.setParams (v);
     if (const int amp = (int) std::lround (v[(size_t) P::ampModel]); amp != latencyAmp.load (std::memory_order_relaxed))
     {
@@ -615,6 +616,7 @@ void RiffhouseProcessor::applyPreset (const Preset& p)
 {
     // Input-side settings belong to your setup, not to the tone, so presets
     // never touch them (like a "global lock").
+    toneChangeQueued.store (true);
     for (const auto& s : paramSpecs())
         if (! belongsToSetup (s.id))
             setValue (s.id, p.values[(size_t) s.id]);
@@ -673,6 +675,7 @@ juce::String RiffhouseProcessor::restoreTone (const ToneState& to)
             ++changed;
             one = &s;
         }
+    if (changed > 1) toneChangeQueued.store (true); // one control put back glides as a knob does
     for (const auto& s : paramSpecs())
         if (! belongsToSetup (s.id))
             setValue (s.id, to.values[(size_t) s.id]);

@@ -54,6 +54,10 @@ public:
     void prepare (double sampleRate, int maxBlock);
     void reset();
     void setParams (const ParamValues& v); // call once per block before process
+    // A whole new tone is on its way (a tone picked, undo, a shared tone). The rig dips for a
+    // few milliseconds, swaps every setting while it is silent, and comes back up, so nothing
+    // clicks; delay and reverb tails of the old tone ring on into the new one. Audio thread.
+    void beginToneChange() noexcept { if (! firstParams) swapWanted = true; }
     void setTempo (double bpm) noexcept { tempo = bpm > 20.0 ? bpm : 120.0; }
     void process (const float* in, float* outL, float* outR, int n);
 
@@ -65,6 +69,8 @@ public:
 
     // Offline use: make every generated IR active immediately.
     void finishPendingWork() { cab.rebuildNow(); }
+    // The same, only when a setting has changed since (cheap to call every block offline).
+    void finishChangedWork() { if (cab.workPending()) cab.rebuildCrossfaded(); }
 
     // Auto level's correction, applied after the rig and before the volume knob. Any thread.
     void setLevelTrimDb (float db) noexcept { levelTrimDb.store (db); }
@@ -83,6 +89,8 @@ public:
     void setInputTap (class PhraseCatcher* t) noexcept { tap = t; }
 
 private:
+    void applyParams (const ParamValues& v, bool toneChange);
+    bool needsSwap (const ParamValues& next) const;
     void processMono (float* x, int n);
     void processStereo (float* l, float* r, int n);
     float delayTimeMs() const;
@@ -92,6 +100,13 @@ private:
     double tempo = 120.0;
     ParamValues p {};
     bool firstParams = true;
+    // the dip around a tone change: out, swap, back in
+    enum class Swap { none, out, hold, in };
+    Swap swap = Swap::none;
+    bool swapWanted = false;
+    ParamValues swapTo {};
+    float swapGain = 1.0f, swapOutStep = 0.1f, swapInStep = 0.05f;
+    int swapOutLeft = 0, swapHoldLeft = 0, swapHoldLen = 0;
 
     InputConditioner input;
     TiltProbe probe;
@@ -106,8 +121,18 @@ private:
     Cabinet cab;
     GraphicEq eq;
     Modulation mod;
-    Delay delay;
-    Reverb reverb;
+    // Two of each, so the old tone's echoes and room ring on while the new tone starts afresh.
+    Delay delayA, delayB;
+    Reverb reverbA, reverbB;
+    Delay* dly = &delayA;
+    Delay* dlyTail = &delayB;
+    Reverb* rev = &reverbA;
+    Reverb* revTail = &reverbB;
+    bool dlyTailBusy = false, revTailBusy = false;
+    int dlyTailQuiet = 0, revTailQuiet = 0;
+    // a tail from two tones back fades out (straight line, 20 ms) to free its pair for the next change
+    float dlyTailGain = 1.0f, revTailGain = 1.0f, tailFadeStep = 0.001f;
+    bool dlyTailFading = false, revTailFading = false;
     LoFi lofi;
     Doubler doubler;
     SafetyLimiter limiter;

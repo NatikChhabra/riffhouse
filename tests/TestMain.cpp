@@ -1151,6 +1151,280 @@ double referenceSeconds (double sr, double seconds)
     return best;
 }
 
+// Thousands of random changes while it plays: every knob, switch, model and tone at random,
+// blocks of any size up to the most the host asked for, and an input that turns hostile now
+// and then (full-scale square, DC, near-denormal dust, silence, clicks). It must never make a
+// NaN, never go past the safety limiter, never get stuck making sound once everything is off,
+// and silence must not get slow (denormals).
+void testStress (double sr, int maxBlock, double seconds, juce::int64 seed)
+{
+    std::printf ("stress @ %.0f Hz, blocks up to %d, %.0f s\n", sr, maxBlock, seconds);
+    juce::Random rnd (seed);
+    const auto presets = loadPresets();
+    const auto& specs = paramSpecs();
+    auto in = test::guitarDi (sr, seconds, 0.3f);
+    // hostile stretches, each half a second, at random places
+    const size_t half = (size_t) (sr * 0.5);
+    for (int k = 0; k < (int) seconds; ++k)
+    {
+        const size_t at = (size_t) rnd.nextInt ((int) (in.size() - half));
+        const int kind = rnd.nextInt (5);
+        for (size_t i = at; i < at + half; ++i)
+        {
+            if (kind == 0) in[i] = ((i / 40) % 2) != 0 ? 1.0f : -1.0f;  // full-scale square
+            else if (kind == 1) in[i] = 0.5f;                          // DC
+            else if (kind == 2) in[i] = 1.0e-30f * (float) ((int) (i % 3) - 1); // dust
+            else if (kind == 3) in[i] = 0.0f;                          // silence
+            else in[i] = (i - at) % 4800 == 0 ? 1.0f : 0.0f;           // clicks
+        }
+    }
+    Rig rig;
+    rig.prepare (sr, maxBlock);
+    auto v = defaultParamValues();
+    std::vector<float> l ((size_t) maxBlock), r ((size_t) maxBlock);
+    auto randomise = [&] (const ParamSpec& sp)
+    {
+        if (sp.kind == ParamKind::toggle) v[(size_t) sp.id] = rnd.nextBool() ? 1.0f : 0.0f;
+        else if (sp.kind == ParamKind::choice) v[(size_t) sp.id] = (float) rnd.nextInt ((int) sp.choices.size());
+        else v[(size_t) sp.id] = sp.min + (sp.max - sp.min) * rnd.nextFloat();
+    };
+    bool finite = true;
+    float loudest = 0.0f;
+    int changes = 0;
+    for (size_t pos = 0; pos < in.size();)
+    {
+        const int n = (int) std::min<size_t> ((size_t) (1 + rnd.nextInt (maxBlock)), in.size() - pos);
+        const float roll = rnd.nextFloat();
+        if (roll < 0.002f && ! presets.empty()) { v = presets[(size_t) rnd.nextInt ((int) presets.size())].values; ++changes; }
+        else if (roll < 0.01f) { for (const auto& sp : specs) randomise (sp); ++changes; }
+        else if (roll < 0.3f) { for (int c = 1 + rnd.nextInt (4); c > 0; --c) randomise (specs[(size_t) rnd.nextInt ((int) specs.size())]); ++changes; }
+        rig.setParams (v);
+        rig.process (in.data() + pos, l.data(), r.data(), n);
+        for (int i = 0; i < n; ++i)
+        {
+            if (! std::isfinite (l[(size_t) i]) || ! std::isfinite (r[(size_t) i])) finite = false;
+            loudest = std::max ({ loudest, std::abs (l[(size_t) i]), std::abs (r[(size_t) i]) });
+        }
+        pos += (size_t) n;
+    }
+    std::printf ("  %d changes, loudest sample %.3f\n", changes, loudest);
+    CHECK (finite, "random changes made a NaN or infinity");
+    CHECK (loudest <= 1.0f, "random changes got past the safety limiter: %.3f", loudest);
+
+    // everything off and nothing coming in: the sound dies away, and silence stays fast
+    const auto off = bare();
+    std::vector<float> quiet ((size_t) maxBlock, 0.0f);
+    const size_t tail = (size_t) (sr * 15.0);
+    double lastPower = 0.0;
+    size_t lastCount = 0;
+    const auto t0 = std::chrono::steady_clock::now();
+    for (size_t pos = 0; pos < tail; pos += (size_t) maxBlock)
+    {
+        rig.setParams (off);
+        rig.process (quiet.data(), l.data(), r.data(), maxBlock);
+        if (pos > tail - (size_t) sr)
+            for (int i = 0; i < maxBlock; ++i) { lastPower += (double) l[(size_t) i] * l[(size_t) i]; ++lastCount; }
+    }
+    const double silentSecs = std::chrono::duration<double> (std::chrono::steady_clock::now() - t0).count();
+    const float lastDb = (float) (10.0 * std::log10 (lastPower / (double) std::max<size_t> (1, lastCount) + 1.0e-30));
+    CHECK (lastDb < -90.0f, "after everything was switched off it still makes sound: %.1f dB", lastDb);
+    // 15 s of silence through a bare rig takes a sliver of real time unless denormals crept in
+    CHECK (silentSecs < 15.0 * 0.05, "silence got slow (denormals?): %.2f s for 15 s", silentSecs);
+}
+
+// Clicks. A player switches pedals, changes tones and turns knobs fast while playing; none of
+// it may click. Two ways to hear one:
+//  - silence in: anything that comes out is the click itself (a DC step, a filter kicked);
+//  - a held note in: a click is a burst of top end, so the output above 4 kHz in the 30 ms
+//    after a change is held against the same band just before and well after it.
+// A change that gives no more top end than either settled state, or stays under -60 dB, passes.
+struct ClickResult
+{
+    float worstDb = -200.0f;
+    juce::String what;
+    std::vector<std::pair<float, juce::String>> all; // every change judged, for the report
+    int limited = 0; // changes left to the safety limiter (see judgeChanges)
+};
+
+static float peakDb (const std::vector<float>& x, size_t from, size_t to)
+{
+    float pk = 0.0f;
+    for (size_t i = from; i < std::min (to, x.size()); ++i) pk = std::max (pk, std::abs (x[i]));
+    return 20.0f * std::log10 (pk + 1.0e-12f);
+}
+
+// Each change is a list of values applied at its sample. Returns the output's left side.
+static std::vector<float> renderChanges (const ParamValues& start, const std::vector<std::pair<size_t, ParamValues>>& changes,
+                                         const std::vector<float>& in, double sr, int block = 64, bool wholeTones = false)
+{
+    Rig rig;
+    rig.setOffline (true);
+    rig.startFresh (start, sr, block);
+    rig.snapParams (start);
+    std::vector<float> l (in.size()), r (in.size());
+    size_t next = 0;
+    auto v = start;
+    for (size_t pos = 0; pos < in.size(); pos += (size_t) block)
+    {
+        bool changed = false;
+        while (next < changes.size() && changes[next].first <= pos) { v = changes[next++].second; changed = true; }
+        const int n = (int) std::min<size_t> ((size_t) block, in.size() - pos);
+        if (changed && wholeTones) rig.beginToneChange(); // as the app does when a tone is picked
+        rig.setParams (v);
+        rig.finishChangedWork(); // a new cabinet sounds at once, as it would a moment later live
+        rig.process (in.data() + pos, l.data() + pos, r.data() + pos, n);
+    }
+    return l;
+}
+
+static void highpass4k (std::vector<float>& x, double sr)
+{
+    Biquad a, b;
+    a.set (Biquad::Type::highpass, sr, 4000.0, 0.54);
+    b.set (Biquad::Type::highpass, sr, 4000.0, 1.31);
+    for (auto& s : x) s = b.process (a.process (s));
+}
+
+// Judge each change: the click is how far the burst after it rises over the louder settled side.
+// The settled side after a change is heard from `settledFromMs` for `settleMs`. A knob's glide
+// takes up to 100 ms, so knobs are heard from 150 ms. A tone change is back up 28 ms after it
+// (6 down, 10 held, 12 up), and a whole new tone can wobble (a vibe, a tremolo, echoes coming
+// in), so tone changes are heard from 40 ms for half a second, more than a slow cycle.
+static void judgeChanges (const std::vector<float>& out, const std::vector<size_t>& at, double sr, bool silentIn,
+                          const juce::String& label, ClickResult& worst, const juce::StringArray& each = {},
+                          double settleMs = 100.0, double settledFromMs = 150.0)
+{
+    auto hf = out;
+    if (! silentIn) highpass4k (hf, sr);
+    const auto ms = [&] (double m) { return (size_t) (m * sr / 1000.0); };
+    for (size_t k = 0; k < at.size(); ++k)
+    {
+        const size_t t = at[k];
+        if (t < ms (80) || t + ms (settledFromMs + settleMs + 10) > hf.size()) continue;
+        // A jump that drives the output over -6 dBFS is the safety limiter's to catch, and it
+        // grabs on purpose (the stress test checks that it holds): such a change is not judged here.
+        if (! silentIn && peakDb (out, t, t + ms (30)) > -6.0f) { ++worst.limited; continue; }
+        const float burst = peakDb (hf, t, t + ms (30));
+        float over = burst;
+        if (! silentIn)
+        {
+            const float before = peakDb (hf, t - ms (70), t - ms (5));
+            const float after = peakDb (hf, t + ms (settledFromMs), t + ms (settledFromMs + settleMs));
+            // how far the burst rises over the louder settled side; top end under -60 dB never counts
+            over = burst - std::max ({ before, after, -60.0f });
+        }
+        const auto what = label + (k < (size_t) each.size() ? each[(int) k] : juce::String()) + juce::String::formatted (" at %.2f s", (double) t / sr);
+        worst.all.push_back ({ over, what });
+        if (over > worst.worstDb) { worst.worstDb = over; worst.what = what; }
+    }
+}
+
+void testClicks (double sr, bool quick)
+{
+    std::printf ("clicks @ %.0f Hz\n", sr);
+    const auto presets = loadPresets();
+    const auto& specs = paramSpecs();
+    const double secs = 3.0;
+    const size_t len = (size_t) (sr * secs);
+    std::vector<float> silence (len, 0.0f), note (len);
+    for (size_t i = 0; i < len; ++i) note[i] = 0.08f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 196.0 * (double) i / sr);
+    const auto keepSetup = [&] (ParamValues to, const ParamValues& from)
+    {
+        for (const auto& s : specs) if (belongsToSetup (s.id)) to[(size_t) s.id] = from[(size_t) s.id];
+        to[(size_t) P::lofiNoise] = 0.0f; // the lo-fi pedal's hiss is meant to be heard
+        to[(size_t) P::gateOn] = 0.0f;    // a gate would hide a click from the test
+        to[(size_t) P::outLevel] -= 10.0f; // well under the safety limiter, so it judges nearly every change
+        return to;
+    };
+    std::vector<size_t> at;
+    for (double t = 0.3; t < secs - 0.3; t += 0.3) at.push_back ((size_t) (t * sr));
+    // tone changes are heard for longer after each one (see judgeChanges), so they come further apart
+    std::vector<size_t> atTone;
+    for (double t = 0.6; t < secs - 0.56; t += 0.6) atTone.push_back ((size_t) (t * sr));
+
+    // the rigs the switches are tried on: a clean tone, a crunch, a high gain one, and everything on
+    std::vector<std::pair<juce::String, ParamValues>> bases;
+    for (const char* name : { "First Light Clean", "Warm Crunch", "Thrash Machine" })
+        for (const auto& q : presets) if (q.name == name) bases.push_back ({ name, keepSetup (q.values, defaultParamValues()) });
+    {
+        auto all = keepSetup (defaultParamValues(), defaultParamValues());
+        for (const auto& s : specs) if (s.kind == ParamKind::toggle && ! belongsToSetup (s.id)) all[(size_t) s.id] = 1.0f;
+        all[(size_t) P::gateOn] = 0.0f;
+        all[(size_t) P::lofiNoise] = 0.0f;
+        bases.push_back ({ "everything on", all });
+    }
+
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const bool silentIn = pass == 0;
+        const auto& in = silentIn ? silence : note;
+        ClickResult toggles, tones, knobs;
+        // 1. every pedal switched on and off
+        for (const auto& [bname, base] : bases)
+            for (const auto& s : specs)
+            {
+                if (s.kind != ParamKind::toggle || belongsToSetup (s.id) || s.id == P::gateOn) continue;
+                std::vector<std::pair<size_t, ParamValues>> ch;
+                auto v = base;
+                for (size_t k = 0; k < at.size(); ++k) { v[(size_t) s.id] = v[(size_t) s.id] > 0.5f ? 0.0f : 1.0f; ch.push_back ({ at[k], v }); }
+                judgeChanges (renderChanges (base, ch, in, sr), at, sr, silentIn, bname + ": " + s.name, toggles);
+            }
+        // 2. tone changes, through every factory tone in turn
+        {
+            const size_t step = quick ? 7 : 1;
+            for (size_t first = 0; first < presets.size(); first += atTone.size() * step)
+            {
+                std::vector<std::pair<size_t, ParamValues>> ch;
+                juce::StringArray names;
+                const auto start = keepSetup (presets[first].values, defaultParamValues());
+                for (size_t k = 0; k < atTone.size(); ++k)
+                {
+                    const size_t from = k == 0 ? first : (first + k * step) % presets.size();
+                    const size_t idx = (first + (k + 1) * step) % presets.size();
+                    ch.push_back ({ atTone[k], keepSetup (presets[idx].values, defaultParamValues()) });
+                    names.add (presets[from].name + " to " + presets[idx].name);
+                }
+                judgeChanges (renderChanges (start, ch, in, sr, 64, true), atTone, sr, silentIn, "", tones, names, 500.0, 40.0);
+            }
+        }
+        // 3. every knob swung end to end in 10 ms
+        for (const auto& [bname, base] : bases)
+            for (const auto& s : specs)
+            {
+                if (s.kind != ParamKind::continuous || belongsToSetup (s.id) || s.id == P::lofiNoise) continue;
+                std::vector<std::pair<size_t, ParamValues>> ch;
+                auto v = base;
+                const size_t sweep = (size_t) (0.010 * sr);
+                for (size_t k = 0; k < at.size(); ++k)
+                {
+                    const float from = k % 2 == 0 ? s.min : s.max, to = k % 2 == 0 ? s.max : s.min;
+                    for (size_t j = 0; j <= sweep; j += 64)
+                    {
+                        v[(size_t) s.id] = from + (to - from) * (float) j / (float) sweep;
+                        ch.push_back ({ at[k] + j, v });
+                    }
+                }
+                judgeChanges (renderChanges (base, ch, in, sr), at, sr, silentIn, bname + ": " + s.name, knobs);
+            }
+        const char* how = silentIn ? "silence in" : "held note in";
+        // silence in: the click is the whole output, held under -60 dB. A held note: the burst
+        // after a change may not rise more than 3 dB over the sound on either side of it.
+        const float limit = silentIn ? -60.0f : 3.0f;
+        for (auto* res : { &toggles, &tones, &knobs })
+        {
+            const char* kind = res == &toggles ? "pedal switch" : res == &tones ? "tone change" : "fast knob";
+            std::sort (res->all.begin(), res->all.end(), [] (const auto& a, const auto& b) { return a.first > b.first; });
+            int bad = 0;
+            for (const auto& [db, w] : res->all) if (db >= limit) ++bad;
+            std::printf ("  %s, %s: worst %.1f dB, %d of %d over %.0f dB%s\n", how, kind, res->worstDb, bad, (int) res->all.size(), limit,
+                         res->limited > 0 ? (" (" + juce::String (res->limited) + " left to the limiter)").toRawUTF8() : "");
+            for (size_t i = 0; i < std::min<size_t> (res->all.size(), 6) && res->all[i].first >= limit; ++i)
+                std::printf ("      %6.1f dB  %s\n", res->all[i].first, res->all[i].second.toRawUTF8());
+            CHECK (res->worstDb < limit, "%s: a %s clicks (%.1f dB, %s)", how, kind, res->worstDb, res->what.toRawUTF8());
+        }
+    }
+}
+
 void testCpu (double sr)
 {
     std::printf ("cpu @ %.0f Hz\n", sr);
@@ -2238,7 +2512,9 @@ int main (int argc, char** argv)
     }
     if (args[0] == "levels" && args.size() >= 2)
     {
-        // prints {"preset name": rms dBFS, ...} for tools/make_presets.py --calibrate
+        // prints {"preset name": {rms, peak} in dBFS, ...} for tools/make_presets.py --calibrate,
+        // each as the tone plays with its output level at 0 dB, whatever level its file holds,
+        // so calibrating gives the same answer however often it is run
         const double sr = 48000.0;
         const auto di = test::guitarDi (sr, 12.0);
         auto* obj = new juce::DynamicObject();
@@ -2246,12 +2522,11 @@ int main (int argc, char** argv)
         {
             auto v = p.values;
             // measure below the safety limiter so it does not skew the numbers
-            const float out = v[(size_t) P::outLevel];
             v[(size_t) P::outLevel] = -24.0f;
             const auto r = renderWith (v, di, sr, 512);
             auto* e = new juce::DynamicObject();
-            e->setProperty ("rms", 0.5f * (rmsDb (r.l) + rmsDb (r.r)) + 24.0f + out);
-            e->setProperty ("peak", gainToDb (std::max (peakOf (r.l), peakOf (r.r))) + 24.0f + out);
+            e->setProperty ("rms", 0.5f * (rmsDb (r.l) + rmsDb (r.r)) + 24.0f);
+            e->setProperty ("peak", gainToDb (std::max (peakOf (r.l), peakOf (r.r))) + 24.0f);
             obj->setProperty (p.name, juce::var (e));
         }
         juce::File (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])).replaceWithText (juce::JSON::toString (juce::var (obj)));
@@ -2383,6 +2658,72 @@ int main (int argc, char** argv)
         return 0;
     }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "stress") { testStress (48000.0, 256, 30.0, 1); testStress (44100.0, 4096, 20.0, 2); testStress (48000.0, 16, 10.0, 3); testStress (96000.0, 512, 10.0, 4); testStress (192000.0, 64, 5.0, 5); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "resetcost")
+    {
+        // how long each drive pedal takes to restart (it settles on silence first): an audio thread cost
+        for (int t = 0; t < 7; ++t)
+        {
+            DrivePedal d;
+            d.prepare (48000.0, 512);
+            d.set (t, 6, 5, 5);
+            const auto t0 = std::chrono::steady_clock::now();
+            for (int k = 0; k < 20; ++k) d.reset();
+            const double ms = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - t0).count() / 20.0;
+            std::vector<float> z (4800, 0.0f);
+            d.reset();
+            for (size_t i = 0; i < z.size(); i += 480) d.process (z.data() + i, 480);
+            std::printf ("drive type %d: %.3f ms a restart, then %.1f dB from silence\n", t, ms, peakDb (z, 0, z.size()));
+        }
+        return 0;
+    }
+    if (args[0] == "clickdebug" && args.size() >= 3)
+    {
+        // clickdebug <tone A> <tone B> [note]: change from A to B at 0.5 s and print the output's
+        // peak, millisecond by millisecond, around the change
+        const double sr = 48000.0;
+        const auto presets = loadPresets();
+        auto find = [&] (const juce::String& n) { for (const auto& q : presets) if (q.name.equalsIgnoreCase (n)) return q.values; return defaultParamValues(); };
+        auto a = find (args[1]);
+        auto b = find (args[2]);
+        if (args[2].startsWith ("="))
+        {
+            // =key=value,key=value: tone A with those changed
+            b = a;
+            for (const auto& kv : juce::StringArray::fromTokens (args[2].substring (1), ",", ""))
+                if (const int id = findParamByKey (kv.upToFirstOccurrenceOf ("=", false, false).toStdString()); id >= 0)
+                    b[(size_t) id] = kv.fromFirstOccurrenceOf ("=", false, false).getFloatValue();
+        }
+        for (auto* v : { &a, &b }) { (*v)[(size_t) P::gateOn] = 0.0f; (*v)[(size_t) P::lofiNoise] = 0.0f; }
+        const size_t len = (size_t) sr;
+        std::vector<float> in (len, 0.0f);
+        if (args.contains ("note"))
+            for (size_t i = 0; i < len; ++i) in[i] = 0.08f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 196.0 * (double) i / sr);
+        if (args.contains ("bisect"))
+        {
+            // which part of B makes the noise: B's settings for one part at a time, on A
+            for (const char* part : { "comp_", "wah_", "pitch_", "drv_", "amp_", "cab_", "eq_", "mod_", "dly_", "rev_", "lofi_", "doubler", "space", "out_" })
+            {
+                auto mix = a;
+                for (const auto& sp : paramSpecs())
+                    if (juce::String (sp.key).startsWith (part)) mix[(size_t) sp.id] = b[(size_t) sp.id];
+                const auto o = renderChanges (a, { { (size_t) (0.5 * sr), mix } }, in, sr, 64, true);
+                std::printf ("%-8s %7.1f dB\n", part, peakDb (o, (size_t) (0.5 * sr), (size_t) (0.56 * sr)));
+            }
+            return 0;
+        }
+        const auto out = renderChanges (a, { { (size_t) (0.5 * sr), b } }, in, sr, 64, ! args.contains ("knob"));
+        auto hf = out;
+        highpass4k (hf, sr);
+        for (int ms = -5; ms < 60; ++ms)
+        {
+            const size_t from = (size_t) ((0.5 + ms / 1000.0) * sr);
+            std::printf ("%4d ms %7.1f dB, above 4 kHz %7.1f dB\n", ms, peakDb (out, from, from + 48), peakDb (hf, from, from + 48));
+        }
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile ("clickdebug.wav"), Render { out, out, 0.0 }, sr);
+        return 0;
+    }
+    if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "cpu") { testCpu (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "profile")
     {
@@ -2440,6 +2781,16 @@ int main (int argc, char** argv)
     testLevelMatch (48000.0);
     if (! quick) testLevelMatch (44100.0);
     testLevelMatcher();
+    testStress (48000.0, 256, 30.0, 1);
+    if (! quick)
+    {
+        testStress (44100.0, 4096, 20.0, 2);
+        testStress (48000.0, 16, 10.0, 3);
+        testStress (96000.0, 512, 10.0, 4);
+        testStress (192000.0, 64, 5.0, 5);
+    }
+    // the quick round of the click test (every switch and knob, every seventh tone); `clicks` runs all
+    testClicks (48000.0, true);
     testCpu (48000.0);
 
     std::printf ("\n%d checks, %d failures\n", checks, failures);
