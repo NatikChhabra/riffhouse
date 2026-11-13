@@ -512,7 +512,7 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     windowAt = (windowAt + 1) % kWindows;
     windowsHeard = std::min (windowsHeard + 1, kWindows);
     // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do.
-    // The very first floor needs only 0.8 s, so a noisy room is gated almost from the start
+    // The very first floor needs the same 1.6 s: a noisy room is gated soon after the start
     // (a quieter floor heard later is believed at once anyway).
     const int need = floorDb < -119.0f ? kFirstWindows : kWindows;
     if (windowsHeard < need) return;
@@ -524,6 +524,13 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
         peak = std::max (peak, windowPeaks[i]);
     }
     if (hi - lo > 1.5f) return;
+    // ... and not on its way down. A held note can stay within 1.5 dB for a second and more,
+    // but it fades the whole time; hiss and hum hold their level. 0.1.5 took a ringing clean
+    // note (fading 1.7 dB a second) for the floor and closed on it.
+    float recent = 0.0f, older = 0.0f;
+    for (int k = 1; k <= need; ++k)
+        (k <= need / 2 ? recent : older) += windows[(windowAt - k + kWindows) % kWindows];
+    if (std::abs (recent - older) / (float) (need / 2) > kMostFloorDriftDb) return;
     const float heard = sum / (float) need;
     if (heard > -40.0f) return;                 // that loud and steady is a sound, not a floor
     if (heard < floorDb) floorDb = std::max (-120.0f, heard); // quieter now: believed at once

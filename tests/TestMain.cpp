@@ -457,6 +457,127 @@ void testDynamics (double sr)
     }
 }
 
+// A clean note held on a good guitar fades slowly: 0.1.5's gate took one fading 1.7 dB a
+// second for the noise floor after 0.8 s and closed on it (a quarter of a clean take muted).
+void testGateHeldNote (double sr)
+{
+    std::printf ("gate: held notes\n");
+    for (double fadeDbPerSecond : { 0.5, 1.0, 1.7, 3.0 })
+    {
+        NoiseGate g;
+        g.prepare (sr);
+        g.set (-60.0f, 80.0f);
+        const int n = (int) (6.0 * sr);
+        std::vector<float> x ((size_t) n);
+        uint32_t seed = 7;
+        for (int i = 0; i < n; ++i)
+        {
+            const double t = i / sr;
+            const double a = dbToGain ((float) (-34.0 - fadeDbPerSecond * t));
+            double v = 0.0;
+            for (int h = 1; h <= 6; ++h) v += std::sin (kTwoPi * 146.8 * h * t) / h;
+            seed = seed * 1664525u + 1013904223u;
+            x[(size_t) i] = (float) (a * 0.55 * v + 3.0e-4 * ((seed >> 8) / 16777216.0 - 0.5)); // and a little hiss
+        }
+        g.process (x.data(), n);
+        // the note stays well above the threshold the whole time: nothing of it may be cut
+        double worst = 0.0;
+        for (int b = (int) (0.5 * sr); b + 4800 <= n; b += 4800)
+        {
+            float pk = 0.0f;
+            for (int i = b; i < b + 4800; ++i) pk = std::max (pk, std::abs (x[(size_t) i]));
+            const double t = b / sr, expected = -34.0 - fadeDbPerSecond * t;
+            worst = std::min (worst, (double) gainToDb (pk) - expected);
+        }
+        CHECK (worst > -3.0, "a held note fading %.1f dB a second is turned down by %.1f dB (threshold now %.1f)", fadeDbPerSecond, -worst, g.thresholdNowDb());
+    }
+    // and the floor is still found: steady hiss well under the playing raises the threshold
+    NoiseGate g;
+    g.prepare (sr);
+    g.set (-70.0f, 80.0f);
+    std::vector<float> hiss ((size_t) (3.0 * sr));
+    uint32_t seed = 3;
+    for (auto& v : hiss) { seed = seed * 1664525u + 1013904223u; v = (float) (0.01 * ((seed >> 8) / 16777216.0 - 0.5)); }
+    g.process (hiss.data(), (int) hiss.size());
+    CHECK (g.noiseFloorDb() > -60.0f && g.thresholdNowDb() > -50.0f, "steady hiss at %.1f dB is learnt as the floor (threshold %.1f)", g.noiseFloorDb(), g.thresholdNowDb());
+}
+
+// 1/3-octave levels at the centres below, 0 dB = the average of 250 Hz to 2 kHz
+static const double kBalanceCentres[] = { 80, 125, 200, 315, 500, 800, 1250, 2000, 2500, 3150, 4000, 5000, 6300, 8000 };
+static std::vector<double> balanceBands (const std::vector<float>& x, double sr)
+{
+    const int N = 8192;
+    juce::dsp::FFT fft (13);
+    std::vector<float> acc ((size_t) N / 2 + 1, 0.0f), buf ((size_t) N * 2);
+    for (size_t at = 0; at + (size_t) N <= x.size(); at += (size_t) N / 2)
+    {
+        std::fill (buf.begin(), buf.end(), 0.0f);
+        for (int i = 0; i < N; ++i) buf[(size_t) i] = x[at + (size_t) i] * 0.5f * (1.0f - std::cos (2.0f * (float) kPi * (float) i / (float) N));
+        fft.performFrequencyOnlyForwardTransform (buf.data());
+        for (int i = 0; i <= N / 2; ++i) acc[(size_t) i] += buf[(size_t) i] * buf[(size_t) i];
+    }
+    std::vector<double> bands;
+    for (double c : kBalanceCentres)
+    {
+        double e = 0;
+        for (int i = 1; i <= N / 2; ++i)
+        {
+            const double f = (double) i * sr / N;
+            if (f >= c * std::pow (2.0, -1.0 / 6.0) && f < c * std::pow (2.0, 1.0 / 6.0)) e += acc[(size_t) i];
+        }
+        bands.push_back (10.0 * std::log10 (e + 1e-30));
+    }
+    double ref = 0;
+    int n = 0;
+    for (size_t i = 0; i < bands.size(); ++i)
+        if (kBalanceCentres[i] >= 250 && kBalanceCentres[i] <= 2000) { ref += bands[i]; ++n; }
+    ref /= n;
+    for (auto& b : bands) b -= ref;
+    return bands;
+}
+
+// The rock and metal amps against real amps. The reference rows are captures of real
+// amps (ToneHunt NAM files, not shipped) played with the same guitar through the same cab,
+// measured with ampvsreal: 5150 + 6505+ for the two metal amps, JCM2000 L2 G6/G8 + JCM900
+// for Brit 81, JVM OD1 for Redline Lead. 0.1.5 shipped Tight Metal 8.8 dB short at 80 Hz
+// and 5 dB at 125 Hz: the bands were only judged as an average, from 125 Hz up, so one
+// amp's missing low end hid in the mean. Here every band of every amp counts on its own.
+void testAmpsMatchReal (double sr)
+{
+    std::printf ("amps against real amps\n");
+    struct Ref { int model; const char* name; double bands[14]; double lowAllowance; };
+    const Ref refs[] = {
+        { choices::brit800, "Brit 81", { -11.1, -7.8, -3.1, -2.2, -2.0, 1.0, 0.3, 2.8, 2.5, 2.3, -0.6, -7.3, -21.1, -29.8 }, 0.0 },
+        { choices::hotRodLead, "Redline Lead", { -10.8, -3.9, -5.1, -5.8, -5.2, 1.4, 3.0, 6.6, 6.8, 6.6, 3.9, -3.0, -17.3, -27.1 }, 0.0 },
+        { choices::modernHigh, "Modern High Gain", { -4.1, -1.4, -2.4, -3.1, -3.0, 0.7, 1.2, 4.1, 4.4, 4.8, 2.8, -2.9, -15.3, -22.2 }, 0.0 },
+        // a tight amp may keep less under 100 Hz than the real amps, by design, but not much less
+        { choices::tightMetal, "Tight Metal", { -4.1, -1.4, -2.4, -3.1, -3.0, 0.7, 1.2, 4.1, 4.4, 4.8, 2.8, -2.9, -15.3, -22.2 }, 5.0 },
+    };
+    const auto in = playedGuitar (sr, 12.0, 0.32f, true);
+    for (const auto& r : refs)
+    {
+        auto v = bare();
+        v[(size_t) P::ampOn] = 1.0f;
+        v[(size_t) P::ampModel] = (float) r.model;
+        v[(size_t) P::ampGain] = 6.0f;
+        v[(size_t) P::cabOn] = 1.0f;
+        v[(size_t) P::cabModel] = 3.0f;
+        const auto b = balanceBands (renderWith (v, in, sr).l, sr);
+        double worst = 0.0;
+        int worstAt = 0;
+        for (int i = 0; i < 14; ++i)
+        {
+            // the top two bands fall steeply with the cab: a little more room there
+            const double room = kBalanceCentres[i] >= 6300 ? 4.5 : 3.5;
+            double d = b[(size_t) i] - r.bands[i];
+            if (i == 0 && d < 0.0) d = std::min (0.0, d + r.lowAllowance);
+            if (std::abs (d) / room > std::abs (worst) / (kBalanceCentres[worstAt] >= 6300 ? 4.5 : 3.5)) { worst = d; worstAt = i; }
+            CHECK (std::abs (d) <= room, "%s at %.0f Hz: %.1f dB against the real amps' %.1f (off by %.1f)", r.name, kBalanceCentres[i], b[(size_t) i], r.bands[i], d);
+        }
+        std::printf ("  %-17s worst band %5.0f Hz, %+.1f dB from the real amps\n", r.name, kBalanceCentres[worstAt], worst);
+    }
+}
+
 // Tone balance of our amps beside captures of real amps, both through the same cab:
 // ampvsreal <folder of .nam files>. Prints 1/3-octave levels, 0 dB = 250 Hz to 2 kHz.
 int ampVsReal (const juce::File& dir)
@@ -3613,6 +3734,8 @@ int main (int argc, char** argv)
     if (args[0] == "devices") { test::runDeviceChecks (checks, failures); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
     if (args[0] == "cabs") { testCabs (48000.0); testCabs (44100.0); testCabs (96000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "worstblock") { testWorstBlock (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -3668,6 +3791,9 @@ int main (int argc, char** argv)
     testInputFix (48000.0);
     testInputGuard();
     testGate (48000.0);
+    testAmpsMatchReal (48000.0);
+    testGateHeldNote (48000.0);
+    testGateHeldNote (44100.0);
     testTimeEffects (48000.0);
     testAliasing (48000.0);
     testNeural (48000.0);

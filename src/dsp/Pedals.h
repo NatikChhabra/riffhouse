@@ -224,7 +224,8 @@ private:
     float userThrDb = -62.0f, thrNowDb = -62.0f, floorDb = -120.0f, floorPeakDb = -120.0f;
     bool follows = true;
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
-    static constexpr int kFirstWindows = 8;         // 0.8 s for the very first floor
+    static constexpr int kFirstWindows = 16;        // the very first floor too: 0.8 s was short enough for a held note to pass
+    static constexpr float kMostFloorDriftDb = 0.3f; // the later half of those windows against the earlier
     float windows[kWindows] {}, windowPeaks[kWindows] {};
     float windowPeak = 0.0f;
     int windowAt = 0, windowsHeard = 0, windowLength = 4800, windowFill = 0;
