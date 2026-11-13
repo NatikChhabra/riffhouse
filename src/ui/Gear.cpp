@@ -3028,6 +3028,7 @@ Footswitch::Footswitch (juce::RangedAudioParameter& p)
 {
     attachment.sendInitialUpdate();
     setTooltip ("Stomp to switch on or off");
+    getProperties().set ("control", p.getParameterID()); // what a film's pointer finds it by
 }
 
 void Footswitch::mouseDown (const juce::MouseEvent&) { pressed = true; repaint(); }
@@ -3158,16 +3159,17 @@ void Footswitch::paint (juce::Graphics& g)
     if (pictured)
     {
         // the switch itself is in the pedal's picture: a press pushes it into shade, the pointer over it lifts it a little
-        if (! pressed && ! isMouseOver()) return;
+        const bool down = pressed || (motion::filmPress && motion::pointedAt (*this));
+        if (! down && ! isMouseOver() && ! motion::pointedAt (*this)) return;
         const auto b = getLocalBounds().toFloat();
         const float fs = std::min (b.getWidth(), b.getHeight());
-        g.setColour (pressed ? juce::Colours::black.withAlpha (0.32f) : juce::Colours::white.withAlpha (0.07f));
+        g.setColour (down ? juce::Colours::black.withAlpha (0.32f) : juce::Colours::white.withAlpha (0.07f));
         if (style == 1)      g.fillRoundedRectangle (b.reduced (1.0f), b.getHeight() * 0.03f);
         else if (style == 2) g.fillEllipse (R (fs * 0.78f, fs * 0.78f * art::squash).withCentre (b.getCentre()));
         else                 g.fillEllipse (R (fs * 0.44f, fs * 0.44f * art::squash).withCentre (b.getCentre().translated (0.0f, -fs * 0.118f)));
         return;
     }
-    drawFootswitch (g, getLocalBounds().toFloat(), pressed, isMouseOver(), style, body);
+    drawFootswitch (g, getLocalBounds().toFloat(), pressed || (motion::filmPress && motion::pointedAt (*this)), isMouseOver() || motion::pointedAt (*this), style, body);
 }
 
 //==============================================================================

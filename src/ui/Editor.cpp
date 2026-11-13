@@ -1496,6 +1496,9 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
         float to = 0.0f;  // where the knob goes, 0 to 1 along its travel
         float from = -1.0f;
         bool started = false, finished = false;
+        // the pointer: glide to a control or a chain pedal, click one, or hold a knob while it turns
+        juce::String pointTo, clickOn;
+        bool knobPointer = false, clicked = false;
     };
     std::vector<Step> steps;
     const juce::var list = script.isArray() ? script : script.getProperty ("steps", juce::var());
@@ -1517,6 +1520,20 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
                     if (id.equalsIgnoreCase (modules()[(size_t) i].id)) st.page = i;
                 if (st.page < 0) return "No page called \"" + id + "\"";
             }
+            auto known = [&] (const juce::String& id)
+            {
+                for (const auto& m : modules())
+                    if (id.equalsIgnoreCase (m.id)) return true;
+                return findParamByKey (id.toStdString()) >= 0;
+            };
+            for (auto* key : { "pointer", "click" })
+                if (v.hasProperty (key) && ! v[key].isBool())
+                {
+                    const auto id = v[key].toString();
+                    if (! known (id)) return "Nothing called \"" + id + "\" to point at (a page like drive, or a control like drv_on)";
+                    (juce::String (key) == "pointer" ? st.pointTo : st.clickOn) = id;
+                }
+            st.knobPointer = v.hasProperty ("pointer") && v["pointer"].isBool() && (bool) v["pointer"];
             const auto knob = v.getProperty ("knob", v.getProperty ("param", juce::var())).toString();
             if (knob.isNotEmpty())
             {
@@ -1553,6 +1570,90 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
     float inMax = 0.0f, outMax = 0.0f;
     int doneSamples = 0;
 
+    // The pointer, in the window's coordinates: a glide from one place to the next on a slight
+    // curve, the way a hand moves a mouse. On a knob that turns, it moves up and down with it,
+    // as dragging a knob does.
+    struct Pointer
+    {
+        bool shown = false;
+        juce::Point<float> at, from, to;
+        double t0 = 0.0, t1 = 0.0;
+        juce::Component* target = nullptr;
+        int dragParam = -1;
+        float dragFrom = 0.0f;
+        double pressFrom = 1.0e9, pressTo = -1.0;
+    } ptr;
+    juce::String pointerError;
+    std::function<void (juce::Component&, const juce::String&, juce::Component*&, float&)> walk;
+    walk = [&] (juce::Component& c, const juce::String& id, juce::Component*& best, float& area)
+    {
+        for (auto* ch : c.getChildren())
+        {
+            if (! ch->isVisible()) continue;
+            const auto& pr = ch->getProperties();
+            if ((pr["page"].toString().isNotEmpty() && pr["page"].toString().equalsIgnoreCase (id)) || pr["control"].toString() == id)
+                if (ch->isShowing() && (float) (ch->getWidth() * ch->getHeight()) > area) { best = ch; area = (float) (ch->getWidth() * ch->getHeight()); }
+            walk (*ch, id, best, area);
+        }
+    };
+    auto findTarget = [&] (const juce::String& id, double t) -> juce::Component*
+    {
+        juce::Component* best = nullptr;
+        float area = 0.0f;
+        walk (r, id, best, area);
+        if (best == nullptr && pointerError.isEmpty())
+            pointerError = "\"" + id + "\" is not on screen at " + juce::String (t, 2) + " s (show its page first)";
+        return best;
+    };
+    auto aimAt = [&] (juce::Component& c)
+    {
+        // a knob is held by its cap, a little right of and below the middle; anything else in its middle
+        juce::Component* spot = &c;
+        for (auto* ch : c.getChildren())
+            if (dynamic_cast<juce::Slider*> (ch) != nullptr) spot = ch;
+        auto b = spot->getLocalBounds().toFloat();
+        auto p = b.getCentre();
+        if (spot != &c) p += { b.getWidth() * 0.1f, b.getHeight() * 0.12f };
+        else if (c.getProperties()["page"].toString().isNotEmpty()) p.y = b.getY() + b.getHeight() * 0.4f; // a chain pedal by its picture, not its name
+        return getLocalPoint (spot, p);
+    };
+    auto glideTo = [&] (juce::Component* target, double t, double seconds)
+    {
+        if (target == nullptr) return;
+        const auto to = aimAt (*target);
+        if (! ptr.shown)
+        {
+            // it comes in from below and to the right, as a hand reaching for the mouse
+            ptr.at = { juce::jmin ((float) getWidth() - 4.0f, to.x + getWidth() * 0.16f), juce::jmin ((float) getHeight() - 4.0f, to.y + getHeight() * 0.14f) };
+            ptr.shown = true;
+        }
+        ptr.from = ptr.at;
+        ptr.to = to;
+        ptr.t0 = t;
+        ptr.t1 = t + (ptr.from.getDistanceFrom (to) < 3.0f ? 0.0 : seconds);
+        ptr.target = target;
+        ptr.dragParam = -1;
+        motion::filmPointer = nullptr; // it rests on nothing while it moves
+    };
+    auto pointerAt = [&] (double t)
+    {
+        if (! ptr.shown) return;
+        const float k = ptr.t1 <= ptr.t0 ? 1.0f : (float) juce::jlimit (0.0, 1.0, (t - ptr.t0) / (ptr.t1 - ptr.t0));
+        const float e = motion::ease (motion::Curve::inOut, k);
+        const auto d = ptr.to - ptr.from;
+        const juce::Point<float> bend { d.y * 0.12f, -d.x * 0.12f }; // a slight arc, never a ruler line
+        const auto mid = (ptr.from + ptr.to) * 0.5f + bend;
+        ptr.at = ptr.from * ((1 - e) * (1 - e)) + mid * (2 * (1 - e) * e) + ptr.to * (e * e);
+        if (k >= 1.0f) motion::filmPointer = ptr.target;
+        if (ptr.dragParam >= 0 && k >= 1.0f)
+        {
+            // dragging a knob up turns it up: the hand moves with the value
+            const float moved = proc.param ((P) ptr.dragParam)->getValue() - ptr.dragFrom;
+            ptr.at = ptr.to - juce::Point<float> (0.0f, moved * 70.0f * std::max (0.25f, r.getTransform().getScaleFactor()));
+        }
+        motion::filmPress = t >= ptr.pressFrom && t < ptr.pressTo;
+    };
+
     auto takeSteps = [&] (double t)
     {
         for (auto& st : steps)
@@ -1564,6 +1665,39 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
                 if (st.tone.isNotEmpty()) proc.loadPreset (proc.presets().indexOf (st.tone));
                 if (st.page >= 0) r.showPage (st.page);
                 if (st.param >= 0) st.from = proc.param ((P) st.param)->getValue();
+                if (st.pointTo.isNotEmpty()) glideTo (findTarget (st.pointTo, st.t), st.t, st.over > 0.0 ? st.over : 0.6);
+                if (st.clickOn.isNotEmpty())
+                {
+                    glideTo (findTarget (st.clickOn, st.t), st.t, st.over > 0.0 ? st.over : 0.4);
+                    ptr.pressFrom = ptr.t1 + 0.05; // a beat to land, then the press, three frames at 30 a second
+                    ptr.pressTo = ptr.pressFrom + 0.1;
+                }
+                if (st.knobPointer && st.param >= 0)
+                {
+                    auto* knob = findTarget (paramSpecs()[(size_t) st.param].key, st.t);
+                    if (knob != nullptr && ptr.target != knob) glideTo (knob, st.t, 0.25);
+                    ptr.target = knob;
+                    ptr.dragParam = st.param;
+                    ptr.dragFrom = st.from;
+                    ptr.pressFrom = st.t;
+                    ptr.pressTo = st.t + std::max (0.1, st.over) + 0.05;
+                }
+            }
+            if (st.clickOn.isNotEmpty() && ! st.clicked && t >= ptr.pressTo && ptr.target != nullptr)
+            {
+                // the press lets go: a chain pedal opens its page, a switch flips
+                st.clicked = true;
+                const auto page = ptr.target->getProperties()["page"].toString();
+                if (page.isNotEmpty())
+                {
+                    for (int i = 0; i < numModules; ++i)
+                        if (page.equalsIgnoreCase (modules()[(size_t) i].id)) r.showPage (i);
+                }
+                else if (const int id = findParamByKey (st.clickOn.toStdString()); id >= 0)
+                {
+                    auto* p = proc.param ((P) id);
+                    p->setValueNotifyingHost (p->getValue() >= 0.5f ? 0.0f : 1.0f);
+                }
             }
             if (st.param >= 0 && ! st.finished)
             {
@@ -1641,11 +1775,39 @@ juce::String RiffhouseEditor::saveFilm (const juce::File& folder, const juce::Fi
         motion::setClock (clock0 + t * 1000.0);
         motion::step();
         r.tick();
-        const auto img = createComponentSnapshot (getLocalBounds(), true, scale);
+        pointerAt (t);
+        if (pointerError.isNotEmpty()) break;
+        auto img = createComponentSnapshot (getLocalBounds(), true, scale);
+        if (ptr.shown)
+        {
+            // the arrow Windows draws, at its size beside this window's controls, sharp at any film scale
+            juce::Graphics g (img);
+            g.addTransform (juce::AffineTransform::scale (scale));
+            const float u = 1.2f * std::max (0.25f, r.getTransform().getScaleFactor());
+            juce::Path arrow;
+            arrow.startNewSubPath (0.0f, 0.0f);
+            arrow.lineTo (0.0f, 16.0f);
+            arrow.lineTo (3.7f, 12.6f);
+            arrow.lineTo (6.3f, 18.5f);
+            arrow.lineTo (8.7f, 17.5f);
+            arrow.lineTo (6.1f, 11.6f);
+            arrow.lineTo (11.0f, 11.6f);
+            arrow.closeSubPath();
+            arrow.applyTransform (juce::AffineTransform::scale (u).translated (ptr.at));
+            g.setColour (juce::Colours::black.withAlpha (0.28f));
+            g.fillPath (arrow, juce::AffineTransform::translation (0.8f * u, 1.4f * u));
+            g.setColour (juce::Colours::white);
+            g.fillPath (arrow);
+            g.setColour (juce::Colours::black);
+            g.strokePath (arrow, juce::PathStrokeType (1.0f * u, juce::PathStrokeType::mitered));
+        }
         auto file = folder.getChildFile ("frame_" + juce::String (f).paddedLeft ('0', 5) + ".png");
         if (auto stream = file.createOutputStream()) png.writeImageToStream (img, *stream);
         else return "Can't write " + file.getFullPathName();
     }
+    motion::filmPointer = nullptr;
+    motion::filmPress = false;
+    if (pointerError.isNotEmpty()) return pointerError;
     // whatever is left after the last frame, so the sound runs to the end of the recording
     while (doneSamples < total)
     {

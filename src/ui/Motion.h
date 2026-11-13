@@ -11,6 +11,11 @@
 // end of setup are the two slower things), and a new input always wins over a running move.
 namespace rh::ui::motion
 {
+// A film (Riffhouse --film) draws a pointer of its own over the window. The control it rests on
+// shows its real hover look, and its pressed look while the film clicks it.
+inline const juce::Component* filmPointer = nullptr;
+inline bool filmPress = false;
+inline bool pointedAt (const juce::Component& c) noexcept { return filmPointer == &c; }
 // Milliseconds. A control never takes longer than `overlay`.
 constexpr int press = 90, release = 150, hover = 170, toggle = 170, ui = 200, overlay = 240, leave = 150, travel = 260;
 constexpr int lampUp = 240, lampDown = 420, ledUp = 60, ledDown = 140; // an amp's jewel lamp warms up; an LED just lights

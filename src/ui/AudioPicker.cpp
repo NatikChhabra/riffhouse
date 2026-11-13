@@ -50,6 +50,12 @@ AudioPicker::AudioPicker (RiffhouseProcessor& p) : proc (p)
     if (auto* host = StandaloneHost::get()) forced = host->settings().getValue ("audioDriver");
     addAndMakeVisible (driver);
     addChildComponent (socket);
+    // the names a screen reader says, the same as the labels drawn beside them
+    driver.setTitle ("Driver");
+    input.setTitle ("Guitar in");
+    socket.setTitle ("Socket");
+    output.setTitle ("Sound out");
+    buffer.setTitle ("Buffer");
     socket.setTooltip ("The pair of sockets on your interface the guitar is plugged into");
     driver.onChange = [this]
     {

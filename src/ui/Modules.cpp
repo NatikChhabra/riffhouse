@@ -187,6 +187,7 @@ public:
         power.style = PowerSwitch::Style::hidden;
         power.onChange = [this] (bool) { repaint(); };
         setTitle (info.title);
+        getProperties().set ("page", juce::String (info.id)); // what a film's pointer finds it by
     }
 
     int currentType() const
@@ -287,7 +288,7 @@ public:
     {
         updateThumb();
         const bool on = power.isOn() && motion::now() >= darkUntil;
-        const bool hover = isMouseOver (true);
+        const bool hover = isMouseOver (true) || motion::pointedAt (*this);
         {
             juce::Graphics::ScopedSaveState s (g);
             g.addTransform (thumbTransform());

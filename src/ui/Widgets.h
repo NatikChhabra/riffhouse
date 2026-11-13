@@ -123,6 +123,13 @@ public:
     void paintButton (juce::Graphics&, bool over, bool down) override;
     void setIcon (juce::Path p, bool filled) { icon = std::move (p); filled_ = filled; repaint(); }
     void setText (juce::String t) { setButtonText (std::move (t)); repaint(); }
+    // An icon has no words a screen reader can say: its tooltip, without the shortcut in
+    // brackets, becomes its name.
+    void setTooltip (const juce::String& tip) override
+    {
+        juce::Button::setTooltip (tip);
+        setTitle (tip.upToFirstOccurrenceOf (" (", false, false));
+    }
     juce::Colour iconColour = colours::textDim, activeColour = colours::accent;
     bool drawBackground = true;
     float iconSize = 20.0f;

@@ -93,6 +93,7 @@ Knob::Knob (RiffhouseProcessor& proc, P id, juce::Colour colour, juce::String la
 {
     const auto& s = spec (id);
     label = labelOverride.isNotEmpty() ? labelOverride : juce::String (s.name);
+    getProperties().set ("control", juce::String (s.key)); // what a film's pointer finds it by
     slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     slider.setRotaryParameters (juce::degreesToRadians (225.0f), juce::degreesToRadians (495.0f), true);
@@ -163,7 +164,7 @@ void Knob::resized()
 void Knob::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().removeFromBottom (labelH);
-    const bool active = slider.isMouseOverOrDragging();
+    const bool active = slider.isMouseOverOrDragging() || motion::pointedAt (*this);
     const float h = std::max (12.0f, std::min (15.0f, (float) labelH * 0.44f));
     if (gear && capsLabel && ! active)
     {
@@ -212,6 +213,7 @@ Fader::Fader (RiffhouseProcessor& proc, P id, juce::Colour colour, juce::String 
 {
     const auto& s = spec (id);
     label = labelOverride.isNotEmpty() ? labelOverride : juce::String (s.name);
+    getProperties().set ("control", juce::String (s.key));
     slider.setSliderStyle (juce::Slider::LinearVertical);
     slider.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     slider.setColour (juce::Slider::trackColourId, colour);
@@ -240,7 +242,7 @@ void Fader::paint (juce::Graphics& g)
 {
     if (gear)
     {
-        const bool active = slider.isMouseOverOrDragging();
+        const bool active = slider.isMouseOverOrDragging() || motion::pointedAt (*this);
         g.setColour (gearInk.withAlpha (active ? 1.0f : 0.0f));
         g.setFont (faceFont (Face::instrumentSemi, 11.5f));
         g.drawText (slider.getTextFromValue (slider.getValue()), getLocalBounds().removeFromTop (20), juce::Justification::centred);
