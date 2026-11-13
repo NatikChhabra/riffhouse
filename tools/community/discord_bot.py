@@ -620,6 +620,10 @@ CHAT = ("general", "gear-talk", "off-topic", "showcase")
 TROUBLE = re.compile(r"\b(help|problem|issue|not working|doesn'?t work|won'?t|can'?t|cannot|error|fix|stuck|bug|broken)\b")
 APP = re.compile(r"\b(riff ?house|the app|app|setup|asio|latency|driver|input|interface|installer|update)\b")
 IDEA = re.compile(r"\b(please add|can you add|could you add|would be (cool|nice|great|sick)|feature request|suggestion|wish it had|you should add|add (a|an|the) \w+ (amp|pedal|cab))\b")
+# a bug report in chat: a failure word AND a Riff House word, and nothing that says it's about something else
+BUG_WHAT = re.compile(r"\b(crash(es|ed|ing)|froze|freez(es|ing)|keeps? (closing|quitting)|(closes|quits|shuts down) (by itself|on its own|randomly)|found a bug|(is|it'?s|got) (a )?bug(gy|ged)?|glitch(es|ed|ing|y)?|stopped working|stops working|broke after|broken after)\b")
+BUG_WHERE = re.compile(r"\b(riff ?house|the app|this app|app|preset|tuner|metronome|installer|after (the|an?) update|0\.\d+\.\d+|v0\.\d|settings|play along|nam capture)\b")
+CASUAL = re.compile(r"\b(game|valorant|minecraft|pc build|windows update|my phone|discord|crash (course|cymbal|pad)|bug spray|insect|lol|lmao|haha|crashed and burned|car|bike|server|website|stock|market|spotify|youtube|chrome|browser|instagram|whatsapp|app store|play store|steam)\b")
 NUDGED_FOOTER = "Riff House nudge"
 
 
@@ -633,8 +637,8 @@ def recent_nudges(channel: str) -> set[str]:
 
 
 def keep_on_purpose(cursor: str | None, log: list[str]):
-    """A help question in chat gets the fix (when known) and a pointer to #help; an idea gets pointed to #ideas.
-    Only after 10 quiet minutes with no reply from anyone else, so it never talks over people."""
+    """A help question in chat gets the fix (when known) and a pointer to #help; an idea gets pointed to #ideas,
+    a bug report gets pointed to #bug-reports and the in-app Report button. Only after 10 quiet minutes with no reply from anyone else, so it never talks over people."""
     now = dt.datetime.now(dt.timezone.utc)
     since = snowflake_time(cursor) - dt.timedelta(minutes=15) if cursor else now - dt.timedelta(hours=1)
     for name in CHAT:
@@ -660,12 +664,15 @@ def keep_on_purpose(cursor: str | None, log: list[str]):
                 fix = (f["text"] + "\n\n") if f else ""
                 body = (f"<@{uid}> {fix}If that doesn't do it, make a post in <#{CH['help']}> with your Riff House version and what your guitar plugs into. "
                         "Stuff there doesn't get buried and it helps the next person too.")
+            elif BUG_WHAT.search(text) and BUG_WHERE.search(text) and not CASUAL.search(text):
+                body = (f"<@{uid}> sorry about that. Quickest way to get it fixed is **Report a problem** inside Riff House, it sends us your logs. "
+                        f"Or make a post in <#{CH['bug-reports']}> with your version and what you were doing when it happened.")
             else:
                 continue
             call("POST", f"/channels/{chan}/messages", {"content": body[:2000], "message_reference": ref,
                                                          "allowed_mentions": {"users": [uid], "replied_user": False}})
             nudged.add(uid)
-            log.append(f"Pointed <@{uid}> from <#{chan}> to {'#ideas' if IDEA.search(text) else '#help'}")
+            log.append(f"Pointed <@{uid}> from <#{chan}> to {'#ideas' if IDEA.search(text) else '#help' if '?' in text else '#bug-reports'}")
 
 
 def triage(threads: list[dict], cursor: str | None, log: list[str]):
