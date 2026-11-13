@@ -7,7 +7,7 @@ Each run it:
        beta    -> #beta-lab (pings Beta tester)
        devlog  -> #dev-log  (all new changes in one message)
        tone    -> #tone-of-the-week
-  1b. Posts each new reel or trailer listed in community/reels.json to #announcements
+  1b. Posts each new reel or trailer listed in community/reels.json to #content
      (see community/reels/README.md for how to add one).
   1c. Runs the release-day event in community/launch.json: a #general thread where the first 50
       people get the Day One role. Starts itself when that release appears.
@@ -65,6 +65,7 @@ CH = {
     "off-topic": "1570506873050890350",
     "showcase": "1570506850963816468",
     "welcome": "1570506374117597265",
+    "content": "1570923361222271110",
 }
 ROLE = {"release-pings": "1570506134857711637", "beta-tester": "1570505782259089549"}
 FORUMS = {CH[k]: k for k in ("help", "bug-reports", "ideas", "beta-feedback", "tone-lab")}
@@ -247,12 +248,12 @@ UPLOAD_LIMIT = 10 * 1024 * 1024
 
 
 def send_file(channel: str, content: str, path: str | None, name: str, data: bytes | None = None,
-              mime: str = "video/mp4", embeds=None, ping_roles=()):
+              mime: str = "video/mp4", embeds=None, ping_roles=(), everyone: bool = False):
     if DRY:
         print(f"[dry] upload {name} to {channel}: {content[:200]}")
         return {}
     boundary = "riffhouse" + str(int(time.time() * 1000))
-    body_json = {"content": content, "allowed_mentions": {"parse": [], "roles": list(ping_roles)},
+    body_json = {"content": content, "allowed_mentions": {"parse": ["everyone"] if everyone else [], "roles": list(ping_roles)},
                  "attachments": [{"id": 0, "filename": name}]}
     if embeds:
         body_json["embeds"] = embeds
@@ -290,7 +291,7 @@ def post_reels(log: list[str]):
         reels = json.load(f)
     if not reels:
         return
-    chan = CH["announcements"]
+    chan = CH["content"]
     done = set()
     for m in my_messages(chan):
         done.update(a["filename"] for a in m.get("attachments", []))
@@ -322,6 +323,20 @@ def post_reels(log: list[str]):
             except RuntimeError as e:
                 print(f"warning: crosspost: {e}", file=sys.stderr)
         log.append(f"Posted reel **{rid}** in <#{chan}>")
+        # a big one (the trailer) is also posted in full in #announcements, with @everyone
+        if r.get("announce") and msg.get("id"):
+            ann = CH["announcements"]
+            text = f"@everyone {r['announce'].strip()}" + ("\n" + link if link else "")
+            if video and os.path.exists(video) and os.path.getsize(video) <= UPLOAD_LIMIT:
+                a = send_file(ann, text, video, name, everyone=True)
+            else:
+                a = call("POST", f"/channels/{ann}/messages", {"content": text, "allowed_mentions": {"parse": ["everyone"]}})
+            if a.get("id"):
+                try:
+                    call("POST", f"/channels/{ann}/messages/{a['id']}/crosspost")
+                except RuntimeError as e:
+                    print(f"warning: crosspost: {e}", file=sys.stderr)
+            log.append(f"Also posted **{rid}** in #announcements with @everyone")
 
 
 # ---------------------------------------------------------------- 1c. launch event

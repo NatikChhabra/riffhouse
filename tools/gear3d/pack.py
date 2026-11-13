@@ -5,7 +5,7 @@
     python pack.py <render folder> <resources/gear>
 
 A big picture becomes a JPEG for its colour and a grey PNG for how solid each pixel is: a fifth
-of the size of one PNG. Knobs stay PNGs. The chicken-head frames become one sheet, 13 across.
+of the size of one PNG. Knobs and panel hardware stay PNGs. The chicken-head frames become one sheet, 13 across.
 """
 import glob
 import os
@@ -44,9 +44,10 @@ total = 0
 for f in sorted(glob.glob(os.path.join(src, "*.png"))):
     name = os.path.splitext(os.path.basename(f))[0].replace("-", "_")
     im = Image.open(f).convert("RGBA")
-    if name.startswith(("knob", "fader")):
-        im = fade_round(im, 0.72, 0.98)
-        im = im.resize((256, 256), Image.LANCZOS) if im.width > 256 else im
+    if name.startswith(("knob", "fader", "hw_")):
+        im = fade_round(im, 0.72 if not name.startswith("hw_") else 0.8, 0.98)
+        side = 128 if name.startswith("hw_screw") else 192 if name.startswith("hw_jack") else 256  # panel hardware: small on screen
+        im = im.resize((side, side), Image.LANCZOS) if im.width > side else im
         out = os.path.join(dst, name + ".png")
         im.save(out, optimize=True)
         total += os.path.getsize(out)

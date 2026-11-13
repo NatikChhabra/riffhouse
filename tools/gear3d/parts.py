@@ -140,6 +140,110 @@ def fader_cap():
     return obs
 
 
+# ------------------------------------------------------------------ panel hardware
+# Each picture is a square round the middle of the part, `canvas` nominal pixels wide, and the
+# app scales it from the size it draws that part at (see HARDWARE in src/ui/Gear.cpp).
+JEWELS = ("f2351f", "ffc35a", "ec2f1b", "7dffa0", "6fb7ff", "ff9f1c")
+
+
+def hw_stage(canvas, px, samples):
+    return c.Stage((0.0, 0.0, canvas, canvas), 0.0, scale=px / canvas, samples=samples)
+
+
+def nut_and_washer(rn=13.0):
+    """A chrome hex nut on a turned washer, `rn` nominal pixels to its corners."""
+    k = CM
+    washer = c.lathe("washer", [(rn * 1.12 * k, 0.0), (rn * 1.12 * k, 0.5 * k), (rn * 1.09 * k, 0.8 * k), (0.0001, 0.8 * k)], c.nickel(), seg=128)
+    nut = c.prism("nut", 6, rn * k, 0.8 * k, 4.4 * k, c.principled("nut", (0.86, 0.86, 0.87), metallic=1.0, rough=0.16),
+                  rot=math.radians(90), round_edges=0.55 * k)
+    return [washer, nut]
+
+
+def toggle(on):
+    """A bat-handle toggle: nut, threaded bush, and a chrome lever ending in a ball, leaning up when on."""
+    k = CM
+    obs = nut_and_washer()
+    prof = [(6.6 * k, 4.2 * k)]
+    z = 4.6
+    while z < 9.6:                                      # the thread: small turned ridges
+        prof += [(6.6 * k, z * k), (6.15 * k, (z + 0.35) * k)]
+        z += 0.7
+    prof += [(6.6 * k, 9.8 * k), (6.3 * k, 10.2 * k), (3.9 * k, 10.2 * k), (3.9 * k, 9.4 * k), (0.0001, 9.4 * k)]
+    chrome = c.principled("lever", (0.9, 0.9, 0.91), metallic=1.0, rough=0.1)
+    obs.append(c.lathe("bush", prof, c.principled("bush", (0.8, 0.8, 0.81), metallic=1.0, rough=0.2), seg=96))
+    obs.append(c.lathe("mouth", [(3.9 * k, 9.4 * k), (3.9 * k, 9.45 * k), (0.0001, 9.45 * k)], c.black(), seg=48))
+    lever = c.lathe("rod", [(3.4 * k, 0.0), (3.4 * k, 1.6 * k), (3.0 * k, 3.2 * k), (2.3 * k, 17.0 * k), (2.3 * k, 19.5 * k), (0.0001, 19.5 * k)], chrome, seg=48)
+    ball = [(0.0001, 18.2 * k)]
+    for i in range(1, 24):
+        a = -math.pi / 2 + math.pi * i / 24
+        ball.append((4.4 * k * math.cos(a), (22.6 + 4.4 * math.sin(a)) * k))
+    ball.append((0.0001, 27.0 * k))
+    bob = c.lathe("ball", ball, chrome, seg=64)
+    for ob in (lever, bob):
+        ob.location = (0.0, 0.0, 7.0 * k)
+        ob.rotation_euler[0] = math.radians(-48.0 if on else 48.0)   # +y is away from the player: up the picture
+        c.bpy.context.view_layer.objects.active = ob
+    return obs + [lever, bob]
+
+
+def jack():
+    """A quarter-inch input socket: nut and washer, a chrome sleeve, the dark hole."""
+    k = CM
+    obs = nut_and_washer()
+    obs.append(c.lathe("sleeve", [(8.2 * k, 4.0 * k), (8.2 * k, 5.6 * k), (7.6 * k, 6.0 * k), (5.6 * k, 6.0 * k), (5.2 * k, 5.4 * k), (5.2 * k, 1.0 * k), (0.0001, 1.0 * k)],
+                       c.principled("sleeve", (0.88, 0.88, 0.89), metallic=1.0, rough=0.12), seg=96))
+    obs.append(c.lathe("hole", [(5.15 * k, 5.3 * k), (5.15 * k, 1.1 * k), (0.0001, 1.1 * k)], c.principled("hole", (0.004, 0.004, 0.004), rough=0.7), seg=64))
+    return obs
+
+
+def screw(turn):
+    """A domed slotted screw head, 10 nominal pixels across its radius."""
+    import bmesh  # noqa: F401
+    k, rr = CM, 10.0
+    prof = [(rr * k, 0.0), (rr * k, 0.6 * k)]
+    for i in range(1, 13):
+        a = (math.pi / 2) * i / 12
+        prof.append((max(0.0001, rr * k * math.cos(a)), (0.6 + 3.2 * math.sin(a)) * k))
+    head = c.lathe("head", prof, c.principled("screw", (0.74, 0.74, 0.73), metallic=1.0, rough=0.3), seg=96)
+    slot = c.box("slot", -rr * 1.2 * k, rr * 1.2 * k, -1.1 * k, 1.1 * k, 2.0 * k, 6.0 * k, c.black())
+    slot.rotation_euler[2] = turn
+    c.cut(head, slot)
+    c.roll(head, 0.25 * k, 2, 50)
+    return [head]
+
+
+def jewel(hex_colour, on):
+    """A pilot light: a knurled chrome bezel round a faceted glass jewel, 12 nominal pixels to its rim."""
+    k, rr = CM, 12.0
+    col = c.rgb(hex_colour)
+    bezel = c.lathe("bezel", [(17.5 * k, 0.0), (17.5 * k, 1.6 * k), (17.0 * k, 2.4 * k), (13.0 * k, 2.6 * k), (12.4 * k, 1.8 * k), (12.4 * k, 0.4 * k), (0.0001, 0.4 * k)],
+                    c.principled("bezel", (0.86, 0.86, 0.87), metallic=1.0, rough=0.18), seg=160, flutes=40, depth=0.04, flute_rings=(0, 1))
+    glass = c.principled("jewel", tuple(v * (0.8 if on else 0.3) for v in col), rough=0.04, coat=1.0, coat_rough=0.02,
+                         emission=col if on else None, strength=1.1 if on else 0.0)
+    prof = [(rr * k, 0.4 * k), (rr * k, 1.4 * k), (rr * 0.82 * k, 4.0 * k), (rr * 0.45 * k, 5.6 * k), (0.0001, 6.0 * k)]
+    gem = c.lathe("gem", prof, glass, seg=12)                    # few sides: cut facets that catch the light
+    for p in gem.data.polygons:
+        p.use_smooth = False
+    return [bezel, gem]
+
+
+def hardware(out, px, samples, only):
+    jobs = {"hw-toggle-on": (96.0, lambda: toggle(True)), "hw-toggle-off": (96.0, lambda: toggle(False)),
+            "hw-jack": (64.0, jack)}
+    for i in range(4):
+        jobs["hw-screw-%d" % i] = (40.0, (lambda t: lambda: screw(t))(math.pi * i / 4))
+    for h in JEWELS:
+        for on in (True, False):
+            jobs["hw-jewel-%s-%s" % (h, "on" if on else "off")] = (80.0, (lambda hh, oo: lambda: jewel(hh, oo))(h, on))
+    for name, (canvas, make) in jobs.items():
+        if only and name not in only and "hw" not in only:
+            continue
+        print("part", name, flush=True)
+        st = hw_stage(canvas, px, samples)
+        make()
+        st.render(os.path.join(out, name + ".png"))
+
+
 def main():
     args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
     out = args[0]
@@ -172,6 +276,8 @@ def main():
             st = stage(px, samples)
             knob_chicken(r, START + (END - START) * f / (FRAMES - 1))
             st.render(os.path.join(out, "_chicken", "%02d.png" % f))
+    if not only or any(n.startswith("hw") for n in only):
+        hardware(out, px, samples, only)
     if not only or "fader-cap" in only:
         print("part fader-cap", flush=True)
         st = stage(px, samples)

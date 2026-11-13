@@ -294,6 +294,9 @@ def finish_material(finish, body_hex, seed=0.0):
     """The six paints and metals a pedal comes in. 0 enamel, 1 hammertone, 2 sparkle, 3 brushed, 4 crinkle, 5 anodised."""
     c = rgb(body_hex)
     deep = tuple(v * 0.62 for v in c)       # paint reads lighter under a bright key light than its swatch
+    top = max(deep)
+    if top > 0.36:                          # near-white paint clips to flat white under the key: hold it down
+        deep = tuple(v * 0.36 / top for v in deep)
     if finish == 0:      # gloss enamel under a clear coat, with a little orange peel
         m = principled("enamel", deep, metallic=0.1, rough=0.5, coat=0.45, coat_rough=0.1)
         n = Nodes(m)
@@ -332,7 +335,11 @@ def finish_material(finish, body_hex, seed=0.0):
         w2 = n.noise(120.0, 3.0)
         n.link(n.bump(n.math("ADD", w, n.math("MULTIPLY", w2, 0.4)), 0.55, 0.02), n.bsdf.inputs["Normal"])
     else:                # anodised: dyed satin metal
-        m = principled("anodised", tuple(max(v * 0.9, 0.01) for v in c), metallic=0.85, rough=0.42)
+        dye = tuple(max(v * 0.9, 0.01) for v in c)
+        top = max(dye)
+        if top > 0.5:                       # a pale dye on bright metal burns out to white: hold it down
+            dye = tuple(v * 0.5 / top for v in dye)
+        m = principled("anodised", dye, metallic=0.85, rough=0.42)
         n = Nodes(m)
         n.link(n.bump(n.noise(260.0, 2.0), 0.04, 0.005), n.bsdf.inputs["Normal"])
     return m

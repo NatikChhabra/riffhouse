@@ -19,7 +19,7 @@ on:
     paths: ['community/reels.json']
   # reels with a post_at time, and a backup if an event is missed
   schedule:
-    - cron: '17 * * * *'
+    - cron: '1,31 * * * *'
   workflow_dispatch:
 
 permissions:
