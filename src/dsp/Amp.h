@@ -34,6 +34,10 @@ struct AmpVoicing
     float presenceHz, depthHz;
     float outputHpHz, outputLpHz; // output transformer bandwidth
     float trimDb;             // loudness calibration
+    // Where the sound sits beside captures of real amps through the same speaker (tests,
+    // ampvsreal): a broad cut in the low mids and a shelf on the top, after the tone stack.
+    // 0 dB leaves each out.
+    float lowMidHz = 250.0f, lowMidDb = 0.0f, topHz = 5000.0f, topDb = 0.0f;
 };
 
 const AmpVoicing& ampVoicing (int model);
@@ -83,7 +87,7 @@ private:
     bool dirty = true;
 
     OnePole inputHp;
-    Biquad bright, midBoost, presence, depth, outHp, outLp, antiFizz;
+    Biquad bright, midBoost, presence, depth, outHp, outLp, antiFizz, lowMid, top;
     Biquad baxLow, baxMid, baxHigh;
     ToneStack stack;
     Stage stages[5];
