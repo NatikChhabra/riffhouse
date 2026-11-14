@@ -4,6 +4,11 @@ name: Report relay check
 # unless the relay says it filed it in the private reports repository.
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "A published release to check (like v0.1.5.2). Empty: the newest build on main."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -36,11 +41,17 @@ jobs:
     name: Send one from the Windows app
     runs-on: windows-2022
     steps:
-      - name: Get the newest installer built on main
+      - name: Get the installer
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
         run: |
+          if ($env:TAG) {
+            "Installer from the $env:TAG release"
+            gh release download $env:TAG -R $env:GITHUB_REPOSITORY -p '*windows-setup.exe' -D dist
+            exit 0
+          }
           $run = gh run list -R $env:GITHUB_REPOSITORY --workflow build.yml --branch main --status success -L 1 --json databaseId,headSha | ConvertFrom-Json
           "Installer from the build of $($run[0].headSha)"
           gh run download $run[0].databaseId -R $env:GITHUB_REPOSITORY -n riffhouse-windows -D dist
