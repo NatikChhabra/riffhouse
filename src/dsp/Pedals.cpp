@@ -497,8 +497,14 @@ void NoiseGate::applyThreshold()
     float t = userThrDb;
     if (follows && floorDb > -119.0f)
     {
+        const float need = std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb);
+        // Once the floor is heard, the threshold is never held far above what that floor
+        // needs: a threshold set high (by a setup that took ringing strings for hiss, or
+        // carried over from another rig) only cuts notes that ring clearly over the hiss.
+        // 0.1.5.1 sat at -42 dB over a -78 dB floor and muted a fifth of the playing.
+        t = std::min (t, std::max (need, kMostAboveNeedLowDb));
         const float cap = std::clamp (userThrDb + kMostFollowAboveDb, kFollowCapLowDb, kFollowCapHighDb);
-        t = std::max (t, std::min (std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb), cap));
+        t = std::max (t, std::min (need, cap));
     }
     thrNowDb = t;
     thrOpen = dbToGain (t);

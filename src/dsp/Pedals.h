@@ -202,6 +202,9 @@ public:
     // and -30 dB: notes must still ring out, and a clean tone (set low for soft playing) is let
     // hum a little before it cuts quiet notes
     static constexpr float kMostFollowAboveDb = 28.0f, kFollowCapLowDb = -40.0f, kFollowCapHighDb = -30.0f;
+    // a threshold above what the heard floor needs is brought down to it, but not under this:
+    // a deliberately tight gate (a quiet floor, a metal tone) keeps up to -60 dB
+    static constexpr float kMostAboveNeedLowDb = -60.0f;
     static constexpr float kStopDropDb = 18.0f;     // this much down inside about 30 ms is a hand on the strings
     static constexpr float kStopRangeDb = 24.0f;    // ... when it lands within this of the threshold
 

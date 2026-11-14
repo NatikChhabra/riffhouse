@@ -742,10 +742,22 @@ void AutoSetup::startNoise()
 
 void AutoSetup::finish()
 {
-    // a high percentile ignores a single accidental bump
-    std::vector<float> v (noiseSamples.begin(), noiseSamples.end());
-    std::sort (v.begin(), v.end());
-    const float noise = v.empty() ? 0.0f : v[(size_t) ((double) (v.size() - 1) * 0.9)];
+    // A high percentile ignores a single accidental bump, taken over the quietest third of
+    // the wait: strings still ringing when it began fade through the first part, and 0.1.5.1
+    // took that ring for hiss (a -42 dB gate over a -78 dB floor, notes cut while they rang).
+    // Hiss holds its level, so its quietest third is all of it.
+    float noise = 0.0f;
+    if (! noiseSamples.isEmpty())
+    {
+        const int n = noiseSamples.size(), span = std::max (1, n / 3);
+        noise = 1.0e9f;
+        for (int at = 0; at + span <= n; ++at)
+        {
+            std::vector<float> v (noiseSamples.begin() + at, noiseSamples.begin() + at + span);
+            std::sort (v.begin(), v.end());
+            noise = std::min (noise, v[(size_t) ((double) (v.size() - 1) * 0.9)]);
+        }
+    }
     result.noiseDb = juce::Decibels::gainToDecibels (noise, -100.0f);
 
     // Input Fix brings the input's hiss up with the treble. When that leaves more hiss than

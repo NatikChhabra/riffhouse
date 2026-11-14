@@ -595,6 +595,45 @@ void testGateHeldNote (double sr)
     for (auto& v : hiss) { seed = seed * 1664525u + 1013904223u; v = (float) (0.01 * ((seed >> 8) / 16777216.0 - 0.5)); }
     g.process (hiss.data(), (int) hiss.size());
     CHECK (g.noiseFloorDb() > -60.0f && g.thresholdNowDb() > -50.0f, "steady hiss at %.1f dB is learnt as the floor (threshold %.1f)", g.noiseFloorDb(), g.thresholdNowDb());
+
+    // A threshold set far over the floor (0.1.5.1's setup: -42 dB over hiss at -73 dB rms,
+    // a player's live take) must not hold once the floor is heard: a clean note fading
+    // 10 dB a second rings on until it nears the hiss, not until it falls to -46 dB.
+    {
+        NoiseGate h;
+        h.prepare (sr);
+        h.set (-42.0f, 80.0f);
+        const int n = (int) (8.0 * sr), at = (int) (2.5 * sr);
+        std::vector<float> x ((size_t) n);
+        uint32_t sd = 11;
+        const double hissAmp = dbToGain (-73.0f) * 1.7320508; // uniform noise at -73 dB rms
+        for (int i = 0; i < n; ++i)
+        {
+            sd = sd * 1664525u + 1013904223u;
+            x[(size_t) i] = (float) (hissAmp * (2.0 * ((sd >> 8) / 16777216.0) - 1.0));
+            if (i >= at)
+            {
+                const double t = (i - at) / sr;
+                double v = 0.0;
+                for (int k = 1; k <= 6; ++k) v += std::sin (kTwoPi * 196.0 * k * t) / k;
+                x[(size_t) i] += (float) (dbToGain ((float) (-14.0 - 10.0 * t)) * 0.55 * v);
+            }
+        }
+        const auto dry = x;
+        h.process (x.data(), n);
+        // the last 50 ms block in which the gate still passes the sound (within 6 dB)
+        double lastOpenAt = 0.0;
+        for (int b = at; b + 2400 <= n; b += 2400)
+        {
+            double eIn = 0.0, eOut = 0.0;
+            for (int i = b; i < b + 2400; ++i) { eIn += (double) dry[(size_t) i] * dry[(size_t) i]; eOut += (double) x[(size_t) i] * x[(size_t) i]; }
+            if (eOut > eIn * 0.25) lastOpenAt = (b - at) / sr;
+        }
+        // -14 dB peak falling 10 dB a second reaches -46 dB after 3.2 s; the hiss peaks sit near -68
+        CHECK (lastOpenAt > 4.0, "a ringing note over a -73 dB floor with the threshold set at -42 dB is cut after %.2f s (threshold now %.1f, floor %.1f)",
+               lastOpenAt, h.thresholdNowDb(), h.noiseFloorDb());
+        std::printf ("  threshold -42 over a -73 dB floor: the note rings %.2f s, threshold now %.1f dB\n", lastOpenAt, h.thresholdNowDb());
+    }
 }
 
 // 1/3-octave levels at the centres below, 0 dB = the average of 250 Hz to 2 kHz
