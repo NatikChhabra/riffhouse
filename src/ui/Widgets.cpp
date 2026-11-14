@@ -109,9 +109,59 @@ Knob::Knob (RiffhouseProcessor& proc, P id, juce::Colour colour, juce::String la
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.state(), s.key, slider);
     slider.setDoubleClickReturnValue (true, s.def);
     if (const auto help = knobHelp (id); help.isNotEmpty())
-        slider.setTooltip (help + " Double-click to reset.");
+        slider.setTooltip (help + " Double-click to reset. Click the number to type a value.");
     shown.snap ((float) slider.valueToProportionOfLength (slider.getValue()));
     setTitle (label);
+}
+
+void Knob::mouseUp (const juce::MouseEvent& e)
+{
+    if (isEnabled() && ! e.mouseWasDraggedSinceMouseDown() && labelArea().contains (e.getPosition())) startTyping();
+}
+
+void Knob::startTyping()
+{
+    if (typing != nullptr) return;
+    typing = std::make_unique<juce::TextEditor>();
+    auto& t = *typing;
+    t.setJustification (juce::Justification::centred);
+    t.setFont (faceFont (Face::instrumentSemi, 14.0f));
+    t.setColour (juce::TextEditor::backgroundColourId, colours::well);
+    t.setColour (juce::TextEditor::textColourId, colours::text);
+    t.setColour (juce::TextEditor::outlineColourId, colours::line);
+    t.setColour (juce::TextEditor::focusedOutlineColourId, colours::accent);
+    t.setColour (juce::TextEditor::highlightColourId, colours::accent.withAlpha (0.35f));
+    t.setInputRestrictions (12, "0123456789.,-+ ");
+    t.setText (slider.getTextFromValue (slider.getValue()).retainCharacters ("0123456789.-+"), false);
+    t.setTitle (label + " value");
+    t.onReturnKey = [this] { endTyping (true); };
+    t.onEscapeKey = [this] { endTyping (false); };
+    t.onFocusLost = [this] { endTyping (true); };
+    auto r = labelArea().withSizeKeepingCentre (std::max (56, std::min (labelArea().getWidth(), 84)), 22);
+    t.setBounds (r.withY (labelArea().getY()));
+    addAndMakeVisible (t);
+    t.grabKeyboardFocus();
+    t.selectAll();
+}
+
+void Knob::endTyping (bool keep)
+{
+    if (typing == nullptr) return;
+    auto text = typing->getText().replaceCharacter (',', '.').trim();
+    // the editor goes first: losing focus as it goes would come back here
+    auto gone = std::move (typing);
+    gone->onFocusLost = nullptr;
+    removeChildComponent (gone.get());
+    juce::MessageManager::callAsync ([g = std::shared_ptr<juce::TextEditor> (gone.release())] {});
+    if (keep && text.containsAnyOf ("0123456789"))
+    {
+        const double v = slider.getValueFromText (text);
+        if (std::isfinite (v))
+        {
+            slider.setValue (juce::jlimit (slider.getMinimum(), slider.getMaximum(), v), juce::sendNotificationSync);
+        }
+    }
+    repaint();
 }
 
 // Where the pointer is drawn. A hand, a foot pedal or a DAW moving the knob is followed exactly.

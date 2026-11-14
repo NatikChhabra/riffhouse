@@ -8,7 +8,10 @@ namespace rh
 {
 bool belongsToSetup (P id)
 {
-    return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter || id == P::gateThresh || id == P::autoLevel;
+    // the guitar input is the player's own, kept whatever tone is loaded: the gate's switch
+    // too (a gate switched off stayed off only until the next tone, 0.1.5.1)
+    return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter || id == P::gateOn || id == P::gateThresh
+        || id == P::autoLevel;
 }
 
 bool sameTone (const ToneState& a, const ToneState& b)
