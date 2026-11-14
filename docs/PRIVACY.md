@@ -10,7 +10,7 @@ Once a week, about 20 seconds after Riffhouse opens, it sends:
 - a random number made on your PC the first time, like `3f9a0c...` (32 letters and digits). It comes from random numbers only, never from your name, your PC, your sound card or anything else about you
 - the app version, like `0.1.5`
 
-That is all. It goes to a small script on Google Apps Script that adds one row to a private sheet only the maker of Riffhouse can open. Google sees the request arrive, as with any website; the script never stores your internet address.
+That is all. It goes to a small script on Google Apps Script that adds one row to a private sheet only the maker of Riffhouse can open, with the time it arrived. Google sees the request arrive, as with any website; the script never sees or stores your internet address. Copies built from the source code and copies on test machines send nothing.
 
 It tells us how many people play each week and how many come back, so we know whether Riffhouse is getting better and what to fix first.
 

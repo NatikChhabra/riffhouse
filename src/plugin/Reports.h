@@ -31,6 +31,9 @@ bool helloOn (juce::PropertiesFile&);
 void setHelloOn (juce::PropertiesFile&, bool);
 void sayHelloIfDue (juce::PropertiesFile&, const juce::String& version);
 juce::String weekOf (juce::Time); // "2026-W46"
+// Test machines and builds from source never count: only a release copy on a player's PC does.
+bool countsAsPlayer (const juce::String& version, bool onTestMachine);
+bool onTestMachine();
 juce::String installId (juce::PropertiesFile&);  // made once from random numbers, then kept
 bool isInstallId (const juce::String&);           // 32 lowercase hex digits
 juce::String helloJson (const juce::String& week, const juce::String& id, const juce::String& version);
