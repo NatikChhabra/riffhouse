@@ -33,6 +33,6 @@ juce::String versionForPeople()
 // kept to one sentence that fits a toast; change it in the release commit of each version
 juce::String whatsNew()
 {
-    return "Held notes ring out again, and Heavy Starter and the other Tight Metal tones get their low end back.";
+    return "No more notes cut short by the gate, no crackle with two sound cards, and you can type a knob's value.";
 }
 } // namespace rh
