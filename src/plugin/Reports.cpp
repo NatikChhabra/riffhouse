@@ -230,9 +230,25 @@ juce::String helloJson (const juce::String& week, const juce::String& id, const 
     return juce::JSON::toString (juce::var (o), true);
 }
 
+bool countsAsPlayer (const juce::String& version, bool onTestMachine)
+{
+    // Only a release copy on a player's PC is a player. 34 hellos in week 46 came from the
+    // builds the release checks start on fresh test machines (14 Nov 2026), each with a new id.
+    return ! onTestMachine && version.isNotEmpty() && ! version.contains ("-dev") && ! version.contains ("source");
+}
+
+bool onTestMachine()
+{
+    // GitHub's machines set both; anyone can set RIFFHOUSE_NO_COUNT on a PC used for testing
+    for (auto* name : { "GITHUB_ACTIONS", "CI", "RIFFHOUSE_NO_COUNT" })
+        if (juce::SystemStats::getEnvironmentVariable (name, {}).isNotEmpty())
+            return true;
+    return false;
+}
+
 void sayHelloIfDue (juce::PropertiesFile& s, const juce::String& version)
 {
-    if (! helloOn (s) || ! canSend()) return;
+    if (! helloOn (s) || ! canSend() || ! countsAsPlayer (version, onTestMachine())) return;
     const auto week = weekOf (juce::Time::getCurrentTime());
     if (s.getValue ("helloWeek") == week) return;
     s.setValue ("helloWeek", week); // once a week, even if this one does not arrive
