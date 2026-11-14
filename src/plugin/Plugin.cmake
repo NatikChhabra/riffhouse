@@ -93,7 +93,12 @@ target_compile_definitions(Riffhouse PUBLIC
 
 # Where a report goes after the player says yes: a relay that files it in a private repository.
 # Release builds get it from the REPORT_URL secret; a build from source has none and sends nothing.
-set(RIFFHOUSE_REPORT_URL "$ENV{RIFFHOUSE_REPORT_URL}")
+# It is kept in the cache: a build can re-run CMake by itself (a new file in a JUCE module folder
+# does it) without the environment, and 0.1.5.2 shipped with no relay that way.
+if (NOT "$ENV{RIFFHOUSE_REPORT_URL}" STREQUAL "")
+    string(STRIP "$ENV{RIFFHOUSE_REPORT_URL}" _riffhouse_relay)
+    set(RIFFHOUSE_REPORT_URL "${_riffhouse_relay}" CACHE INTERNAL "Where reports go")
+endif()
 if (RIFFHOUSE_REPORT_URL MATCHES "^https://[^\"]+$")
     set_source_files_properties("${CMAKE_CURRENT_LIST_DIR}/Reports.cpp" PROPERTIES COMPILE_DEFINITIONS "RIFFHOUSE_REPORT_URL=\"${RIFFHOUSE_REPORT_URL}\"")
     message(STATUS "Reports go to the relay")

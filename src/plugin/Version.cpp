@@ -33,6 +33,6 @@ juce::String versionForPeople()
 // kept to one sentence that fits a toast; change it in the release commit of each version
 juce::String whatsNew()
 {
-    return "No more notes cut short by the gate, no crackle with two sound cards, and you can type a knob's value.";
+    return "Bug reports and the weekly player count reach us again.";
 }
 } // namespace rh

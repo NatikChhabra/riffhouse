@@ -8,6 +8,11 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+## 0.1.5.3 (0.1.5 Hotfix 3)
+
+The third hotfix for 0.1.5. Nothing changes in the sound or the screens.
+
+- 0.1.5.2 was built without the address that bug reports and the weekly player count go to, so Report a problem said it had nowhere to send and no copy was counted. The build now keeps that address even when it reconfigures itself halfway, and every build fails if the finished app does not carry it.
 - The weekly player count now counts only players. Test machines and copies built from source send nothing, so the number is people, not our checks.
 
 ## 0.1.5.2 (0.1.5 Hotfix 2)
