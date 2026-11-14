@@ -15,9 +15,6 @@ on:
     - cron: '5 9 * * 1'
     # Every day, so the dev log picks up changes that did not touch the site.
     - cron: '30 15 * * *'
-  # a new release goes into the feed (and on to Discord #releases) right away
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:

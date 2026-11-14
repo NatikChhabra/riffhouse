@@ -13,6 +13,10 @@ on:
   workflow_run:
     workflows: [Website]
     types: [completed]
+  # a release was published: the site rebuild that adds it to the feed is started by a bot,
+  # which doesn't fire workflow_run, so wait here for the feed instead
+  release:
+    types: [published]
   # a reel or the trailer was queued
   push:
     branches: [main]
@@ -32,13 +36,23 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: |
             tools/community
             community
+      - name: Wait for the release to reach the feed
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          for i in $(seq 1 20); do
+            curl -fsS "https://natikchhabra.github.io/riffhouse/feeds/builds.xml?t=$(date +%s)" | grep -q "release-$TAG<" && exit 0
+            sleep 30
+          done
+          echo "::warning::$TAG not in the feed after 10 minutes, the hourly run will catch it"
       - name: Run the bot
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
