@@ -24,6 +24,10 @@ Riffhouse asks GitHub for the newest version, the same as opening the download p
 
 "Send a report" sends the app's log and settings privately so a problem can be fixed. Your Windows user name, PC name, names inside device names and email addresses are taken out first. Nothing is sent unless you press the button, at most three a day.
 
+## The website
+
+The website counts visits and clicks on its Download buttons with [GoatCounter](https://www.goatcounter.com), a free and open counter. It sets no cookies and keeps nothing that identifies you: the page, where the visit came from (like reddit.com), the browser and screen size in broad groups, and the country. Your internet address is not stored.
+
 ## Questions
 
 Open an issue: https://github.com/NatikChhabra/riffhouse/issues
