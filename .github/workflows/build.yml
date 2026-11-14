@@ -127,7 +127,33 @@ jobs:
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DRIFFHOUSE_ASIO_SDK_DIR="${{ env.ASIO_SDK }}" "-DRIFFHOUSE_VERSION_LABEL=$label"
 
       - name: Build
+        env:
+          # CMake can configure again during the build; it keeps the relay from the first run
+          RIFFHOUSE_REPORT_URL: ${{ secrets.REPORT_URL }}
         run: cmake --build build --config Release --parallel --target Riffhouse_Standalone Riffhouse_VST3 riffhouse_tests
+
+      # A release that can't reach the relay sends no reports and no weekly count, and nothing
+      # in the app says so. 0.1.5.2 shipped that way; this stops the next one.
+      - name: The app knows where reports go
+        shell: pwsh
+        env:
+          RIFFHOUSE_REPORT_URL: ${{ secrets.REPORT_URL }}
+        run: |
+          if (-not $env:RIFFHOUSE_REPORT_URL) { "No relay on this build (fork or outside pull request)"; exit 0 }
+          $relayHost = ([uri]$env:RIFFHOUSE_REPORT_URL.Trim()).Host
+          $bad = $false
+          foreach ($f in @(Get-ChildItem build -Recurse -Include Riffhouse.exe, Reports.obj -ErrorAction SilentlyContinue)) {
+            $has = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($f.FullName)).Contains($relayHost)
+            "$($f.FullName.Substring($PWD.Path.Length)): $(if ($has) { 'has the relay' } else { 'NO relay' })"
+            if (-not $has -and $f.Name -eq 'Riffhouse.exe') { $bad = $true }
+          }
+          if ($bad) { throw "Riffhouse.exe was built without the relay address" }
+          $label = (Select-String -Path build\CMakeCache.txt -Pattern '^RIFFHOUSE_VERSION_LABEL:STRING=(.*)$').Matches[0].Groups[1].Value
+          if ($label) {
+            $exe = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes("build\src\Riffhouse_artefacts\Release\Standalone\Riffhouse.exe"))
+            if (-not $exe.Contains($label)) { throw "Riffhouse.exe does not carry its version label $label" }
+            "Version label $label is in the app"
+          }
 
       - name: Test the sound engine
         run: build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe
