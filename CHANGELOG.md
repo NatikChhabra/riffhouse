@@ -6,6 +6,18 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
+## 0.1.5.2 (0.1.5 Hotfix 2)
+
+The second hotfix for 0.1.5, tested on a real player's PC with a USB guitar input and separate USB headphones.
+
+- A guitar input and headphones on two different sound cards run on two clocks that never quite agree. Riffhouse read the guitar only when the headphones asked for sound, with nothing in between: a late packet played as silence, and in Exclusive Mode packets were lost while it waited. None of it was counted, so setup kept raising the buffer, up to 1024 samples and 85 ms of delay. There is now a small cushion between the two that follows their drift (the way macOS joins two devices), the guitar is read as soon as it arrives, and every real gap is counted, so setup and the dropout guard see what you hear. On one sound card for both, nothing changes.
+- The gate muted notes that were still ringing: on a real take a fifth of the playing came out silent. Setup had measured the "quiet" while the strings still rang and set the gate far above the hiss. Setup now measures the quietest part, and once the gate hears the real hiss it never sits far above it, so this is fixed for everyone who already ran setup too.
+- The gate's on/off switch now stays as you set it when you change tones, like the input level and the gate threshold.
+- Click the name or number under any knob to type a value.
+- Exclusive Mode can skip Windows' input boost and hear a USB guitar input about 20 dB quieter, which the amp then turned up into hiss and fizz. Setup now compares how loud your guitar is in each mode and skips one that hears it far quieter.
+- Closing the audio window while setup was still switching sound cards could crash Riffhouse. Fixed, found from the crash report.
+- No more dark squares behind the knobs, and a new power switch, pilot lamps, screws and input jack.
+
 ## 0.1.5.1 (0.1.5 Hotfix 1)
 
 The first hotfix for 0.1.5. The gate no longer cuts held notes, and Tight Metal gets its low end back.

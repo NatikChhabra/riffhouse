@@ -17,6 +17,7 @@ class AudioPicker : public juce::Component
 {
 public:
     explicit AudioPicker (RiffhouseProcessor&);
+    ~AudioPicker() override;
     void paint (juce::Graphics&) override;
     void resized() override;
 

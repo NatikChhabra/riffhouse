@@ -9,6 +9,8 @@
 //   riffhouse_tests report          print loudness/latency/CPU table
 
 #include "engine/InputGuard.h"
+#include "audio/ElasticInput.h"
+#include <random>
 #include "TestSignals.h"
 #include "engine/History.h"
 #include "engine/LevelMatch.h"
@@ -458,6 +460,98 @@ void testDynamics (double sr)
     }
 }
 
+// Windows Audio with a guitar input and separate headphones: two clocks, each handing over sound in
+// its own packets. 0.1.5 read the input only when the output wanted sound and played silence when
+// its packet was late (the crackle), and lost input packets in Exclusive Mode (the dropouts that
+// held setup at 1024 samples). The cushion must follow any clock difference a real pair can have,
+// with no gap and no step once settled, at every packet and buffer shape, and recover from a stall.
+struct ElasticRun { int gapsLate = 0; double maxStep = 0, ratioErrPpm = 0, wobblePpm = 0, fillErr = 0; int stallGaps = 0; };
+
+static ElasticRun runElastic (double ppm, int packet, int block, int burst, double jitterMs, double secs, bool stall)
+{
+    const double sr = 48000.0;
+    riffhouse::ElasticInput el;
+    el.prepare (1, block, packet, burst, sr);
+    std::mt19937 rng (7);
+    std::uniform_real_distribution<double> jit (0.0, jitterMs / 1000.0);
+    const double inRate = sr * (1.0 + ppm * 1e-6);
+    double tIn = 0, tOut = 0, prev1 = 0, prev2 = 0, rSum = 0, rMin = 9, rMax = 0;
+    long long inN = 0, outN = 0, space = 0, pulled = 0;
+    int rCount = 0;
+    std::vector<float> pk ((size_t) packet), ob ((size_t) block);
+    ElasticRun r;
+    while (tOut < secs)
+    {
+        if (tIn + packet / inRate <= tOut + burst / sr)
+        {
+            tIn += packet / inRate;
+            for (int i = 0; i < packet; ++i)
+                pk[(size_t) i] = 0.5f * (float) std::sin (2.0 * juce::MathConstants<double>::pi * 997.0 * (double) (inN + i) / inRate);
+            inN += packet;
+            const float* src = pk.data();
+            el.push (&src, 1, packet, tIn + jit (rng));
+            continue;
+        }
+        tOut += burst / sr;
+        const bool stalled = stall && tOut > secs * 0.5 && tOut < secs * 0.5 + 0.06;
+        if (stalled) continue;
+        space += burst;
+        const double t = tOut + jit (rng);
+        while (pulled < space)
+        {
+            pulled += block;
+            float* d = ob.data();
+            const int g0 = el.glitches();
+            el.pull (&d, 1, block, t);
+            const bool late = tOut > 3.0 && ! (stall && tOut > secs * 0.5 && tOut < secs * 0.5 + 0.5);
+            if (el.glitches() > g0) { if (late) ++r.gapsLate; else if (stall && tOut > secs * 0.5) ++r.stallGaps; }
+            for (int i = 0; i < block; ++i)
+            {
+                const double y = ob[(size_t) i];
+                if (late && outN > 2) r.maxStep = std::max (r.maxStep, std::abs (y - 2.0 * prev1 + prev2));
+                prev2 = prev1; prev1 = y; ++outN;
+            }
+            if (tOut > secs * 0.6 && ! stall)
+            {
+                rSum += el.currentRatio(); ++rCount;
+                rMin = std::min (rMin, el.currentRatio()); rMax = std::max (rMax, el.currentRatio());
+            }
+        }
+    }
+    if (rCount > 0)
+    {
+        r.ratioErrPpm = (rSum / rCount - (1.0 + ppm * 1e-6)) * 1e6;
+        r.wobblePpm = (rMax - rMin) * 1e6;
+    }
+    r.fillErr = std::abs (el.averageFill() - el.latencyFrames()) / (double) el.latencyFrames();
+    return r;
+}
+
+void testElasticInput()
+{
+    std::printf ("windows audio: two clocks through the cushion\n");
+    // {input packet, callback block, output burst}: exclusive pairs, shared mode (10 ms packets with
+    // small callbacks run back to back), 44.1 kHz packets, mismatched sizes
+    const int shapes[][3] = { { 144, 144, 144 }, { 480, 144, 480 }, { 480, 480, 480 }, { 1024, 1024, 1024 },
+                              { 441, 256, 441 }, { 96, 1024, 1024 }, { 480, 1024, 480 }, { 144, 64, 144 }, { 528, 256, 480 } };
+    const double drifts[] = { -2000.0, -500.0, -100.0, 0.0, 100.0, 500.0, 2000.0 };
+    // a 997 Hz sine at 0.5 changes its second difference by at most 0.0086 a sample: a gap or a
+    // jump in the read is several times that
+    for (const auto& s : shapes)
+        for (const double d : drifts)
+        {
+            const auto r = runElastic (d, s[0], s[1], s[2], 1.0, 40.0, false);
+            CHECK (r.gapsLate == 0, "packet %d block %d burst %d at %+.0f ppm: %d gaps after settling", s[0], s[1], s[2], d, r.gapsLate);
+            CHECK (r.maxStep < 0.012, "packet %d block %d burst %d at %+.0f ppm: a step of %.4f in the sound", s[0], s[1], s[2], d, r.maxStep);
+            CHECK (std::abs (r.ratioErrPpm) < 30.0, "packet %d block %d burst %d at %+.0f ppm: follows the clocks %.1f ppm off", s[0], s[1], s[2], d, r.ratioErrPpm);
+            CHECK (r.wobblePpm < 1200.0, "packet %d block %d burst %d at %+.0f ppm: pitch wobbles %.0f ppm (2 cents = 1160)", s[0], s[1], s[2], d, r.wobblePpm);
+            CHECK (r.fillErr < 0.1, "packet %d block %d burst %d at %+.0f ppm: the delay sits %.0f%% off the one reported", s[0], s[1], s[2], d, r.fillErr * 100.0);
+        }
+    // a 60 ms stall (a frozen window, a driver hiccup): at most one gap, then clean again
+    const auto st = runElastic (300.0, 480, 144, 480, 1.0, 30.0, true);
+    CHECK (st.stallGaps <= 1 && st.gapsLate == 0, "after a 60 ms stall: %d gaps at the stall, %d later", st.stallGaps, st.gapsLate);
+}
+
 // A clean note held on a good guitar fades slowly: 0.1.5's gate took one fading 1.7 dB a
 // second for the noise floor after 0.8 s and closed on it (a quarter of a clean take muted).
 void testGateHeldNote (double sr)
@@ -501,6 +595,45 @@ void testGateHeldNote (double sr)
     for (auto& v : hiss) { seed = seed * 1664525u + 1013904223u; v = (float) (0.01 * ((seed >> 8) / 16777216.0 - 0.5)); }
     g.process (hiss.data(), (int) hiss.size());
     CHECK (g.noiseFloorDb() > -60.0f && g.thresholdNowDb() > -50.0f, "steady hiss at %.1f dB is learnt as the floor (threshold %.1f)", g.noiseFloorDb(), g.thresholdNowDb());
+
+    // A threshold set far over the floor (0.1.5.1's setup: -42 dB over hiss at -73 dB rms,
+    // a player's live take) must not hold once the floor is heard: a clean note fading
+    // 10 dB a second rings on until it nears the hiss, not until it falls to -46 dB.
+    {
+        NoiseGate h;
+        h.prepare (sr);
+        h.set (-42.0f, 80.0f);
+        const int n = (int) (8.0 * sr), at = (int) (2.5 * sr);
+        std::vector<float> x ((size_t) n);
+        uint32_t sd = 11;
+        const double hissAmp = dbToGain (-73.0f) * 1.7320508; // uniform noise at -73 dB rms
+        for (int i = 0; i < n; ++i)
+        {
+            sd = sd * 1664525u + 1013904223u;
+            x[(size_t) i] = (float) (hissAmp * (2.0 * ((sd >> 8) / 16777216.0) - 1.0));
+            if (i >= at)
+            {
+                const double t = (i - at) / sr;
+                double v = 0.0;
+                for (int k = 1; k <= 6; ++k) v += std::sin (kTwoPi * 196.0 * k * t) / k;
+                x[(size_t) i] += (float) (dbToGain ((float) (-14.0 - 10.0 * t)) * 0.55 * v);
+            }
+        }
+        const auto dry = x;
+        h.process (x.data(), n);
+        // the last 50 ms block in which the gate still passes the sound (within 6 dB)
+        double lastOpenAt = 0.0;
+        for (int b = at; b + 2400 <= n; b += 2400)
+        {
+            double eIn = 0.0, eOut = 0.0;
+            for (int i = b; i < b + 2400; ++i) { eIn += (double) dry[(size_t) i] * dry[(size_t) i]; eOut += (double) x[(size_t) i] * x[(size_t) i]; }
+            if (eOut > eIn * 0.25) lastOpenAt = (b - at) / sr;
+        }
+        // -14 dB peak falling 10 dB a second reaches -46 dB after 3.2 s; the hiss peaks sit near -68
+        CHECK (lastOpenAt > 4.0, "a ringing note over a -73 dB floor with the threshold set at -42 dB is cut after %.2f s (threshold now %.1f, floor %.1f)",
+               lastOpenAt, h.thresholdNowDb(), h.noiseFloorDb());
+        std::printf ("  threshold -42 over a -73 dB floor: the note rings %.2f s, threshold now %.1f dB\n", lastOpenAt, h.thresholdNowDb());
+    }
 }
 
 // 1/3-octave levels at the centres below, 0 dB = the average of 250 Hz to 2 kHz
@@ -646,7 +779,7 @@ int ampVsReal (const juce::File& dir)
         rig.finishPendingWork();
         show ("REAL " + f.getFileNameWithoutExtension(), spectrum (run (rig, v, in).l));
     }
-    for (int m = choices::brit800; m <= choices::tightMetal; ++m)
+    for (int m = choices::glassClean; m <= choices::tightMetal; ++m)
         for (float g : { 4.0f, 6.0f, 8.0f })
         {
             auto v = bare();
@@ -3578,6 +3711,97 @@ int main (int argc, char** argv)
         std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));
         return 0;
     }
+    if (args[0] == "di" && args.size() >= 2)
+    {
+        // di <out.wav>: the reference guitar with a recorded guitar's treble, for listening and spectra
+        const auto g = playedGuitar (48000.0, 12.0, 0.32f, true);
+        Render r; r.l = g; r.r = g;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[1]), r, 48000.0);
+        return 0;
+    }
+    if (args[0] == "wash")
+    {
+        // wash [filter]: for each tone, how much of what is heard is room (reverb + delay), how
+        // long the sound hangs on after the playing stops, and how much of a held note's ring
+        // the gate takes away (a note left to fade, on a quiet interface and on a hissy one)
+        const double sr = 48000.0;
+        auto played = playedGuitar (sr, 12.0, 0.32f, true);
+        const size_t playEnd = played.size();
+        played.resize (playEnd + (size_t) (3.0 * sr), 0.0f);
+        // a note left to ring: 2 s of hiss for the gate to learn the floor, then a G3 peaking at
+        // noteDb whose fundamental fades 10 dB a second (a real string's sustain), upper
+        // harmonics faster
+        auto heldNote = [&] (float noteDb, float noiseDb, bool withNote, bool withNoise)
+        {
+            std::vector<float> x ((size_t) (10.0 * sr), 0.0f);
+            uint32_t seed = 12345u;
+            const float nAmp = dbToGain (noiseDb) * 1.7320508f;
+            if (withNoise) for (auto& s : x) { seed = seed * 1664525u + 1013904223u; s = nAmp * ((float) (seed >> 8) / 8388608.0f - 1.0f); }
+            if (withNote)
+            {
+                const size_t at = (size_t) (2.0 * sr);
+                const float peak = dbToGain (noteDb);
+                for (size_t i = 0; at + i < x.size(); ++i)
+                {
+                    const double t = (double) i / sr;
+                    double v = 0.0;
+                    for (int h = 1; h <= 12; ++h)
+                        v += std::exp (-t * 1.15 * (1.0 + 0.25 * (h - 1))) * std::sin (2.0 * 3.14159265 * 196.0 * h * t) / h;
+                    x[at + i] += (float) (peak * 0.6 * v * std::min (1.0, t * 2000.0));
+                }
+            }
+            return x;
+        };
+        // how far above the hiss the note still was when the gate began to take it (6 dB under
+        // the same tone with no gate); 99 = it never did before the note sank into the hiss
+        auto closesAbove = [&] (const ParamValues& v, const ParamValues& noGate, float noteDb, float noiseDb)
+        {
+            const auto in = heldNote (noteDb, noiseDb, true, true), clean = heldNote (noteDb, noiseDb, true, false);
+            const auto on = renderWith (v, in, sr), off = renderWith (noGate, in, sr);
+            const size_t w = (size_t) (0.05 * sr);
+            for (size_t i = (size_t) (2.1 * sr); i + w <= in.size(); i += w)
+            {
+                const float noteNow = rmsDb (clean, i, i + w);
+                if (noteNow < noiseDb + 3.0f) break;
+                const float a = 0.5f * (rmsDb (on.l, i, i + w) + rmsDb (on.r, i, i + w)), b = 0.5f * (rmsDb (off.l, i, i + w) + rmsDb (off.r, i, i + w));
+                if (a < b - 6.0f) return noteNow - noiseDb;
+            }
+            return 99.0f;
+        };
+        std::printf ("%-28s %7s %7s %6s %6s %6s %6s %6s\n", "tone", "room dB", "tail s", "rev", "dly", "dbl", "hiss62", "quiet62", "hiss78");
+        for (const auto& p : loadPresets())
+        {
+            if (args.size() > 1 && args[1] != "-" && ! p.name.containsIgnoreCase (args[1])) continue;
+            auto v = p.values;
+            v[(size_t) P::autoLevel] = 0.0f;
+            auto dry = v;
+            dry[(size_t) P::revOn] = 0.0f; dry[(size_t) P::dlyOn] = 0.0f;
+            const auto full = renderWith (v, played, sr), plain = renderWith (dry, played, sr);
+            double eDiff = 0.0, eDry = 0.0;
+            for (size_t i = 0; i < playEnd; ++i)
+            {
+                const double dl = full.l[i] - plain.l[i], dr = full.r[i] - plain.r[i];
+                eDiff += dl * dl + dr * dr;
+                eDry += (double) plain.l[i] * plain.l[i] + (double) plain.r[i] * plain.r[i];
+            }
+            const float roomDb = (float) (10.0 * std::log10 ((eDiff + 1e-20) / (eDry + 1e-20)));
+            // tail: how long until the sound after the last note is 40 dB under the playing
+            const float playDb = 0.5f * (rmsDb (full.l, 0, playEnd) + rmsDb (full.r, 0, playEnd));
+            double tail = 0.0;
+            for (size_t i = playEnd; i + 2400 <= full.l.size(); i += 2400)
+                if (0.5f * (rmsDb (full.l, i, i + 2400) + rmsDb (full.r, i, i + 2400)) > playDb - 40.0f) tail = (double) (i + 2400 - playEnd) / sr;
+            // the gate's toll on a ringing note, against the same tone with the gate off
+            auto noGate = v; noGate[(size_t) P::gateOn] = 0.0f;
+            const bool gateToo = args.size() > 2 && args[2] == "gate";
+            const float c1 = gateToo ? closesAbove (v, noGate, -12.0f, -62.0f) : 0.0f, c2 = gateToo ? closesAbove (v, noGate, -26.0f, -62.0f) : 0.0f, c3 = gateToo ? closesAbove (v, noGate, -12.0f, -78.0f) : 0.0f;
+            std::printf ("%-28s %7.1f %7.2f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f\n", p.name.substring (0, 28).toRawUTF8(), roomDb, tail,
+                         v[(size_t) P::revOn] > 0.5f ? v[(size_t) P::revMix] : 0.0f, v[(size_t) P::dlyOn] > 0.5f ? v[(size_t) P::dlyMix] : 0.0f,
+                         v[(size_t) P::doubler], c1, c2, c3);
+            std::fflush (stdout);
+
+        }
+        return 0;
+    }
     if (args[0] == "fresh")
     {
         // which block keeps something from the tone before: one rig, a tone, another tone, the first again
@@ -3745,6 +3969,7 @@ int main (int argc, char** argv)
     if (args[0] == "clicks") { std::setvbuf (stdout, nullptr, _IONBF, 0); testClicks (48000.0, args.contains ("--quick")); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "elastic") { testElasticInput(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
@@ -3805,6 +4030,7 @@ int main (int argc, char** argv)
     testAmpsMatchReal (48000.0);
     testGateHeldNote (48000.0);
     testGateHeldNote (44100.0);
+    testElasticInput();
     testTimeEffects (48000.0);
     testAliasing (48000.0);
     testNeural (48000.0);

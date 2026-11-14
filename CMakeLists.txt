@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 3.22)
-project(Riffhouse VERSION 0.1.5.1 LANGUAGES C CXX)
+project(Riffhouse VERSION 0.1.5.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
+
+# Windows release builds keep their debug symbols (Riffhouse.pdb, kept with each build), so a crash
+# dump from a player names the function. /OPT:REF and /OPT:ICF keep the code the same as without.
+if (MSVC)
+    add_compile_options($<$<CONFIG:Release>:/Zi>)
+    add_link_options($<$<CONFIG:Release>:/DEBUG:FULL> $<$<CONFIG:Release>:/OPT:REF> $<$<CONFIG:Release>:/OPT:ICF> $<$<CONFIG:Release>:/INCREMENTAL:NO>)
+endif()
 
 option(RIFFHOUSE_BUILD_PLUGIN "Build the standalone app and plugins" ON)
 option(RIFFHOUSE_BUILD_TESTS "Build the offline test and render tools" ON)
@@ -13,8 +20,10 @@ set(RIFFHOUSE_ASIO_SDK_DIR "" CACHE PATH "Path to the Steinberg ASIO SDK (Window
 include(FetchContent)
 set(FETCHCONTENT_QUIET OFF)
 
-# JUCE (AGPLv3). One patch: Windows Audio counted the smallest buffer at each device's own
-# Windows rate, so a guitar input set to 192 kHz held every PC at 12 ms buffers (cmake/patches).
+# JUCE (AGPLv3). One patch to Windows Audio (cmake/patches): the smallest buffer is counted at the
+# rate that runs (a guitar input set to 192 kHz held every PC at 12 ms), and an input with a separate
+# output gets a cushion that follows the two clocks, is read while the output is waited for, and has
+# every gap counted (src/audio/ElasticInput.h, copied in next to the file that uses it).
 FetchContent_Declare(juce
     GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
     GIT_TAG 8.0.10
@@ -22,6 +31,8 @@ FetchContent_Declare(juce
     PATCH_COMMAND ${CMAKE_COMMAND} -DPATCH=${CMAKE_CURRENT_SOURCE_DIR}/cmake/patches/juce-wasapi-buffer-sizes.patch
                   -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/ApplyPatch.cmake)
 FetchContent_MakeAvailable(juce)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/audio/ElasticInput.h
+               ${juce_SOURCE_DIR}/modules/juce_audio_devices/native/riffhouse_ElasticInput.h COPYONLY)
 
 # Neural Amp Modeler core (MIT)
 FetchContent_Declare(namcore

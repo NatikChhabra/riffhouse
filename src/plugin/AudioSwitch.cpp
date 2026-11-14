@@ -19,6 +19,10 @@ AudioSwitch::AudioSwitch (juce::AudioDeviceManager& d, RiffhouseProcessor& p) : 
 
 AudioSwitch::~AudioSwitch()
 {
+    // Never call back from here: the owner is being torn down (0.1.5.1 crashed when the audio
+    // window closed mid-change, its callback re-enabling boxes the window had already destroyed).
+    // The device is still put back below; the owner tidies its own side.
+    onDone = nullptr;
     probe.cancel();
     if (working && search != nullptr)
     {

@@ -1,8 +1,18 @@
 diff --git a/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp b/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
-index 3c815cb..d79f480 100644
+index 3c815cb..1975d48 100644
 --- a/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
 +++ b/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp
-@@ -541,6 +541,8 @@ public:
+@@ -32,6 +32,9 @@
+   ==============================================================================
+ */
+ 
++// Riffhouse: the cushion that keeps a separate input and output in step (copied in by cmake)
++#include "riffhouse_ElasticInput.h"
++
+ namespace juce
+ {
+ 
+@@ -541,6 +544,8 @@ public:
      int numChannels = 0, actualNumChannels = 0, maxNumChannels = 0, defaultNumChannels = 0;
      int minBufferSize = 0, defaultBufferSize = 0, latencySamples = 0;
      int lowLatencyBufferSizeMultiple = 0, lowLatencyMaxBufferSize = 0;
@@ -11,7 +21,7 @@ index 3c815cb..d79f480 100644
      DWORD defaultFormatChannelMask = 0;
      Array<double> rates;
      HANDLE clientEvent = {};
-@@ -676,6 +678,8 @@ private:
+@@ -676,6 +681,8 @@ private:
          if (! check (audioClient->GetDevicePeriod (&defaultPeriod, &minPeriod)))
              return;
  
@@ -20,7 +30,214 @@ index 3c815cb..d79f480 100644
          minBufferSize = refTimeToSamples (minPeriod, defaultSampleRate);
          defaultBufferSize = refTimeToSamples (defaultPeriod, defaultSampleRate);
      }
-@@ -1232,6 +1236,17 @@ public:
+@@ -961,17 +968,21 @@ public:
+ 
+     bool start (int userBufferSizeIn)
+     {
++        streamRunning = false;
+         const auto reservoirSize = nextPowerOfTwo ((int) (actualBufferSize + (UINT32) userBufferSizeIn));
+ 
+         queue = SingleThreadedAbstractFifo (reservoirSize);
+         reservoir.setSize ((size_t) (queue.getSize() * bytesPerFrame), true);
+         xruns = 0;
++        packetsSinceStart = 0;
++        expectedPosition = 0;
+ 
+         if (! check (client->Start()))
+             return false;
+ 
+         purgeInputBuffers();
+         isActive = true;
++        streamRunning = true;
+ 
+         return true;
+     }
+@@ -997,10 +1008,27 @@ public:
+         UINT32 numSamplesAvailable = 0;
+         DWORD flags = 0;
+ 
+-        while (check (captureClient->GetBuffer (&inputData, &numSamplesAvailable, &flags, nullptr, nullptr)) && numSamplesAvailable > 0)
++        UINT64 devicePosition = 0;
++
++        while (check (captureClient->GetBuffer (&inputData, &numSamplesAvailable, &flags, &devicePosition, nullptr)) && numSamplesAvailable > 0)
+         {
+-            if ((flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0)
+-                xruns++;
++            // Riffhouse: Windows flags the first packets after a start as a break whatever happened,
++            // and some USB drivers flag packets that lost nothing. A sound is lost when the device's
++            // own position jumps past the last packet; the flag alone counts only when the driver
++            // gives no position.
++            if (packetsSinceStart > 8)
++            {
++                const bool jumped = devicePosition > 0 && expectedPosition > 0 && devicePosition > expectedPosition + 16;
++                const bool flagged = (flags & AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) != 0;
++                if (flagged && (jumped || devicePosition == 0))
++                    xruns++;
++            }
++
++            ++packetsSinceStart;
++            expectedPosition = devicePosition > 0 ? devicePosition + numSamplesAvailable : 0;
++
++            if (useElastic && numSamplesAvailable > (UINT32) queue.getRemainingSpace())
++                drainToElastic();
+ 
+             if (numSamplesAvailable > (UINT32) queue.getRemainingSpace())
+             {
+@@ -1026,6 +1054,9 @@ public:
+ 
+             captureClient->ReleaseBuffer (numSamplesAvailable);
+         }
++
++        if (useElastic)
++            drainToElastic();
+     }
+ 
+     void copyBuffersFromReservoir (float* const* destBuffers, const int numDestBuffers, const int bufferSize)
+@@ -1055,7 +1086,48 @@ public:
+     ComSmartPtr<IAudioCaptureClient> captureClient;
+     MemoryBlock reservoir;
+     SingleThreadedAbstractFifo queue;
+-    int xruns = 0;
++    int xruns = 0, packetsSinceStart = 0;
++    std::atomic<bool> streamRunning { false }; // Riffhouse: started and purged; the audio thread reads it only then
++    UINT64 expectedPosition = 0;
++
++    // Riffhouse: with a separate output running, input goes straight into a cushion that is read
++    // at the output's pace (see riffhouse_ElasticInput.h), instead of being read only when the
++    // output wanted sound and replaced by silence whenever its packet was late.
++    riffhouse::ElasticInput elastic;
++    bool useElastic = false;
++    AudioBuffer<float> elasticScratch;
++
++    void prepareElastic (int block, int outBurst, double rate)
++    {
++        // input packets: one device period (the shared engine's period, or the exclusive buffer)
++        const int packet = isExclusiveMode (deviceMode)  ? (int) actualBufferSize
++                         : isLowLatencyMode (deviceMode) ? block
++                                                         : jmax (1, refTimeToSamples (defaultPeriodTime > 0 ? defaultPeriodTime : 100000, rate));
++        elastic.prepare (jmax (1, channelMaps.size()), block, packet, outBurst, rate);
++        elasticScratch.setSize (jmax (1, channelMaps.size()), jmax (64, nextPowerOfTwo ((int) actualBufferSize + block)));
++        useElastic = true;
++    }
++
++    int elasticLatency() const noexcept { return useElastic ? elastic.latencyFrames() : 0; }
++
++    void drainToElastic()
++    {
++        const auto now = Time::getMillisecondCounterHiRes() * 0.001;
++
++        for (int n = queue.getNumReadable(); n > 0; n = queue.getNumReadable())
++        {
++            const int chunk = jmin (n, elasticScratch.getNumSamples());
++            copyBuffersFromReservoir (elasticScratch.getArrayOfWritePointers(), elasticScratch.getNumChannels(), chunk);
++            elastic.push (elasticScratch.getArrayOfReadPointers(), elasticScratch.getNumChannels(), chunk, now);
++        }
++    }
++
++    void pullFromElastic (float* const* dest, int numDest, int frames)
++    {
++        if (streamRunning)
++            handleDeviceBuffer(); // whatever has arrived, even with no event yet
++        elastic.pull (dest, numDest, frames, Time::getMillisecondCounterHiRes() * 0.001);
++    }
+ 
+     std::unique_ptr<AudioData::Converter> converter;
+ 
+@@ -1116,6 +1188,8 @@ public:
+         if (! check (client->Start()))
+             return false;
+ 
++        underruns = 0;
++        writesSinceStart = 0;
+         isActive = true;
+ 
+         return true;
+@@ -1137,6 +1211,50 @@ public:
+         return (int) actualBufferSize;
+     }
+ 
++    // Riffhouse: wait for the output, taking in every input packet that arrives meanwhile (JUCE only
++    // did this in shared mode, so in Exclusive Mode input packets were lost while it waited)
++    bool waitForOutput (WASAPIInputDevice* inputDevice, DWORD timeoutMs)
++    {
++        const bool alsoInput = inputDevice != nullptr && inputDevice->streamRunning && inputDevice->clientEvent != nullptr;
++        HANDLE events[2] = { clientEvent, alsoInput ? inputDevice->clientEvent : nullptr };
++        const auto started = Time::getMillisecondCounter();
++
++        for (;;)
++        {
++            const auto waited = Time::getMillisecondCounter() - started; // unsigned: safe across the wrap
++            if (waited >= timeoutMs)
++                return false;
++
++            const auto r = WaitForMultipleObjects (alsoInput ? 2 : 1, events, FALSE, timeoutMs - waited);
++
++            if (r == WAIT_OBJECT_0)
++                return true;
++
++            if (alsoInput && r == WAIT_OBJECT_0 + 1)
++            {
++                inputDevice->handleDeviceBuffer();
++                continue;
++            }
++
++            return false;
++        }
++    }
++
++    int underruns = 0;
++    int writesSinceStart = 0;
++    int sharedQueue = 0; // Riffhouse: most frames kept queued in shared mode (0 = the whole buffer)
++
++    // shared mode filled Windows' whole buffer (about 20 ms) ahead of time; a period plus one
++    // callback is enough to never run dry and is half the delay
++    int sharedRoom (int available) const noexcept
++    {
++        if (isExclusiveMode (deviceMode) || sharedQueue <= 0)
++            return available;
++
++        const int queued = (int) actualBufferSize - available;
++        return jlimit (0, available, sharedQueue - queued);
++    }
++
+     void copyBuffers (const float* const* srcBuffers, int numSrcBuffers, int bufferSize,
+                       WASAPIInputDevice* inputDevice, Thread& thread)
+     {
+@@ -1148,22 +1266,28 @@ public:
+         while (bufferSize > 0)
+         {
+             // This is needed in order not to drop any input data if the output device endpoint buffer was full
+-            if ((! isExclusiveMode (deviceMode)) && inputDevice != nullptr
+-                  && WaitForSingleObject (inputDevice->clientEvent, 0) == WAIT_OBJECT_0)
++            if (inputDevice != nullptr && WaitForSingleObject (inputDevice->clientEvent, 0) == WAIT_OBJECT_0)
+                 inputDevice->handleDeviceBuffer();
+ 
+-            int samplesToDo = jmin (getNumSamplesAvailableToCopy(), bufferSize);
++            const int available = getNumSamplesAvailableToCopy();
++            int samplesToDo = jmin (sharedRoom (available), bufferSize);
++
++            // Riffhouse: in shared mode an empty output buffer means Windows already played silence
++            // (plain shared mode only, where the buffer holds two periods or more)
++            ++writesSinceStart;
++            if (sharedQueue > 0 && writesSinceStart > 50 && available >= (int) actualBufferSize)
++                ++underruns;
+ 
+             if (samplesToDo == 0)
+             {
+                 // This can ONLY occur in non-exclusive mode
+-                if (! thread.threadShouldExit() && WaitForSingleObject (clientEvent, 1000) == WAIT_OBJECT_0)
++                if (! thread.threadShouldExit() && waitForOutput (inputDevice, 1000))
+                     continue;
+ 
+                 break;
+             }
+ 
+-            if (isExclusiveMode (deviceMode) && WaitForSingleObject (clientEvent, 1000) == WAIT_TIMEOUT)
++            if (isExclusiveMode (deviceMode) && ! waitForOutput (inputDevice, 1000))
+                 break;
+ 
+             const auto numChannelsToCopy = jmin (actualNumChannels, numSrcBuffers);
+@@ -1232,6 +1356,17 @@ public:
                  minBufferSize = jmax (inputDevice->minBufferSize, outputDevice->minBufferSize);
                  defaultBufferSize = jmax (inputDevice->defaultBufferSize, outputDevice->defaultBufferSize);
  
@@ -38,10 +255,62 @@ index 3c815cb..d79f480 100644
                  if (isLowLatencyMode (deviceMode))
                  {
                      lowLatencyMaxBufferSize = jmin (inputDevice->lowLatencyMaxBufferSize, outputDevice->lowLatencyMaxBufferSize);
-@@ -1355,6 +1370,21 @@ public:
+@@ -1343,7 +1478,15 @@ public:
+     BigInteger getActiveOutputChannels() const override     { return outputDevice != nullptr ? outputDevice->channels : BigInteger(); }
+     BigInteger getActiveInputChannels() const override      { return inputDevice  != nullptr ? inputDevice->channels  : BigInteger(); }
+     String getLastError() override                          { return lastError; }
+-    int getXRunCount() const noexcept override              { return inputDevice != nullptr ? inputDevice->xruns : -1; }
++    // Riffhouse: every gap anyone hears, not only input packets Windows flagged as lost
++    int getXRunCount() const noexcept override
++    {
++        if (inputDevice == nullptr && outputDevice == nullptr)
++            return -1;
++
++        return (inputDevice != nullptr ? inputDevice->xruns + (inputDevice->useElastic ? inputDevice->elastic.glitches() : 0) : 0)
++             + (outputDevice != nullptr ? outputDevice->underruns : 0);
++    }
+ 
+     std::optional<BigInteger> getDefaultOutputChannels() const override
+     {
+@@ -1355,6 +1498,56 @@ public:
          return inputDevice != nullptr ? inputDevice->getDefaultLayout() : std::nullopt;
      }
  
++    // Riffhouse: true when both endpoints belong to one piece of hardware (one clock), by Windows'
++    // container id; unknown counts as different, which only costs the cushion's small delay
++    static bool sameHardware (IMMDevice* a, IMMDevice* b)
++    {
++        auto containerOf = [] (IMMDevice* d) -> String
++        {
++            if (d == nullptr)
++                return {};
++
++            ComSmartPtr<IPropertyStore> properties;
++
++            if (! check (d->OpenPropertyStore (STGM_READ, properties.resetAndGetPointerAddress())))
++                return {};
++
++            PROPVARIANT value;
++            zerostruct (value);
++            const PROPERTYKEY PKEY_Device_ContainerId
++                = { { 0x8c7ed206, 0x3f8a, 0x4827, { 0xb3, 0xab, 0xae, 0x9e, 0x1f, 0xae, 0xfc, 0x6c } }, 2 };
++            String id;
++
++            if (check (properties->GetValue (PKEY_Device_ContainerId, &value)) && value.vt == VT_CLSID && value.puuid != nullptr)
++            {
++                const auto& g = *value.puuid;
++                id = String::toHexString ((int) g.Data1) + String::toHexString ((int) g.Data2) + String::toHexString ((int) g.Data3)
++                   + String::toHexString (g.Data4, 8, 0);
++            }
++
++            PropVariantClear (&value);
++            return id;
++        };
++
++        const auto ia = containerOf (a), ib = containerOf (b);
++        return ia.isNotEmpty() && ia == ib;
++    }
++
 +    // Riffhouse: the smallest buffer at the rate that will run (see the note in scan)
 +    int minBufferSizeAt (double rate) const
 +    {
@@ -60,7 +329,7 @@ index 3c815cb..d79f480 100644
      String open (const BigInteger& inputChannels, const BigInteger& outputChannels,
                   double sampleRate, int bufferSizeSamples) override
      {
-@@ -1367,8 +1397,8 @@ public:
+@@ -1367,8 +1560,8 @@ public:
              return lastError;
          }
  
@@ -70,3 +339,83 @@ index 3c815cb..d79f480 100644
          lastKnownInputChannels    = inputChannels;
          lastKnownOutputChannels   = outputChannels;
  
+@@ -1402,6 +1595,34 @@ public:
+         if (inputDevice != nullptr)   ResetEvent (inputDevice->clientEvent);
+         if (outputDevice != nullptr)  ResetEvent (outputDevice->clientEvent);
+ 
++        // Riffhouse: an input with an output gets the cushion; it is ready before the thread runs
++        if (inputDevice != nullptr)
++        {
++            inputDevice->useElastic = false;
++
++            // one interface runs its input and output on one clock: no cushion, no added delay
++            if (outputDevice != nullptr && inputDevice->client != nullptr && outputDevice->client != nullptr
++                && ! sameHardware (inputDevice->device, outputDevice->device))
++            {
++                const int outBurst = isExclusiveMode (deviceMode)  ? (int) outputDevice->actualBufferSize
++                                   : isLowLatencyMode (deviceMode) ? currentBufferSizeSamples
++                                                                  : jmax (1, refTimeToSamples (outputDevice->defaultPeriodTime > 0 ? outputDevice->defaultPeriodTime : 100000,
++                                                                                               currentSampleRate));
++                inputDevice->prepareElastic (currentBufferSizeSamples, outBurst, currentSampleRate);
++            }
++        }
++
++        if (outputDevice != nullptr)
++        {
++            outputDevice->sharedQueue = 0;
++
++            if (! isExclusiveMode (deviceMode) && ! isLowLatencyMode (deviceMode))
++            {
++                const int period = jmax (1, refTimeToSamples (outputDevice->defaultPeriodTime > 0 ? outputDevice->defaultPeriodTime : 100000, currentSampleRate));
++                outputDevice->sharedQueue = jmin ((int) outputDevice->actualBufferSize, period + currentBufferSizeSamples + 32);
++            }
++        }
++
+         // No lock here; background thread is not running
+         flags &= ~(flagShutdown | flagSampleRateChanged);
+ 
+@@ -1410,7 +1631,7 @@ public:
+ 
+         if (inputDevice != nullptr && inputDevice->client != nullptr)
+         {
+-            latencyIn = (int) (inputDevice->latencySamples + currentBufferSizeSamples);
++            latencyIn = (int) (inputDevice->latencySamples + currentBufferSizeSamples + inputDevice->elasticLatency());
+ 
+             if (! inputDevice->start (currentBufferSizeSamples))
+             {
+@@ -1422,7 +1643,7 @@ public:
+ 
+         if (outputDevice != nullptr && outputDevice->client != nullptr)
+         {
+-            latencyOut = (int) (outputDevice->latencySamples + currentBufferSizeSamples);
++            latencyOut = (int) (outputDevice->latencySamples + (outputDevice->sharedQueue > 0 ? outputDevice->sharedQueue : currentBufferSizeSamples));
+ 
+             if (! outputDevice->start())
+             {
+@@ -1561,13 +1782,25 @@ public:
+                     if (inputDevice->getNumSamplesInReservoir() < bufferSize)
+                         continue;
+                 }
++                else if (inputDevice->useElastic)
++                {
++                    inputDevice->pullFromElastic (ins.getArrayOfWritePointers(), numInputBuffers, bufferSize);
++                }
+                 else
+                 {
+                     if (isExclusiveMode (deviceMode) && WaitForSingleObject (inputDevice->clientEvent, 0) == WAIT_OBJECT_0)
+                         inputDevice->handleDeviceBuffer();
+                 }
+ 
+-                inputDevice->copyBuffersFromReservoir (ins.getArrayOfWritePointers(), numInputBuffers, bufferSize);
++                if (! inputDevice->useElastic)
++                {
++                    // Riffhouse: input that had not arrived is played as silence: that is a gap
++                    if (outputDevice != nullptr && inputDevice->streamRunning && inputDevice->packetsSinceStart > 8
++                        && inputDevice->getNumSamplesInReservoir() < bufferSize)
++                        ++inputDevice->xruns;
++
++                    inputDevice->copyBuffersFromReservoir (ins.getArrayOfWritePointers(), numInputBuffers, bufferSize);
++                }
+ 
+                 if (inputDevice->sampleRateHasChanged)
+                 {

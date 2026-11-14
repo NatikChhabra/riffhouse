@@ -621,8 +621,6 @@ void RiffhouseProcessor::applyPreset (const Preset& p)
     for (const auto& s : paramSpecs())
         if (! belongsToSetup (s.id))
             setValue (s.id, p.values[(size_t) s.id]);
-    // high-gain presets need the gate: keep the user's calibrated threshold,
-    // but switch the gate on if the preset asks for it
 }
 
 void RiffhouseProcessor::loadPreset (int index)

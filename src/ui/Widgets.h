@@ -31,8 +31,15 @@ public:
     void setGear (KnobStyle, juce::Colour cap, juce::Colour ink, Face face, bool upper);
     bool capsLabel = false; // letter it like the app's frame, not like a piece of gear
     void setNumbers (bool on) { slider.getProperties().set ("numbers", on); } // 0 to 10 round the knob, like an amp panel
+    // Click the name or number under the knob to type a value: Enter sets it, Escape leaves it.
+    void mouseUp (const juce::MouseEvent&) override;
+    void startTyping();
+    bool isTyping() const noexcept { return typing != nullptr; }
 
 private:
+    std::unique_ptr<juce::TextEditor> typing;
+    void endTyping (bool keep);
+    juce::Rectangle<int> labelArea() const { return getLocalBounds().reduced (spill).removeFromBottom (labelH); }
     struct S : juce::Slider
     {
         std::function<void()> onHover;

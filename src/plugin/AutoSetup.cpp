@@ -14,6 +14,7 @@ namespace
 {
     constexpr float kHeardThreshold = 0.0032f; // -50 dBFS: something is playing
     constexpr float kSureThreshold = 0.063f;   // -24 dBFS: that is definitely a guitar
+    constexpr float kMostLevelLossDb = 16.0f;  // a mode hearing the guitar this much quieter loses Windows' boost
     constexpr double kDwellMs = 1100.0;
     constexpr double kTuneMs = 1600.0;
     constexpr double kQuietMs = 2600.0;
@@ -420,6 +421,8 @@ void AutoSetup::timerCallback()
             if (elapsed > 300.0)
             {
                 if (xrunStart < 0) xrunStart = dm.getXRunCount();
+                if (modePeakFor != modeIndex) { modePeakFor = modeIndex; modePeak = 0.0f; }
+                modePeak = std::max (modePeak, raw);
                 tunePeak = std::max (tunePeak, raw);
                 strumPeak = std::max (strumPeak, raw);
                 cpuMax = std::max (cpuMax, dm.getCpuUsage());
@@ -431,7 +434,23 @@ void AutoSetup::timerCallback()
             auto* dev = dm.getCurrentAudioDevice();
             const bool ok = ! lastOpenFailed && dev != nullptr && xr <= 0 && cpuMax < 0.7 && tunePeak > 1.0e-7f;
             bool settled = false;
-            if (ok)
+            // Some inputs come in far quieter with the sound card to ourselves: Exclusive Mode skips
+            // the level and boost Windows applies (a USB guitar input measured 20 dB down, with the
+            // same hiss), and the boost that makes up for it turns the hiss into fizz. The guitar was
+            // found in Windows' own mode, so a mode that hears it much quieter is not used.
+            const float quieterDb = juce::Decibels::gainToDecibels (chosenPeak, -100.0f) - juce::Decibels::gainToDecibels (modePeak, -100.0f);
+            // judged only on real playing in this mode too: a pause is not a quiet input
+            const bool losesLevel = ok && chosen.type == "Windows Audio" && modes[modeIndex] != "Windows Audio"
+                                    && chosenPeak > kHeardThreshold && modePeak > kHeardThreshold && quieterDb > kMostLevelLossDb;
+            if (losesLevel)
+            {
+                devlog::note (modes[modeIndex] + " hears the guitar " + juce::String (quieterDb, 1)
+                              + " dB quieter than Windows Audio: not used, its boost would only add hiss");
+                result.quieterModeSkipped = true;
+                ++modeIndex;
+                bufferIndex = 0;
+            }
+            else if (ok)
             {
                 const double lat = measuredLatencyMs();
                 if (lat < best.latency)
@@ -534,6 +553,8 @@ void AutoSetup::beginTuning()
 
     modeIndex = 0;
     bufferIndex = 0;
+    modePeakFor = -1;
+    modePeak = 0.0f;
     while (modeIndex < modes.size() && ! (openMode (modes[modeIndex], 0) && ! buffers.isEmpty()))
         ++modeIndex;
     if (modeIndex >= modes.size()) { finishTuning(); return; }
@@ -721,10 +742,22 @@ void AutoSetup::startNoise()
 
 void AutoSetup::finish()
 {
-    // a high percentile ignores a single accidental bump
-    std::vector<float> v (noiseSamples.begin(), noiseSamples.end());
-    std::sort (v.begin(), v.end());
-    const float noise = v.empty() ? 0.0f : v[(size_t) ((double) (v.size() - 1) * 0.9)];
+    // A high percentile ignores a single accidental bump, taken over the quietest third of
+    // the wait: strings still ringing when it began fade through the first part, and 0.1.5.1
+    // took that ring for hiss (a -42 dB gate over a -78 dB floor, notes cut while they rang).
+    // Hiss holds its level, so its quietest third is all of it.
+    float noise = 0.0f;
+    if (! noiseSamples.isEmpty())
+    {
+        const int n = noiseSamples.size(), span = std::max (1, n / 3);
+        noise = 1.0e9f;
+        for (int at = 0; at + span <= n; ++at)
+        {
+            std::vector<float> v (noiseSamples.begin() + at, noiseSamples.begin() + at + span);
+            std::sort (v.begin(), v.end());
+            noise = std::min (noise, v[(size_t) ((double) (v.size() - 1) * 0.9)]);
+        }
+    }
     result.noiseDb = juce::Decibels::gainToDecibels (noise, -100.0f);
 
     // Input Fix brings the input's hiss up with the treble. When that leaves more hiss than
