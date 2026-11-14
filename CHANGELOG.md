@@ -6,6 +6,10 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
+## Unreleased
+
+- The weekly player count now counts only players. Test machines and copies built from source send nothing, so the number is people, not our checks.
+
 ## 0.1.5.2 (0.1.5 Hotfix 2)
 
 The second hotfix for 0.1.5, tested on a real player's PC with a USB guitar input and separate USB headphones.

@@ -570,6 +570,10 @@ void runDeviceChecks (int& checks, int& failures)
         CHECK (reports::weekOf (juce::Time (2026, 10, 12, 12, 0)) == "2026-W46", "12 November 2026 is in week 46 (%s)", reports::weekOf (juce::Time (2026, 10, 12, 12, 0)).toRawUTF8());
         CHECK (reports::weekOf (juce::Time (2027, 0, 1, 12, 0)) == "2026-W53", "1 January 2027 still belongs to 2026's last week (%s)", reports::weekOf (juce::Time (2027, 0, 1, 12, 0)).toRawUTF8());
         CHECK (reports::weekOf (juce::Time (2026, 0, 1, 12, 0)) == "2026-W01", "1 January 2026, a Thursday, starts week 1");
+        CHECK (reports::countsAsPlayer ("0.1.5.2", false), "a release copy on a player's PC is counted");
+        CHECK (! reports::countsAsPlayer ("0.1.5.2", true), "the same copy on a test machine is not");
+        CHECK (! reports::countsAsPlayer ("0.1.4-dev.43e3e38", false), "a build from source is not");
+        CHECK (! reports::countsAsPlayer ("0.0.0-dev (built from source)", false), "nor one without a version");
         {
             // the weekly count: on by default, a random id made once and kept, and nothing else in what is sent
             const auto file = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-hello-test.settings");
