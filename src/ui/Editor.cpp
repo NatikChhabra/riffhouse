@@ -376,6 +376,17 @@ public:
         tunerButton.onClick = [this] { toggleOverlay (tuner); };
         metroButton.setTooltip ("Metronome");
         metroButton.onClick = [this] { showPopover (metroPanel, metroButton.getBounds(), 300, 274); };
+        // beside the name, out of the way of playing: say what is wrong, and a quiet thank-you
+        feedbackButton.setTooltip ("Send feedback: tell us what to fix");
+        feedbackButton.onClick = [this] { showPopover (feedbackDialog, feedbackButton.getBounds(), 420, 324); };
+        supportButton.setTooltip ("Support Riffhouse. Everyone gets the same app; supporting is a thank-you, not a purchase.");
+        supportButton.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
+        for (auto* b : { &feedbackButton, &supportButton })
+        {
+            b->drawBackground = false;
+            addAndMakeVisible (*b);
+        }
+        feedbackDialog.onDone = [this] (juce::String m) { closeOverlays(); editor.showToast (m); };
         settingsButton.setTooltip ("Settings");
         settingsButton.onClick = [this] { toggleOverlay (settings); };
         recordOptions.setTooltip ("Recording options and play-along");
@@ -466,7 +477,7 @@ public:
         scrim.onClick = [this] { closePopovers(); };
         for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings,
                                     (juce::Component*) &takesView, (juce::Component*) &sheetView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel, (juce::Component*) &looperPanel,
-                                    (juce::Component*) &saveDialog })
+                                    (juce::Component*) &saveDialog, (juce::Component*) &feedbackDialog })
             addChildComponent (c);
         addChildComponent (dropHint);
         addChildComponent (toast);
@@ -667,7 +678,7 @@ public:
     void closePopovers()
     {
         scrim.setVisible (false);
-        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog })
+        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog, (Popover*) &feedbackDialog })
             p->setVisible (false);
     }
 
@@ -817,6 +828,9 @@ public:
         // top bar: name on the left, the tone in the middle, tools on the right
         auto top = juce::Rectangle<int> (0, 0, getWidth(), topH).reduced (24, 10);
         logoArea = top.removeFromLeft (180);
+        top.removeFromLeft (4);
+        feedbackButton.setBounds (top.removeFromLeft (34));
+        supportButton.setBounds (top.removeFromLeft (34));
         settingsButton.setBounds (top.removeFromRight (36));
         top.removeFromRight (6);
         recordOptions.setBounds (top.removeFromRight (18));
@@ -966,6 +980,7 @@ public:
     IconButton undoButton { icons::undo() }, redoButton { icons::redo() }, loopButton { icons::loop() };
     int historyTicks = 0;
     IconButton sheetButton { icons::chordBox() };
+    IconButton feedbackButton { icons::message() }, supportButton { icons::heart() };
     IconButton tunerButton { icons::tuningFork() }, metroButton { icons::metronome(), "100" }, settingsButton { icons::gear() };
     RecordButton record;
     IconButton recordOptions { icons::chevronDown() };
@@ -987,6 +1002,7 @@ public:
     MetronomePanel metroPanel;
     LooperPanel looperPanel;
     SaveDialog saveDialog;
+    FeedbackDialog feedbackDialog;
     Toast toast;
     DropHint dropHint;
     NoticeBar noticeBar;
@@ -1004,7 +1020,8 @@ public:
                      inSettings { settings, motion::Enter::rise }, inTakes { takesView, motion::Enter::rise },
                      inScrim { scrim, motion::Enter::fade },
                      inRecord { recordPanel, motion::Enter::drop }, inMetro { metroPanel, motion::Enter::drop },
-                     inLooper { looperPanel, motion::Enter::drop }, inSave { saveDialog, motion::Enter::drop };
+                     inLooper { looperPanel, motion::Enter::drop }, inSave { saveDialog, motion::Enter::drop },
+                     inFeedback { feedbackDialog, motion::Enter::drop };
 
     juce::String lastStatus;
     bool demoLevels = false;
@@ -2032,6 +2049,9 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     r.closePopovers();
     r.showPopover (r.saveDialog, r.saveButton.getBounds(), 360, 206);
     shoot ("save");
+    r.closePopovers();
+    r.showPopover (r.feedbackDialog, r.feedbackButton.getBounds(), 420, 324);
+    shoot ("feedback");
     r.closePopovers();
     {
         SetupWizard w (proc);
