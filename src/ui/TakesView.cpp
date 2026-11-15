@@ -230,9 +230,19 @@ void TakesView::paint (juce::Graphics& g)
                 r.removeFromTop (24), juce::Justification::centredLeft, true);
     if (takes.empty())
     {
-        g.setFont (font (16.0f));
-        g.drawFittedText ("No takes yet. Press R, or the REC button, and play something.",
-                          list.getBounds().withHeight (140), juce::Justification::centred, 2, 1.0f);
+        // a record button, unlit, standing where the first take will be
+        const auto area = list.getBounds().withHeight (190).toFloat();
+        const auto c = juce::Point<float> (area.getCentreX(), area.getY() + 56.0f);
+        g.setColour (colours::line.brighter (0.15f));
+        g.drawEllipse (juce::Rectangle<float> (64.0f, 64.0f).withCentre (c), 2.0f);
+        g.setColour (colours::record.withAlpha (0.6f));
+        g.fillEllipse (juce::Rectangle<float> (26.0f, 26.0f).withCentre (c));
+        g.setColour (colours::text);
+        g.setFont (font (17.0f, Weight::semibold));
+        g.drawText ("No takes yet", area.withTrimmedTop (104.0f).removeFromTop (26.0f), juce::Justification::centred);
+        g.setColour (colours::textDim);
+        g.setFont (font (14.5f));
+        g.drawText ("Press R, or the REC button, and play something.", area.withTrimmedTop (132.0f).removeFromTop (24.0f), juce::Justification::centred);
     }
 }
 
