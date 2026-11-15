@@ -2306,9 +2306,11 @@ void testNeural (double sr)
 
 // Measured 3.6 with every pedal on (GCC, November 2026), then 4.9 to 5.5 once the default
 // drive pedal became its real circuit, solved at 8x (0.1.5), and 4.0 to 5.7 with the amp at 4x
-// and its curves antialiased. The budget leaves room for a
-// different compiler and a noisy machine, and still catches a rig that got a fifth slower.
-constexpr double kRigCostBudget = 6.0;
+// and its curves antialiased. Update 1's real amp captures cost a tenth more than the circuit
+// models they replace (5.29 against 4.80 on GCC, 6.17 on the Windows build, Tight Metal), so the
+// budget moved from 6.0 by that same tenth. It leaves room for a different compiler and a noisy
+// machine, and still catches a rig that got a fifth slower.
+constexpr double kRigCostBudget = 6.6;
 
 // A fixed piece of arithmetic of the kind the rig is made of, timed on the same machine
 // at the same moment. Shared build machines differ by a factor of two and more from
@@ -2686,6 +2688,14 @@ void testCpu (double sr)
     const double ref = referenceSeconds (sr, length);
     const double cost = took / ref;
     std::printf ("  every pedal on, 64-sample blocks: %.1fx realtime, %.2f times the reference load\n", rt, cost);
+    {
+        // the same rig with the circuit model the capture replaces, for the record
+        Rig::circuitModelsOnly = true;
+        double circuit = 1.0e9;
+        for (int attempt = 0; attempt < 3; ++attempt) circuit = std::min (circuit, renderWith (v, di, sr, 64).seconds);
+        Rig::circuitModelsOnly = false;
+        std::printf ("  the same with the circuit model instead of the capture: %.2f times the reference load\n", circuit / ref);
+    }
     // Two checks. The first holds on any machine: a change that makes the rig slower shows
     // up as a higher cost against the reference. The second is the floor for playing live.
     CHECK (cost < kRigCostBudget, "the rig got slower: %.2f times the reference load (budget %.2f)", cost, kRigCostBudget);
