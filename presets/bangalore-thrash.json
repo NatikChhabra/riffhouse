@@ -19,7 +19,7 @@
     "amp_master": 5,
     "amp_level": 0.0,
     "cab_on": true,
-    "cab_model": "4x12 Vintage",
+    "cab_model": "4x12 Real Classic",
     "cab_mic": 3,
     "cab_distance": 1.5,
     "cab_lowcut": 60,
@@ -33,6 +33,6 @@
     "gate_thresh": -56,
     "gate_release": 50,
     "rev_on": false,
-    "out_level": -4.4
+    "out_level": -1.4
   }
 }

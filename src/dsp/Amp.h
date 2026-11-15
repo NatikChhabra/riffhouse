@@ -40,6 +40,18 @@ struct AmpVoicing
     float lowMidHz = 250.0f, lowMidDb = 0.0f, topHz = 5000.0f, topDb = 0.0f;
     // and the weight a real amp's power section puts under the speaker's low resonance
     float lowHz = 110.0f, lowDb = 0.0f;
+    // Each preamp stage's cathode, partly bypassed: below stageShelfHz the stage has
+    // stageShelfDb less gain, so the low strings reach the clipping with less weight while
+    // their upper partials do the clipping (the chug of a real high-gain preamp, not the
+    // wool of a fuzz). 0 dB leaves a stage fully bypassed.
+    float stageShelfHz[5] {}, stageShelfDb[5] {};
+    // The gain knob as a real audio-taper pot (amplitude follows the knob squared, so the
+    // drive builds fast low on the knob and gently near the top): gainMaxDb at 10. At 0 the
+    // track itself is 68 dB down and gainMinDb leaks past it on top of that, so knob 0 sits
+    // at gainMinDb or a little above it. A high-gain preamp is fully clipping over most of that span, as the
+    // real amps are (their captures hold their level from full input to 24 dB below it).
+    // 0 keeps the knob linear in dB from gainMinDb to gainMaxDb.
+    float gainTaper = 0.0f;
 };
 
 const AmpVoicing& ampVoicing (int model);
@@ -75,8 +87,8 @@ private:
 
     struct Stage
     {
-        OnePole hp, lp;
-        float gain = 1.0f, bias = 0.0f;
+        OnePole hp, lp, shelf;
+        float gain = 1.0f, bias = 0.0f, shelfCut = 0.0f; // shelfCut: 1 - the gain left below the shelf
         AaState last; // where the stage's curve was a sample ago, for the antialiasing
         EnvelopeFollower blocking;
     };
@@ -100,6 +112,7 @@ private:
     DcBlocker dcPre, dcPost;
     Smoother preGain, masterGain, outGain;
     float stackMakeup = 1.0f;
+    bool postOn = false;
 
     // The tone knobs (bass, mid, treble, presence, depth, and gain for the bright cap) glide to
     // where they are turned, the filters following every 32 samples: a filter that jumps clicks.

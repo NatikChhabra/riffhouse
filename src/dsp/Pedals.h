@@ -473,6 +473,10 @@ private:
     Smoother wobS, radioS, mixS, bitsS;
     float radioNow = -1.0f, radioTarget = 0.0f;
     void setRadio (float rd);
+    // Downsample glides too, its filter and hold step following it every 16 samples
+    Smoother downS;
+    float down = 0.0f, downNow = -1.0f;
+    void setDown (float d);
 };
 
 class Doubler

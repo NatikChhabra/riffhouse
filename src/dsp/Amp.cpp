@@ -25,18 +25,22 @@ namespace
         { "Brit 68", 30.0f, 6.0f, -14.0f, 22.0f, 3,
           { 1, 16, 1.2f, 1, 1 }, { 0.20f, 0.18f, 0.05f, 0, 0 }, { 30, 90, 40, 0, 0 }, { 12000, 11250, 14000, 0, 0 },
           false, british, 750.0f, 1.6f, 0.02f, 0.25f, 3500.0f, 100.0f, 60.0f, 10500.0f, -3.2f },
-        { "Brit 81", 40.0f, 4.0f, -40.0f, 20.0f, 4,
-          { 1, 22, 12, 1.2f, 1 }, { 0.25f, 0.35f, 0.15f, 0.05f, 0 }, { 40, 120, 90, 40, 0 }, { 16000, 14000, 12500, 16000, 0 },
-          false, british, 700.0f, 1.3f, 0.02f, 0.20f, 3200.0f, 100.0f, 70.0f, 12000.0f, -2.9f, 210.0f, -7.5f },
-        { "Redline Lead", 40.0f, 2.0f, -46.0f, 16.0f, 5,
-          { 1, 20, 14, 8, 1.2f }, { 0.25f, 0.30f, 0.20f, 0.10f, 0.05f }, { 40, 150, 120, 80, 40 }, { 17000, 15000, 14000, 14000, 17000 },
-          false, britishHot, 650.0f, 1.2f, 0.02f, 0.20f, 3000.0f, 95.0f, 70.0f, 13000.0f, -3.4f, 300.0f, -9.0f },
-        { "Modern High Gain", 30.0f, 1.0f, -48.0f, 16.0f, 5,
-          { 1, 22, 16, 10, 1.2f }, { 0.20f, 0.30f, 0.25f, 0.10f, 0.05f }, { 30, 70, 60, 50, 30 }, { 18000, 17000, 16000, 16000, 18000 },
-          false, modern, 550.0f, 1.6f, 0.0f, 0.40f, 3500.0f, 80.0f, 45.0f, 14000.0f, -7.6f, 230.0f, -5.0f, 5000.0f, 7.0f, 110.0f, 4.0f },
-        { "Tight Metal", 60.0f, 2.0f, -46.0f, 18.0f, 5,
-          { 1, 25, 18, 10, 1.2f }, { 0.20f, 0.30f, 0.20f, 0.10f, 0.05f }, { 60, 130, 100, 70, 40 }, { 18000, 17000, 16000, 16000, 18000 },
-          false, modern, 650.0f, 1.3f, 0.0f, 0.15f, 3800.0f, 90.0f, 60.0f, 14000.0f, -6.1f, 240.0f, -4.0f, 4500.0f, 6.0f, 100.0f, 5.0f },
+        { "Brit 81", 40.0f, 4.0f, -62.0f, 6.3f, 4,
+          { 1, 22.7f, 21.8f, 12.3f, 1 }, { 0.25f, 0.35f, 0.15f, 0.05f, 0 }, { 41, 54, 120, 60, 0 }, { 7150, 8790, 1740, 5750, 0 },
+          false, british, 700.0f, 1.3f, 0.02f, 0.20f, 3200.0f, 100.0f, 70.0f, 12000.0f, -4.9f, 210.0f, -3.8f, 5000.0f, 2.4f, 110.0f, 3.0f,
+          { 90, 210, 90, 80, 0 }, { 0, 12.3f, 0, 0, 0 }, 2.0f },
+        { "Redline Lead", 40.0f, 2.0f, -41.0f, 1.6f, 5,
+          { 1, 15.6f, 9.2f, 3.3f, 3.2f }, { 0.25f, 0.30f, 0.20f, 0.10f, 0.05f }, { 65, 96, 91, 46, 26 }, { 6950, 10320, 6630, 12640, 9100 },
+          false, britishHot, 650.0f, 1.2f, 0.02f, 0.20f, 3000.0f, 95.0f, 70.0f, 13000.0f, -5.4f, 300.0f, -8.6f, 5000.0f, 2.3f, 110.0f, 3.9f,
+          { 500, 520, 600, 100, 140 }, { 4.2f, 8.1f, 2.9f, 0, 7.4f }, 2.0f },
+        { "Modern High Gain", 30.0f, 1.0f, -67.4f, 0.9f, 5,
+          { 1, 29.9f, 27.4f, 14.1f, 15.9f }, { 0.20f, 0.30f, 0.25f, 0.10f, 0.05f }, { 13, 206, 165, 37, 25 }, { 5630, 6820, 7450, 9260, 12040 },
+          false, modern, 550.0f, 1.6f, 0.0f, 0.40f, 3500.0f, 80.0f, 45.0f, 14000.0f, -9.5f, 230.0f, 0.2f, 5000.0f, 5.4f, 110.0f, 8.5f,
+          { 480, 130, 530, 290, 160 }, { 7.3f, 0, 0, 1.9f, 0 }, 2.0f },
+        { "Tight Metal", 60.0f, 2.0f, -65.4f, 2.9f, 5,
+          { 1, 8.3f, 9.6f, 44.5f, 58.3f }, { 0.20f, 0.30f, 0.20f, 0.10f, 0.05f }, { 52, 357, 326, 26, 12 }, { 2610, 6870, 8950, 2600, 16270 },
+          false, modern, 650.0f, 1.3f, 0.0f, 0.15f, 3800.0f, 90.0f, 60.0f, 14000.0f, -7.6f, 240.0f, -1.3f, 4500.0f, 4.2f, 100.0f, 9.0f,
+          { 40, 610, 230, 500, 490 }, { 3.3f, 3.9f, 5.1f, 4.2f, 3.3f }, 2.0f },
         { "Bass Station", 15.0f, 0.0f, -10.0f, 18.0f, 2,
           { 1, 8, 1, 1, 1 }, { 0.15f, 0.10f, 0, 0, 0 }, { 15, 20, 0, 0, 0 }, { 12000, 11250, 0, 0, 0 },
           true, american, 500.0f, 1.2f, 0.0f, 0.30f, 5000.0f, 60.0f, 28.0f, 9000.0f, 1.8f },
@@ -97,7 +101,7 @@ void Amp::reset()
     bright.reset(); midBoost.reset(); lowMid.reset(); top.reset(); low.reset(); presence.reset(); depth.reset(); outHp.reset(); outLp.reset(); antiFizz.reset();
     baxLow.reset(); baxMid.reset(); baxHigh.reset();
     stack.reset();
-    for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.blocking.reset(); s.last = {}; }
+    for (auto& s : stages) { s.hp.reset(); s.lp.reset(); s.shelf.reset(); s.blocking.reset(); s.last = {}; }
     powerLast = {};
     for (auto& t : tubes) t.reset();
     supply.reset();
@@ -131,7 +135,15 @@ void Amp::updateFilters()
     v = &ampVoicing (settings.model);
 
     const float g01 = clamp01 (settings.gain / 10.0f);
-    preGain.setTarget (dbToGain (lerp (v->gainMinDb, v->gainMaxDb, g01)));
+    float gainDb = lerp (v->gainMinDb, v->gainMaxDb, g01);
+    if (v->gainTaper > 0.0f)
+    {
+        // the pot's track plus the little that leaks past it at 0 (gainMinDb)
+        const float track = std::pow ((g01 + 0.02f) / 1.02f, v->gainTaper);
+        const float leak = dbToGain (v->gainMinDb - v->gainMaxDb);
+        gainDb = v->gainMaxDb + gainToDb (leak + (1.0f - leak) * track);
+    }
+    preGain.setTarget (dbToGain (gainDb));
     masterGain.setTarget (dbToGain (lerp (-18.0f, 6.0f, clamp01 (settings.master / 10.0f))));
     outGain.setTarget (dbToGain (v->trimDb + settings.levelDb));
 
@@ -144,6 +156,8 @@ void Amp::updateFilters()
         st.bias = v->stageBias[i];
         st.hp.setCutoff (osr, std::max (5.0f, v->stageHpHz[i]));
         st.lp.setCutoff (osr, v->stageLpHz[i] > 0 ? v->stageLpHz[i] : 20000.0f);
+        st.shelf.setCutoff (osr, v->stageShelfHz[i] > 0 ? v->stageShelfHz[i] : 100.0f);
+        st.shelfCut = v->stageShelfHz[i] > 0 ? 1.0f - dbToGain (-std::max (0.0f, v->stageShelfDb[i])) : 0.0f;
 
         // The same stage as a real triode. The coupling capacitor into a 1 MOhm grid leak sets
         // how tight it is; the grid stopper against the tube's input capacitance sets where the
@@ -193,6 +207,7 @@ void Amp::updateFilters()
     outHp.set (Biquad::Type::highpass, osr, v->outputHpHz, 0.6);
     outLp.set (Biquad::Type::lowpass, osr, v->outputLpHz, 0.6);
     antiFizz.set (Biquad::Type::lowpass, osr, std::min (16000.0, 0.45 * sr), 0.5);
+    postOn = v->lowMidDb != 0.0f || v->topDb != 0.0f || v->lowDb != 0.0f;
     lowMid.set (Biquad::Type::peak, osr, v->lowMidHz, 0.8, v->lowMidDb);
     top.set (Biquad::Type::highShelf, osr, v->topHz, 0.7, v->topDb);
     low.set (Biquad::Type::peak, osr, v->lowHz, 0.9, v->lowDb);
@@ -344,6 +359,8 @@ void Amp::process (float* data, int n)
             // squashy, dynamic feel when you dig in. Kept gentle: more than this and a
             // high-gain amp turns darker and quieter as you dig in, which real ones never do
             // (measured on captures, 13 Nov)
+            if (st.shelfCut > 0.0f)
+                s -= st.shelfCut * st.shelf.lowpass (s);
             const float env = st.blocking.process (std::max (0.0f, s));
             s = tubeAA (s, st.bias - 0.15f * std::min (env, 2.0f), st.last);
             s = st.hp.highpass (s);
@@ -366,9 +383,7 @@ void Amp::process (float* data, int n)
         s = dcPost.process (s);
         // the voicing against real amps sits after the power amp, so its feel under the
         // fingers (how it compresses and sags) stays as it was
-        if (v->lowMidDb != 0.0f) s = lowMid.process (s);
-        if (v->topDb != 0.0f) s = top.process (s);
-        if (v->lowDb != 0.0f) s = low.process (s);
+        if (postOn) s = low.process (top.process (lowMid.process (s)));
         s = outLp.process (outHp.process (s));
         x[i] = antiFizz.process (s);
     }

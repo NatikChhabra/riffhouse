@@ -2,7 +2,7 @@
 
 # Riffhouse
 
-**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 9 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
+**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 11 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
 
@@ -64,7 +64,7 @@ Every amp, pedal and cabinet is its own piece of gear, with its own face and its
 | ![A cabinet with its microphone](docs/screenshots/cab.png) | ![The tone browser](docs/screenshots/browser.png) |
 
 - **11 amps**, from glassy cleans to tight metal, plus a bass amp and a direct channel.
-- **9 speaker cabinets** with a mic you can move across the cone, and a slot for your own impulse response.
+- **11 speaker cabinets**, three of them recordings of real 4x12s, each with a mic you can move across the cone, and a slot for your own impulse response.
 - **30 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
 - **197 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
 - **Neural captures:** load any `.nam` file as the amp.
@@ -158,6 +158,6 @@ build/tests/riffhouse_tests_artefacts/Release/riffhouse_tests
 
 Riffhouse is made by [Natik Chhabra](https://github.com/NatikChhabra). It is free software under the GNU Affero General Public License, version 3 or later.
 
-It is built with [JUCE](https://juce.com) (AGPLv3), [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT) and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) (MIT), which slows the song down, and [LAME](https://lame.sourceforge.io) (LGPL 2.0), which writes the MP3 copies. Fonts: Instrument Sans, Inter, Doto, Big Shoulders, Kaushan Script and Alfa Slab One under the SIL Open Font License, and Yellowtail under the Apache License 2.0.
+It is built with [JUCE](https://juce.com) (AGPLv3), [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT) and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) (MIT), which slows the song down, and [LAME](https://lame.sourceforge.io) (LGPL 2.0), which writes the MP3 copies. The three "Real" cabinets are recordings from [Jester's Brutal Pack](https://jester-dyne-productions.com) by Jester Dyne Productions, dedicated to the public domain (CC0 1.0). Fonts: Instrument Sans, Inter, Doto, Big Shoulders, Kaushan Script and Alfa Slab One under the SIL Open Font License, and Yellowtail under the Apache License 2.0.
 
-Every amp, pedal and cabinet in Riffhouse is an original design. Tones named "Inspired by" describe a style. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.
+Every amp and pedal in Riffhouse is an original design, and so is every cabinet except the three recorded "Real" ones. Tones named "Inspired by" describe a style. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.

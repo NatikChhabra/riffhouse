@@ -67,6 +67,9 @@ juce::String describeChoice (P param, int i)
                 "4x10 bass cab with a tweeter. Punchy and clear.",
                 "1x15 bass cab. Deep, round and old-school.",
                 "Your own impulse response file (.wav).",
+                "A real 4x12, recorded. Classic rock and metal mids. Mic moves through real close placements, bright to dark.",
+                "A real 4x12, recorded. Darker and heavier, thick lows for doom and death metal.",
+                "A real 4x12, recorded. Tight and focused lows for djent and metalcore.",
             };
             return juce::isPositiveAndBelow (i, (int) std::size (d)) ? d[i] : "";
         }

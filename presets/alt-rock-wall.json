@@ -20,7 +20,7 @@
     "amp_master": 5,
     "amp_level": 0.0,
     "cab_on": true,
-    "cab_model": "4x12 Modern",
+    "cab_model": "4x12 Real Heavy",
     "cab_mic": 3,
     "cab_distance": 2,
     "cab_lowcut": 60,
@@ -35,6 +35,6 @@
     "rev_tone": 5,
     "rev_mix": 0.9,
     "doubler": 7,
-    "out_level": 2.1
+    "out_level": 3.8
   }
 }

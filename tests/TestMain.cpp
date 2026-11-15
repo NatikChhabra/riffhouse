@@ -185,7 +185,10 @@ void testParams()
     CHECK ((int) spec (P::ampModel).choices.size() == choices::numAmpModels, "amp choice list");
     CHECK ((int) spec (P::cabModel).choices.size() == choices::numCabModels, "cab choice list");
     CHECK (numAmpVoicings() == choices::numAmpModels - 1, "amp voicing count");
-    CHECK (numCabs() == choices::numCabModels - 1, "cab count");
+    CHECK (numCabs() + 1 + numRealCabs() == choices::numCabModels, "cab count: the generated cabs, the player's IR and the real cabs");
+    for (int c = 0; c < numRealCabs(); ++c)
+        CHECK (juce::String (spec (P::cabModel).choices[(size_t) (numCabs() + 1 + c)]) == realCabName (c),
+               "cab choice %d is not the real cab %s", numCabs() + 1 + c, realCabName (c));
 }
 
 void testToneStacks()
@@ -292,6 +295,63 @@ void testCabs (double sr)
         for (int i = 0; i < (int) center.size(); ++i)
             if (std::abs (center[(size_t) i]) > std::abs (center[(size_t) peakIdx])) peakIdx = i;
         CHECK (peakIdx < (int) (0.0015 * sr), "cab %s IR peak at %d samples: would sound late", cabDescription (c).name, peakIdx);
+        // no flat top: a real cab keeps falling past its breakup (the fizz of 0.1.5's metal tones)
+        if (cabDescription (c).tweeterDb == 0.0f)
+        {
+            const auto mid = irMagnitudeDb (generateCabIr (c, 0.3f, 0.2f, sr), sr, { 500, 1000, 2000 });
+            const auto top = irMagnitudeDb (generateCabIr (c, 0.3f, 0.2f, sr), sr, { 16000 });
+            const float core = (mid[0] + mid[1] + mid[2]) / 3.0f;
+            if (sr > 40000.0)
+                CHECK (top[0] < core - 28.0f, "cab %s keeps %.1f dB at 16 kHz: a fizz shelf", cabDescription (c).name, top[0] - core);
+        }
+    }
+    // the recorded cabs: whole, as loud as the others, darker as the mic moves off the cap, no fizz shelf
+    for (int c = 0; c < numRealCabs(); ++c)
+    {
+        const auto bright = realCabIr (c, 0.0f, 0.0f), dark = realCabIr (c, 1.0f, 0.0f), mid = realCabIr (c, 0.5f, 0.15f);
+        bool finite = true;
+        for (const auto* ir : { &bright, &dark, &mid })
+            for (float x : *ir) finite &= std::isfinite (x);
+        CHECK (finite, "real cab %s IR not finite", realCabName (c));
+        const auto core = irMagnitudeDb (mid, kRealCabRate, { 250, 500, 1000, 2000 });
+        const float level = (core[0] + core[1] + core[2] + core[3]) / 4.0f;
+        CHECK (std::abs (level) < 0.5f, "real cab %s sits %.1f dB off the others", realCabName (c), level);
+        const auto top = irMagnitudeDb (mid, kRealCabRate, { 10000, 16000 });
+        CHECK (top[0] < -20.0f && top[1] < -30.0f, "real cab %s: %.1f dB at 10 kHz, %.1f at 16 kHz", realCabName (c), top[0], top[1]);
+        std::vector<float> upper;
+        for (double f = 2500.0; f <= 5001.0; f *= std::pow (2.0, 1.0 / 24.0)) upper.push_back ((float) f);
+        const auto power = [&] (const std::vector<float>& ir)
+        {
+            double p = 0;
+            for (float db : irMagnitudeDb (ir, kRealCabRate, upper)) p += std::pow (10.0, db / 10.0);
+            return 10.0 * std::log10 (p / (double) upper.size());
+        };
+        const double hb = power (bright), hd = power (dark);
+        CHECK (hb >= hd - 0.5, "real cab %s: the mic on the cap is not the brighter end (%.1f vs %.1f)", realCabName (c), hb, hd);
+    }
+    // and through the Cabinet the rig plays, at this sample rate (the recordings are 48 kHz):
+    // a 1 kHz tone comes out as loud as through a generated 4x12, give or take a little
+    auto tone1k = [&] (int model)
+    {
+        Cabinet cab;
+        cab.setOffline (true);
+        cab.prepare (sr, 512);
+        cab.set (model, 0.3f, 0.2f, 0.0f, 0.0f);
+        cab.rebuildNow();
+        std::vector<float> x ((size_t) (sr * 0.5));
+        for (size_t i = 0; i < x.size(); ++i) x[i] = 0.25f * (float) std::sin (kTwoPi * 1000.0 * (double) i / sr);
+        for (size_t at = 0; at < x.size(); at += 512) cab.process (x.data() + at, (int) std::min<size_t> (512, x.size() - at));
+        double e = 0;
+        bool ok = true;
+        for (size_t i = x.size() / 2; i < x.size(); ++i) { e += (double) x[i] * x[i]; ok &= std::isfinite (x[i]); }
+        return std::make_pair (ok, 10.0 * std::log10 (e / (double) (x.size() / 2) + 1e-30));
+    };
+    const auto ref = tone1k (choices::cabModern4x12);
+    for (int c = 0; c < numRealCabs(); ++c)
+    {
+        const auto got = tone1k (numCabs() + 1 + c);
+        CHECK (got.first && std::abs (got.second - ref.second) < 4.0, "real cab %s through the rig at %.0f Hz: %.1f dB against a generated 4x12's %.1f",
+               realCabName (c), sr, got.second, ref.second);
     }
 
     // Each cab against its speaker's published curve (bar line 17). Both are smoothed to
@@ -672,8 +732,9 @@ static std::vector<double> balanceBands (const std::vector<float>& x, double sr)
 
 // The rock and metal amps against real amps. The reference rows are captures of real
 // amps (ToneHunt NAM files, not shipped) played with the same guitar through the same cab,
-// measured with ampvsreal: 5150 + 6505+ for the two metal amps, JCM2000 L2 G6/G8 + JCM900
-// for Brit 81, JVM OD1 for Redline Lead. 0.1.5 shipped Tight Metal 8.8 dB short at 80 Hz
+// measured with ampvsreal: each amp beside the amp it was fitted to (Update 1): 5150 for
+// Modern High Gain, 6505+ for Tight Metal, JCM2000 L2 G6/G8 + JCM900 for Brit 81, JVM OD1
+// for Redline Lead. Measured again when the generated cabs started falling past 7 kHz. 0.1.5 shipped Tight Metal 8.8 dB short at 80 Hz
 // and 5 dB at 125 Hz: the bands were only judged as an average, from 125 Hz up, so one
 // amp's missing low end hid in the mean. Here every band of every amp counts on its own.
 void testAmpsMatchReal (double sr)
@@ -681,11 +742,11 @@ void testAmpsMatchReal (double sr)
     std::printf ("amps against real amps\n");
     struct Ref { int model; const char* name; double bands[14]; double lowAllowance; };
     const Ref refs[] = {
-        { choices::brit800, "Brit 81", { -11.1, -7.8, -3.1, -2.2, -2.0, 1.0, 0.3, 2.8, 2.5, 2.3, -0.6, -7.3, -21.1, -29.8 }, 0.0 },
-        { choices::hotRodLead, "Redline Lead", { -10.8, -3.9, -5.1, -5.8, -5.2, 1.4, 3.0, 6.6, 6.8, 6.6, 3.9, -3.0, -17.3, -27.1 }, 0.0 },
-        { choices::modernHigh, "Modern High Gain", { -4.1, -1.4, -2.4, -3.1, -3.0, 0.7, 1.2, 4.1, 4.4, 4.8, 2.8, -2.9, -15.3, -22.2 }, 0.0 },
+        { choices::brit800, "Brit 81", { -11.1, -7.8, -3.1, -2.2, -1.9, 1.0, 0.3, 2.7, 2.5, 2.2, -1.0, -8.1, -23.0, -33.2 }, 0.0 },
+        { choices::hotRodLead, "Redline Lead", { -10.8, -3.9, -5.1, -5.8, -5.2, 1.3, 3.0, 6.6, 6.7, 6.5, 3.4, -3.9, -19.1, -30.5 }, 0.0 },
+        { choices::modernHigh, "Modern High Gain", { -3.7, -0.3, -0.9, -1.9, -2.7, 0.6, 0.6, 3.3, 3.2, 3.4, 1.0, -5.1, -18.6, -27.0 }, 0.0 },
         // a tight amp may keep less under 100 Hz than the real amps, by design, but not much less
-        { choices::tightMetal, "Tight Metal", { -4.1, -1.4, -2.4, -3.1, -3.0, 0.7, 1.2, 4.1, 4.4, 4.8, 2.8, -2.9, -15.3, -22.2 }, 5.0 },
+        { choices::tightMetal, "Tight Metal", { -4.5, -2.5, -3.9, -4.1, -3.3, 0.8, 1.8, 4.9, 5.4, 5.9, 3.7, -2.3, -15.7, -24.4 }, 5.0 },
     };
     const auto in = playedGuitar (sr, 12.0, 0.32f, true);
     for (const auto& r : refs)
@@ -710,6 +771,111 @@ void testAmpsMatchReal (double sr)
         }
         std::printf ("  %-17s worst band %5.0f Hz, %+.1f dB from the real amps\n", r.name, kBalanceCentres[worstAt], worst);
     }
+}
+
+// How the high-gain amps clip, beside real amps. A fuzz pedal squares the whole string, so its
+// output crosses zero about once per note period and its top end arrives as one burst per
+// period; a real high-gain preamp cuts the bass going into its clipping stages, so the string's
+// upper partials do the clipping: the output crosses zero two to three times as often and its
+// top end is an even grind. 0.1.5 crossed half as often as the captures below and its top end
+// pulsed half again as hard (15 Nov, a reviewer: "super fuzzy like a fuzz pedal").
+struct ClipFeel { double crossings, buzz; };
+ClipFeel clipFeel (const std::vector<float>& x, double sr)
+{
+    Biquad hp, lp, env;
+    hp.set (Biquad::Type::highpass, sr, 2000.0, 0.707);
+    lp.set (Biquad::Type::lowpass, sr, 6000.0, 0.707);
+    env.set (Biquad::Type::lowpass, sr, 800.0, 0.707);
+    std::vector<float> e (x.size());
+    for (size_t i = 0; i < x.size(); ++i) e[i] = env.process (std::abs (lp.process (hp.process (x[i]))));
+    const size_t w = (size_t) (0.4 * sr);
+    double peak = 0.0;
+    for (size_t a = 0; a + w <= x.size(); a += w)
+    {
+        double ss = 0.0;
+        for (size_t i = a; i < a + w; ++i) ss += (double) x[i] * x[i];
+        peak = std::max (peak, ss / (double) w);
+    }
+    std::vector<double> zc, bz;
+    for (size_t a = 0; a + w <= x.size(); a += w)
+    {
+        double ss = 0.0, mean = 0.0;
+        for (size_t i = a; i < a + w; ++i) { ss += (double) x[i] * x[i]; mean += x[i]; }
+        if (ss / (double) w < peak * 0.01) continue; // only where something is being played
+        mean /= (double) w;
+        int n = 0;
+        for (size_t i = a + 1; i < a + w; ++i) n += ((x[i] - mean) > 0) != ((x[i - 1] - mean) > 0);
+        zc.push_back (n / 0.4);
+        double em = 0.0, ev = 0.0;
+        for (size_t i = a; i < a + w; ++i) em += e[i];
+        em /= (double) w;
+        for (size_t i = a; i < a + w; ++i) ev += (e[i] - em) * (e[i] - em);
+        bz.push_back (std::sqrt (ev / (double) w) / (em + 1e-12));
+    }
+    auto median = [] (std::vector<double> v) { if (v.empty()) return 0.0; std::nth_element (v.begin(), v.begin() + (long) v.size() / 2, v.end()); return v[v.size() / 2]; };
+    return { median (zc), median (bz) };
+}
+
+// The amp alone (no cab, no gate) at gain 6.5, the test guitar like a recording.
+ClipFeel ampClipFeel (int model, double sr)
+{
+    const auto in = playedGuitar (sr, 12.0, 0.32f, true);
+    auto v = bare();
+    v[(size_t) P::ampOn] = 1.0f;
+    v[(size_t) P::ampModel] = (float) model;
+    v[(size_t) P::ampGain] = 6.5f;
+    v[(size_t) P::cabOn] = 0.0f;
+    return clipFeel (renderWith (v, in, sr).l, sr);
+}
+
+void testAmpsClipLikeReal (double sr)
+{
+    std::printf ("high-gain amps clip like real amps\n");
+    // measured with `riffhouse_tests ampclip <folder of .nam files>`: the captures behind each
+    // amp's voicing (ToneHunt, not shipped), their gain as captured
+    struct Ref { int model; const char* name; double crossings, buzz; };
+    const Ref refs[] = {
+        { choices::modernHigh, "Modern High Gain", 2032, 0.57 },  // 5150 block letter, no boost
+        { choices::tightMetal, "Tight Metal", 2168, 0.50 },       // 6505+ red channel, no boost
+        { choices::brit800, "Brit 81", 1482, 0.65 },               // JCM2000 lead 2, gain 8
+        { choices::hotRodLead, "Redline Lead", 2015, 0.51 },     // JVM OD1
+    };
+    for (const auto& r : refs)
+    {
+        const auto f = ampClipFeel (r.model, sr);
+        std::printf ("  %-17s crossings %5.0f/s (real %5.0f)  top-end pulsing %.2f (real %.2f)\n", r.name, f.crossings, r.crossings, f.buzz, r.buzz);
+        CHECK (f.crossings > r.crossings * 0.75 && f.crossings < r.crossings * 1.33, "%s crosses zero %.0f times a second, the real amp %.0f", r.name, f.crossings, r.crossings);
+        CHECK (f.buzz < r.buzz + 0.15, "%s: its top end pulses like a fuzz (%.2f, the real amp %.2f)", r.name, f.buzz, r.buzz);
+    }
+}
+
+// Prints the clip feel of each capture and of our amps, for the references above.
+int ampClip (const juce::File& dir)
+{
+    const double sr = 48000.0;
+    const auto in = playedGuitar (sr, 12.0, 0.32f, true);
+    for (const auto& f : dir.findChildFiles (juce::File::findFiles, false, "*.nam"))
+    {
+        Rig rig;
+        rig.setOffline (true);
+        if (! rig.neural().load (f.getFullPathName().toStdString()).empty()) continue;
+        auto v = bare();
+        v[(size_t) P::ampOn] = 1.0f;
+        v[(size_t) P::ampModel] = (float) choices::neuralCapture;
+        v[(size_t) P::ampGain] = 5.0f;
+        v[(size_t) P::cabOn] = 0.0f;
+        rig.setParams (v);
+        rig.prepare (sr, 256);
+        rig.finishPendingWork();
+        const auto c = clipFeel (run (rig, v, in).l, sr);
+        std::printf ("REAL %-40s crossings %6.0f  buzz %.2f\n", f.getFileNameWithoutExtension().substring (0, 40).toRawUTF8(), c.crossings, c.buzz);
+    }
+    for (int m : { (int) choices::brit800, (int) choices::hotRodLead, (int) choices::modernHigh, (int) choices::tightMetal })
+    {
+        const auto c = ampClipFeel (m, sr);
+        std::printf ("%-45s crossings %6.0f  buzz %.2f\n", ampVoicing (m).name, c.crossings, c.buzz);
+    }
+    return 0;
 }
 
 // Tone balance of our amps beside captures of real amps, both through the same cab:
@@ -3971,8 +4137,9 @@ int main (int argc, char** argv)
     if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "elastic") { testElasticInput(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
-    if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); testAmpsClipLikeReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
+    if (args[0] == "ampclip" && args.size() >= 2) return ampClip (juce::File (args[1]));
     if (args[0] == "cabs") { testCabs (48000.0); testCabs (44100.0); testCabs (96000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "worstblock") { testWorstBlock (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "cpu") { testCpu (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -4028,6 +4195,7 @@ int main (int argc, char** argv)
     testInputGuard();
     testGate (48000.0);
     testAmpsMatchReal (48000.0);
+    testAmpsClipLikeReal (48000.0);
     testGateHeldNote (48000.0);
     testGateHeldNote (44100.0);
     testElasticInput();
