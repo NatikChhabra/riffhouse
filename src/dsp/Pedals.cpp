@@ -467,7 +467,7 @@ void NoiseGate::prepare (double sampleRate)
     windowLength = std::max (1, (int) (0.1 * sr));
     stepLength = std::max (1, (int) (0.0025 * sr));
     reopenDecay = dbToGain (-0.3f); // per step: what a stop asked for is forgotten in about 100 ms
-    floorDb = floorPeakDb = -120.0f; // as if just built: what an earlier run heard is forgotten
+    floorDb = floorPeakDb = loudDb = -120.0f; // as if just built: what an earlier run heard is forgotten
     windowPeak = 0.0f;
     windowsHeard = windowAt = windowFill = 0;
     windowPower = 0.0;
@@ -523,10 +523,29 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     windowPeaks[windowAt] = peakDb;
     windowAt = (windowAt + 1) % kWindows;
     windowsHeard = std::min (windowsHeard + 1, kWindows);
+    // the loudest the guitar has been lately, forgotten at 1 dB a second
+    loudDb = std::max (peakDb, loudDb - 0.1f);
     // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do.
     // The very first floor needs the same 1.6 s: a noisy room is gated soon after the start
     // (a quieter floor heard later is believed at once anyway).
-    const int need = floorDb < -119.0f ? kFirstWindows : kWindows;
+    // A level far under the playing is believed after 0.6 s, and at once when it is louder than
+    // the floor known so far: real playing rarely leaves 1.6 s of quiet, and a floor seeded low
+    // (or none, from a cold start) left the hiss roaring through the gaps for 6 to 10 s
+    // (16 Nov, a take at -79 dBFS hiss with 27 dB of input gain and fix in front of the gate).
+    // No note that rings 45 dB under the hardest playing of the last half minute holds within
+    // 1.5 dB for 0.6 s while a gate threshold just over it could matter.
+    bool fast = false;
+    if (fastFloor && windowsHeard >= kFastWindows)
+    {
+        float lo = 1000.0f, hi = -1000.0f, sum = 0.0f;
+        for (int k = 1; k <= kFastWindows; ++k)
+        {
+            const float w = windows[(windowAt - k + kWindows) % kWindows];
+            lo = std::min (lo, w); hi = std::max (hi, w); sum += w;
+        }
+        fast = hi - lo <= 1.5f && loudDb - sum / (float) kFastWindows >= kFastUnderPlayingDb;
+    }
+    const int need = fast ? kFastWindows : floorDb < -119.0f ? kFirstWindows : kWindows;
     if (windowsHeard < need) return;
     float lo = 1000.0f, hi = -1000.0f, sum = 0.0f, peak = -1000.0f;
     for (int k = 1; k <= need; ++k)
@@ -545,9 +564,9 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     if (std::abs (recent - older) / (float) (need / 2) > kMostFloorDriftDb) return;
     const float heard = sum / (float) need;
     if (heard > -40.0f) return;                 // that loud and steady is a sound, not a floor
-    if (heard < floorDb) floorDb = std::max (-120.0f, heard); // quieter now: believed at once
+    if (heard < floorDb || fast) floorDb = std::max (-120.0f, heard); // quieter now, or far under the playing: believed at once
     else floorDb = std::min (heard, floorDb < -119.0f ? heard : floorDb + 1.0f);
-    if (peak < floorPeakDb) floorPeakDb = std::max (-120.0f, peak);
+    if (peak < floorPeakDb || fast) floorPeakDb = std::max (-120.0f, peak);
     else floorPeakDb = std::min (peak, floorPeakDb < -119.0f ? peak : floorPeakDb + 1.0f);
     applyThreshold();
 }

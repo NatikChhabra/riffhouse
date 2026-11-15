@@ -209,6 +209,7 @@ public:
     static constexpr float kStopDropDb = 18.0f;     // this much down inside about 30 ms is a hand on the strings
     static constexpr float kStopRangeDb = 24.0f;    // ... when it lands within this of the threshold
 
+    static inline bool fastFloor = true; // the test tool turns it off to replay how Update 1 heard a take
     void prepare (double sampleRate);
     void reset();
     void set (float thresholdDb, float releaseMs);
@@ -246,6 +247,9 @@ private:
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
     static constexpr int kFirstWindows = 16;        // the very first floor too: 0.8 s was short enough for a held note to pass
     static constexpr float kMostFloorDriftDb = 0.3f; // the later half of those windows against the earlier
+    static constexpr int kFastWindows = 6;          // 0.6 s is enough for a level far under the playing
+    static constexpr float kFastUnderPlayingDb = 45.0f;
+    float loudDb = -120.0f;                          // the loudest window peak lately
     float windows[kWindows] {}, windowPeaks[kWindows] {};
     float windowPeak = 0.0f;
     int windowAt = 0, windowsHeard = 0, windowLength = 4800, windowFill = 0;
