@@ -495,7 +495,13 @@ void NoiseGate::set (float thresholdDb, float releaseMs)
 void NoiseGate::applyThreshold()
 {
     float t = userThrDb;
-    if (follows && floorDb > -119.0f)
+    if (autoThreshold && floorDb > -119.0f)
+    {
+        // Auto: sit just over the hiss and hum heard, never so high that notes are cut
+        const float need = std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb);
+        t = std::clamp (need, kAutoLowestDb, kFollowCapHighDb);
+    }
+    else if (follows && floorDb > -119.0f)
     {
         const float need = std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb);
         // Once the floor is heard, the threshold is never held far above what that floor

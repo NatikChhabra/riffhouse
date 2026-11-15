@@ -11,7 +11,7 @@ bool belongsToSetup (P id)
     // the guitar input is the player's own, kept whatever tone is loaded: the gate's switch
     // too (a gate switched off stayed off only until the next tone, 0.1.5.1)
     return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter || id == P::gateOn || id == P::gateThresh
-        || id == P::autoLevel;
+        || id == P::autoLevel || id == P::gateAuto;
 }
 
 bool sameTone (const ToneState& a, const ToneState& b)

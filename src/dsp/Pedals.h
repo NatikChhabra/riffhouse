@@ -205,6 +205,7 @@ public:
     // a threshold above what the heard floor needs is brought down to it, but not under this:
     // a deliberately tight gate (a quiet floor, a metal tone) keeps up to -60 dB
     static constexpr float kMostAboveNeedLowDb = -60.0f;
+    static constexpr float kAutoLowestDb = -80.0f;  // Auto never sits lower than this, however quiet the input
     static constexpr float kStopDropDb = 18.0f;     // this much down inside about 30 ms is a hand on the strings
     static constexpr float kStopRangeDb = 24.0f;    // ... when it lands within this of the threshold
 
@@ -212,6 +213,11 @@ public:
     void reset();
     void set (float thresholdDb, float releaseMs);
     void setFollowsNoise (bool f) noexcept { follows = f; }
+    // Auto: the threshold is what the heard floor needs and nothing else; the chosen threshold
+    // is only where it starts until a floor has been heard. Manual keeps the chosen threshold as
+    // the least the gate asks for (it still rises over a louder floor).
+    void setAuto (bool a) { if (a != autoThreshold) { autoThreshold = a; applyThreshold(); } }
+    bool isAuto() const noexcept { return autoThreshold; }
     // Gates x in place. gainsOut, when given, gets the gain used on each sample.
     void process (float* x, int n, float* gainsOut = nullptr);
     bool isOpen() const noexcept { return open; }
@@ -225,7 +231,7 @@ private:
 
     double sr = 48000.0;
     float userThrDb = -62.0f, thrNowDb = -62.0f, floorDb = -120.0f, floorPeakDb = -120.0f;
-    bool follows = true;
+    bool follows = true, autoThreshold = false;
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
     static constexpr int kFirstWindows = 16;        // the very first floor too: 0.8 s was short enough for a held note to pass
     static constexpr float kMostFloorDriftDb = 0.3f; // the later half of those windows against the earlier
