@@ -3902,7 +3902,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "play" && args.size() >= 4)
     {
-        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0]
+        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0] [seed=dB] [trace=1]
         // Plays a recorded clean guitar through a preset, for listening checks, with Auto level
         // as the app applies it (measured on this guitar) unless auto_level=0.
         juce::AudioFormatManager fm; fm.registerBasicFormats();
@@ -3928,12 +3928,17 @@ int main (int argc, char** argv)
         bool found = args[2] == "-";
         for (const auto& p : loadPresets()) if (p.name == args[2]) { v = p.values; found = true; }
         if (! found) { std::printf ("no preset %s\n", args[2].toRawUTF8()); return 1; }
-        float trim = 0.0f;
+        float trim = 0.0f, seed = -120.0f;
+        bool trace = false;
         for (int i = 4; i < args.size(); ++i)
         {
             const auto key = args[i].upToFirstOccurrenceOf ("=", false, false);
             const float value = args[i].fromFirstOccurrenceOf ("=", false, false).getFloatValue();
             if (key == "trim") { trim = value; continue; }
+            // seed=<dB>: the hiss setup measured (your-input.txt noise_floor_db), as the app gives it to the gate
+            if (key == "seed") { seed = value; continue; }
+            // trace=1: every half second, what the gate heard, where it sat and how long it was open
+            if (key == "trace") { trace = value > 0.5f; continue; }
             if (key == "captures") { Rig::circuitModelsOnly = value < 0.5f; continue; } // captures=0: the circuit models
             const int id = findParamByKey (key.toStdString());
             if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
@@ -3954,7 +3959,44 @@ int main (int argc, char** argv)
             if (loud > kSilentDb) autoTrim = std::clamp (kHouseLoudnessDb - loud, kMostCutDb, kMostBoostDb);
             std::printf ("auto level: %.1f dB\n", autoTrim);
         }
-        auto r = renderWith (v, di, sr, 256);
+        Render r;
+        {
+            Rig rig;
+            rig.setOffline (true);
+            rig.setParams (v);
+            rig.prepare (sr, 256);
+            rig.setParams (v);
+            rig.finishPendingWork();
+            rig.prepare (sr, 256);
+            rig.finishPendingWork();
+            if (seed > -119.0f) rig.seedGateFloor (seed);
+            rig.setParams (v);
+            r.l.resize (di.size());
+            r.r.resize (di.size());
+            float inPk = 0.0f, outPk = 0.0f;
+            int blocks = 0, openBlocks = 0;
+            const size_t every = (size_t) (0.5 * sr) / 256 * 256;
+            for (size_t pos = 0; pos < di.size(); pos += 256)
+            {
+                const int n = (int) std::min<size_t> (256, di.size() - pos);
+                rig.setParams (v);
+                rig.process (di.data() + pos, r.l.data() + pos, r.r.data() + pos, n);
+                if (! trace) continue;
+                auto& m = rig.meters();
+                inPk = std::max (inPk, m.gateInPeak.load());
+                for (int i = 0; i < n; ++i) outPk = std::max (outPk, std::abs (r.l[pos + (size_t) i]));
+                ++blocks;
+                if (m.gateOpen.load()) ++openBlocks;
+                if ((pos + 256) % every == 0 || pos + 256 >= di.size())
+                {
+                    std::printf ("%6.1f s  gate hears %6.1f dB  threshold %6.1f dB  open %3d%%  out peak %6.1f dB
+", (double) (pos + 256) / sr,
+                                 gainToDb (inPk), m.gateThreshNow.load(), 100 * openBlocks / std::max (1, blocks), gainToDb (outPk));
+                    inPk = outPk = 0.0f;
+                    blocks = openBlocks = 0;
+                }
+            }
+        }
         const float g = dbToGain (trim + autoTrim);
         for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
