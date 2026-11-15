@@ -33,7 +33,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - run: python3 tools/release/notes.py check "$GITHUB_REF_NAME"
 
   # Publishing a release makes the tag, and people then wait for the installer. When main already
@@ -72,7 +72,7 @@ jobs:
           fi
           echo "Using the installer run $run built and tested: $file $hash"
           echo "found=true" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: steps.find.outputs.found == 'true'
         with:
           name: riffhouse-windows
@@ -89,10 +89,10 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       # The ASIO SDK is GPLv3 since October 2025. MSYS2 packages its headers.
-      - uses: msys2/setup-msys2@v2
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
         id: msys2
         with:
           msystem: UCRT64
@@ -184,7 +184,7 @@ jobs:
           # which version this was built as and from which commit: a release only reuses its own build
           "$env:LABEL $env:GITHUB_SHA" | Out-File -FilePath dist\BUILD.txt -Encoding ascii
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: riffhouse-windows
           path: |
@@ -194,7 +194,7 @@ jobs:
           if-no-files-found: error
 
       # The debug symbols of exactly this build: a player's crash dump read with them names the function.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: riffhouse-windows-symbols
           path: build/src/Riffhouse_artefacts/Release/Standalone/*.pdb
@@ -354,7 +354,7 @@ jobs:
       # The pictures are only there to look at when something went wrong. A build that passed
       # every check is not failed because GitHub could not store them (11 November 2026: this
       # step hung for ten minutes and failed a build that was green).
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         continue-on-error: true
         timeout-minutes: 5
@@ -370,7 +370,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       # The runner fetches packages from a mirror inside its own cloud first. When that mirror cannot be
       # reached, apt waits on it for every single package (33 minutes on 11 November 2026, and a release
       # waited with it). So: a short first try, then the same again from Ubuntu's own servers only.
@@ -403,9 +403,11 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write     # signs the build provenance below
+      attestations: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: riffhouse-windows
           path: dist
@@ -428,7 +430,15 @@ jobs:
           } > notes.md
           echo "PRERELEASE=$(python3 tools/release/notes.py prerelease "$GITHUB_REF_NAME")" >> "$GITHUB_ENV"
           cat notes.md
-      - uses: softprops/action-gh-release@v2
+      # A signed record that this installer was built here, from this commit, by this workflow.
+      # Anyone can check a download with: gh attestation verify <file>.exe -R NatikChhabra/riffhouse
+      # It never holds up a release.
+      - name: Sign the build provenance
+        continue-on-error: true
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/*.exe
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             dist/*.exe
