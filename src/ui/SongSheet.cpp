@@ -290,7 +290,7 @@ SongSheetView::SongSheetView()
     {
         if (! hasSheet) return;
         juce::SystemClipboard::copyTextToClipboard (toText (current, current.shift, false)
-                                                    + "\nSet out in Riffhouse, the free guitar amp: https://natikchhabra.github.io/riffhouse/\n");
+                                                    + "\nSet out in Riffhouse, the free guitar amp: https://riffhouse.in/\n");
         const auto key = keyText();
         message (key.isNotEmpty() ? "Copied in " + key.upToFirstOccurrenceOf (",", false, false).fromFirstOccurrenceOf ("Key of ", false, false)
                                         + ". Paste it in any chat or notes app."

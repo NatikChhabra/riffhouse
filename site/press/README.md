@@ -19,7 +19,7 @@ One line: Free open-source guitar amp and pedalboard for Windows.
 Two lines: Riffhouse is a free guitar amp and pedalboard for Windows, standalone and VST3. 11 amps, 30 pedals, 197 tones, NAM loader, and it works through a laptop mic jack.
 
 ## Links
-- Site and download: https://natikchhabra.github.io/riffhouse/
+- Site and download: https://riffhouse.in/
 - Latest release: https://github.com/NatikChhabra/riffhouse/releases/latest
 - Source: https://github.com/NatikChhabra/riffhouse
 - Instagram: https://www.instagram.com/realriffhouse/

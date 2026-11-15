@@ -666,7 +666,7 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     page.addAndMakeVisible (website);
     // a thank-you, never a purchase: everyone gets the same app
     support.setTooltip ("Opens the website's support page. Everyone gets the same app; supporting is a thank-you, not a purchase.");
-    support.onClick = [] { juce::URL ("https://natikchhabra.github.io/riffhouse/#support").launchInDefaultBrowser(); };
+    support.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
     page.addAndMakeVisible (support);
     problem.setTooltip ("Copies the report, with your user name and computer name taken out, and opens the public page where "
                         "problems are reported. Paste it there and say what went wrong. Nothing is sent by itself.");

@@ -44,7 +44,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 API = "https://discord.com/api/v10"
-SITE = "https://natikchhabra.github.io/riffhouse/"
+SITE = "https://riffhouse.in/"
 HELP_PAGE = "https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md"
 GUILD = "1570500603606736896"
 
@@ -369,7 +369,7 @@ def launch_event(log: list[str]):
         call("POST", f"/channels/{th['id']}/messages", {"content": (
             f"{tag.lstrip('v')} is out. first {limit} people to drop a message in here get the **Day One** role, and it stays forever.\n"
             "say what you're playing through it, or just say hi. update from Settings > Check for updates, "
-            "or grab it at https://natikchhabra.github.io/riffhouse/"), "allowed_mentions": {"parse": []}})
+            "or grab it at https://riffhouse.in/"), "allowed_mentions": {"parse": []}})
         log.append(f"Launch event started: <#{th['id']}>")
         return
     if th.get("thread_metadata", {}).get("locked"):
@@ -427,7 +427,7 @@ def welcome(log: list[str]):
     names = " ".join(f"<@{i}>" for i in ids)
     text = (f"hey {names}, welcome to Riff House\n\n"
             "it's a free guitar amp app for Windows. amps, pedals, cabs, no paywall on tone\n\n"
-            "get it here: https://natikchhabra.github.io/riffhouse/\n"
+            "get it here: https://riffhouse.in/\n"
             f"stuck on anything? make a post in <#{CH['help']}>\n"
             "want builds before everyone else? grab the Beta tester role in <id:customize>\n\n"
             f"then say hi in <#{CH['general']}> and tell us what you play")

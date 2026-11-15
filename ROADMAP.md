@@ -2,7 +2,7 @@
 
 Everything coming to Riffhouse, in the order it lands. Every release stays free for everyone.
 
-The nicer version of this page is on the website: https://natikchhabra.github.io/riffhouse/roadmap.html
+The nicer version of this page is on the website: https://riffhouse.in/roadmap.html
 
 Updated 14 November 2026.
 

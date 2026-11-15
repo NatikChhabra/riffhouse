@@ -32,7 +32,7 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 REPO = os.environ.get("GITHUB_REPOSITORY", "NatikChhabra/riffhouse")
-SITE = "https://natikchhabra.github.io/riffhouse/"
+SITE = "https://riffhouse.in/"
 ROOT = Path(__file__).resolve().parents[2]
 PRESETS = ROOT / "presets"
 WEEKS_KEPT = 6

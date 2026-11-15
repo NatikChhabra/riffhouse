@@ -49,7 +49,7 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           for i in $(seq 1 20); do
-            curl -fsS "https://natikchhabra.github.io/riffhouse/feeds/builds.xml?t=$(date +%s)" | grep -q "release-$TAG<" && exit 0
+            curl -fsSL "https://riffhouse.in/feeds/builds.xml?t=$(date +%s)" | grep -q "release-$TAG<" && exit 0
             sleep 30
           done
           echo "::warning::$TAG not in the feed after 10 minutes, the hourly run will catch it"
