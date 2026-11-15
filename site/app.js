@@ -421,5 +421,60 @@
   }
 
 
-  tabs(); reveals(); download(); finder(); demos(); copyId(); words(); stomp(); counts(); play();
+  /* Visits, Download clicks and the two small forms go to one address of our own.
+     No cookies, no ids, nothing kept in the browser. A local preview or an automated check is not a visit. */
+  const RELAY = 'https://script.google.com/macros/s/AKfycbyXRpXQQjG-g7loWwQLSROANdTUO_Iy5FcEQri0sfxmKE-5EjgFRTpclacPy8jQ1pi-/exec';
+  const real = /^https:$/.test(location.protocol) && !navigator.webdriver;
+  const send = (o) => { try { return real && navigator.sendBeacon(RELAY, JSON.stringify(o)); } catch { return false; } };
+  function tally() {
+    let from = '';
+    try { const h = new URL(document.referrer).hostname; if (h !== location.hostname) from = h; } catch { /* a direct visit */ }
+    send({ t: 'view', p: location.pathname, r: from });
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest ? e.target.closest('[data-tally]') : null;
+      if (a) send({ t: 'click', e: a.dataset.tally });
+    });
+  }
+
+  /* Update emails: the address goes to the list and nowhere else, and the page says whether it arrived. */
+  function news() {
+    $$('[data-news]').forEach((form) => {
+      const input = $('input', form);
+      const say = $('[data-news-say]', form);
+      const tell = (text, done) => { say.textContent = text; say.hidden = false; form.classList.toggle('is-done', !!done); };
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = input.value.trim();
+        if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { tell('Check the address.'); input.focus(); return; }
+        tell('Sending.');
+        try {
+          const res = await fetch(RELAY, { method: 'POST', body: JSON.stringify({ t: 'subscribe', email }) });
+          const reply = await res.json();
+          if (!reply.ok) throw new Error('refused');
+          input.value = '';
+          tell('Done. You will hear about updates, and nothing else.', true);
+        } catch { tell('That did not go through. Try again in a minute.'); }
+      });
+    });
+  }
+
+  /* The one question after an uninstall. */
+  function left() {
+    const form = $('[data-left]');
+    if (!form) return;
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pick = $('input[name="reason"]:checked', form);
+      if (!pick) { $('[data-left-pick]', form).hidden = false; return; }
+      const v = (new URLSearchParams(location.search).get('v') || '').replace(/[^0-9a-z.-]/gi, '').slice(0, 16);
+      send({ t: 'left', reason: pick.value, note: $('textarea', form).value.trim().slice(0, 300), v });
+      const done = $('[data-left-done]');
+      form.hidden = true;
+      done.hidden = false;
+      done.setAttribute('tabindex', '-1');
+      done.focus();
+    });
+  }
+
+  tabs(); reveals(); download(); finder(); demos(); copyId(); words(); stomp(); counts(); play(); tally(); news(); left();
 })();

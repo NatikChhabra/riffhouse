@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://riffhouse.in/sitemap.xml
