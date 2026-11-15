@@ -258,21 +258,27 @@ struct FuzzToneStack
 // 51 pF, and two silicon diodes; to ground from its minus input 4.7 kOhm and 47 nF, so only the
 // part of the guitar above about 720 Hz is boosted and clipped, and the rest passes clean.
 // Then a fixed 723 Hz lowpass and a tone control that lifts the treble back.
+// In front of it all a 120 Hz first-order cut: the schematic alone leaves the low strings at
+// full level, but captures of real units (Maxon OD808, Boss SD-1, MXR M77) and of real amps
+// with and without one in front all show 4-8 dB less under 125 Hz than the schematic gives.
+// That is the tightening players use these pedals for before a high-gain amp. Measured
+// 15 Nov 2026: research/benchmark/06-pedals.md.
 struct GreenDrive
 {
-    OnePoleD gainLeg, toneLp, toneTop;
+    OnePoleD gainLeg, toneLp, toneTop, inHp;
     DiodeFeedback fb;
     double fs = 0, rTone = 0.3;
     void prepare (double f, int newtonSteps)
     {
         fs = f;
+        inHp.set (fs, 120.0);
         gainLeg.set (fs, 1.0 / (kTwoPi * 4700.0 * 47e-9));
         toneLp.set (fs, 1.0 / (kTwoPi * 1000.0 * 0.22e-6));
         toneTop.set (fs, 9000.0);
         fb.prepare (fs, 51e-12, silicon, newtonSteps);
         reset();
     }
-    void reset() { gainLeg.reset(); toneLp.reset(); toneTop.reset(); fb.reset(); }
+    void reset() { gainLeg.reset(); toneLp.reset(); toneTop.reset(); fb.reset(); inHp.reset(); }
     void set (double drive, double tone)
     {
         fb.setResistance (51000.0 + 500000.0 * audioTaper (drive));
@@ -280,6 +286,7 @@ struct GreenDrive
     }
     double process (double u)
     {
+        u = inHp.hp (u);
         const double i = gainLeg.hp (u) / 4700.0;
         const double clip = std::clamp (u + fb.process (i), -4.0, 4.0);
         const double lp = toneLp.lp (clip);
