@@ -62,8 +62,15 @@ void TunerView::paint (juce::Graphics& g)
         drawWell (g, noteArea.withSizeKeepingCentre (340.0f, 210.0f), 16.0f);
     g.setColour (live ? (display && inTune ? colours::good : colours::text) : colours::textFaint.withAlpha (0.6f));
     g.setFont (display ? font (165.0f, Weight::numeric) : font (168.0f, Weight::display));
-    const juce::String note = reading.valid ? reading.noteName : "--";
-    g.drawText (note, noteArea, juce::Justification::centred);
+    const juce::String note = reading.valid ? reading.noteName : juce::String();
+    if (note.isNotEmpty())
+        g.drawText (note, noteArea, juce::Justification::centred);
+    else
+    {
+        // nothing heard yet: a quiet ring where the note will be, not placeholder bars that read as a broken glyph
+        g.setColour (colours::textFaint.withAlpha (0.35f));
+        g.drawEllipse (juce::Rectangle<float> (96.0f, 96.0f).withCentre (noteArea.getCentre()), 2.0f);
+    }
     if (reading.valid)
     {
         const float nw = juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), note);

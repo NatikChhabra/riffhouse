@@ -2276,8 +2276,20 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
             f.deleteFile();
             if (auto out = f.createOutputStream()) png.writeImageToStream (print, *out);
         }
+        juce::Array<juce::var> cabs;
+        for (int m = 0; m < choices::numCabModels; ++m)
+        {
+            const auto l = cabLayout ({ 0.0f, 0.0f, 900.0f, 440.0f }, m);
+            juce::Image print;
+            auto desc = cabDescription (m, l, print, 2.0f);
+            cabs.add (desc);
+            auto f = dir.getChildFile (desc["id"].toString() + "-print.png");
+            f.deleteFile();
+            if (auto out = f.createOutputStream()) png.writeImageToStream (print, *out);
+        }
         auto* root = new juce::DynamicObject();
         root->setProperty ("scale", 2.0);
+        root->setProperty ("cabs", cabs);
         root->setProperty ("pedals", pedals);
         root->setProperty ("amps", amps);
         dir.getChildFile ("gear.json").replaceWithText (juce::JSON::toString (juce::var (root)));
