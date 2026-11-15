@@ -521,8 +521,8 @@ void LooperPanel::paint (juce::Graphics& g)
     g.drawText ("Volume", r.removeFromTop (26), juce::Justification::centredLeft);
     r.removeFromTop (8);
     g.setFont (font (12.5f));
-    g.drawText ("The O key is the big button.", r.removeFromTop (18), juce::Justification::centredLeft);
-    g.drawText ("The loop is for your ears. Takes you record leave it out.", r.removeFromTop (18), juce::Justification::centredLeft);
+    g.drawText ("Press O to record, then again to overdub.", r.removeFromTop (18), juce::Justification::centredLeft);
+    g.drawText ("The loop is only for practice: your takes do not include it.", r.removeFromTop (18), juce::Justification::centredLeft);
 }
 
 void MetronomePanel::tap()
