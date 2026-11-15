@@ -178,6 +178,22 @@ private:
     juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, earlyText, motionHead, countHead, countText, helpText, aboutHead, aboutArea;
 };
 
+// Say what is wrong (or right) in a few words, sent privately with the same report Settings sends.
+class FeedbackDialog : public Popover
+{
+public:
+    FeedbackDialog();
+    void resized() override;
+    void visibilityChanged() override;
+    std::function<void (juce::String)> onDone; // closes the card and says what happened
+
+private:
+    void send();
+    juce::TextEditor note;
+    juce::ToggleButton withReport { "Add my settings and setup report (names taken out)" };
+    juce::TextButton sendButton { "Send feedback" }, cancel { "Cancel" };
+};
+
 // Ask for a name and save the current tone.
 class SaveDialog : public Popover
 {

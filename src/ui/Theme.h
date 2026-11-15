@@ -153,6 +153,8 @@ namespace icons
     juce::Path chordBox();
     juce::Path plus();
     juce::Path minus();
+    juce::Path message(); // a speech bubble: feedback
+    juce::Path heart();   // support, a thank-you
 } // namespace icons
 
 // Surfaces

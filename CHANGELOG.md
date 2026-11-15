@@ -19,6 +19,7 @@ Update 1. The high-gain amps were rebuilt after a player told us the metal tones
 - Three new cabinets: 4x12 Real Classic, Real Heavy and Real Tight, recordings of real 4x12 cabinets (public domain). The mic knob moves through the real mic placements, from bright to dark. All 65 metal and hard rock tones now play through them.
 - The other cabinets roll off above 7 kHz the way real speakers do, with no flat fizz on top.
 - Every tone was level-matched again.
+- A Feedback button sits next to the name at the top: write what sounds or feels wrong and it goes straight to the people who fix Riffhouse, with your settings report if you want (your user name and computer name are taken out). The heart beside it opens the support page; supporting is a thank-you, everyone gets the same app.
 - The Lo-fi pedal's Downsample knob glides when it is turned, with no click.
 - If you automate the Cabinet choice in a DAW: the list grew, so automation recorded on it may land on a different cabinet.
 

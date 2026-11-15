@@ -1502,4 +1502,85 @@ void SaveDialog::resized()
 }
 
 void SaveDialog::paint (juce::Graphics& g) { Popover::paint (g); }
+
+//==============================================================================
+FeedbackDialog::FeedbackDialog()
+{
+    title = "Tell us what to fix";
+    note.setMultiLine (true, true);
+    note.setReturnKeyStartsNewLine (true);
+    note.setFont (font (15.0f));
+    note.setIndents (12, 10);
+    note.setTextToShowWhenEmpty ("What sounds or feels wrong? Which tone, what you played, what you expected.", colours::textFaint);
+    note.onEscapeKey = [this] { setVisible (false); };
+    addAndMakeVisible (note);
+    withReport.setToggleState (true, juce::dontSendNotification);
+    withReport.setTooltip ("The same text as Settings, Save a report: your settings and what setup measured. "
+                           "Your Windows user name and computer name are taken out first.");
+    addAndMakeVisible (withReport);
+    sendButton.setColour (juce::TextButton::buttonColourId, colours::accent);
+    sendButton.setColour (juce::TextButton::textColourOffId, colours::bg);
+    sendButton.onClick = [this] { send(); };
+    cancel.onClick = [this] { setVisible (false); };
+    addAndMakeVisible (sendButton);
+    addAndMakeVisible (cancel);
+}
+
+void FeedbackDialog::visibilityChanged()
+{
+    if (isVisible())
+    {
+        sendButton.setEnabled (true);
+        note.grabKeyboardFocus();
+    }
+}
+
+void FeedbackDialog::send()
+{
+    const auto words = note.getText().trim();
+    if (words.isEmpty()) { note.grabKeyboardFocus(); return; }
+    auto* host = StandaloneHost::get();
+    juce::String body = words;
+    if (withReport.getToggleState() && host != nullptr && host->makeReport) body << "
+
+---
+" << host->makeReport();
+    else body << "
+
+Riffhouse: " << versionLabel();
+    const auto firstLine = juce::StringArray::fromLines (words)[0].substring (0, 60);
+
+    if (host != nullptr && reports::canSend())
+    {
+        sendButton.setEnabled (false);
+        juce::Component::SafePointer<FeedbackDialog> safe (this);
+        reports::send (host->settings(), "Feedback: " + firstLine, body, [safe] (bool ok, juce::String why)
+        {
+            if (safe == nullptr) return;
+            safe->sendButton.setEnabled (true);
+            if (ok) safe->note.clear();
+            if (safe->onDone) safe->onDone (ok ? "Feedback sent. Thank you, it gets read." : "The feedback did not go: " + why);
+        });
+        return;
+    }
+    // no private way to send from here (inside another app, or a build from source): the public page instead
+    juce::SystemClipboard::copyTextToClipboard (reports::scrubForThisComputer (body));
+    juce::URL ("https://github.com/NatikChhabra/riffhouse/issues/new").launchInDefaultBrowser();
+    note.clear();
+    if (onDone) onDone ("Your feedback is on the clipboard. Paste it into the page that just opened.");
+}
+
+void FeedbackDialog::resized()
+{
+    auto r = getLocalBounds().reduced (20, 16);
+    r.removeFromTop (34);
+    auto row = r.removeFromBottom (36);
+    sendButton.setBounds (row.removeFromRight (140));
+    row.removeFromRight (10);
+    cancel.setBounds (row.removeFromRight (100));
+    r.removeFromBottom (12);
+    withReport.setBounds (r.removeFromBottom (28));
+    r.removeFromBottom (8);
+    note.setBounds (r);
+}
 } // namespace rh::ui
