@@ -134,10 +134,19 @@ int onset (const std::vector<float>& x, float fraction = 0.05f)
     return -1;
 }
 
+// The factory tones: the source tree's when built here, or a presets folder next to the tool
+// when it runs somewhere else (the test tool CI keeps for off-line listening clips)
+juce::File presetFolder()
+{
+    const juce::File built (RIFFHOUSE_PRESET_DIR);
+    if (built.isDirectory()) return built;
+    return juce::File::getSpecialLocation (juce::File::currentExecutableFile).getSiblingFile ("presets");
+}
+
 std::vector<Preset> loadPresets()
 {
     PresetLibrary lib;
-    lib.scanFolder (juce::File (RIFFHOUSE_PRESET_DIR), true);
+    lib.scanFolder (presetFolder(), true);
     return lib.all();
 }
 
@@ -2861,7 +2870,7 @@ void testToneNames()
     CHECK (presetFromJson (R"({"name":"My take: louder","category":"User"})", p, err) && p.title() == "My take: louder", "a colon in your own tone's name is left alone");
 
     PresetLibrary lib;
-    lib.scanFolder (juce::File (RIFFHOUSE_PRESET_DIR), true);
+    lib.scanFolder (presetFolder(), true);
     for (const auto& q : lib.all())
     {
         if (q.category != "Inspired By") continue;
