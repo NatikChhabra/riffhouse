@@ -778,7 +778,7 @@ public:
         if (proc.value (P::inputFix) > 0.5f) s.push_back ({ "Input fix on", true });
         if (proc.value (P::gateOn) > 0.5f)
         {
-            const bool open = proc.meters().gateOpen.load();
+            const bool open = demoLevels || proc.meters().gateOpen.load();
             s.push_back ({ juce::String ("Gate ") + (open ? "open" : "closed"), open });
         }
         return s;

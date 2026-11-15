@@ -354,26 +354,27 @@ def bakelite(): return principled("bakelite", (0.006, 0.006, 0.007), rough=0.22)
 
 
 def wood(seed=0.0):
-    """Varnished hardwood, the grain running the length of the box."""
-    m = principled("wood", (0.2, 0.09, 0.04), rough=0.45, coat=0.4, coat_rough=0.16)
+    """Varnished walnut, the grain running the length of the box: pores, a cathedral figure, a deep gloss."""
+    m = principled("wood", (0.2, 0.09, 0.04), rough=0.3, coat=0.7, coat_rough=0.07)
     n = Nodes(m)
     mp = n.new("ShaderNodeMapping")
-    mp.inputs["Scale"].default_value = (6.0, 0.22, 6.0)
+    mp.inputs["Scale"].default_value = (7.0, 0.18, 7.0)
     mp.inputs["Location"].default_value = (seed, seed * 0.37, 0.0)
     n.link(n.coord.outputs["Object"], mp.inputs["Vector"])
     nz = n.new("ShaderNodeTexNoise")
-    nz.inputs["Scale"].default_value = 1.6
-    nz.inputs["Detail"].default_value = 6.0
-    nz.inputs["Distortion"].default_value = 1.4
+    nz.inputs["Scale"].default_value = 1.8
+    nz.inputs["Detail"].default_value = 8.0
+    nz.inputs["Distortion"].default_value = 1.6
     n.link(mp.outputs["Vector"], nz.inputs["Vector"])
     wave = n.new("ShaderNodeTexWave", wave_type="BANDS", bands_direction="X")
-    wave.inputs["Scale"].default_value = 2.2
-    wave.inputs["Distortion"].default_value = 5.0
-    wave.inputs["Detail"].default_value = 3.0
+    wave.inputs["Scale"].default_value = 3.4
+    wave.inputs["Distortion"].default_value = 6.0
+    wave.inputs["Detail"].default_value = 4.0
     n.link(mp.outputs["Vector"], wave.inputs["Vector"])
-    f = n.math("ADD", n.math("MULTIPLY", wave.outputs["Fac"], 0.6), n.math("MULTIPLY", nz.outputs["Fac"], 0.5))
-    n.link(n.ramp(f, [(0.32, (0.008, 0.003, 0.0015)), (0.55, (0.04, 0.014, 0.005)), (0.78, (0.115, 0.044, 0.014))]), n.bsdf.inputs["Base Color"])
-    n.link(n.bump(f, 0.05, 0.01), n.bsdf.inputs["Normal"])
+    pores = n.noise(120.0, 2.0, stretch=(0.04, 1.0, 1.0))
+    f = n.math("ADD", n.math("MULTIPLY", wave.outputs["Fac"], 0.7), n.math("MULTIPLY", nz.outputs["Fac"], 0.45))
+    n.link(n.ramp(f, [(0.28, (0.014, 0.005, 0.002)), (0.5, (0.075, 0.03, 0.011)), (0.72, (0.2, 0.09, 0.034)), (0.9, (0.3, 0.15, 0.06))]), n.bsdf.inputs["Base Color"])
+    n.link(n.bump(n.math("ADD", f, n.math("MULTIPLY", pores, 0.6)), 0.12, 0.01), n.bsdf.inputs["Normal"])
     return m
 
 

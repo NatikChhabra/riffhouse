@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "AudioPicker.h"
 #include "Panels.h"
+#include "GearArt.h"
 #include "../plugin/DeviceLog.h"
 #include "../plugin/Reports.h"
 #include "../plugin/StandaloneHost.h"
@@ -24,7 +25,7 @@ TunerView::TunerView (RiffhouseProcessor& p) : proc (p)
 void TunerView::resized()
 {
     close.setBounds (getWidth() - 70, 20, 46, 46);
-    mute.setBounds (juce::Rectangle<int> (290, 28).withCentre ({ getWidth() / 2, 600 })); // with the rest of the tuner, not at the far edge
+    mute.setBounds (juce::Rectangle<int> (290, 28).withCentre ({ getWidth() / 2, 640 })); // with the rest of the tuner, not at the far edge
 }
 
 void TunerView::refresh()
@@ -49,6 +50,11 @@ void TunerView::paint (juce::Graphics& g)
     const bool inTune = live && std::abs (reading.cents) < 3.0f;
     const auto c = ! live ? colours::textFaint : (inTune ? colours::good : (std::abs (reading.cents) < 12.0f ? colours::warn : colours::accent));
     const float cx = (float) getWidth() * 0.5f;
+    // the tuner's body is photographed: the note and the needle are shown through its two windows
+    const bool unit = art::has ("tuner_unit");
+    if (unit)
+        art::draw (g, "tuner_unit", juce::Rectangle<float> (cx - 450.0f, 50.0f, 900.0f, 470.0f));
+    const float below = unit ? 30.0f : 0.0f;
 
     // note name, big
     const auto noteArea = juce::Rectangle<float> (420.0f, 190.0f).withCentre ({ cx, 210.0f });
@@ -58,7 +64,7 @@ void TunerView::paint (juce::Graphics& g)
         g.fillEllipse (noteArea.withSizeKeepingCentre (440.0f, 300.0f));
     }
     const bool display = look() != Look::studio;
-    if (display)
+    if (display && ! unit)
         drawWell (g, noteArea.withSizeKeepingCentre (340.0f, 210.0f), 16.0f);
     g.setColour (live ? (display && inTune ? colours::good : colours::text) : colours::textFaint.withAlpha (0.6f));
     g.setFont (display ? font (165.0f, Weight::numeric) : font (168.0f, Weight::display));
@@ -81,7 +87,7 @@ void TunerView::paint (juce::Graphics& g)
     }
 
     // horizontal cents scale
-    const float w = 680.0f, y = 400.0f;
+    const float w = unit ? 600.0f : 680.0f, y = 400.0f;
     const float x0 = cx - w * 0.5f;
     for (int cents = -50; cents <= 50; cents += 5)
     {
@@ -99,8 +105,8 @@ void TunerView::paint (juce::Graphics& g)
     }
     g.setFont (font (13.0f, Weight::semibold));
     g.setColour (colours::textFaint);
-    g.drawText ("FLAT", juce::Rectangle<float> (x0 - 90.0f, y - 10.0f, 70.0f, 20.0f), juce::Justification::centredRight);
-    g.drawText ("SHARP", juce::Rectangle<float> (x0 + w + 20.0f, y - 10.0f, 70.0f, 20.0f), juce::Justification::centredLeft);
+    g.drawText ("FLAT", juce::Rectangle<float> (x0 - (unit ? 78.0f : 90.0f), y - 10.0f, unit ? 60.0f : 70.0f, 20.0f), juce::Justification::centredRight);
+    g.drawText ("SHARP", juce::Rectangle<float> (x0 + w + (unit ? 18.0f : 20.0f), y - 10.0f, unit ? 60.0f : 70.0f, 20.0f), juce::Justification::centredLeft);
 
     if (live)
     {
@@ -116,15 +122,15 @@ void TunerView::paint (juce::Graphics& g)
     g.setFont (font (22.0f, Weight::semibold));
     g.setColour (c);
     const juce::String status = ! live ? "Play one string" : (inTune ? "In tune" : (reading.cents < 0 ? "A little flat, tune up" : "A little sharp, tune down"));
-    g.drawText (status, juce::Rectangle<float> (600.0f, 30.0f).withCentre ({ cx, y + 86.0f }), juce::Justification::centred);
+    g.drawText (status, juce::Rectangle<float> (600.0f, 30.0f).withCentre ({ cx, y + 86.0f + below }), juce::Justification::centred);
     g.setFont (font (14.5f));
     g.setColour (colours::textDim);
     if (live)
         g.drawText (juce::String (reading.hz, 1) + juce::String (" Hz, ") + (reading.cents > 0 ? "+" : "") + juce::String (juce::roundToInt (reading.cents)) + " cents",
-                    juce::Rectangle<float> (500.0f, 24.0f).withCentre ({ cx, y + 116.0f }), juce::Justification::centred);
+                    juce::Rectangle<float> (500.0f, 24.0f).withCentre ({ cx, y + 116.0f + below }), juce::Justification::centred);
     g.setColour (colours::textFaint);
     g.drawText ("Any tuning works: standard, drop, open or down-tuned. It always shows the nearest note.",
-                juce::Rectangle<float> (760.0f, 24.0f).withCentre ({ cx, y + 146.0f }), juce::Justification::centred);
+                juce::Rectangle<float> (760.0f, 24.0f).withCentre ({ cx, y + 146.0f + below }), juce::Justification::centred);
 }
 
 //==============================================================================

@@ -89,13 +89,18 @@ def stomp_switch(st, bodies, x, y, fs, parts):
 
 
 def soft_switch(st, bodies, x, y, fs, parts):
-    """A low soft-touch switch in a counterbore: a satin ring round a dished black button."""
+    """A soft-touch switch: a chromed flange and nut, a black rubber cap with a groove ring and fine pebble grain."""
     p, nrm = st.on(bodies, x, y)
     r = fs * 0.5
-    ring = c.lathe("ring", [(r * 0.98, 0), (r * 0.98, 0.1), (r * 0.94, 0.16), (r * 0.8, 0.17), (r * 0.78, 0.08)], parts["chrome"], seg=96)
-    cap = c.lathe("cap", [(r * 0.78, 0.05), (r * 0.78, 0.2), (r * 0.74, 0.25), (r * 0.6, 0.24), (r * 0.3, 0.215), (0.0001, 0.205)],
-                  c.principled("softcap", (0.02, 0.021, 0.023), rough=0.42), seg=96)
-    for ob in (ring, cap):
+    ring = c.lathe("ring", [(r * 1.02, 0), (r * 1.02, 0.09), (r * 0.98, 0.17), (r * 0.9, 0.2), (r * 0.84, 0.16), (r * 0.8, 0.08)], parts["chrome"], seg=128,
+                   flutes=36, depth=0.012, flute_rings=(0, 2))
+    rubber = c.principled("softcap", (0.014, 0.015, 0.016), rough=0.62)
+    n = c.Nodes(rubber)
+    n.link(n.bump(n.noise(260.0, 3.0), 0.5, 0.012), n.bsdf.inputs["Normal"])
+    cap = c.lathe("cap", [(r * 0.8, 0.06), (r * 0.8, 0.24), (r * 0.76, 0.31), (r * 0.7, 0.32), (r * 0.67, 0.27), (r * 0.64, 0.32), (r * 0.5, 0.31),
+                          (r * 0.3, 0.27), (0.0001, 0.255)], rubber, seg=128)
+    dot = c.lathe("pip", [(r * 0.12, 0.255), (r * 0.12, 0.27), (r * 0.08, 0.285), (0.0001, 0.288)], parts["chrome"], seg=32)
+    for ob in (ring, cap, dot):
         c.stand(ob, p, nrm)
 
 
@@ -338,9 +343,8 @@ def build(p, gear_dir, out_dir, samples, scale):
         stomp_switch(st, bodies, fx + fw / 2, fy + fh / 2, fs, parts)
     elif p["footStyle"] == 2:
         soft_switch(st, bodies, fx + fw / 2, fy + fh / 2, fs, parts)
-    if form != 4:
-        jy = by + bh * (0.13 if form == 5 else (0.19 if form == 1 else 0.22))
-        side_jacks(st, x0, x1, jy, H * 0.52, parts)
+    jy = by + bh * (0.13 if form == 5 else (0.19 if form == 1 else 0.22))
+    side_jacks(st, x0, x1, jy, H * 0.52, parts)
     if p["stripe"] == 2:
         tread_strip(st, bodies[0], p["box"], os.path.join(out_dir, "_work"), pid, parts)
 
