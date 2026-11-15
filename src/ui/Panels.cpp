@@ -1541,13 +1541,8 @@ void FeedbackDialog::send()
     if (words.isEmpty()) { note.grabKeyboardFocus(); return; }
     auto* host = StandaloneHost::get();
     juce::String body = words;
-    if (withReport.getToggleState() && host != nullptr && host->makeReport) body << "
-
----
-" << host->makeReport();
-    else body << "
-
-Riffhouse: " << versionLabel();
+    if (withReport.getToggleState() && host != nullptr && host->makeReport) body << "\n\n---\n" << host->makeReport();
+    else body << "\n\nRiffhouse: " << versionLabel();
     const auto firstLine = juce::StringArray::fromLines (words)[0].substring (0, 60);
 
     if (host != nullptr && reports::canSend())
