@@ -1312,20 +1312,25 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
         juce::GlyphArrangement ga;
         ga.addLineOfText (f, msText, num.getX(), num.getCentreY() + (f.getAscent() - f.getDescent()) * 0.5f);
         const float cell = f.getHeight() * 0.075f;
+        float pull = 0.0f; // the dot needs far less room than Doto's plus-shaped one
         for (int i = 0; i < ga.getNumGlyphs(); ++i)
         {
             const auto& gl = ga.getGlyph (i);
             if (gl.getCharacter() == '.')
-                g.fillRect (gl.getBounds().getCentreX() - cell * 0.5f, gl.getBaselineY() - cell, cell, cell);
+            {
+                const float room = gl.getRight() - gl.getLeft();
+                g.fillRect (gl.getLeft() + cell * 0.6f - pull, gl.getBaselineY() - cell, cell, cell);
+                pull += std::max (0.0f, room - cell * 2.2f);
+            }
             else
             {
                 juce::Path path;
                 gl.createPath (path);
-                g.fillPath (path);
+                g.fillPath (path, juce::AffineTransform::translation (-pull, 0.0f));
             }
         }
     }
-    const float numW = juce::GlyphArrangement::getStringWidth (faceFont (Face::doto, 52.0f), msText);
+    const float numW = juce::GlyphArrangement::getStringWidth (faceFont (Face::doto, 52.0f), msText) - 0.0f;
     g.setFont (font (16.0f, Weight::medium));
     g.setColour (colours::textDim);
     g.drawText ("ms", num.withTrimmedLeft (numW + 8.0f).withTrimmedTop (18.0f), juce::Justification::centredLeft);
