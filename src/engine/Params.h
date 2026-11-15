@@ -72,7 +72,7 @@ ParamValues defaultParamValues();
 namespace choices
 {
     enum AmpModel { glassClean, tweedEdge, chimeTop, britPlexi, brit800, hotRodLead, modernHigh, tightMetal, bassStation, studioDirect, neuralCapture, numAmpModels };
-    enum CabModel { cabOpen1x12, cabBlue2x12, cabVintage4x12, cabModern4x12, cabUs2x12, cabTiny1x8, cabBass4x10, cabBass1x15, cabUserIr, cabRealClassic, cabRealHeavy, cabRealTight, numCabModels };
+    enum CabModel { cabOpen1x12, cabBlue2x12, cabVintage4x12, cabModern4x12, cabUs2x12, cabTiny1x8, cabBass4x10, cabBass1x15, cabUserIr, cabRealClassic, cabRealHeavy, cabRealTight, cabRealPresence, numCabModels };
     enum DriveType { drvBoost, drvTrebleBoost, drvGreen, drvBlues, drvRat, drvFuzz, drvMetal, numDriveTypes };
     enum ModType { modChorus, modFlanger, modPhaser, modTremolo, modVibrato, modVibe, numModTypes };
     enum DelayType { dlyDigital, dlyAnalog, dlyTape, dlyPingPong, numDelayTypes };
