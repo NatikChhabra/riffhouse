@@ -1,0 +1,10 @@
+# Keeps the pinned GitHub Actions up to date (each pin is a full commit id, so a moved tag can't change what runs).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
