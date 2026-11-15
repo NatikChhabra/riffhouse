@@ -422,11 +422,23 @@
 
 
   /* Visits, Download clicks and the two small forms go to one address of our own.
-     No cookies, no ids, nothing kept in the browser. A local preview or an automated check is not a visit. */
+     No cookies, no ids. A local preview, an automated check, a robot or one of our own browsers is not a visit. */
   const RELAY = 'https://script.google.com/macros/s/AKfycbyXRpXQQjG-g7loWwQLSROANdTUO_Iy5FcEQri0sfxmKE-5EjgFRTpclacPy8jQ1pi-/exec';
   const real = /^https:$/.test(location.protocol) && !navigator.webdriver;
   const send = (o) => { try { return real && navigator.sendBeacon(RELAY, JSON.stringify(o)); } catch { return false; } };
+  /* Our own browsers and robots are not visitors. Opening any page once with ?notme marks this browser
+     (one flag in this browser only, nothing sent); ?countme undoes it. Crawlers say so in their user agent. */
+  let me = false;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.has('notme')) localStorage.setItem('rh-notme', '1');
+    if (q.has('countme')) localStorage.removeItem('rh-notme');
+    me = localStorage.getItem('rh-notme') === '1';
+  } catch { /* storage blocked: count as usual */ }
+  const robot = /bot|crawl|spider|slurp|preview|headless|lighthouse|pagespeed|facebookexternalhit|embedly|whatsapp|discord|telegram/i.test(navigator.userAgent || '');
+  const counted = !me && !robot;
   function tally() {
+    if (!counted) return;
     let from = '';
     try { const h = new URL(document.referrer).hostname; if (h !== location.hostname) from = h; } catch { /* a direct visit */ }
     send({ t: 'view', p: location.pathname, r: from });

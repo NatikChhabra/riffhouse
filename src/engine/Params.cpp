@@ -79,7 +79,7 @@ namespace
         s.push_back (pick (P::cabModel, "cab_model", "Cabinet",
                            { "1x12 Open Back", "2x12 Blue", "4x12 Vintage", "4x12 Modern", "2x12 American",
                              "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR",
-                             "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight" }, 2));
+                             "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight", "4x12 Real Presence" }, 2));
         s.push_back (knob (P::cabMic, "cab_mic", "Mic Position", 3.0f));
         s.push_back (knob (P::cabDistance, "cab_distance", "Distance", 2.0f));
         s.push_back (cont (P::cabLowCut, "cab_lowcut", "Low Cut", 20.0f, 300.0f, 60.0f, "Hz", 80.0f));
@@ -128,6 +128,7 @@ namespace
         s.push_back (cont (P::space, "space", "Space", 0.0f, 2.0f, 1.0f, "x"));
         s.push_back (cont (P::outLevel, "out_level", "Output", -36.0f, 12.0f, 0.0f, "dB"));
         s.push_back (tog (P::autoLevel, "auto_level", "Auto level", true));
+        s.push_back (pick (P::gateAuto, "gate_auto", "Gate Mode", { "Manual", "Auto" }, 1));
 
         assert ((int) s.size() == kNumParams);
         for (int i = 0; i < (int) s.size(); ++i)

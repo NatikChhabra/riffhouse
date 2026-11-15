@@ -495,7 +495,13 @@ void NoiseGate::set (float thresholdDb, float releaseMs)
 void NoiseGate::applyThreshold()
 {
     float t = userThrDb;
-    if (follows && floorDb > -119.0f)
+    if (autoThreshold && floorDb > -119.0f)
+    {
+        // Auto: sit just over the hiss and hum heard, never so high that notes are cut
+        const float need = std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb);
+        t = std::clamp (need, kAutoLowestDb, kFollowCapHighDb);
+    }
+    else if (follows && floorDb > -119.0f)
     {
         const float need = std::max (floorDb + kAboveFloorDb, floorPeakDb + kAbovePeaksDb);
         // Once the floor is heard, the threshold is never held far above what that floor
@@ -1328,7 +1334,7 @@ void Reverb::configure()
     float rt60 = 1.0f;
     switch (type)
     {
-        case 0: size = 0.32f; rt60 = lerp (0.25f, 1.6f, decay); diffusion = 0.6f; modDepth = 0.1f; inputLp = 9000; break;
+        case 0: size = 0.32f; rt60 = lerp (0.25f, 1.6f, decay); diffusion = 0.6f; modDepth = 0.5f; inputLp = 9000; break;
         case 1: size = 1.0f;  rt60 = lerp (1.0f, 7.0f, decay);  diffusion = 0.7f; modDepth = 0.35f; inputLp = 8000; break;
         case 2: size = 0.55f; rt60 = lerp (0.6f, 5.0f, decay);  diffusion = 0.8f; modDepth = 0.15f; inputLp = 14000; break;
         case 3: size = 0.3f;  rt60 = lerp (0.8f, 3.5f, decay);  diffusion = 0.65f; modDepth = 0.2f; inputLp = 5000; break;
@@ -1343,7 +1349,7 @@ void Reverb::configure()
         lineGain[i] = std::pow (10.0f, -3.0f * (lineLen[i] / (float) sr) / rt60);
         // high frequencies die faster: tone sets the damping cutoff
         damp[i].setCutoff (sr, expMap (tone, 1500.0f, type == 2 ? 16000.0f : 11000.0f));
-        lowCut[i].setCutoff (sr, type == 3 ? 250.0 : 60.0);
+        lowCut[i].setCutoff (sr, type == 3 ? 250.0 : 20.0); // 60 Hz here cut the bass RT to 0.6x of the mids (07-effects.md)
     }
     for (int i = 0; i < 4; ++i)
         diffLen[i] = diffMs[i] * std::max (0.4f, size) * 0.001f * (float) sr;
@@ -1415,7 +1421,7 @@ void Reverb::process (float* l, float* r, int n)
         for (int k = 0; k < N; ++k)
         {
             float len = lineLen[k];
-            if (k < 4) len += modAmt * mod.sine (0.25f * (float) k) + modAmt;
+            len += modAmt * mod.sine (0.125f * (float) k) + modAmt; // every line moves, so no mode stands still and rings
             y[k] = lines[k].read (std::max (1.0f, len));
         }
         mod.advance();
@@ -1436,7 +1442,7 @@ void Reverb::process (float* l, float* r, int n)
         }
 
         const float outL = (y[0] - y[2] + y[4] - y[6] + 0.5f * (y[1] + y[7])) * 0.55f;
-        const float outR = (y[1] - y[3] + y[5] - y[7] + 0.5f * (y[2] + y[6])) * 0.55f;
+        const float outR = (y[1] - y[3] + y[5] - y[7] + 0.5f * (y[6] - y[2])) * 0.55f; // taps chosen so L and R do not cancel in mono
         const float m = mixS.next();
         l[i] += outL * m;
         r[i] += outR * m;

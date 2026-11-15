@@ -2522,6 +2522,7 @@ namespace
             case 9:  return { 2, 2, 12.0f, 0xff4a463f, 0xff131313, 1.0f };  // real 4x12 classic
             case 10: return { 2, 2, 12.0f, 0xff1c1d1f, 0xff0c0c0c, 1.0f };  // real 4x12 heavy
             case 11: return { 2, 2, 12.0f, 0xff2b2d30, 0xff111111, 1.0f };  // real 4x12 tight
+            case 12: return { 2, 2, 12.0f, 0xff3a3631, 0xff0f0f0f, 1.0f };  // real 4x12 presence
             default: return { 1, 1, 12.0f, 0xff5d6166, 0xff161616, 1.6f };  // your IR: one speaker beside a display
         }
     }
@@ -2551,6 +2552,7 @@ namespace
             case 9:  return { Weave::saltPepper, 0,         -1, 0.16f, false };
             case 10: return { Weave::grid,       0,         -1, 0.22f, false };
             case 11: return { Weave::mesh,       0,         -1, 1.0f,  false };
+            case 12: return { Weave::black,      0,         -1, 0.18f, false };
             default: return { Weave::none,       0,         -1, 1.0f,  false };
         }
     }

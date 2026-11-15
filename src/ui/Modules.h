@@ -96,6 +96,7 @@ private:
     int index;
     PowerSwitch power;
     std::unique_ptr<ChoiceSelector> types, sync;
+    P syncParam = P::dlySync; // what the small switch on the right sets
     juce::OwnedArray<Knob> knobs;
     juce::OwnedArray<Fader> faders;
     std::unique_ptr<IconButton> loadIr;

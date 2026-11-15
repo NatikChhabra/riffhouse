@@ -1034,6 +1034,9 @@ RiffhouseEditor::RiffhouseEditor (RiffhouseProcessor& p) : AudioProcessorEditor 
         // Setup opens by itself once, on the first start. After that it is a button in Settings,
         // and a missing input is a line at the bottom of the window, never a setup that comes back.
         const bool done = host->settings().getBoolValue ("setupDone", false);
+        // the gate starts from the hiss setup measured
+        if (done && host->settings().containsKey ("setupNoiseDb"))
+            proc.setGateFloorSeed ((float) host->settings().getDoubleValue ("setupNoiseDb", -120.0));
         // a setup made by an older version is offered a new run, once
         const bool old = done && host->settings().getIntValue ("setupVersion", 1) < AutoSetup::kSetupVersion;
         if (! done || old)

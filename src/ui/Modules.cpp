@@ -9,7 +9,7 @@ const std::vector<ModuleInfo>& modules()
 {
     static const std::vector<ModuleInfo> m {
         { "gate", "Gate", juce::Colour (0xff94a3b8), P::gateOn, -1, { P::gateThresh, P::gateRelease },
-          "Silences hiss and hum between notes. Setup sets the threshold for your guitar automatically." },
+          "Silences hiss and hum between notes. Auto sets the threshold from the hiss it hears; turn Threshold to set it yourself." },
         { "comp", "Comp", juce::Colour (0xff2dd4bf), P::compOn, -1, { P::compSustain, P::compAttack, P::compLevel, P::compBlend },
           "Evens out your picking and adds sustain. Great for clean funk and country." },
         { "wah", "Wah", juce::Colour (0xffa78bfa), P::wahOn, (int) P::wahMode, { P::wahPos, P::wahSens, P::wahQ },
@@ -774,6 +774,15 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
         for (auto b : bands)
             addAndMakeVisible (faders.add (new Fader (proc, b, moduleColour (index), b == P::eqLevel ? "Level" : juce::String())));
     }
+    if (index == mGate)
+    {
+        // Auto or Manual: turning Threshold switches it to Manual by itself
+        syncParam = P::gateAuto;
+        sync = std::make_unique<ChoiceSelector> (proc, P::gateAuto);
+        sync->textHeight = 13.0f;
+        sync->onChange = [this] (int) { repaint(); };
+        addAndMakeVisible (*sync);
+    }
     if (index == mDelay)
     {
         sync = std::make_unique<ChoiceSelector> (proc, P::dlySync);
@@ -860,8 +869,9 @@ void ModulePage::refresh()
         const float m = proc.value (P::cabMic), d = proc.value (P::cabDistance);
         if (m != lastMic || d != lastDist) { lastMic = m; lastDist = d; repaint(); if (micMap != nullptr) micMap->repaint(); }
     }
-    if (sync != nullptr && juce::roundToInt (proc.value (P::dlySync)) != lastSync)
+    if (sync != nullptr && juce::roundToInt (proc.value (syncParam)) != lastSync)
     {
+        lastSync = juce::roundToInt (proc.value (syncParam));
         updateEnablement();
         repaint();
     }
@@ -1000,7 +1010,7 @@ void ModulePage::paint (juce::Graphics& g)
         drawCaps (g, spec (info.onParam).name, getLocalBounds().removeFromTop (headerH).toFloat(), 22.0f, colours::text,
                   juce::Justification::centred, 0.06f);
     if (sync != nullptr || index == mWah)
-        drawCaps (g, index == mWah ? "Mode" : "Sync", syncLabel.toFloat(), 11.5f, colours::textDim, juce::Justification::centredRight);
+        drawCaps (g, index == mWah || index == mGate ? "Mode" : "Sync", syncLabel.toFloat(), 11.5f, colours::textDim, juce::Justification::centredRight);
     g.setColour (colours::textDim);
     g.setFont (font (13.5f));
     g.drawText (typeText, descArea, juce::Justification::centred, true);

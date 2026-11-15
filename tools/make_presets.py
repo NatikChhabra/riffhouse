@@ -22,7 +22,7 @@ AMPS = ["Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline
         "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture"]
 CABS = ["1x12 Open Back", "2x12 Blue", "4x12 Vintage", "4x12 Modern", "2x12 American",
         "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR",
-        "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight"]
+        "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight", "4x12 Real Presence"]
 DRIVES = ["Clean Boost", "Treble Boost", "Green Drive", "Blues Drive", "Rodent Dist", "Big Fuzz", "Metal Box"]
 
 def A(model, gain=5, bass=5, mid=5, treble=5, presence=5, depth=5, master=5, level=0.0):

@@ -3,6 +3,7 @@
 #include "Cabinet.h"
 #include "CabCurves.h"
 #include "RealCabIrs.h"
+#include "DerivedCabIrs.h"
 
 #include <complex>
 
@@ -207,12 +208,17 @@ std::vector<float> generateCabIr (int cabIndex, float mic, float distance, doubl
     return ir;
 }
 
-int numRealCabs() { return realcabs::kNumFamilies; }
-const char* realCabName (int i) { return realcabs::kFamilies[std::clamp (i, 0, numRealCabs() - 1)].name; }
+int numRealCabs() { return realcabs::kNumFamilies + realcabs::kNumDerived; }
+static const realcabs::Family& realFamily (int i)
+{
+    i = std::clamp (i, 0, numRealCabs() - 1);
+    return i < realcabs::kNumFamilies ? realcabs::kFamilies[i] : realcabs::kDerivedFamilies[i - realcabs::kNumFamilies];
+}
+const char* realCabName (int i) { return realFamily (i).name; }
 
 std::vector<float> realCabIr (int index, float mic, float distance)
 {
-    const auto& fam = realcabs::kFamilies[std::clamp (index, 0, numRealCabs() - 1)];
+    const auto& fam = realFamily (index);
     const auto take = [] (const std::int16_t* q)
     {
         std::vector<float> x ((size_t) realcabs::kLength);

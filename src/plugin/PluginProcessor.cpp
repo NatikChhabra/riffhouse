@@ -70,6 +70,7 @@ RiffhouseProcessor::RiffhouseProcessor()
         raw[(size_t) s.id] = apvts.getRawParameterValue (s.key);
         jassert (params[(size_t) s.id] != nullptr);
     }
+    params[(size_t) P::gateThresh]->addListener (&gateManualOnTouch);
     formats.registerBasicFormats();
     // only the app itself learns the player's phrase: a plugin on a drum bus must not
     matcher.setLearns (wrapperType == wrapperType_Standalone);
@@ -84,6 +85,7 @@ RiffhouseProcessor::RiffhouseProcessor()
 
 RiffhouseProcessor::~RiffhouseProcessor()
 {
+    params[(size_t) P::gateThresh]->removeListener (&gateManualOnTouch);
     alive->store (false);
     loader.removeAllJobs (true, 10000);
     rec.stop();
@@ -109,6 +111,7 @@ void RiffhouseProcessor::rememberSetup() const
     for (const auto& s : paramSpecs())
         if (belongsToSetup (s.id))
             t << s.key << "=" << juce::String (value (s.id), 3) << "\n";
+    if (gateFloorSeed() > -119.0f) t << "noise_floor_db=" << juce::String (gateFloorSeed(), 1) << "\n";
     const auto f = setupFile();
     f.getParentDirectory().createDirectory();
     f.replaceWithText (t);
@@ -124,6 +127,7 @@ bool RiffhouseProcessor::recallSetup()
         const auto key = l.upToFirstOccurrenceOf ("=", false, false).trim();
         const auto text = l.fromFirstOccurrenceOf ("=", false, false).trim();
         if (key.isEmpty() || text.isEmpty() || ! text.containsOnly ("0123456789.-")) continue;
+        if (key == "noise_floor_db") { setGateFloorSeed (juce::jlimit (-119.0f, -30.0f, text.getFloatValue())); continue; }
         for (const auto& s : paramSpecs())
             if (belongsToSetup (s.id) && key == s.key)
             {
@@ -277,6 +281,7 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     // project always renders the same file.
     if (isNonRealtime()) matcher.matchNow (v);
     if (toneChangeQueued.exchange (false)) rig.beginToneChange();
+    if (const float seed = gateSeed.load(); seed != gateSeedApplied) { gateSeedApplied = seed; rig.seedGateFloor (seed); }
     rig.setParams (v);
     if (const int amp = (int) std::lround (v[(size_t) P::ampModel]); amp != latencyAmp.load (std::memory_order_relaxed))
     {
@@ -912,7 +917,11 @@ void RiffhouseProcessor::setStateInformation (const void* data, int size)
     if (! st.isValid() || ! st.hasType (apvts.state.getType())) return; // not ours: leave everything as it is
     if (auto ui = st.getChildWithName ("UI"); ui.isValid()) uiState.copyPropertiesAndChildrenFrom (ui, nullptr);
     if (uiState.hasProperty ("foot")) foot.fromText (uiState.getProperty ("foot").toString().toStdString());
+    // Before Update 1 the gate belonged to the setup, so one "off" stayed off for every tone.
+    // A session saved then has no gate mode: it comes back with the gate on, in Auto.
+    const bool beforeGateMode = ! st.getChildWithProperty ("id", "gate_auto").isValid();
     apvts.replaceState (st);
+    if (beforeGateMode) { setValue (P::gateOn, 1.0f); setValue (P::gateAuto, 1.0f); }
     currentPreset = library.indexOf (st.getProperty ("preset").toString());
     for (int i = 0; i < kNumParams; ++i) presetSnapshot[(size_t) i] = raw[(size_t) i]->load();
     metronomeBpm.store ((float) st.getProperty ("metronomeBpm", 100.0));
