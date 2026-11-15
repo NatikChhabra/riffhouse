@@ -1511,7 +1511,6 @@ FeedbackDialog::FeedbackDialog()
     note.setReturnKeyStartsNewLine (true);
     note.setFont (font (15.0f));
     note.setIndents (12, 10);
-    note.setTextToShowWhenEmpty ("What sounds or feels wrong? Which tone, what you played, what you expected.", colours::textFaint);
     note.onEscapeKey = [this] { setVisible (false); };
     addAndMakeVisible (note);
     withReport.setToggleState (true, juce::dontSendNotification);
@@ -1565,10 +1564,20 @@ void FeedbackDialog::send()
     if (onDone) onDone ("Your feedback is on the clipboard. Paste it into the page that just opened.");
 }
 
+void FeedbackDialog::paint (juce::Graphics& g)
+{
+    Popover::paint (g);
+    // the prompt stays in sight: a box's own hint disappears the moment it has the cursor, and it opens with it
+    g.setColour (colours::textDim);
+    g.setFont (font (13.5f));
+    g.drawText ("Which tone, what you played, and what sounded or felt wrong.",
+                getLocalBounds().reduced (20, 16).withTrimmedTop (30).removeFromTop (20), juce::Justification::centredLeft);
+}
+
 void FeedbackDialog::resized()
 {
     auto r = getLocalBounds().reduced (20, 16);
-    r.removeFromTop (34);
+    r.removeFromTop (58);
     auto row = r.removeFromBottom (36);
     sendButton.setBounds (row.removeFromRight (140));
     row.removeFromRight (10);

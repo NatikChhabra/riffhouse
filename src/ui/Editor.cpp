@@ -378,7 +378,7 @@ public:
         metroButton.onClick = [this] { showPopover (metroPanel, metroButton.getBounds(), 300, 274); };
         // beside the name, out of the way of playing: say what is wrong, and a quiet thank-you
         feedbackButton.setTooltip ("Send feedback: tell us what to fix");
-        feedbackButton.onClick = [this] { showPopover (feedbackDialog, feedbackButton.getBounds(), 420, 300); };
+        feedbackButton.onClick = [this] { showPopover (feedbackDialog, feedbackButton.getBounds(), 420, 324); };
         supportButton.setTooltip ("Support Riffhouse. Everyone gets the same app; supporting is a thank-you, not a purchase.");
         supportButton.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
         for (auto* b : { &feedbackButton, &supportButton })
@@ -2050,7 +2050,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     r.showPopover (r.saveDialog, r.saveButton.getBounds(), 360, 206);
     shoot ("save");
     r.closePopovers();
-    r.showPopover (r.feedbackDialog, r.feedbackButton.getBounds(), 420, 300);
+    r.showPopover (r.feedbackDialog, r.feedbackButton.getBounds(), 420, 324);
     shoot ("feedback");
     r.closePopovers();
     {

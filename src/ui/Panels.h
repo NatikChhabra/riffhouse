@@ -184,6 +184,7 @@ class FeedbackDialog : public Popover
 public:
     FeedbackDialog();
     void resized() override;
+    void paint (juce::Graphics&) override;
     void visibilityChanged() override;
     std::function<void (juce::String)> onDone; // closes the card and says what happened
 
