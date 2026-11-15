@@ -81,12 +81,6 @@ def plywood():
 def diagram(out, samples, scale):
     area = (0.0, -4.0, 392.0, 132.0)
     st = c.Stage(area, ZC, scale=scale, samples=samples, floor=True)
-    ply = plywood()
-    for side in (-1, 1):
-        x0 = CX + side * (CONE_R + 4.0)
-        xa, xb = (x0, 392.0 + 20) if side > 0 else (-20.0, x0)
-        p, q = st.at(xa, BAFFLE - BOARD / 2, ZC), st.at(xb, BAFFLE + BOARD / 2, ZC)
-        b = c.box("board", p.x, q.x, q.y, p.y, 0.0, ZC, ply, edge=0.03, edge_segments=2)
     steel = c.principled("basket", (0.2, 0.21, 0.22), metallic=0.9, rough=0.42)
     paper = c.principled("paper", (0.13, 0.105, 0.08), rough=0.9)
     pn = c.Nodes(paper)
