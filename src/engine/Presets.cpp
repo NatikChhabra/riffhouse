@@ -214,7 +214,7 @@ juce::String presetToShareMessage (const Preset& p)
     // a tone named after an artist says it is a style; the line goes above the code so nothing
     // typed after the code can run into it
     const bool artist = p.artist().isNotEmpty() || name.startsWithIgnoreCase ("Inspired by ");
-    return name + ", a guitar tone made in Riffhouse, the free amp app: https://natikchhabra.github.io/riffhouse/\n"
+    return name + ", a guitar tone made in Riffhouse, the free amp app: https://riffhouse.in/\n"
          + (artist ? "Inspired by means a style. Not affiliated with the artist.\n" : "")
          + "To play it, copy this whole message, open Riffhouse and press Ctrl+V.\n"
          + presetToShareCode (p);

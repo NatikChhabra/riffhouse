@@ -8,7 +8,7 @@ Plug your guitar into whatever you have, an audio interface or the mic jack on a
 
 ### [Download for Windows](https://github.com/NatikChhabra/riffhouse/releases/latest)
 
-More on the [website](https://natikchhabra.github.io/riffhouse/), or go straight to [help and fixes](docs/TROUBLESHOOTING.md), [what changed](CHANGELOG.md) and the [roadmap](ROADMAP.md).
+More on the [website](https://riffhouse.in/), or go straight to [help and fixes](docs/TROUBLESHOOTING.md), [what changed](CHANGELOG.md) and the [roadmap](ROADMAP.md).
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
@@ -108,7 +108,7 @@ Every change runs more than 6,900 automatic checks on the sound engine before it
 
 The next big update, 0.2.0, brings a real pedalboard (any pedal, in any order, two of the same), scenes you switch while you play, a Mic button that sends guitar and voice into any call, Share clip for the last 30 seconds you played, a second amp, drums and a daily practice goal. Smaller updates before it fix what players report and lay its groundwork.
 
-The whole plan is in the [roadmap](ROADMAP.md) and on the [roadmap page](https://natikchhabra.github.io/riffhouse/roadmap.html). Things only get added to it, never pushed to a later version.
+The whole plan is in the [roadmap](ROADMAP.md) and on the [roadmap page](https://riffhouse.in/roadmap.html). Things only get added to it, never pushed to a later version.
 
 Missing something? [Say so](https://github.com/NatikChhabra/riffhouse/issues/new). If something is broken, **Send a report** in Settings sends the details privately, or **Report in public** fills in a public report for you.
 
