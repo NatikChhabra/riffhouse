@@ -14,11 +14,12 @@ juce::String spokenVersion (const juce::String& label)
 {
     // A fourth number is a follow-up to that release: "0.1.5.1" is said "0.1.5 Hotfix 1" when it
     // only fixes things, "0.1.5 Update 1" when it also brings something new. Set in the release commit.
-    constexpr const char* kFollowUpWord = "Hotfix";
+    // 0.1.5.4 brought real amp captures and the auto gate, so it is "0.1.5 Update 1", not Hotfix 4
     const auto core = label.upToFirstOccurrenceOf ("-", false, false), rest = label.substring (core.length());
+    if (core == "0.1.5.4") return "0.1.5 Update 1" + rest;
     const auto parts = juce::StringArray::fromTokens (core, ".", {});
     if (parts.size() == 4 && parts[3].getIntValue() > 0)
-        return parts[0] + "." + parts[1] + "." + parts[2] + " " + kFollowUpWord + " " + parts[3] + rest;
+        return parts[0] + "." + parts[1] + "." + parts[2] + " Hotfix " + parts[3] + rest;
     return label;
 }
 
@@ -33,6 +34,6 @@ juce::String versionForPeople()
 // kept to one sentence that fits a toast; change it in the release commit of each version
 juce::String whatsNew()
 {
-    return "Bug reports and the weekly player count reach us again.";
+    return "Real amp captures for the metal amps, and a noise gate that sets itself.";
 }
 } // namespace rh
