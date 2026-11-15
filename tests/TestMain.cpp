@@ -3990,8 +3990,7 @@ int main (int argc, char** argv)
                 if (m.gateOpen.load()) ++openBlocks;
                 if ((pos + 256) % every == 0 || pos + 256 >= di.size())
                 {
-                    std::printf ("%6.1f s  gate hears %6.1f dB  threshold %6.1f dB  open %3d%%  out peak %6.1f dB
-", (double) (pos + 256) / sr,
+                    std::printf ("%6.1f s  gate hears %6.1f dB  threshold %6.1f dB  open %3d%%  out peak %6.1f dB\n", (double) (pos + 256) / sr,
                                  gainToDb (inPk), m.gateThreshNow.load(), 100 * openBlocks / std::max (1, blocks), gainToDb (outPk));
                     inPk = outPk = 0.0f;
                     blocks = openBlocks = 0;
