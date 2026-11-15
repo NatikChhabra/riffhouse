@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Cabinet.h"
 #include "CabCurves.h"
+#include "RealCabIrs.h"
 
 #include <complex>
 
@@ -82,6 +83,47 @@ namespace
     }
 } // namespace
 
+namespace
+{
+    // The floor bounce and a small room as the mic moves back, a faded tail, and one loudness
+    // for every cab in the guitar's core range.
+    void addRoomAndLevel (std::vector<float>& ir, float distance, uint32_t seed, double sampleRate)
+    {
+        const int len = (int) ir.size();
+        if (distance > 0.01f)
+        {
+            const int bounce = (int) ((0.4 + 1.6 * distance) * 0.001 * sampleRate);
+            std::vector<float> early (ir);
+            for (int i = bounce; i < len; ++i)
+                ir[(size_t) i] += 0.45f * distance * early[(size_t) (i - bounce)];
+            Noise rn (seed + 99u);
+            OnePole lp;
+            lp.setCutoff (sampleRate, 5000.0);
+            const float roomLevel = 0.025f * distance;
+            const int start = (int) (0.004 * sampleRate);
+            for (int i = start; i < len; ++i)
+            {
+                const float t = (float) (i - start) / (float) sampleRate;
+                ir[(size_t) i] += roomLevel * lp.lowpass (rn.next()) * std::exp (-t / 0.012f);
+            }
+        }
+
+        // fade the tail
+        const int fade = len / 4;
+        for (int i = 0; i < fade; ++i)
+            ir[(size_t) (len - fade + i)] *= 0.5f * (1.0f + std::cos ((float) kPi * (float) i / (float) fade));
+
+        // normalise so every cab sits at the same loudness in the guitar's core range
+        const std::vector<float> probe { 250, 500, 1000, 2000 };
+        const auto mags = irMagnitudeDb (ir, sampleRate, probe);
+        float mean = 0;
+        for (float m : mags) mean += m;
+        mean /= (float) mags.size();
+        const float g = dbToGain (-mean);
+        for (auto& s : ir) s *= g;
+    }
+} // namespace
+
 int numCabs() { return (int) (sizeof (cabs) / sizeof (cabs[0])); }
 const CabDescription& cabDescription (int i) { return cabs[std::clamp (i, 0, numCabs() - 1)]; }
 
@@ -135,6 +177,12 @@ std::vector<float> generateCabIr (int cabIndex, float mic, float distance, doubl
         }
         db += toCap * (peakDb (f, 4500.0, c.brightness, 0.9));
         db += toEdge * 0.6 * lp2Db (f, 1800.0, 0.7);
+        // The cone stops radiating above its breakup: measured cabs keep falling past 7 kHz
+        // (Jester's real 4x12s, close mic: -25 to -35 dB at 10 kHz, -39 to -52 at 16 kHz), where
+        // a datasheet curve flattens into its measuring floor. That flat top is where a
+        // high-gain amp's fizz came through (15 Nov). A horn is left its top.
+        if (c.tweeterDb == 0.0f)
+            db += lp2Db (f, 7000.0, 0.707);
         // gentle infrasonic and ultrasonic limits
         db += hp2Db (f, 30.0, 0.7) + lp2Db (f, std::min (18000.0, 0.45 * sampleRate), 0.7);
         logMag[(size_t) i] = std::max (db, -120.0) * std::log (10.0) / 20.0;
@@ -155,38 +203,47 @@ std::vector<float> generateCabIr (int cabIndex, float mic, float distance, doubl
     std::vector<float> ir ((size_t) len);
     for (int i = 0; i < len; ++i) ir[(size_t) i] = (float) buf[(size_t) i].real();
 
-    // floor bounce and a small room as the mic moves back
-    if (distance > 0.01f)
+    addRoomAndLevel (ir, distance, c.seed, sampleRate);
+    return ir;
+}
+
+int numRealCabs() { return realcabs::kNumFamilies; }
+const char* realCabName (int i) { return realcabs::kFamilies[std::clamp (i, 0, numRealCabs() - 1)].name; }
+
+std::vector<float> realCabIr (int index, float mic, float distance)
+{
+    const auto& fam = realcabs::kFamilies[std::clamp (index, 0, numRealCabs() - 1)];
+    const auto take = [] (const std::int16_t* q)
     {
-        const int bounce = (int) ((0.4 + 1.6 * distance) * 0.001 * sampleRate);
-        std::vector<float> early (ir);
-        for (int i = bounce; i < len; ++i)
-            ir[(size_t) i] += 0.45f * distance * early[(size_t) (i - bounce)];
-        Noise rn (c.seed + 99u);
-        OnePole lp;
-        lp.setCutoff (sampleRate, 5000.0);
-        const float roomLevel = 0.025f * distance;
-        const int start = (int) (0.004 * sampleRate);
-        for (int i = start; i < len; ++i)
+        std::vector<float> x ((size_t) realcabs::kLength);
+        for (int i = 0; i < realcabs::kLength; ++i) x[(size_t) i] = (float) q[i] * (1.0f / 32767.0f);
+        return x;
+    };
+    // where the mic knob falls among the recordings, and how far toward the next one
+    const float at = clamp01 (mic) * (float) (fam.count - 1);
+    const int a = std::min ((int) at, fam.count - 1), b = std::min (a + 1, fam.count - 1);
+    const float t = at - (float) a;
+    auto ir = take (fam.irs[a]);
+    if (t > 1e-4f && b != a)
+    {
+        // each recording at the level of the first, its peak moved onto the first one's, so the
+        // blend between two placements is a placement and not a comb
+        auto other = take (fam.irs[b]);
+        const auto peakOf = [] (const std::vector<float>& x) { return (int) (std::max_element (x.begin(), x.end(), [] (float p, float q) { return std::abs (p) < std::abs (q); }) - x.begin()); };
+        const int shift = peakOf (ir) - peakOf (other);
+        const std::vector<float> probe { 250, 500, 1000, 2000 };
+        float la = 0, lb = 0;
+        for (float m : irMagnitudeDb (ir, kRealCabRate, probe)) la += m;
+        for (float m : irMagnitudeDb (other, kRealCabRate, probe)) lb += m;
+        const float g = dbToGain ((la - lb) / (float) probe.size());
+        for (int i = 0; i < (int) ir.size(); ++i)
         {
-            const float t = (float) (i - start) / (float) sampleRate;
-            ir[(size_t) i] += roomLevel * lp.lowpass (rn.next()) * std::exp (-t / 0.012f);
+            const int j = i - shift;
+            const float o = j >= 0 && j < (int) other.size() ? other[(size_t) j] * g : 0.0f;
+            ir[(size_t) i] = (1.0f - t) * ir[(size_t) i] + t * o;
         }
     }
-
-    // fade the tail
-    const int fade = len / 4;
-    for (int i = 0; i < fade; ++i)
-        ir[(size_t) (len - fade + i)] *= 0.5f * (1.0f + std::cos ((float) kPi * (float) i / (float) fade));
-
-    // normalise so every cab sits at the same loudness in the guitar's core range
-    const std::vector<float> probe { 250, 500, 1000, 2000 };
-    const auto mags = irMagnitudeDb (ir, sampleRate, probe);
-    float mean = 0;
-    for (float m : mags) mean += m;
-    mean /= (float) mags.size();
-    const float g = dbToGain (-mean);
-    for (auto& s : ir) s *= g;
+    addRoomAndLevel (ir, clamp01 (distance), 1000u + (uint32_t) index, kRealCabRate);
     return ir;
 }
 
@@ -267,12 +324,34 @@ void Cabinet::setCuts()
     highCut.set (SweepFilter::Type::lowpass, sr, std::min (highNow, 0.45 * sr), 0.707);
 }
 
-void Cabinet::installIr (std::vector<float> ir)
+void Cabinet::installIr (std::vector<float> ir, double rate)
 {
     juce::AudioBuffer<float> b (1, (int) ir.size());
     std::copy (ir.begin(), ir.end(), b.getWritePointer (0));
-    conv.loadImpulseResponse (std::move (b), sr, juce::dsp::Convolution::Stereo::no,
+    conv.loadImpulseResponse (std::move (b), rate, juce::dsp::Convolution::Stereo::no,
                               juce::dsp::Convolution::Trim::no, juce::dsp::Convolution::Normalise::no);
+}
+
+// Model numbers: the generated cabs, then the player's own IR, then the real cabs.
+void Cabinet::installModel (int m)
+{
+    const float mc = mic.load(), d = distance.load();
+    if (m < numCabs())
+        installIr (generateCabIr (m, mc, d, sr), sr);
+    else if (m > numCabs())
+        installIr (realCabIr (m - numCabs() - 1, mc, d), kRealCabRate);
+    else
+    {
+        bool haveUserIr;
+        {
+            const juce::ScopedLock sl (userLock);
+            haveUserIr = userIrLoaded;
+        }
+        if (haveUserIr)
+            installUserIr();
+        else
+            installIr (generateCabIr (2, mc, d, sr), sr);
+    }
 }
 
 void Cabinet::installUserIr()
@@ -298,13 +377,7 @@ void Cabinet::rebuildNow()
     pending.store (false);
     const int m = model.load();
     lastModel = m; lastMic = mic.load(); lastDist = distance.load();
-    if (m >= numCabs())
-    {
-        if (userIrLoaded) installUserIr();
-        else installIr (generateCabIr (2, mic.load(), distance.load(), sr));
-    }
-    else
-        installIr (generateCabIr (m, mic.load(), distance.load(), sr));
+    installModel (m);
     if (prepared) conv.prepare (spec);
 }
 
@@ -313,8 +386,7 @@ void Cabinet::rebuildCrossfaded()
     pending.store (false);
     const int m = model.load();
     lastModel = m; lastMic = mic.load(); lastDist = distance.load();
-    if (m < numCabs()) installIr (generateCabIr (m, mic.load(), distance.load(), sr));
-    else installUserIr();
+    installModel (m);
     juce::Thread::sleep (60);
 }
 
@@ -327,11 +399,7 @@ void Cabinet::run()
         {
             wait (30); // let fast knob moves settle
             pending.store (false);
-            const int m = model.load();
-            if (m < numCabs())
-                installIr (generateCabIr (m, mic.load(), distance.load(), sr));
-            else
-                installUserIr();
+            installModel (model.load());
         }
     }
 }
@@ -357,7 +425,7 @@ bool Cabinet::loadUserIr (const juce::File& file)
         userIrLoaded = true;
         userName = file.getFileNameWithoutExtension();
     }
-    if (model.load() >= numCabs())
+    if (model.load() == numCabs())
         installUserIr();
     return true;
 }

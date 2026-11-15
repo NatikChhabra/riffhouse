@@ -2503,6 +2503,9 @@ namespace
             case 5: return { 1, 1, 8.0f,  0xff8c9196, 0xff2b2118, 1.05f };  // 1x8 tiny combo
             case 6: return { 2, 2, 10.0f, 0xff2a2c2f, 0xff1d2530, 1.0f };   // 4x10 bass
             case 7: return { 1, 1, 15.0f, 0xff2a2c2f, 0xff1d2530, 0.92f };  // 1x15 bass
+            case 9:  return { 2, 2, 12.0f, 0xff4a463f, 0xff131313, 1.0f };  // real 4x12 classic
+            case 10: return { 2, 2, 12.0f, 0xff1c1d1f, 0xff0c0c0c, 1.0f };  // real 4x12 heavy
+            case 11: return { 2, 2, 12.0f, 0xff2b2d30, 0xff111111, 1.0f };  // real 4x12 tight
             default: return { 1, 1, 12.0f, 0xff5d6166, 0xff161616, 1.6f };  // your IR: one speaker beside a display
         }
     }
@@ -2528,6 +2531,10 @@ namespace
             case 5:  return { Weave::wheat,      0,          1, 0.12f, true  };
             case 6:
             case 7:  return { Weave::mesh,       0,          8, 1.0f,  false };
+            // the recorded cabs: plain working boxes, no amp's name on them
+            case 9:  return { Weave::saltPepper, 0,         -1, 0.16f, false };
+            case 10: return { Weave::grid,       0,         -1, 0.22f, false };
+            case 11: return { Weave::mesh,       0,         -1, 1.0f,  false };
             default: return { Weave::none,       0,         -1, 1.0f,  false };
         }
     }

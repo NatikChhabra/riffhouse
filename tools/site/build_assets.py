@@ -37,7 +37,8 @@ PEDALS = [
 AMPS = ["Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline Lead",
         "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture"]
 CABS = ["1x12 Open Back", "2x12 Blue", "4x12 Vintage", "4x12 Modern", "2x12 American",
-        "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR"]
+        "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR",
+        "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight"]
 # The choices behind each pedal slot, the same lists and defaults as src/engine/Params.cpp.
 SLOTS = [  # switch, default on, type key, choices, default choice, cutout prefix
     ("gate_on", True, None, None, 0, "gate"), ("comp_on", False, None, None, 0, "comp"),
@@ -92,8 +93,9 @@ def gear():
         small.thumbnail((360, 360), Image.LANCZOS)
         save(small, SITE / "img" / "gear" / f"{key}-s.webp", 84)
         out[key] = {"name": name, "kind": kind, "w": im.width, "h": im.height}
-    for i in range(len(AMPS)):
-        for prefix, count in (("amp", f"{i:02d}"), ("cab", str(i))):
+    for prefix, n in (("amp", len(AMPS)), ("cab", len(CABS))):
+        for i in range(n):
+            count = f"{i:02d}" if prefix == "amp" else str(i)
             src = SHOTS / "cutouts" / f"{prefix}-{count}.png"
             if src.exists():
                 im = trim(Image.open(src).convert("RGBA"))

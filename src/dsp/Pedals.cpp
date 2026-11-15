@@ -1461,6 +1461,8 @@ void LoFi::prepare (double sampleRate)
     radioS.prepare (sr, 20.0f);
     mixS.prepare (sr, 20.0f);
     bitsS.prepare (sr, 30.0f);
+    downS.prepare (sr, 30.0f);
+    downNow = -1.0f;
     reset();
 }
 
@@ -1472,6 +1474,15 @@ void LoFi::setRadio (float rd)
     radioLpL.set (Biquad::Type::lowpass, sr, lp, 0.8);  radioLpR.set (Biquad::Type::lowpass, sr, lp, 0.8);
 }
 
+void LoFi::setDown (float d)
+{
+    downNow = d;
+    const float targetRate = expMap (1.0f - d, 2000.0f, (float) sr);
+    holdRatio = std::max (1.0f, (float) sr / targetRate);
+    preLpL.set (Biquad::Type::lowpass, sr, std::min (0.45 * targetRate, 0.45 * sr), 0.7);
+    preLpR.set (Biquad::Type::lowpass, sr, std::min (0.45 * targetRate, 0.45 * sr), 0.7);
+}
+
 void LoFi::reset()
 {
     dl.reset(); dr.reset();
@@ -1479,6 +1490,7 @@ void LoFi::reset()
     holdCounter = 0; heldL = heldR = 0;
     wobS.reset (wobble); mixS.reset (mix); bitsS.reset (bits);
     if (radioNow >= 0.0f) { radioS.reset (radioTarget); setRadio (radioTarget); }
+    if (downNow >= 0.0f) { downS.reset (down); setDown (down); }
 }
 
 void LoFi::listen (const float* l, const float* r, int n)
@@ -1493,15 +1505,15 @@ void LoFi::wake()
     // switched on, the knobs are where they are
     wobS.reset (wobble); mixS.reset (mix); bitsS.reset (bits);
     if (radioNow >= 0.0f) { radioS.reset (radioTarget); setRadio (radioTarget); }
+    if (downNow >= 0.0f) { downS.reset (down); setDown (down); }
 }
 
 void LoFi::set (float crush, float downsample, float wob, float nz, float radio, float m)
 {
     bits = lerp (16.0f, 4.0f, clamp01 (crush / 10.0f));
-    const float targetRate = expMap (1.0f - clamp01 (downsample / 10.0f), 2000.0f, (float) sr);
-    holdRatio = std::max (1.0f, (float) sr / targetRate);
-    preLpL.set (Biquad::Type::lowpass, sr, std::min (0.45 * targetRate, 0.45 * sr), 0.7);
-    preLpR.set (Biquad::Type::lowpass, sr, std::min (0.45 * targetRate, 0.45 * sr), 0.7);
+    down = clamp01 (downsample / 10.0f);
+    if (downNow < 0.0f) { downS.reset (down); setDown (down); }
+    downS.setTarget (down);
     wobble = clamp01 (wob / 10.0f);
     noiseAmt = clamp01 (nz / 10.0f);
     const float rd = clamp01 (radio / 10.0f);
@@ -1528,9 +1540,12 @@ void LoFi::process (float* l, float* r, int n)
         {
             const float rd = radioS.get();
             if (std::abs (rd - radioNow) > 1e-4f) setRadio (rd);
+            const float dn = downS.get();
+            if (std::abs (dn - downNow) > 1e-4f) setDown (dn);
             q = std::pow (2.0f, bitsS.get() - 1.0f); // Crush glides through the bit depths too
         }
         radioS.next();
+        downS.next();
         const float bitsNow = bitsS.next();
 
         // tape wow and flutter with a slow random drift; the whole delay, its 6 ms base too,
@@ -1551,12 +1566,20 @@ void LoFi::process (float* l, float* r, int n)
         }
 
         // sample-rate reduction (sample and hold) and bit crushing
+        // the filter runs all the time, so turning Downsample up starts it from the sound
+        // already playing instead of from where it was left
+        const float fl = preLpL.process (sl), fr = preLpR.process (sr2);
         if (holdRatio > 1.0f)
         {
-            sl = preLpL.process (sl); sr2 = preLpR.process (sr2);
+            sl = fl; sr2 = fr;
             holdCounter += 1.0f;
             if (holdCounter >= holdRatio) { holdCounter -= holdRatio; heldL = sl; heldR = sr2; }
             sl = heldL; sr2 = heldR;
+        }
+        else
+        {
+            // follow the sound, so turning Downsample up holds what is playing, not an old sample
+            heldL = fl; heldR = fr; holdCounter = 0.0f;
         }
         if (bitsNow < 15.9f)
         {

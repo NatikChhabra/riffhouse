@@ -2088,7 +2088,7 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
         // every type of the other gear with more than one look
         struct Set { int page; P type, on; int n; const char* name; };
         for (auto set : { Set { mMod, P::modType, P::modOn, 6, "mod" }, Set { mDelay, P::dlyType, P::dlyOn, 4, "delay" },
-                          Set { mReverb, P::revType, P::revOn, 6, "reverb" }, Set { mCab, P::cabModel, P::cabOn, 9, "cab" } })
+                          Set { mReverb, P::revType, P::revOn, 6, "reverb" }, Set { mCab, P::cabModel, P::cabOn, choices::numCabModels, "cab" } })
         {
             const float t0 = proc.value (set.type), on0 = proc.value (set.on);
             r.showPage (set.page);
@@ -2159,8 +2159,9 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
             drawAmpJewel (tg, thumb.amp, d, true);
             write ("amp-" + juce::String (m).paddedLeft ('0', 2), thumb.image);
         }
-        for (int m = 0; m < 8; ++m)
-            write ("cab-" + juce::String (m), cabThumb (m, 2.0f * cutouts).image);
+        for (int m = 0; m < choices::numCabModels; ++m)
+            if (m != choices::cabUserIr) // the player's own IR has no cab of its own to show
+                write ("cab-" + juce::String (m), cabThumb (m, 2.0f * cutouts).image);
     }
 
     // what the 3D renderer needs to build each pedal: its design, where its parts sit, and its print
