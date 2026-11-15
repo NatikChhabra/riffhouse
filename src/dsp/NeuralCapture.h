@@ -28,6 +28,8 @@ public:
 
     // Call from a non-audio thread. Returns an error message, or empty on success.
     std::string load (const std::string& path);
+    // One of the captures built into the app (FactoryCaptures.h). Same rules as load().
+    std::string loadFactory (int index);
     void unload();
     bool hasModel() const noexcept { return active != nullptr || pending.load() != nullptr; }
     std::string modelName() const;
@@ -39,6 +41,7 @@ public:
 private:
     struct Model;
     std::unique_ptr<Model> makeModel (const std::string& path, std::string& error);
+    std::unique_ptr<Model> finishModel (std::unique_ptr<nam::DSP> dsp, const std::string& modelName);
     static bool isDamaged (const std::filesystem::path&); // a file cut short, which the library would read past
     void setupResampling();
 

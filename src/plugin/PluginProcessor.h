@@ -175,6 +175,18 @@ private:
     void renderClick (float* l, float* r, int n);
 
     juce::AudioProcessorValueTreeState apvts;
+    // Turning the gate's threshold by hand (a knob, typing a value, a host's automation
+    // gesture) puts that tone's gate in Manual: the player's number then holds.
+    struct GateManualOnTouch : juce::AudioProcessorParameter::Listener
+    {
+        RiffhouseProcessor& owner;
+        explicit GateManualOnTouch (RiffhouseProcessor& o) : owner (o) {}
+        void parameterValueChanged (int, float) override {}
+        void parameterGestureChanged (int, bool starting) override
+        {
+            if (starting && owner.value (P::gateAuto) > 0.5f) owner.setValue (P::gateAuto, 0.0f);
+        }
+    } gateManualOnTouch { *this };
     std::array<juce::RangedAudioParameter*, kNumParams> params {};
     std::array<std::atomic<float>*, kNumParams> raw {};
 

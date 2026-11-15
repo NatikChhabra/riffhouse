@@ -120,6 +120,13 @@ private:
     Amp amp;
     NeuralCapture nam;
     Biquad namBass, namMid, namTreble;
+    // The real amps behind Modern High Gain and Tight Metal, built in (FactoryCaptures.h): those
+    // two play the capture itself, with the knobs around it, and fall back to the circuit
+    // model only if a capture could not be built.
+    NeuralCapture factory[2];
+    bool factoryReady[2] {};
+    Biquad facBass, facMid, facTreble, facPresence, facDepth;
+    int factoryFor (int ampModel) const noexcept;
     Cabinet cab;
     GraphicEq eq;
     Modulation mod;

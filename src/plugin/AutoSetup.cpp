@@ -439,13 +439,19 @@ void AutoSetup::timerCallback()
             // same hiss), and the boost that makes up for it turns the hiss into fizz. The guitar was
             // found in Windows' own mode, so a mode that hears it much quieter is not used.
             const float quieterDb = juce::Decibels::gainToDecibels (chosenPeak, -100.0f) - juce::Decibels::gainToDecibels (modePeak, -100.0f);
-            // judged only on real playing in this mode too: a pause is not a quiet input
-            const bool losesLevel = ok && chosen.type == "Windows Audio" && modes[modeIndex] != "Windows Audio"
-                                    && chosenPeak > kHeardThreshold && modePeak > kHeardThreshold && quieterDb > kMostLevelLossDb;
+            // A mode is kept only once it has heard the playing at about the level Windows' own
+            // mode did. Hearing nothing is not a pass: 20 dB down takes a normal strum under the
+            // "something is playing" line, and that is how Exclusive Mode slipped through once
+            // (15 Nov: the guitar came in at -60 dB over a -80 dB floor and the boost turned it to hiss).
+            const bool other = ok && chosen.type == "Windows Audio" && modes[modeIndex] != "Windows Audio"
+                               && chosenPeak > kHeardThreshold;
+            const bool unheard = other && modePeak <= kHeardThreshold;
+            const bool losesLevel = other && (unheard || quieterDb > kMostLevelLossDb);
             if (losesLevel)
             {
-                devlog::note (modes[modeIndex] + " hears the guitar " + juce::String (quieterDb, 1)
-                              + " dB quieter than Windows Audio: not used, its boost would only add hiss");
+                devlog::note (unheard ? modes[modeIndex] + " heard no playing, so its level could not be checked: not used"
+                                      : modes[modeIndex] + " hears the guitar " + juce::String (quieterDb, 1)
+                                            + " dB quieter than Windows Audio: not used, its boost would only add hiss");
                 result.quieterModeSkipped = true;
                 ++modeIndex;
                 bufferIndex = 0;

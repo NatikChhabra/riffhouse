@@ -40,6 +40,9 @@ namespace
 
     bool on (const ParamValues& p, P id) { return p[(size_t) id] >= 0.5f; }
     int choice (const ParamValues& p, P id) { return (int) std::lround (p[(size_t) id]); }
+    // how much each built-in capture's output is turned so it plays as loud as the circuit model
+    // it replaces did (tests: calibrate)
+    constexpr float kFactoryTrimDb[2] = { 8.8f, 2.8f };
 } // namespace
 
 Rig::Rig() { p = defaultParamValues(); }
@@ -57,6 +60,11 @@ void Rig::prepare (double sampleRate, int block)
     drive.prepare (sr, maxBlock);
     amp.prepare (sr, maxBlock);
     nam.prepare (sr, maxBlock);
+    for (int i = 0; i < 2; ++i)
+    {
+        factory[i].prepare (sr, maxBlock);
+        if (! factoryReady[i]) factoryReady[i] = factory[i].loadFactory (i).empty();
+    }
     eq.prepare (sr);
     mod.prepare (sr);
     modOld.prepare (sr);
@@ -122,6 +130,7 @@ void Rig::reset()
     eq.reset(); mod.reset(); modOld.reset(); modXfade = 0; lofi.reset(); doubler.reset(); limiter.reset();
     for (Delay* d : { &delayA, &delayB }) d->reset();
     for (Reverb* r : { &reverbA, &reverbB }) r->reset();
+    for (Biquad* b : { &facBass, &facMid, &facTreble, &facPresence, &facDepth }) b->reset();
     dlyTailBusy = revTailBusy = false;
     if (swap != Swap::none) { swap = Swap::none; applyParams (swapTo, false); }
     swapGain = 1.0f;
@@ -129,11 +138,18 @@ void Rig::reset()
     gateDelayAt = 0;
 }
 
+int Rig::factoryFor (int ampModel) const noexcept
+{
+    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : -1;
+    return i >= 0 && factoryReady[i] ? i : -1;
+}
+
 int Rig::latencySamples() const
 {
     // one amp is in the path at a time: the modelled one, or the capture
     const bool neural = choice (p, P::ampModel) == choices::neuralCapture;
-    return neural ? nam.latencySamples() : (int) std::lround (amp.latencySamples());
+    const int fac = factoryFor (choice (p, P::ampModel));
+    return fac >= 0 ? factory[fac].latencySamples() : neural ? nam.latencySamples() : (int) std::lround (amp.latencySamples());
 }
 
 float Rig::delayTimeMs() const
@@ -229,6 +245,13 @@ void Rig::applyParams (const ParamValues& v, bool toneChange)
     namBass.set (Biquad::Type::lowShelf, sr, 120.0, 0.7, (get (P::ampBass) - 5.0f) * 2.0f);
     namMid.set (Biquad::Type::peak, sr, 700.0, 0.8, (get (P::ampMid) - 5.0f) * 1.6f);
     namTreble.set (Biquad::Type::highShelf, sr, 2800.0, 0.7, (get (P::ampTreble) - 5.0f) * 2.0f);
+    // around a built-in capture the knobs act like the amp's own: the tone stack and the power
+    // amp's presence and depth, as gentle shelves and a mid band
+    facBass.set (Biquad::Type::lowShelf, sr, 110.0, 0.7, (get (P::ampBass) - 5.0f) * 1.6f);
+    facMid.set (Biquad::Type::peak, sr, 650.0, 0.7, (get (P::ampMid) - 5.0f) * 1.6f);
+    facTreble.set (Biquad::Type::highShelf, sr, 2200.0, 0.7, (get (P::ampTreble) - 5.0f) * 1.4f);
+    facPresence.set (Biquad::Type::highShelf, sr, 4500.0, 0.7, (get (P::ampPresence) - 5.0f) * 1.2f);
+    facDepth.set (Biquad::Type::lowShelf, sr, 85.0, 0.8, (get (P::ampDepth) - 5.0f) * 1.2f);
 
     cab.set (choice (p, P::cabModel), get (P::cabMic) / 10.0f, get (P::cabDistance) / 10.0f, get (P::cabLowCut), get (P::cabHighCut));
 
@@ -348,9 +371,22 @@ void Rig::processMono (float* x, int n)
     runFaded (fDrive, x, n, dry, [&] (float* b, int k) { drive.process (b, k); });
 
     const bool neural = choice (p, P::ampModel) == choices::neuralCapture;
+    const int fac = factoryFor (choice (p, P::ampModel));
     runFaded (fAmp, x, n, dry, [&] (float* b, int k)
     {
-        if (neural)
+        if (fac >= 0)
+        {
+            // the gain knob drives the capture like the amp's own pot: an audio taper with 6.5 as
+            // the capture was made, +7 dB at 10, and nearly nothing left at 0
+            const float g01 = juce::jlimit (0.0f, 1.0f, p[(size_t) P::ampGain] / 10.0f);
+            const float drive = 40.0f * std::log10 ((g01 + 0.02f) / 1.02f) - 40.0f * std::log10 (0.67f / 1.02f);
+            // master and level both set how loud it plays: the capture already has its power amp
+            const float outDb = p[(size_t) P::ampLevel] + (p[(size_t) P::ampMaster] - 5.0f) + kFactoryTrimDb[fac];
+            factory[fac].process (b, k, drive, outDb);
+            for (int i = 0; i < k; ++i)
+                b[i] = facDepth.process (facPresence.process (facTreble.process (facMid.process (facBass.process (b[i])))));
+        }
+        else if (neural)
         {
             // gain knob trims the capture's input, level trims its output
             nam.process (b, k, (p[(size_t) P::ampGain] - 5.0f) * 2.4f, p[(size_t) P::ampLevel]);
@@ -364,7 +400,7 @@ void Rig::processMono (float* x, int n)
     // The gate again, after the drive and the amp, in step with what comes out of them: they
     // squash a fade made in front of them, so a closing gate would leave crunch behind.
     {
-        int late = neural ? nam.latencySamples() : (int) std::lround (amp.latencySamples());
+        int late = fac >= 0 ? factory[fac].latencySamples() : neural ? nam.latencySamples() : (int) std::lround (amp.latencySamples());
         if (! fDrive.idle()) late += (int) std::lround (drive.latencySamples());
         late = juce::jlimit (0, kGateDelay - 1, late);
         for (int i = 0; i < n; ++i)

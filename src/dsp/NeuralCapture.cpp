@@ -4,6 +4,7 @@
 
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
+#include "FactoryCaptures.h"
 
 #include <cmath>
 #include <filesystem>
@@ -91,19 +92,33 @@ std::unique_ptr<NeuralCapture::Model> NeuralCapture::makeModel (const std::strin
 {
     try
     {
-        auto m = std::make_unique<Model>();
         const std::filesystem::path fsPath (std::u8string (reinterpret_cast<const char8_t*> (path.data()), path.size()));
         if (isDamaged (fsPath))
         {
             error = "This capture file is damaged: it has fewer numbers than its model needs. Download it again.";
             return nullptr;
         }
-        m->dsp = nam::get_dsp (fsPath);
-        if (! m->dsp)
+        auto dsp = nam::get_dsp (fsPath);
+        if (! dsp)
         {
             error = "This file could not be read as a Neural Amp Modeler capture.";
             return nullptr;
         }
+        const auto stem = fsPath.stem().u8string();
+        return finishModel (std::move (dsp), std::string (stem.begin(), stem.end()));
+    }
+    catch (const std::exception& e)
+    {
+        error = std::string ("Could not load capture: ") + e.what();
+        return nullptr;
+    }
+}
+
+std::unique_ptr<NeuralCapture::Model> NeuralCapture::finishModel (std::unique_ptr<nam::DSP> dsp, const std::string& modelName)
+{
+    auto m = std::make_unique<Model>();
+    m->dsp = std::move (dsp);
+    {
         m->modelRate = m->dsp->GetExpectedSampleRate() > 0 ? m->dsp->GetExpectedSampleRate() : 48000.0;
         // Captures carry their own loudness; bring them all to about -18 dB so
         // switching captures does not jump in level.
@@ -111,14 +126,30 @@ std::unique_ptr<NeuralCapture::Model> NeuralCapture::makeModel (const std::strin
             m->loudnessTrim = (float) std::pow (10.0, (-18.0 - m->dsp->GetLoudness()) / 20.0);
         const double runRate = m->dsp->SupportsArbitrarySampleRate() ? sr : m->modelRate;
         m->dsp->Reset (runRate, maxBlock * 4);
-        const auto stem = fsPath.stem().u8string();
-        m->name = std::string (stem.begin(), stem.end());
+        m->name = modelName;
         return m;
+    }
+}
+
+std::string NeuralCapture::loadFactory (int index)
+{
+    if (index < 0 || index >= factory_captures::count) return "No such built-in capture.";
+    const auto& c = factory_captures::all[index];
+    try
+    {
+        auto j = nlohmann::json::parse (c.config);
+        auto& w = j["weights"] = nlohmann::json::array();
+        for (unsigned long i = 0; i < c.count; ++i) w.push_back (c.weights[i]);
+        auto dsp = nam::get_dsp (j);
+        if (! dsp) return "The built-in capture could not be built.";
+        auto m = finishModel (std::move (dsp), c.name);
+        name = m->name;
+        delete pending.exchange (m.release());
+        return {};
     }
     catch (const std::exception& e)
     {
-        error = std::string ("Could not load capture: ") + e.what();
-        return nullptr;
+        return std::string ("Could not build the built-in capture: ") + e.what();
     }
 }
 

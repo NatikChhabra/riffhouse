@@ -70,6 +70,7 @@ RiffhouseProcessor::RiffhouseProcessor()
         raw[(size_t) s.id] = apvts.getRawParameterValue (s.key);
         jassert (params[(size_t) s.id] != nullptr);
     }
+    params[(size_t) P::gateThresh]->addListener (&gateManualOnTouch);
     formats.registerBasicFormats();
     // only the app itself learns the player's phrase: a plugin on a drum bus must not
     matcher.setLearns (wrapperType == wrapperType_Standalone);
@@ -84,6 +85,7 @@ RiffhouseProcessor::RiffhouseProcessor()
 
 RiffhouseProcessor::~RiffhouseProcessor()
 {
+    params[(size_t) P::gateThresh]->removeListener (&gateManualOnTouch);
     alive->store (false);
     loader.removeAllJobs (true, 10000);
     rec.stop();
