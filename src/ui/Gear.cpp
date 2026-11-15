@@ -2534,7 +2534,7 @@ namespace
             // the recorded cabs: plain working boxes, no amp's name on them
             case 9:  return { Weave::saltPepper, 0,         -1, 0.16f, false };
             case 10: return { Weave::grid,       0,         -1, 0.22f, false };
-            case 11: return { Weave::black,      0,         -1, 0.20f, false };
+            case 11: return { Weave::mesh,       0,         -1, 1.0f,  false };
             default: return { Weave::none,       0,         -1, 1.0f,  false };
         }
     }
