@@ -5,8 +5,9 @@
 
 <kit folder> is the press kit as it is handed out: README.md, logo/ and screenshots/.
 Copies it to site/press/ and writes the small pictures the page shows to site/img/press/.
-A screenshot named in SWAP is taken from the snapshot folder instead, at the kit's size:
-those two in the kit still show the old logo, and one lists a tone named after a player.
+A screenshot named in SWAP is taken from the snapshot folder instead, at the kit's size, so the
+page shows the app as it looks now. The kit's own were drawn with --tone "First Light Clean";
+take-tone and takes need two recorded takes in the recordings folder when the snapshots are made.
 The zip that the page offers is made when the site is published (see pages.yml).
 """
 import shutil
@@ -18,7 +19,8 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[2]
 PRESS = ROOT / "site" / "press"
 SMALL = ROOT / "site" / "img" / "press"
-SWAP = {"takes": "takes", "take-tone": "take-tone"}
+SWAP = {"amp": "05-amp", "pedal": "04-drive", "cab": "06-cab", "wah": "02-wah", "browser": "browser", "setup": "setup",
+        "take-tone": "take-tone", "takes": "takes", "play-along": "record-song", "looper": "looper", "chords": "sheet", "tuner": "tuner"}
 # How each logo is shown on the page: the ground it sits on, and the width of its small picture.
 LOGOS = {"mark-1024": 880, "wordmark-flat-cream": 800, "wordmark-flat-ink": 800, "lockup-transparent": 900, "social-card-1200x630": 900}
 
