@@ -216,6 +216,17 @@ public:
     // Auto: the threshold is what the heard floor needs and nothing else; the chosen threshold
     // is only where it starts until a floor has been heard. Manual keeps the chosen threshold as
     // the least the gate asks for (it still rises over a louder floor).
+    // The floor setup measured in its quiet moment, so the gate knows it from the first note
+    // instead of waiting for 1.6 s of steady quiet, which real playing rarely leaves. What it
+    // hears later still corrects it (a quieter floor at once, a louder one a decibel at a time).
+    // Setup hears the hiss as short peaks (the meter's); its level sits about 10 dB under them.
+    void seedFloor (float peakDb)
+    {
+        if (peakDb <= -119.0f || floorDb > -119.0f) return;
+        floorDb = peakDb - 10.0f;
+        floorPeakDb = peakDb;
+        applyThreshold();
+    }
     void setAuto (bool a) { if (a != autoThreshold) { autoThreshold = a; applyThreshold(); } }
     bool isAuto() const noexcept { return autoThreshold; }
     // Gates x in place. gainsOut, when given, gets the gain used on each sample.

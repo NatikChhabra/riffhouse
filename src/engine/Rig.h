@@ -120,13 +120,25 @@ private:
     Amp amp;
     NeuralCapture nam;
     Biquad namBass, namMid, namTreble;
-    // The real amps behind Modern High Gain and Tight Metal, built in (FactoryCaptures.h): those
-    // two play the capture itself, with the knobs around it, and fall back to the circuit
+    // The real amps behind Modern High Gain, Tight Metal and Brit 81, built in (FactoryCaptures.h): those
+    // three play the capture itself, with the knobs around it, and fall back to the circuit
     // model only if a capture could not be built.
-    NeuralCapture factory[2];
-    bool factoryReady[2] {};
+    static constexpr int kFactory = 3;
+    NeuralCapture factory[kFactory];
+    bool factoryReady[kFactory] {};
     Biquad facBass, facMid, facTreble, facPresence, facDepth;
+    Smoother facDrive, facOut; // glide, so a knob turned fast never clicks
+    // A capture remembers the last ~4000 samples it heard. One left behind is fed silence
+    // until that memory is quiet, so coming back to it later starts clean, not with a burst
+    // of what it last played.
+    int facFlushLeft[kFactory] {};
+    std::vector<float> facZeros;
     int factoryFor (int ampModel) const noexcept;
+    float gateSeedDb = -120.0f;
+public:
+    // the input's hiss as setup measured it (its peaks, dBFS at the gate), or -120 when unknown
+    void seedGateFloor (float db) { gateSeedDb = db; gate.seedFloor (db); }
+private:
     Cabinet cab;
     GraphicEq eq;
     Modulation mod;

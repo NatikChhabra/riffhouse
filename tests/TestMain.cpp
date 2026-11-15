@@ -1570,8 +1570,13 @@ void testAliasing (double sr)
     // of 3.1 kHz, anything else is aliasing
     const double f0 = 3100.0;
     const auto in = test::sine (sr, f0, 1.5, 0.3f);
+  // the circuit models are oversampled and must stay clean; the built-in captures (Modern High
+  // Gain, Tight Metal, Brit 81) play exactly as the NAM plugin plays them, unoversampled at 48 kHz,
+  // so they get NAM's own figure as the bar
+  for (int amp : { (int) choices::hotRodLead, (int) choices::tightMetal })
+  {
     auto v = bare();
-    v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = choices::tightMetal; v[(size_t) P::ampGain] = 10;
+    v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = (float) amp; v[(size_t) P::ampGain] = 10;
     const auto r = renderWith (v, in, sr);
     const int N = 32768;
     juce::dsp::FFT fft (15);
@@ -1592,8 +1597,10 @@ void testAliasing (double sr)
         if (std::abs (f - nearest) < 40.0 && nearest > 0) harmonic += e; else alias += e;
     }
     const double ratioDb = 10.0 * std::log10 (alias / harmonic);
-    std::printf ("  alias-to-harmonic ratio: %.1f dB\n", ratioDb);
-    CHECK (ratioDb < -35.0, "too much aliasing: %.1f dB", ratioDb);
+    std::printf ("  %s: alias-to-harmonic ratio %.1f dB\n", ampVoicing (amp).name, ratioDb);
+    const double bar = amp == choices::tightMetal ? -25.0 : -35.0;
+    CHECK (ratioDb < bar, "too much aliasing in %s: %.1f dB", ampVoicing (amp).name, ratioDb);
+  }
 }
 
 void testPresets (double sr)
@@ -3079,9 +3086,12 @@ void testHistory()
     // your input setup is not part of the tone: changing it makes no step and undo leaves it alone
     const int before = h.depth();
     t.values[(size_t) P::inGain] = 11.0f;
-    t.values[(size_t) P::gateThresh] = -40.0f;
     show(); show(); show();
     CHECK (h.depth() == before, "input settings made no step");
+    // the gate is part of the tone (Update 1): turning it is a step like any knob
+    t.values[(size_t) P::gateThresh] = -40.0f;
+    show(); show(); show();
+    CHECK (h.depth() == before + 1, "the gate is part of the tone: a step (%d, was %d)", h.depth(), before);
 
     // it never grows without end
     for (int i = 0; i < 300; ++i)

@@ -111,6 +111,7 @@ void RiffhouseProcessor::rememberSetup() const
     for (const auto& s : paramSpecs())
         if (belongsToSetup (s.id))
             t << s.key << "=" << juce::String (value (s.id), 3) << "\n";
+    if (gateFloorSeed() > -119.0f) t << "noise_floor_db=" << juce::String (gateFloorSeed(), 1) << "\n";
     const auto f = setupFile();
     f.getParentDirectory().createDirectory();
     f.replaceWithText (t);
@@ -126,6 +127,7 @@ bool RiffhouseProcessor::recallSetup()
         const auto key = l.upToFirstOccurrenceOf ("=", false, false).trim();
         const auto text = l.fromFirstOccurrenceOf ("=", false, false).trim();
         if (key.isEmpty() || text.isEmpty() || ! text.containsOnly ("0123456789.-")) continue;
+        if (key == "noise_floor_db") { setGateFloorSeed (juce::jlimit (-119.0f, -30.0f, text.getFloatValue())); continue; }
         for (const auto& s : paramSpecs())
             if (belongsToSetup (s.id) && key == s.key)
             {
@@ -279,6 +281,7 @@ void RiffhouseProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     // project always renders the same file.
     if (isNonRealtime()) matcher.matchNow (v);
     if (toneChangeQueued.exchange (false)) rig.beginToneChange();
+    if (const float seed = gateSeed.load(); seed != gateSeedApplied) { gateSeedApplied = seed; rig.seedGateFloor (seed); }
     rig.setParams (v);
     if (const int amp = (int) std::lround (v[(size_t) P::ampModel]); amp != latencyAmp.load (std::memory_order_relaxed))
     {

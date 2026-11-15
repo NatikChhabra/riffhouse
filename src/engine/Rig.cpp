@@ -42,7 +42,22 @@ namespace
     int choice (const ParamValues& p, P id) { return (int) std::lround (p[(size_t) id]); }
     // how much each built-in capture's output is turned so it plays as loud as the circuit model
     // it replaces did (tests: calibrate)
-    constexpr float kFactoryTrimDb[2] = { 8.8f, 2.8f };
+    constexpr int kFactoryMemory = 4608; // a standard WaveNet capture's reach, with some to spare
+    constexpr float kFactoryTrimDb[3] = { 8.8f, 2.8f, -4.4f };
+
+    // the gain knob drives the capture like the amp's own pot: an audio taper with 6.5 as the
+    // capture was made, +7 dB at 10, and nearly nothing left at 0
+    float factoryDriveDb (const ParamValues& p) noexcept
+    {
+        const float g01 = juce::jlimit (0.0f, 1.0f, p[(size_t) P::ampGain] / 10.0f);
+        return 40.0f * std::log10 ((g01 + 0.02f) / 1.02f) - 40.0f * std::log10 (0.67f / 1.02f);
+    }
+
+    // master and level both set how loud it plays: the capture already has its power amp
+    float factoryOutDb (const ParamValues& p, int fac) noexcept
+    {
+        return p[(size_t) P::ampLevel] + (p[(size_t) P::ampMaster] - 5.0f) + kFactoryTrimDb[fac];
+    }
 } // namespace
 
 Rig::Rig() { p = defaultParamValues(); }
@@ -54,13 +69,17 @@ void Rig::prepare (double sampleRate, int block)
     input.prepare (sr);
     probe.prepare (sr);
     gate.prepare (sr);
+    gate.seedFloor (gateSeedDb);
     comp.prepare (sr);
     wah.prepare (sr);
     pitch.prepare (sr);
     drive.prepare (sr, maxBlock);
     amp.prepare (sr, maxBlock);
     nam.prepare (sr, maxBlock);
-    for (int i = 0; i < 2; ++i)
+    facDrive.prepare (sr, 30.0f); facOut.prepare (sr, 30.0f);
+    facZeros.assign ((size_t) maxBlock, 0.0f);
+    std::fill (std::begin (facFlushLeft), std::end (facFlushLeft), 0);
+    for (int i = 0; i < kFactory; ++i)
     {
         factory[i].prepare (sr, maxBlock);
         if (! factoryReady[i]) factoryReady[i] = factory[i].loadFactory (i).empty();
@@ -140,7 +159,7 @@ void Rig::reset()
 
 int Rig::factoryFor (int ampModel) const noexcept
 {
-    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : -1;
+    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : ampModel == choices::brit800 ? 2 : -1;
     return i >= 0 && factoryReady[i] ? i : -1;
 }
 
@@ -252,6 +271,13 @@ void Rig::applyParams (const ParamValues& v, bool toneChange)
     facTreble.set (Biquad::Type::highShelf, sr, 2200.0, 0.7, (get (P::ampTreble) - 5.0f) * 1.4f);
     facPresence.set (Biquad::Type::highShelf, sr, 4500.0, 0.7, (get (P::ampPresence) - 5.0f) * 1.2f);
     facDepth.set (Biquad::Type::lowShelf, sr, 85.0, 0.8, (get (P::ampDepth) - 5.0f) * 1.2f);
+    if (const int fac = factoryFor (choice (p, P::ampModel)); fac >= 0 && (toneChange || firstParams))
+    {
+        // a new tone starts at its own drive and level, not gliding up from the last tone's
+        facDrive.reset (dbToGain (factoryDriveDb (p)));
+        facOut.reset (dbToGain (factoryOutDb (p, fac)));
+        for (auto* b : { &facBass, &facMid, &facTreble, &facPresence, &facDepth }) b->reset();
+    }
 
     cab.set (choice (p, P::cabModel), get (P::cabMic) / 10.0f, get (P::cabDistance) / 10.0f, get (P::cabLowCut), get (P::cabHighCut));
 
@@ -372,19 +398,25 @@ void Rig::processMono (float* x, int n)
 
     const bool neural = choice (p, P::ampModel) == choices::neuralCapture;
     const int fac = factoryFor (choice (p, P::ampModel));
+    for (int i = 0; i < kFactory; ++i)
+    {
+        if (i == fac) { facFlushLeft[i] = kFactoryMemory; continue; }
+        if (facFlushLeft[i] <= 0 || ! factoryReady[i]) continue;
+        const int k = std::min (n, (int) facZeros.size());
+        std::fill (facZeros.begin(), facZeros.begin() + k, 0.0f);
+        factory[i].process (facZeros.data(), k, 0.0f, 0.0f);
+        facFlushLeft[i] -= k;
+    }
     runFaded (fAmp, x, n, dry, [&] (float* b, int k)
     {
         if (fac >= 0)
         {
-            // the gain knob drives the capture like the amp's own pot: an audio taper with 6.5 as
-            // the capture was made, +7 dB at 10, and nearly nothing left at 0
-            const float g01 = juce::jlimit (0.0f, 1.0f, p[(size_t) P::ampGain] / 10.0f);
-            const float drive = 40.0f * std::log10 ((g01 + 0.02f) / 1.02f) - 40.0f * std::log10 (0.67f / 1.02f);
-            // master and level both set how loud it plays: the capture already has its power amp
-            const float outDb = p[(size_t) P::ampLevel] + (p[(size_t) P::ampMaster] - 5.0f) + kFactoryTrimDb[fac];
-            factory[fac].process (b, k, drive, outDb);
+            facDrive.setTarget (dbToGain (factoryDriveDb (p)));
+            facOut.setTarget (dbToGain (factoryOutDb (p, fac)));
+            for (int i = 0; i < k; ++i) b[i] *= facDrive.next();
+            factory[fac].process (b, k, 0.0f, 0.0f);
             for (int i = 0; i < k; ++i)
-                b[i] = facDepth.process (facPresence.process (facTreble.process (facMid.process (facBass.process (b[i])))));
+                b[i] = facOut.next() * facDepth.process (facPresence.process (facTreble.process (facMid.process (facBass.process (b[i])))));
         }
         else if (neural)
         {

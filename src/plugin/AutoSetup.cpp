@@ -784,6 +784,7 @@ void AutoSetup::finish()
     gate = std::round (gate);
     result.gateDb = gate;
     proc.setValue (P::gateThresh, gate);
+    proc.setGateFloorSeed (result.noiseDb);
     proc.rememberSetup(); // new copies of the plugin in a DAW start from this
     proc.muteOutput.store (false);
     devlog::note ("Setup finished: " + result.deviceType + " / " + result.inputName + " -> " + result.outputName + ", "

@@ -51,6 +51,9 @@ public:
     juce::RangedAudioParameter* param (P id) const noexcept { return params[(size_t) id]; }
     float value (P id) const noexcept { return raw[(size_t) id]->load(); }
     void setValue (P id, float v);
+    // the input's hiss as setup measured it, so the gate knows the floor from the first note
+    void setGateFloorSeed (float db) noexcept { gateSeed.store (db); }
+    float gateFloorSeed() const noexcept { return gateSeed.load(); }
 
     // Presets (message thread)
     PresetLibrary& presets() noexcept { return library; }
@@ -175,6 +178,8 @@ private:
     void renderClick (float* l, float* r, int n);
 
     juce::AudioProcessorValueTreeState apvts;
+    std::atomic<float> gateSeed { -120.0f };
+    float gateSeedApplied = -120.0f; // audio thread
     // Turning the gate's threshold by hand (a knob, typing a value, a host's automation
     // gesture) puts that tone's gate in Manual: the player's number then holds.
     struct GateManualOnTouch : juce::AudioProcessorParameter::Listener

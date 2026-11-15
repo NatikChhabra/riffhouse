@@ -13,6 +13,7 @@ import json, os, sys
 CAPTURES = [
     ("Modern High Gain", "Helga B 5150 BlockLetter - NoBoost.nam", "Helga Behrens"),
     ("Tight Metal",      "Helga B 6505+ Red ch - NoBoost.nam",     "Helga Behrens"),
+    ("Brit 81",          "Tim R JCM2000 L2 G8.nam",                "Tim Robertson"),
 ]
 
 def lit(x):
