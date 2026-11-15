@@ -30,7 +30,7 @@ The website counts visits and clicks on its buttons with a small script of our o
 
 ### Update emails (only if you sign up)
 
-If you type your email address into the "Get update news" box, it goes into a private list only the maker of Riffhouse can open, with the date and a random code for leaving the list. You get an email only when a new Riffhouse update comes out, a few times a year at most. The address is never shared or sold, and there is no account. Every email has a link that takes you off the list straight away.
+If you leave your email address on the [updates page](https://riffhouse.in/updates.html), it goes into a private list only the maker of Riffhouse can open, with the date and a random code for leaving the list. You get one email when an update ships, and nothing else. The address is never shared or sold, and there is no account. Every email has a link that takes you off the list straight away.
 
 ### The "Why did you uninstall?" page
 
