@@ -1,6 +1,6 @@
 # What Riffhouse sends
 
-Riffhouse is free and has no accounts, no ads and no tracking. Three things can leave your PC, and this page lists all of them.
+Riffhouse is free and has no accounts, no ads and no tracking. Three things can leave your PC, and this page lists all of them, plus what the website collects.
 
 ## The weekly player count (on unless you switch it off)
 
@@ -26,7 +26,15 @@ Riffhouse asks GitHub for the newest version, the same as opening the download p
 
 ## The website
 
-The website counts visits and clicks on its Download buttons with [GoatCounter](https://www.goatcounter.com), a free and open counter. It sets no cookies and keeps nothing that identifies you: the page, where the visit came from (like reddit.com), the browser and screen size in broad groups, and the country. Your internet address is not stored.
+The website counts visits and clicks on its buttons with a small script of our own on Google Apps Script. It sets no cookies and uses no tracking IDs. For a visit it sends only the page and the site you came from (like reddit.com); for a click, which button (like the Download button). Visits and clicks are added up per hour, and only the totals are kept. Your internet address is not stored.
+
+### Update emails (only if you sign up)
+
+If you leave your email address on the [updates page](https://riffhouse.in/updates.html), it goes into a private list only the maker of Riffhouse can open, with the date and a random code for leaving the list. You get one email when an update ships, and nothing else. The address is never shared or sold, and there is no account. Every email has a link that takes you off the list straight away.
+
+### The "Why did you uninstall?" page
+
+If you answer it, it sends the reason you picked, the short note you typed (if any, up to 300 letters) and the app version. Nothing else, and nothing that says who you are. Please don't put personal details in the note.
 
 ## Questions
 
