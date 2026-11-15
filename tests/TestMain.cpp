@@ -1073,14 +1073,19 @@ static std::vector<float> whinePlayer (double sr, double secs, std::vector<char>
 // about -76 dBFS (measured on a Realtek USB guitar cable, 15 Nov). With the gate on (every tone
 // that has one) the pauses must come out at least 40 dB under the playing: a high-gain amp puts
 // 50 dB and more on that hiss, and with the gate off it was only 3 to 6 dB under the notes.
-void testNoiseBetweenNotes (double sr, float hissDb = -76.0f) // -70: a USB guitar input at full gain (16 Nov)
+void testNoiseBetweenNotes (double sr, float hissDb = -76.0f, bool bursts = false) // -70: a USB guitar input at full gain; bursts: its hiss swings 6 dB every few tens of ms (16 Nov)
 {
     std::printf ("hiss at %.0f dBFS between notes on a cheap input, every tone @ %.0f Hz\n", hissDb, sr);
     std::vector<char> quiet;
     auto di = whinePlayer (sr, 30.0, quiet);
     Noise rnd (0x5EEDu);
     const float hiss = juce::Decibels::decibelsToGain (hissDb) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
-    for (auto& x : di) x += hiss * rnd.next();
+    float burst = 1.0f;
+    for (size_t i = 0; i < di.size(); ++i)
+    {
+        if (bursts && i % 2400 == 0) burst = rnd.next() > 0.3f ? 1.0f : 2.0f; // a third of the time 6 dB up, as Natik's USB input did
+        di[i] += hiss * burst * rnd.next();
+    }
     // judged in the pauses only once the gate has had time to hear the floor, and away from
     // each note's tail (a quarter of a second for the release)
     const size_t tail = (size_t) (0.25 * sr), from = (size_t) (3.0 * sr);
@@ -4183,7 +4188,7 @@ int main (int argc, char** argv)
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, fileSr);
         return 0;
     }
-    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); testNoiseBetweenNotes (48000.0, -70.0f, true); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "selfnoise") { testSelfNoise (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "whine") { testWhine (48000.0); testWhine (44100.0); testWhine (192000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -4318,7 +4323,7 @@ int main (int argc, char** argv)
     testWhine (48000.0);
     testWhine (192000.0);
     testSelfNoise (48000.0);
-    testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f);
+    testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); testNoiseBetweenNotes (48000.0, -70.0f, true);
     testInputFix (48000.0);
     testInputGuard();
     testGate (48000.0);

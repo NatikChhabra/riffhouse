@@ -197,7 +197,9 @@ class NoiseGate
 {
 public:
     static constexpr float kAboveFloorDb = 17.0f;   // threshold over the floor's level (hiss peaks sit about 10 dB up; it closes 4 dB lower)
-    static constexpr float kAbovePeaksDb = 6.0f;    // ... and over the floor's own loudest peaks: buzzy hum peaks far above its level
+    // ... and over the floor's own loudest peaks: buzzy hum and bursty USB hiss peak far above their level.
+    // It closes 4 dB lower, so 8 keeps the closing point clear of the hiss's own peaks (6 left it inside them).
+    static constexpr float kAbovePeaksDb = 8.0f;
     // following never asks for more than the tone's own threshold plus this, kept between -40
     // and -30 dB: notes must still ring out, and a clean tone (set low for soft playing) is let
     // hum a little before it cuts quiet notes
@@ -225,7 +227,8 @@ public:
     {
         if (peakDb <= -119.0f || floorDb > -119.0f) return;
         floorDb = peakDb - 10.0f;
-        floorPeakDb = peakDb;
+        // setup's figure is a typical hiss peak; the loudest over a second or two sit about 4 dB higher
+        floorPeakDb = peakDb + 4.0f;
         applyThreshold();
     }
     void setAuto (bool a) { if (a != autoThreshold) { autoThreshold = a; applyThreshold(); } }
@@ -247,8 +250,8 @@ private:
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
     static constexpr int kFirstWindows = 16;        // the very first floor too: 0.8 s was short enough for a held note to pass
     static constexpr float kMostFloorDriftDb = 0.3f; // the later half of those windows against the earlier
-    static constexpr int kFastWindows = 6;          // 0.6 s is enough for a level far under the playing
-    static constexpr float kFastUnderPlayingDb = 45.0f;
+    static constexpr int kFastWindows = 8;          // 0.8 s of steady peaks is enough for a level far under the playing
+    static constexpr float kFastUnderPlayingDb = 30.0f;
     float loudDb = -120.0f;                          // the loudest window peak lately
     float windows[kWindows] {}, windowPeaks[kWindows] {};
     float windowPeak = 0.0f;

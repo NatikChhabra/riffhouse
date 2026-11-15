@@ -528,24 +528,41 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do.
     // The very first floor needs the same 1.6 s: a noisy room is gated soon after the start
     // (a quieter floor heard later is believed at once anyway).
-    // A level far under the playing is believed after 0.6 s, and at once when it is louder than
-    // the floor known so far: real playing rarely leaves 1.6 s of quiet, and a floor seeded low
-    // (or none, from a cold start) left the hiss roaring through the gaps for 6 to 10 s
-    // (16 Nov, a take at -79 dBFS hiss with 27 dB of input gain and fix in front of the gate).
-    // No note that rings 45 dB under the hardest playing of the last half minute holds within
-    // 1.5 dB for 0.6 s while a gate threshold just over it could matter.
-    bool fast = false;
+    // A USB guitar input hisses in bursts: its level swings 6 to 8 dB from one tenth of a second
+    // to the next, so the test above never passed and the gate went by setup's one measurement
+    // for good, 2 to 3 dB over the hiss. Any change in the input (a few dB hotter, a cold start)
+    // let the amp turn the hiss into a roar as loud as the playing (16 Nov). The loudest moment
+    // of each tenth holds far steadier on such hiss (within 1 to 1.5 dB) and a ringing note still
+    // fades through it, so 0.8 s of steady peaks, 30 dB or more under the playing of the last
+    // half minute, is believed at once as the floor, louder or quieter than the one known so far.
     if (fastFloor && windowsHeard >= kFastWindows)
     {
-        float lo = 1000.0f, hi = -1000.0f, sum = 0.0f;
-        for (int k = 1; k <= kFastWindows; ++k)
+        float pk[kFastWindows], lv[kFastWindows];
+        for (int k = 0; k < kFastWindows; ++k)
         {
-            const float w = windows[(windowAt - k + kWindows) % kWindows];
-            lo = std::min (lo, w); hi = std::max (hi, w); sum += w;
+            const int i = (windowAt - 1 - k + 2 * kWindows) % kWindows; // k = 0 is the newest
+            pk[k] = windowPeaks[i];
+            lv[k] = windows[i];
         }
-        fast = hi - lo <= 1.5f && loudDb - sum / (float) kFastWindows >= kFastUnderPlayingDb;
+        auto median = [] (float* v, int n) { std::sort (v, v + n); return 0.5f * (v[(n - 1) / 2] + v[n / 2]); };
+        float newer[kFastWindows / 2], older[kFastWindows / 2];
+        std::copy (pk, pk + kFastWindows / 2, newer);
+        std::copy (pk + kFastWindows / 2, pk + kFastWindows, older);
+        const float drift = std::abs (median (newer, kFastWindows / 2) - median (older, kFastWindows / 2));
+        float sorted[kFastWindows];
+        std::copy (pk, pk + kFastWindows, sorted);
+        std::sort (sorted, sorted + kFastWindows);
+        const float spread = sorted[kFastWindows * 3 / 4] - sorted[kFastWindows / 4]; // the middle half
+        const float typical = median (pk, kFastWindows);
+        if (spread <= 1.5f && drift <= 1.0f && loudDb - typical >= kFastUnderPlayingDb && typical < -40.0f)
+        {
+            floorDb = std::max (-120.0f, median (lv, kFastWindows));
+            floorPeakDb = std::max (-120.0f, sorted[kFastWindows - 1]);
+            applyThreshold();
+            return;
+        }
     }
-    const int need = fast ? kFastWindows : floorDb < -119.0f ? kFirstWindows : kWindows;
+    const int need = floorDb < -119.0f ? kFirstWindows : kWindows;
     if (windowsHeard < need) return;
     float lo = 1000.0f, hi = -1000.0f, sum = 0.0f, peak = -1000.0f;
     for (int k = 1; k <= need; ++k)
@@ -564,9 +581,9 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     if (std::abs (recent - older) / (float) (need / 2) > kMostFloorDriftDb) return;
     const float heard = sum / (float) need;
     if (heard > -40.0f) return;                 // that loud and steady is a sound, not a floor
-    if (heard < floorDb || fast) floorDb = std::max (-120.0f, heard); // quieter now, or far under the playing: believed at once
+    if (heard < floorDb) floorDb = std::max (-120.0f, heard); // quieter now: believed at once
     else floorDb = std::min (heard, floorDb < -119.0f ? heard : floorDb + 1.0f);
-    if (peak < floorPeakDb || fast) floorPeakDb = std::max (-120.0f, peak);
+    if (peak < floorPeakDb) floorPeakDb = std::max (-120.0f, peak);
     else floorPeakDb = std::min (peak, floorPeakDb < -119.0f ? peak : floorPeakDb + 1.0f);
     applyThreshold();
 }
