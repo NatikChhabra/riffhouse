@@ -323,7 +323,7 @@ details:not([open]) > p { display: none; }
 .road-say { display: grid; gap: 12px; margin-top: clamp(24px, 3vw, 36px); max-width: 34em; }
 .road-say .lead { font-weight: 500; }
 .road-updated { margin-top: 24px; font-size: var(--t-small); color: var(--soft); }
-.stops { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--gap); margin-top: clamp(32px, 4vw, 52px); }
+.stops { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); margin-top: clamp(32px, 4vw, 52px); }
 .stops::before { content: ""; position: absolute; left: 0; right: 0; top: 12px; height: 4px; border-radius: 2px; background: var(--coal); }
 .stops a { position: relative; display: grid; gap: 4px; padding-top: 44px; text-decoration: none; min-height: 44px; }
 .stops a::before { content: ""; position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--amber); border: 4px solid var(--coal); box-sizing: border-box; }
