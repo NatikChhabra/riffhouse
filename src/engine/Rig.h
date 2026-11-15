@@ -51,6 +51,9 @@ struct RigMeters
 class Rig
 {
 public:
+    // Off-line listening checks only: play the high-gain amps' circuit models instead of their
+    // real amp captures, as before Update 1 and as the fallback when a capture cannot load.
+    static inline bool circuitModelsOnly = false;
     Rig();
 
     void prepare (double sampleRate, int maxBlock);

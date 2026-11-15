@@ -3883,7 +3883,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "play" && args.size() >= 4)
     {
-        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB]
+        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0]
         // Plays a recorded clean guitar through a preset, for listening checks, with Auto level
         // as the app applies it (measured on this guitar) unless auto_level=0.
         juce::AudioFormatManager fm; fm.registerBasicFormats();
@@ -3915,6 +3915,7 @@ int main (int argc, char** argv)
             const auto key = args[i].upToFirstOccurrenceOf ("=", false, false);
             const float value = args[i].fromFirstOccurrenceOf ("=", false, false).getFloatValue();
             if (key == "trim") { trim = value; continue; }
+            if (key == "captures") { Rig::circuitModelsOnly = value < 0.5f; continue; } // captures=0: the circuit models
             const int id = findParamByKey (key.toStdString());
             if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
             v[(size_t) id] = value;

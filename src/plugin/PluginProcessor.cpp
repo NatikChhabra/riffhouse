@@ -917,7 +917,11 @@ void RiffhouseProcessor::setStateInformation (const void* data, int size)
     if (! st.isValid() || ! st.hasType (apvts.state.getType())) return; // not ours: leave everything as it is
     if (auto ui = st.getChildWithName ("UI"); ui.isValid()) uiState.copyPropertiesAndChildrenFrom (ui, nullptr);
     if (uiState.hasProperty ("foot")) foot.fromText (uiState.getProperty ("foot").toString().toStdString());
+    // Before Update 1 the gate belonged to the setup, so one "off" stayed off for every tone.
+    // A session saved then has no gate mode: it comes back with the gate on, in Auto.
+    const bool beforeGateMode = ! st.getChildWithProperty ("id", "gate_auto").isValid();
     apvts.replaceState (st);
+    if (beforeGateMode) { setValue (P::gateOn, 1.0f); setValue (P::gateAuto, 1.0f); }
     currentPreset = library.indexOf (st.getProperty ("preset").toString());
     for (int i = 0; i < kNumParams; ++i) presetSnapshot[(size_t) i] = raw[(size_t) i]->load();
     metronomeBpm.store ((float) st.getProperty ("metronomeBpm", 100.0));

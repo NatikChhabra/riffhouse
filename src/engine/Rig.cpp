@@ -160,7 +160,7 @@ void Rig::reset()
 int Rig::factoryFor (int ampModel) const noexcept
 {
     const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : ampModel == choices::brit800 ? 2 : -1;
-    return i >= 0 && factoryReady[i] ? i : -1;
+    return i >= 0 && factoryReady[i] && ! circuitModelsOnly ? i : -1;
 }
 
 int Rig::latencySamples() const
