@@ -1060,6 +1060,60 @@ static std::vector<float> whinePlayer (double sr, double secs, std::vector<char>
     return g;
 }
 
+// What a cheap USB guitar input sounds like between notes, through every tone: its hiss sits at
+// about -76 dBFS (measured on a Realtek USB guitar cable, 15 Nov). With the gate on (every tone
+// that has one) the pauses must come out at least 40 dB under the playing: a high-gain amp puts
+// 50 dB and more on that hiss, and with the gate off it was only 3 to 6 dB under the notes.
+void testNoiseBetweenNotes (double sr)
+{
+    std::printf ("hiss between notes on a cheap input, every tone @ %.0f Hz\n", sr);
+    std::vector<char> quiet;
+    auto di = whinePlayer (sr, 30.0, quiet);
+    Noise rnd (0x5EEDu);
+    const float hiss = juce::Decibels::decibelsToGain (-76.0f) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
+    for (auto& x : di) x += hiss * rnd.next();
+    // judged in the pauses only once the gate has had time to hear the floor, and away from
+    // each note's tail (a quarter of a second for the release)
+    const size_t tail = (size_t) (0.25 * sr), from = (size_t) (3.0 * sr);
+    std::vector<char> pause (di.size(), 0);
+    for (size_t i = from; i < di.size(); ++i)
+    {
+        bool q = true;
+        for (size_t k = i >= tail ? i - tail : 0; k <= i && q; k += 64) q = quiet[k] != 0;
+        pause[i] = q && quiet[i];
+    }
+    float worst = 1000.0f; juce::String worstName;
+    int gated = 0;
+    for (const auto& p : loadPresets())
+    {
+        if (p.values[(size_t) P::lofiOn] > 0.5f && p.values[(size_t) P::lofiNoise] > 0.0f) continue; // added hiss is the effect
+        // echoes and rooms ring on into the pauses on purpose: judged without them
+        auto v = p.values;
+        v[(size_t) P::dlyOn] = 0.0f; v[(size_t) P::revOn] = 0.0f; v[(size_t) P::space] = 0.0f;
+        const auto r = renderWith (v, di, sr, 256);
+        double ep = 0.0, eq = 0.0; size_t np = 0, nq = 0;
+        for (size_t i = from; i < di.size(); ++i)
+        {
+            const double e = 0.5 * ((double) r.l[i] * r.l[i] + (double) r.r[i] * r.r[i]);
+            if (pause[i]) { eq += e; ++nq; }
+            else if (! quiet[i]) { ep += e; ++np; }
+        }
+        const float play = (float) (10.0 * std::log10 (ep / (double) std::max<size_t> (1, np) + 1e-30));
+        const float rest = (float) (10.0 * std::log10 (eq / (double) std::max<size_t> (1, nq) + 1e-30));
+        const float under = play - rest;
+        const bool gate = p.values[(size_t) P::gateOn] > 0.5f;
+        if (gate)
+        {
+            ++gated;
+            if (under < worst) { worst = under; worstName = p.name; }
+            CHECK (under >= 40.0f, "%s: the pauses are only %.1f dB under the playing (%.1f vs %.1f dBFS)", p.name.toRawUTF8(), under, rest, play);
+        }
+        else
+            CHECK (under >= 40.0f || play - rest >= 40.0f, "%s (no gate): the hiss is only %.1f dB under the playing", p.name.toRawUTF8(), under);
+    }
+    std::printf ("  %d tones with a gate, closest %.1f dB under the playing (%s)\n", gated, worst, worstName.toRawUTF8());
+}
+
 // Steady whines are cut and nothing else is ever touched: a clean input gets no notch at
 // all, and with whines on the input every notch sits on a real one and the playing comes
 // through as it was.
@@ -1516,8 +1570,13 @@ void testAliasing (double sr)
     // of 3.1 kHz, anything else is aliasing
     const double f0 = 3100.0;
     const auto in = test::sine (sr, f0, 1.5, 0.3f);
+  // the circuit models are oversampled and must stay clean; the built-in captures (Modern High
+  // Gain, Tight Metal, Brit 81) play exactly as the NAM plugin plays them, unoversampled at 48 kHz,
+  // so they get NAM's own figure as the bar
+  for (int amp : { (int) choices::hotRodLead, (int) choices::tightMetal })
+  {
     auto v = bare();
-    v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = choices::tightMetal; v[(size_t) P::ampGain] = 10;
+    v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = (float) amp; v[(size_t) P::ampGain] = 10;
     const auto r = renderWith (v, in, sr);
     const int N = 32768;
     juce::dsp::FFT fft (15);
@@ -1538,8 +1597,10 @@ void testAliasing (double sr)
         if (std::abs (f - nearest) < 40.0 && nearest > 0) harmonic += e; else alias += e;
     }
     const double ratioDb = 10.0 * std::log10 (alias / harmonic);
-    std::printf ("  alias-to-harmonic ratio: %.1f dB\n", ratioDb);
-    CHECK (ratioDb < -35.0, "too much aliasing: %.1f dB", ratioDb);
+    std::printf ("  %s: alias-to-harmonic ratio %.1f dB\n", ampVoicing (amp).name, ratioDb);
+    const double bar = amp == choices::tightMetal ? -25.0 : -35.0;
+    CHECK (ratioDb < bar, "too much aliasing in %s: %.1f dB", ampVoicing (amp).name, ratioDb);
+  }
 }
 
 void testPresets (double sr)
@@ -2245,9 +2306,11 @@ void testNeural (double sr)
 
 // Measured 3.6 with every pedal on (GCC, November 2026), then 4.9 to 5.5 once the default
 // drive pedal became its real circuit, solved at 8x (0.1.5), and 4.0 to 5.7 with the amp at 4x
-// and its curves antialiased. The budget leaves room for a
-// different compiler and a noisy machine, and still catches a rig that got a fifth slower.
-constexpr double kRigCostBudget = 6.0;
+// and its curves antialiased. Update 1's real amp captures cost a tenth more than the circuit
+// models they replace (5.29 against 4.80 on GCC, 6.17 on the Windows build, Tight Metal), so the
+// budget moved from 6.0 by that same tenth. It leaves room for a different compiler and a noisy
+// machine, and still catches a rig that got a fifth slower.
+constexpr double kRigCostBudget = 6.6;
 
 // A fixed piece of arithmetic of the kind the rig is made of, timed on the same machine
 // at the same moment. Shared build machines differ by a factor of two and more from
@@ -2625,6 +2688,14 @@ void testCpu (double sr)
     const double ref = referenceSeconds (sr, length);
     const double cost = took / ref;
     std::printf ("  every pedal on, 64-sample blocks: %.1fx realtime, %.2f times the reference load\n", rt, cost);
+    {
+        // the same rig with the circuit model the capture replaces, for the record
+        Rig::circuitModelsOnly = true;
+        double circuit = 1.0e9;
+        for (int attempt = 0; attempt < 3; ++attempt) circuit = std::min (circuit, renderWith (v, di, sr, 64).seconds);
+        Rig::circuitModelsOnly = false;
+        std::printf ("  the same with the circuit model instead of the capture: %.2f times the reference load\n", circuit / ref);
+    }
     // Two checks. The first holds on any machine: a change that makes the rig slower shows
     // up as a higher cost against the reference. The second is the floor for playing live.
     CHECK (cost < kRigCostBudget, "the rig got slower: %.2f times the reference load (budget %.2f)", cost, kRigCostBudget);
@@ -3025,9 +3096,12 @@ void testHistory()
     // your input setup is not part of the tone: changing it makes no step and undo leaves it alone
     const int before = h.depth();
     t.values[(size_t) P::inGain] = 11.0f;
-    t.values[(size_t) P::gateThresh] = -40.0f;
     show(); show(); show();
     CHECK (h.depth() == before, "input settings made no step");
+    // the gate is part of the tone (Update 1): turning it is a step like any knob
+    t.values[(size_t) P::gateThresh] = -40.0f;
+    show(); show(); show();
+    CHECK (h.depth() == before + 1, "the gate is part of the tone: a step (%d, was %d)", h.depth(), before);
 
     // it never grows without end
     for (int i = 0; i < 300; ++i)
@@ -3819,7 +3893,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "play" && args.size() >= 4)
     {
-        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB]
+        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0]
         // Plays a recorded clean guitar through a preset, for listening checks, with Auto level
         // as the app applies it (measured on this guitar) unless auto_level=0.
         juce::AudioFormatManager fm; fm.registerBasicFormats();
@@ -3851,6 +3925,7 @@ int main (int argc, char** argv)
             const auto key = args[i].upToFirstOccurrenceOf ("=", false, false);
             const float value = args[i].fromFirstOccurrenceOf ("=", false, false).getFloatValue();
             if (key == "trim") { trim = value; continue; }
+            if (key == "captures") { Rig::circuitModelsOnly = value < 0.5f; continue; } // captures=0: the circuit models
             const int id = findParamByKey (key.toStdString());
             if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
             v[(size_t) id] = value;
@@ -4057,6 +4132,7 @@ int main (int argc, char** argv)
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, fileSr);
         return 0;
     }
+    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "selfnoise") { testSelfNoise (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "whine") { testWhine (48000.0); testWhine (44100.0); testWhine (192000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -4191,6 +4267,7 @@ int main (int argc, char** argv)
     testWhine (48000.0);
     testWhine (192000.0);
     testSelfNoise (48000.0);
+    testNoiseBetweenNotes (48000.0);
     testInputFix (48000.0);
     testInputGuard();
     testGate (48000.0);

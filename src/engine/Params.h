@@ -40,6 +40,8 @@ enum class P : int
     doubler, space, outLevel,
     // Auto level: tones load at one loudness and switches never change the volume (part of the setup, not the tone)
     autoLevel,
+    // Gate mode: Auto sets the threshold from the hiss it hears (part of the setup, not the tone)
+    gateAuto,
     count
 };
 

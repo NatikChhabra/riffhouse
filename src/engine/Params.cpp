@@ -128,6 +128,7 @@ namespace
         s.push_back (cont (P::space, "space", "Space", 0.0f, 2.0f, 1.0f, "x"));
         s.push_back (cont (P::outLevel, "out_level", "Output", -36.0f, 12.0f, 0.0f, "dB"));
         s.push_back (tog (P::autoLevel, "auto_level", "Auto level", true));
+        s.push_back (pick (P::gateAuto, "gate_auto", "Gate Mode", { "Manual", "Auto" }, 1));
 
         assert ((int) s.size() == kNumParams);
         for (int i = 0; i < (int) s.size(); ++i)
