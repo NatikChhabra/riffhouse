@@ -214,6 +214,7 @@ void Rig::applyParams (const ParamValues& v, bool toneChange)
 
     input.set (choice (p, P::humFilter), on (p, P::inputFix), get (P::inputFixAmt));
     if (changed (P::gateThresh) || changed (P::gateRelease)) gate.set (get (P::gateThresh), get (P::gateRelease));
+    gate.setAuto (choice (p, P::gateAuto) == 1);
     comp.set (get (P::compSustain), get (P::compAttack), get (P::compLevel), get (P::compBlend));
     wah.set (choice (p, P::wahMode), get (P::wahPos), get (P::wahSens), get (P::wahQ));
     pitch.set (choice (p, P::pitchMode), get (P::pitchSemis), get (P::pitchMix));

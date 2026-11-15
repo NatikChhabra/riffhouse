@@ -8,10 +8,12 @@ namespace rh
 {
 bool belongsToSetup (P id)
 {
-    // the guitar input is the player's own, kept whatever tone is loaded: the gate's switch
-    // too (a gate switched off stayed off only until the next tone, 0.1.5.1)
-    return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter || id == P::gateOn || id == P::gateThresh
-        || id == P::autoLevel || id == P::gateAuto;
+    // the guitar input is the player's own, kept whatever tone is loaded. The gate is not:
+    // like Helix, Fractal, Kemper and ToneX it belongs to the tone, because a metal tone needs it
+    // and a clean one may not. (0.1.5.1 to Update 1 kept it with the setup, and one switch-off
+    // left every metal preset hissing.) Auto sets its threshold from the hiss it hears.
+    return id == P::inGain || id == P::inputFix || id == P::inputFixAmt || id == P::humFilter
+        || id == P::autoLevel;
 }
 
 bool sameTone (const ToneState& a, const ToneState& b)
