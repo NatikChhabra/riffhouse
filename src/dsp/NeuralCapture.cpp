@@ -2,6 +2,7 @@
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "NeuralCapture.h"
 
+#include "NAM/activations.h"
 #include "NAM/dsp.h"
 #include "NAM/get_dsp.h"
 #include "FactoryCaptures.h"
@@ -21,7 +22,13 @@ struct NeuralCapture::Model
     std::string name;
 };
 
-NeuralCapture::NeuralCapture() = default;
+NeuralCapture::NeuralCapture()
+{
+    // the fast tanh the official NAM plugin runs with: about a third of the CPU, and captures
+    // sound as they do there (set once, before any model is built)
+    static const bool fast = [] { nam::activations::Activation::enable_fast_tanh(); return true; }();
+    (void) fast;
+}
 
 NeuralCapture::~NeuralCapture()
 {

@@ -11,8 +11,8 @@ import json, os, sys
 
 # amp voicing it stands in for, file name in the collection, who made it
 CAPTURES = [
-    ("Modern High Gain", "Helga B 5150 BlockLetter - NoBoost.nam", "Helga B"),
-    ("Tight Metal",      "Helga B 6505+ Red ch - NoBoost.nam",     "Helga B"),
+    ("Modern High Gain", "Helga B 5150 BlockLetter - NoBoost.nam", "Helga Behrens"),
+    ("Tight Metal",      "Helga B 6505+ Red ch - NoBoost.nam",     "Helga Behrens"),
 ]
 
 def lit(x):

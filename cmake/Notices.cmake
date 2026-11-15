@@ -22,7 +22,7 @@ _riffhouse_notice("Eigen (MPL 2.0; source at https://gitlab.com/libeigen/eigen)"
 _riffhouse_notice("nlohmann/json (MIT, Copyright 2013-2025 Niels Lohmann)" "${CMAKE_CURRENT_LIST_DIR}/notices/nlohmann-json-MIT.txt")
 _riffhouse_notice("Signalsmith Stretch (MIT)" "${signalsmith_stretch_SOURCE_DIR}/LICENSE.txt")
 _riffhouse_notice("Signalsmith Linear (MIT)" "${signalsmith_linear_SOURCE_DIR}/LICENSE.txt")
-_riffhouse_notice("Amp captures in Modern High Gain and Tight Metal: Helga B, NAM_models collection (GNU GPL v3; https://github.com/pelennor2170/NAM_models)" "${CMAKE_SOURCE_DIR}/tools/captures/COPYING-NAM_models.txt")
+_riffhouse_notice("Amp captures in Modern High Gain and Tight Metal: Helga Behrens, NAM_models collection compiled by Chris Kenrick (GNU GPL v3; https://github.com/pelennor2170/NAM_models)" "${CMAKE_SOURCE_DIR}/tools/captures/COPYING-NAM_models.txt")
 _riffhouse_notice("Real cabinet impulse responses: Jester's Brutal Pack by Jester Dyne Productions (CC0 1.0)" "${CMAKE_SOURCE_DIR}/tools/cabs/LICENSE-jester.txt")
 _riffhouse_notice("LAME MP3 encoder 3.100 (LGPL 2.0 or later; source at https://lame.sourceforge.io)" "${lame_SOURCE_DIR}/COPYING")
 _riffhouse_notice("Fonts: Inter (SIL Open Font License 1.1)" "${CMAKE_SOURCE_DIR}/resources/fonts/OFL-Inter.txt")
