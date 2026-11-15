@@ -2994,6 +2994,28 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
     // bottom edge, and lower still as the mic is pulled back toward us.
     const auto clip = c + axis * (hr * 2.0f);
     const float footY = l.box.getBottom() + 4.0f + 7.0f * away;
+    // The photographed mic (tools/gear3d/mic.py) comes in three pictures: the mic in its clip with
+    // the rod running out of the bottom, a piece of rod stretched to fit, and the tripod. Their
+    // numbers are nominal pixels for a head 30 across its radius, measured from the grille's front.
+    const bool photo = art::has ("mic_head") && art::has ("mic_base") && art::has ("mic_rod");
+    const float ps = hr / 30.0f;
+    const auto plugEnd = photo ? c + juce::Point<float> (53.71f, 68.0f) * ps : tail; // where the cable leaves the plug
+    if (photo)
+    {
+        const float rodX = c.x + 26.85f * ps;
+        const juce::Point<float> hub (rodX, footY - 45.0f * ps);
+        // the rod runs down from the mic's swivel into the top of the tripod's height clutch
+        const float headBottom = c.y + 140.0f * ps, clutchTop = hub.y - 82.0f * ps;
+        if (clutchTop > headBottom)
+            art::draw (g, "mic_rod", R (rodX - 10.0f * ps, headBottom - 1.0f, 20.0f * ps, clutchTop - headBottom + 2.0f));
+        {
+            juce::Graphics::ScopedSaveState ss (g);
+            g.reduceClipRegion (R (c.x - 200.0f * ps, c.y - 200.0f * ps, 400.0f * ps, clutchTop - (c.y - 200.0f * ps)).toNearestInt());
+            art::draw (g, "mic_head", R (c.x - 60.0f * ps, c.y - 60.0f * ps, 200.0f * ps, 200.0f * ps));
+        }
+        art::draw (g, "mic_base", R (hub.x - 110.0f * ps, hub.y - 100.0f * ps, 220.0f * ps, 160.0f * ps));
+    }
+    if (! photo)
     {
         // A tripod seen from the front, like everything else in the picture: two legs
         // spread to the sides, the third comes straight at us and shows as a short stub.
@@ -3044,11 +3066,11 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
     // cable out of the tail, down to the floor, and along it to the channel strip
     {
         const float floorY = l.box.getBottom() + 5.0f;
-        const juce::Point<float> land (tail.x + hr * 3.2f, floorY);
+        const juce::Point<float> land (plugEnd.x + hr * 3.2f, floorY);
         juce::Path cable;
-        cable.startNewSubPath (tail);
+        cable.startNewSubPath (plugEnd);
         // it leaves along the mic, hangs, and meets the floor at a shallow angle
-        cable.cubicTo (tail + axis * (hr * 2.4f), { land.x - hr * 2.6f, floorY - hr * 0.2f }, land);
+        cable.cubicTo (plugEnd + axis * (hr * 2.4f), { land.x - hr * 2.6f, floorY - hr * 0.2f }, land);
         const bool plugged = socket.x > land.x + 60.0f;
         if (plugged)
         {
@@ -3058,7 +3080,7 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
             cable.cubicTo ({ land.x + run * 0.3f, floorY + 4.0f }, { land.x + run * 0.55f, floorY - 2.0f }, { socket.x - rise * 0.9f, floorY + 1.0f });
             cable.cubicTo ({ socket.x - rise * 0.25f, floorY + 2.0f }, { socket.x, floorY - rise * 0.35f }, { socket.x, socket.y + 14.0f });
         }
-        const float cw = std::max (2.0f, hr * 0.2f);
+        const float cw = std::max (2.0f, hr * (photo ? 0.24f : 0.2f));
         g.setColour (juce::Colours::black.withAlpha (0.45f));
         g.strokePath (cable, juce::PathStrokeType (cw, juce::PathStrokeType::curved, juce::PathStrokeType::rounded), juce::AffineTransform::translation (1.5f, 2.5f));
         g.setColour (C (0xff070707));
@@ -3077,6 +3099,7 @@ void drawCabMic (juce::Graphics& g, const CabLayout& l, float micPos, float dist
             g.fillEllipse (R (17.0f, 17.0f).withCentre (socket));
         }
     }
+    if (photo) return;
     // the body: a satin tube, lit along its upper side
     {
         const auto mid = c + axis * (hr * 1.65f);

@@ -44,6 +44,11 @@ total = 0
 for f in sorted(glob.glob(os.path.join(src, "*.png"))):
     name = os.path.splitext(os.path.basename(f))[0].replace("-", "_")
     im = Image.open(f).convert("RGBA")
+    if name.startswith("mic_"):
+        # the cab's mic and stand: the rod runs off the edges on purpose, so nothing is faded
+        im.save(os.path.join(dst, name + ".png"), optimize=True)
+        total += os.path.getsize(os.path.join(dst, name + ".png"))
+        continue
     if name.startswith(("knob", "fader", "hw_")):
         im = fade_round(im, 0.72 if not name.startswith("hw_") else 0.8, 0.98)
         side = 128 if name.startswith("hw_screw") else 192 if name.startswith("hw_jack") else 256  # panel hardware: small on screen
