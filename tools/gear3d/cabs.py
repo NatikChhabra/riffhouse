@@ -244,7 +244,7 @@ def build(k, gear_dir, out_dir, samples, scale):
         c.grid(pl, 0.4)
         c.cut(pl, rect_box("irwin", win, zb + 0.08, zb + 1, c.black(), corner=8 * CM))
         c.roll(pl, 0.05, 3)
-        rect_box("irglass", win, zb + 0.06, zb + 0.09, c.principled("lcd", (0.004, 0.005, 0.005), rough=0.25, coat=1.0, coat_rough=0.02), corner=8 * CM)
+        rect_box("irglass", win, zb + 0.06, zb + 0.09, c.principled("lcd", (0.004, 0.005, 0.005), rough=0.55), corner=8 * CM)
         for xx in (plate[0] + 11, plate[0] + plate[2] - 11):
             amps.screw_head(st, xx, plate[1] + plate[3] / 2, zb + 0.22, 0.13, c.chrome(), xx * 0.37)
 

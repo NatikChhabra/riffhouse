@@ -872,8 +872,8 @@ static void pedalLettering (juce::Graphics& g, const PedalDesign& d, const Pedal
             if (d.stripe == 1) // never on the pinstripes
                 for (const float sy : { l.name.getY() - 9.0f * u, l.name.getBottom() + 27.0f * u })
                     if (std::abs (ly - sy) < 10.0f * u) ly = sy - 12.0f * u;
-            letter (g, "IN", R (b.getX() + 9.0f * u, ly - 7.0f * u, 30.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredLeft);
-            letter (g, "OUT", R (b.getRight() - 49.0f * u, ly - 7.0f * u, 40.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredRight);
+            letter (g, "IN", R (b.getX() + 9.0f * u, ly - 7.0f * u, 30.0f * u, 14.0f * u), small, ink.withAlpha (0.92f), juce::Justification::centredLeft);
+            letter (g, "OUT", R (b.getRight() - 49.0f * u, ly - 7.0f * u, 40.0f * u, 14.0f * u), small, ink.withAlpha (0.92f), juce::Justification::centredRight);
         }
         if (smallPrint && (form == 0 || form == 2 || form == 3) && d.stripe != 2) // a tread plate leaves no room for it
         {
@@ -883,7 +883,7 @@ static void pedalLettering (juce::Graphics& g, const PedalDesign& d, const Pedal
             const juce::String mark = "RIFFHOUSE  " + juce::String::charToString ((juce::juce_wchar) juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) d.name[0]))
                                       + "-" + juce::String (10 + sum % 89);
             const float my = b.getBottom() - 19.0f * u;
-            letter (g, mark, R (b.getX(), my, w, 13.0f * u), small, ink.withAlpha (0.55f), juce::Justification::centred);
+            letter (g, mark, R (b.getX(), my, w, 13.0f * u), small, ink.withAlpha (0.8f), juce::Justification::centred);
         }
     }
 }

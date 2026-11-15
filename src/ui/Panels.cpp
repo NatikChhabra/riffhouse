@@ -1306,7 +1306,25 @@ void SettingsView::paintPlate (juce::Graphics& g, juce::Rectangle<float> a)
     g.setFont (faceFont (Face::doto, 52.0f));
     auto num = figure.withTrimmedBottom (26.0f);
     const auto msText = delayFigure (ms);
-    g.drawText (msText, num, juce::Justification::centredLeft);
+    {
+        // Doto draws its decimal point as a plus of dots, which reads as "6+3": set the point as one square dot instead
+        const auto f = faceFont (Face::doto, 52.0f);
+        juce::GlyphArrangement ga;
+        ga.addLineOfText (f, msText, num.getX(), num.getCentreY() + (f.getAscent() - f.getDescent()) * 0.5f);
+        const float cell = f.getHeight() * 0.075f;
+        for (int i = 0; i < ga.getNumGlyphs(); ++i)
+        {
+            const auto& gl = ga.getGlyph (i);
+            if (gl.getCharacter() == '.')
+                g.fillRect (gl.getBounds().getCentreX() - cell * 0.5f, gl.getBaselineY() - cell, cell, cell);
+            else
+            {
+                juce::Path path;
+                gl.createPath (path);
+                g.fillPath (path);
+            }
+        }
+    }
     const float numW = juce::GlyphArrangement::getStringWidth (faceFont (Face::doto, 52.0f), msText);
     g.setFont (font (16.0f, Weight::medium));
     g.setColour (colours::textDim);
