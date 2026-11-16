@@ -2223,7 +2223,7 @@ void testBadFiles (double sr)
     std::printf ("  3000 broken tones and share codes: %d read safely, %d refused with a reason\n", read, refused);
 
     // captures and IRs on disk
-    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-badfiles");
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-badfiles-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt())); // its own folder: test runs side by side wiped each other's files mid-read
     dir.deleteRecursively();
     dir.createDirectory();
     auto bytes = [&rnd] (int n) { juce::MemoryBlock m ((size_t) n); for (int k = 0; k < n; ++k) static_cast<char*> (m.getData())[k] = (char) rnd.nextInt (256); return m; };
@@ -3560,7 +3560,7 @@ void testTakes()
 {
     std::printf ("takes\n");
     const double sr = 48000.0;
-    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-takes-test");
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-takes-test-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt())); // its own folder: test runs side by side wiped each other's files mid-read
     dir.deleteRecursively();
     const auto di = test::guitarDi (sr, 3.0);
 
