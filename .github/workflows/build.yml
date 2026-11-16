@@ -33,7 +33,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: python3 tools/release/notes.py check "$GITHUB_REF_NAME"
 
   # Publishing a release makes the tag, and people then wait for the installer. When main already
@@ -72,7 +72,7 @@ jobs:
           fi
           echo "Using the installer run $run built and tested: $file $hash"
           echo "found=true" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.find.outputs.found == 'true'
         with:
           name: riffhouse-windows
@@ -89,7 +89,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The ASIO SDK is GPLv3 since October 2025. MSYS2 packages its headers.
       - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
@@ -141,7 +141,7 @@ jobs:
           New-Item -ItemType Directory -Force listen-tool\presets | Out-Null
           Copy-Item build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe listen-tool\
           Copy-Item presets\*.json listen-tool\presets\
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: riffhouse-windows-tests
           path: listen-tool
@@ -200,7 +200,7 @@ jobs:
           # which version this was built as and from which commit: a release only reuses its own build
           "$env:LABEL $env:GITHUB_SHA" | Out-File -FilePath dist\BUILD.txt -Encoding ascii
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: riffhouse-windows
           path: |
@@ -210,7 +210,7 @@ jobs:
           if-no-files-found: error
 
       # The debug symbols of exactly this build: a player's crash dump read with them names the function.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: riffhouse-windows-symbols
           path: build/src/Riffhouse_artefacts/Release/Standalone/*.pdb
@@ -370,7 +370,7 @@ jobs:
       # The pictures are only there to look at when something went wrong. A build that passed
       # every check is not failed because GitHub could not store them (11 November 2026: this
       # step hung for ten minutes and failed a build that was green).
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         continue-on-error: true
         timeout-minutes: 5
@@ -386,7 +386,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The runner fetches packages from a mirror inside its own cloud first. When that mirror cannot be
       # reached, apt waits on it for every single package (33 minutes on 11 November 2026, and a release
       # waited with it). So: a short first try, then the same again from Ubuntu's own servers only.
@@ -422,8 +422,8 @@ jobs:
       id-token: write     # signs the build provenance below
       attestations: write
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: riffhouse-windows
           path: dist
@@ -451,10 +451,10 @@ jobs:
       # It never holds up a release.
       - name: Sign the build provenance
         continue-on-error: true
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*.exe
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             dist/*.exe
