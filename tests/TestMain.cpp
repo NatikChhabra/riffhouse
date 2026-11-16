@@ -2234,6 +2234,10 @@ void testBadFiles (double sr)
             rig.prepare (sr, 256);
             const auto err = rig.neural().load (file.getFullPathName().toStdString());
             CHECK (! err.empty(), "%s was taken as a capture", f.name);
+            // a WaveNet with too few numbers is caught before the library reads past their end
+            // (it used to be read first: a crash in one full test run of two on Windows)
+            if (juce::String (f.name) == "wrong-weights.nam")
+                CHECK (juce::String (err).contains ("damaged"), "a short WaveNet was read before being refused: %s", err.c_str());
             auto v = bare();
             v[(size_t) P::ampOn] = 1;
             v[(size_t) P::ampModel] = choices::neuralCapture;
