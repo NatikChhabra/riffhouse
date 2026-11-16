@@ -18,7 +18,7 @@ Update 1. The high-gain amps were rebuilt after a player told us the metal tones
 - Redline Lead now clips the way real high-gain amps do. Each preamp stage cuts the bass going into it and the fizz coming out of it, as the real circuits' coupling and cathode parts do, so the strings' upper notes do the clipping instead of the whole low string. It was fitted to a capture of the real amp it is modelled on, and the tests now hold it there: through the same speaker, its tone sits within 1 to 2 dB of the real amp's, where 0.1.5 was 3 to 5 dB off.
 - The gain knob on all four high-gain amps turns like a real amp's: most of the drive arrives in the first half of the knob, and the top adds a little more.
 - Three new cabinets: 4x12 Real Classic, Real Heavy and Real Tight, recordings of real 4x12 cabinets (public domain). The mic knob moves through the real mic placements, from bright to dark. All 65 metal and hard rock tones now play through them.
-- The 65 metal and hard rock tones on the Real cabinets now cut the top above 7 kHz instead of 12 kHz. Against a leading paid amp modeler on the same guitar takes they carried 7 to 8 dB more fizz at 10 kHz; now about 4.
+- The 65 metal and hard rock tones on the Real cabinets now cut the top above 7 kHz instead of 12 kHz, so less fizz rides above the tone.
 - The other cabinets roll off above 7 kHz the way real speakers do, with no flat fizz on top.
 - Every tone was level-matched again.
 - A Feedback button sits next to the name at the top: write what sounds or feels wrong and it goes straight to the people who fix Riffhouse, with your settings report if you want (your user name and computer name are taken out). The heart beside it opens the support page; supporting is a thank-you, everyone gets the same app.
