@@ -10,6 +10,7 @@ on:
       - 'presets/**'
       - 'tools/community/**'
       - 'tools/site/check_release.py'
+      - 'tools/site/schema.py'
       - '.github/workflows/pages.yml'
   schedule:
     # Mondays 09:05 UTC: the new tone of the week goes out.
@@ -73,3 +74,14 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+      # IndexNow: tells Bing and the search engines that share its list which pages to read again. ChatGPT and
+      # Copilot search through Bing. The key is public by design: it is the file site/<key>.txt. Never fails the publish.
+      - name: Tell search engines the site changed
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          key=0a74ae2ec02f570a4e4071be0260f348
+          urls=$(grep -o '<loc>[^<]*</loc>' site/sitemap.xml | sed 's/<loc>\(.*\)<\/loc>/"\1"/' | paste -sd, -)
+          curl -sS -m 30 -o /dev/null -w 'IndexNow answered %{http_code}\n' -X POST https://api.indexnow.org/indexnow \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -d "{\"host\":\"riffhouse.in\",\"key\":\"$key\",\"keyLocation\":\"https://riffhouse.in/$key.txt\",\"urlList\":[$urls]}"
