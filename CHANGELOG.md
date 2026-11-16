@@ -10,6 +10,7 @@ Each release on GitHub carries the notes of its version from this file.
 
 Update 1. The high-gain amps were rebuilt after a player told us the metal tones sounded like a fuzz pedal. They did, and the numbers showed it.
 
+- A capture file (.nam) that was cut short, as a broken download is, could crash Riffhouse when you dropped it in: the capture library read past the end of its numbers before noticing. Riffhouse now checks first and says the file is damaged.
 - Modern High Gain, Tight Metal and Brit 81 now play captures of real amps: a 5150 Block Letter, a 6505+ red channel and a JCM2000, neural models made by Helga Behrens and Tim Robertson and shared under the GPL v3 in the NAM_models collection. Palm mutes stop dead, the low end stays tight and the drive cleans up when you play softer, because that is what the real amps do. Gain drives the capture like the amp's own knob, and Bass, Mid, Treble, Presence, Depth, Master and Level work around it. Every tone that used these amps was level-matched to the new sound.
 - The noise gate has a new Auto mode, the default on every tone. It listens to the hiss your guitar and input make and sets its threshold just above it, starting from the hiss setup measured, so it is right from the first note. Turn Threshold yourself and it switches to Manual and stays where you put it.
 - The gate is saved with each tone again, as on hardware amps: a tone with the gate off no longer turns it off for every other tone. Your input level, hum filter and input fix still stay the same across tones.
