@@ -1,0 +1,5 @@
+Contact: https://github.com/NatikChhabra/riffhouse/security/advisories/new
+Expires: 2027-11-16T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://github.com/NatikChhabra/riffhouse/blob/main/SECURITY.md
+Canonical: https://riffhouse.in/.well-known/security.txt
