@@ -23,7 +23,7 @@
     "cab_mic": 2.5,
     "cab_distance": 1,
     "cab_lowcut": 80,
-    "cab_highcut": 10000,
+    "cab_highcut": 7000,
     "drv_on": true,
     "drv_type": "Green Drive",
     "drv_gain": 0.5,

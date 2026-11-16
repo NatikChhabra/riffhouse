@@ -25,7 +25,7 @@
     "cab_mic": 3,
     "cab_distance": 2,
     "cab_lowcut": 60,
-    "cab_highcut": 12000,
+    "cab_highcut": 7000,
     "rev_on": true,
     "rev_type": "Room",
     "rev_decay": 3.5,
