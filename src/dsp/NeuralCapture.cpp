@@ -7,6 +7,7 @@
 #include "NAM/get_dsp.h"
 #include "FactoryCaptures.h"
 
+#include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -93,13 +94,24 @@ namespace
         }
         catch (const std::exception& e)
         {
-            const std::string m = e.what();
-            const auto at = m.find ("assigned ");
-            if (at == std::string::npos) return true; // cannot tell: refuse rather than read past the end
-            return std::stoull (m.substr (at + 9)) > have + 1;
+            const auto n = NeuralCapture::firstUnusedWeight (e.what());
+            return n < 0 || (unsigned long long) n > have + 1; // cannot tell: refuse rather than read past the end
         }
         catch (...) { return true; }
     }
+}
+
+// "Weight mismatch: assigned 1234 weights, ...": 1234, or -1 when the message says no number.
+// Parsed without exceptions: this runs inside a catch block, where a throw would escape.
+long long NeuralCapture::firstUnusedWeight (const std::string& message)
+{
+    const auto at = message.find ("assigned ");
+    if (at == std::string::npos) return -1;
+    const char* first = message.data() + at + 9;
+    const char* last = message.data() + message.size();
+    long long n = -1;
+    const auto r = std::from_chars (first, last, n);
+    return r.ec == std::errc() && n >= 0 ? n : -1;
 }
 
 // The NAM library reads a model's numbers one after another without looking where the list

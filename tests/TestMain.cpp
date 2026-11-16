@@ -2237,6 +2237,15 @@ void testBadFiles (double sr)
             // a WaveNet with too few numbers is caught before the library reads past their end
             // (it used to be read first: a crash in one full test run of two on Windows)
             if (juce::String (f.name) == "wrong-weights.nam")
+            {
+                CHECK (NeuralCapture::firstUnusedWeight ("Weight mismatch: assigned 12 weights, but 9 were provided.") == 12
+                       && NeuralCapture::firstUnusedWeight ("assigned many weights") == -1
+                       && NeuralCapture::firstUnusedWeight ("assigned 99999999999999999999999 weights") == -1
+                       && NeuralCapture::firstUnusedWeight ("assigned ") == -1
+                       && NeuralCapture::firstUnusedWeight ("bad_alloc") == -1,
+                       "the library's weight count is read safely from its message, or not at all");
+            }
+            if (juce::String (f.name) == "wrong-weights.nam")
                 CHECK (juce::String (err).contains ("damaged"), "a short WaveNet was read before being refused: %s", err.c_str());
             auto v = bare();
             v[(size_t) P::ampOn] = 1;
