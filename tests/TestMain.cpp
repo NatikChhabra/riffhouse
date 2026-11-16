@@ -1080,11 +1080,23 @@ void testNoiseBetweenNotes (double sr, float hissDb = -76.0f, bool bursts = fals
     auto di = whinePlayer (sr, 30.0, quiet);
     Noise rnd (0x5EEDu);
     const float hiss = juce::Decibels::decibelsToGain (hissDb) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
-    float burst = 1.0f;
+    // bursts: a USB guitar input (16 Nov) hisses in swells, 0 to 7 dB every 50 ms, with clicks of a
+    // steady height on top, about 60 a second. Its level then swings 5 dB from one tenth of a second
+    // to the next while its loudest moments hold within a decibel, as measured on the real input.
+    const size_t swell = (size_t) (0.05 * sr);
+    const float click = juce::Decibels::decibelsToGain (hissDb + 18.0f);
+    float gain = 1.0f, clickLeft = 0.0f;
     for (size_t i = 0; i < di.size(); ++i)
     {
-        if (bursts && i % 2400 == 0) burst = rnd.next() > 0.3f ? 1.0f : 2.0f; // a third of the time 6 dB up, as Natik's USB input did
-        di[i] += hiss * burst * rnd.next();
+        if (bursts && i % swell == 0) gain = juce::Decibels::decibelsToGain (3.5f + 3.5f * rnd.next());
+        float x = hiss * gain * rnd.next();
+        if (bursts)
+        {
+            if (std::abs (rnd.next()) < 60.0f / (float) sr) clickLeft = rnd.next() < 0.0f ? -click : click;
+            x += clickLeft;
+            clickLeft *= 0.88f; // gone in about 1 ms
+        }
+        di[i] += x;
     }
     // judged in the pauses only once the gate has had time to hear the floor, and away from
     // each note's tail (a quarter of a second for the release)
