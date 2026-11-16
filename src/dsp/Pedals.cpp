@@ -554,7 +554,9 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
         std::sort (sorted, sorted + kFastWindows);
         const float spread = sorted[kFastWindows * 3 / 4] - sorted[kFastWindows / 4]; // the middle half
         const float typical = median (pk, kFastWindows);
-        if (spread <= 1.5f && drift <= 1.0f && loudDb - typical >= kFastUnderPlayingDb && typical < -40.0f)
+        // ... and none of them above it: a note that starts in the newest tenth is not hiss
+        if (spread <= 1.5f && drift <= 1.0f && sorted[kFastWindows - 1] - typical <= 3.0f
+            && loudDb - typical >= kFastUnderPlayingDb && typical < -40.0f)
         {
             floorDb = std::max (-120.0f, median (lv, kFastWindows));
             floorPeakDb = std::max (-120.0f, sorted[kFastWindows - 1]);
