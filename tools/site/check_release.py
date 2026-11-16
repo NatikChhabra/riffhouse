@@ -12,14 +12,18 @@ It reads the files in site/ and fails with a plain list of what is stale:
   - the card has its picture and a link to that version's notes
   - every page states the same number of tones, amps, pedals and cabinets, and the tone
     count is the number of tones in site/tones.json
+  - the version line written into the home and press pages names the version (it is what search engines and
+    AI assistants read: they do not run the script that fills in the live one)
+  - the data block in the home page head, site/llms.txt and the sitemap dates are up to date (tools/site/schema.py)
   - the release has an installer the download button can find (only when asking GitHub)
 
-The home page and the press page read the newest version from GitHub when they load, so they cannot go stale.
+For a visitor, the home page and the press page read the newest version from GitHub when they load.
 """
 import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -120,6 +124,16 @@ def check(tag):
         stale.append(f"roadmap.html: the 'Out now' heading does not say {base}")
     if patched and full not in text_of(road):
         stale.append(f"roadmap.html does not name {full}: say which hotfix or update is the current one")
+
+    # The version line a crawler reads, and the facts built from it.
+    for name in ("index.html", "press.html"):
+        line = re.search(r"data-release[^>]*>([^<]*)<", pages[name])
+        if not line or not re.search(rf"Version {re.escape(full)}, released \d{{1,2}} [A-Z][a-z]+ \d{{4}}\.", line.group(1)):
+            stale.append(f"{name}: the version line in the page says '{line.group(1).strip() if line else 'nothing'}', "
+                         f"write 'Version {full}, released <day month year>.'")
+    built = subprocess.run([sys.executable, str(ROOT / "tools" / "site" / "schema.py"), "--check"], capture_output=True, text=True)
+    if built.returncode:
+        stale.append((built.stderr or built.stdout).strip().replace("schema: ", ""))
 
     # The numbers agree on every page, and the tone count is the real one.
     tones = len(json.loads((SITE / "tones.json").read_text(encoding="utf-8")))

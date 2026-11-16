@@ -1,0 +1,66 @@
+# Riffhouse
+
+> Riffhouse is a free, open-source guitar amp simulator and pedalboard for Windows 10 and 11. It runs on its own or as a VST3 plugin, with 11 amps, 30 pedals, 9 cabinets and 197 tones, and it works through a computer's mic jack with no audio interface.
+
+Current version: 0.1.5.3, released 2026-11-14. Price: free (0 USD), with no account, no ads and no paid version. Platform: Windows 10 and 11, 64-bit. Licence: AGPL-3.0, open source. Made by Natik Chhabra.
+
+## What it has
+
+- 11 amps, 30 pedals, 9 cabinets and 197 ready tones
+- Standalone app and VST3 plugin
+- Works through a computer's mic jack, no audio interface needed
+- Setup that finds the guitar input and sets levels by itself
+- Loads .nam amp captures and cabinet impulse responses
+- Tuner, looper, metronome, play along with slow-down, take recorder
+- No account, no ads, no paid version
+- Open source under the AGPL-3.0 licence
+
+## Questions
+
+### What is Riffhouse?
+
+Riffhouse is a free, open-source guitar amp simulator and pedalboard for Windows 10 and 11. It runs on its own or as a VST3 plugin, with 11 amps, 30 pedals, 9 cabinets and 197 tones.
+
+### Is it really free?
+
+Yes. No price, no account, no ads in the app and no paid tier, now or later. The code is open under the AGPL-3.0 licence. Why it’s free.
+
+### Do I need an audio interface?
+
+No. Plug the guitar into the computer’s mic jack with a 6.35 mm to 3.5 mm adapter or cable. A laptop with one combined headset socket needs a splitter with a separate mic socket. If you own an interface, pick it as your input. Its maker’s ASIO driver is used when it works.
+
+### Will I hear myself late?
+
+The rig itself adds next to nothing. What you feel is your computer’s audio buffer, and setup picks the shortest one that runs clean.
+
+### Does it work in my recording software?
+
+Yes. The installer adds a VST3 plugin of the same rig, for any DAW on Windows that loads VST3. See the DAW guide.
+
+### Can I use my own captures?
+
+Yes. Any .nam file loads as the amp and any impulse response as the cabinet. Drop the file on the window.
+
+### Are the artist tones official?
+
+No. “Inspired by” names a style. Riffhouse has no tie to any artist, band or equipment maker.
+
+### Is there a Mac or Linux version?
+
+No installer yet. You can build it from source today.
+
+### Something is broken. Where do I say so?
+
+Start with Help and fixes. Still stuck? Settings has report buttons under Help. One opens the GitHub page with a report ready to paste. Tone requests go there too.
+
+## Links
+
+- [Home page](https://riffhouse.in/): what it is, the tone list, how setup works
+- [Download](https://github.com/NatikChhabra/riffhouse/releases/latest): the Windows installer
+- [What's new](https://riffhouse.in/updates.html): every version so far
+- [Roadmap](https://riffhouse.in/roadmap.html): what comes next
+- [Why it's free](https://riffhouse.in/why-free.html): who pays for it, and what is never sold
+- [Press kit](https://riffhouse.in/press.html): facts, logo and screenshots
+- [Source code](https://github.com/NatikChhabra/riffhouse): the code, the changelog and how to build it
+- [Help and fixes](https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md)
+- [Using it in recording software](https://github.com/NatikChhabra/riffhouse/blob/main/docs/DAW.md)
