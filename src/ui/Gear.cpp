@@ -872,8 +872,8 @@ static void pedalLettering (juce::Graphics& g, const PedalDesign& d, const Pedal
             if (d.stripe == 1) // never on the pinstripes
                 for (const float sy : { l.name.getY() - 9.0f * u, l.name.getBottom() + 27.0f * u })
                     if (std::abs (ly - sy) < 10.0f * u) ly = sy - 12.0f * u;
-            letter (g, "IN", R (b.getX() + 9.0f * u, ly - 7.0f * u, 30.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredLeft);
-            letter (g, "OUT", R (b.getRight() - 49.0f * u, ly - 7.0f * u, 40.0f * u, 14.0f * u), small, ink.withAlpha (0.7f), juce::Justification::centredRight);
+            letter (g, "IN", R (b.getX() + 9.0f * u, ly - 7.0f * u, 30.0f * u, 14.0f * u), small, ink.withAlpha (0.92f), juce::Justification::centredLeft);
+            letter (g, "OUT", R (b.getRight() - 49.0f * u, ly - 7.0f * u, 40.0f * u, 14.0f * u), small, ink.withAlpha (0.92f), juce::Justification::centredRight);
         }
         if (smallPrint && (form == 0 || form == 2 || form == 3) && d.stripe != 2) // a tread plate leaves no room for it
         {
@@ -883,7 +883,7 @@ static void pedalLettering (juce::Graphics& g, const PedalDesign& d, const Pedal
             const juce::String mark = "RIFFHOUSE  " + juce::String::charToString ((juce::juce_wchar) juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) d.name[0]))
                                       + "-" + juce::String (10 + sum % 89);
             const float my = b.getBottom() - 19.0f * u;
-            letter (g, mark, R (b.getX(), my, w, 13.0f * u), small, ink.withAlpha (0.55f), juce::Justification::centred);
+            letter (g, mark, R (b.getX(), my, w, 13.0f * u), small, ink.withAlpha (0.8f), juce::Justification::centred);
         }
     }
 }
@@ -1123,12 +1123,22 @@ void drawPedalLed (juce::Graphics& g, const PedalLayout& l, const PedalDesign& d
     const C led (d.led);
     if (pedalPictured (d))
     {
-        // the lens and its bezel are in the picture, dark: only the light itself is drawn
-        if (! on) return;
+        // the lens and its bezel are in the picture: only the light itself is drawn
         const float k = l.box.getHeight() / 420.0f;
         const float lr = 6.2f * k;
         const auto c = l.led.getCentre().translated (0.0f, -lr * 1.1f * art::rise);
         const auto lens = R (lr * 2.0f, lr * 2.0f * art::squash).withCentre (c);
+        if (! on)
+        {
+            // the photographed lens keeps a little of its tint, enough to read as lit at a glance: an
+            // unlit LED is a dark, smoky dome with only the room's reflection on it
+            g.setGradientFill (juce::ColourGradient (C (0xff000000).withAlpha (0.62f), c.x, c.y + lr * 0.3f,
+                                                     C (0xff000000).withAlpha (0.38f), lens.getRight(), lens.getBottom(), true));
+            g.fillEllipse (lens.reduced (lr * 0.04f));
+            g.setColour (juce::Colours::white.withAlpha (0.35f));
+            g.fillEllipse (R (lr * 0.42f, lr * 0.3f).withCentre (c.translated (-lr * 0.34f, -lr * 0.4f)));
+            return;
+        }
         g.setGradientFill (juce::ColourGradient (led.withAlpha (0.5f), c.x, c.y, led.withAlpha (0.0f), c.x + 26.0f * k, c.y, true));
         g.fillEllipse (lens.expanded (26.0f * k));
         g.setGradientFill (juce::ColourGradient (juce::Colours::white, c.x - lr * 0.3f, c.y - lr * 0.3f, led, lens.getRight(), lens.getBottom(), true));
@@ -2097,6 +2107,12 @@ juce::Image renderAmp (const AmpDesign& d, const AmpLayout& l, R area, float sca
     const bool rightSize = std::abs (l.area.getWidth() - ampCanvasW) < 0.5f && std::abs (l.area.getHeight() - ampCanvasH) < 0.5f;
     if (rightSize && ampPictured (d) && art::draw (g, ampArtName (d), ampArtArea (l.area)))
     {
+        // the photograph is the cabinet alone: the panel's hardware is photographed on its own and laid on top
+        if (d.form != 5)
+            for (auto x : { l.panel.getX() + 10.0f, l.panel.getRight() - 10.0f })
+                screw (g, { x, l.panel.getY() + 12.0f }, 6.0f, 0.6f);
+        jackSocket (g, l.jack, l.knobSize < 62.0f ? 13.0f : 15.0f);
+        lampHousing (g, l, d);
         if (d.form == 5)
             letter (g, displayText.isNotEmpty() ? displayText : juce::String (d.badge), l.grille.reduced (14.0f, 0.0f),
                     faceFont (Face::doto, std::min (30.0f, l.grille.getHeight() * 0.36f)), C (d.jewel), juce::Justification::centred);
@@ -2675,6 +2691,96 @@ CabLayout cabLayout (R area, int model)
     return l;
 }
 
+namespace
+{
+    R cabBadgeArea (const CabLayout& l)
+    {
+        const float bw = l.baffle.getWidth(), bh = l.baffle.getHeight();
+        const float hh = juce::jlimit (16.0f, 58.0f, bh * 0.125f);
+        return { l.baffle.getX() + std::max (12.0f, bw * 0.045f), l.baffle.getY() + std::max (10.0f, bh * 0.05f), std::min (bw * 0.42f, hh * 6.0f), hh };
+    }
+    // the window on the IR cab's display, which names the loaded file
+    R cabIrWindow (const CabLayout& l)
+    {
+        const float room = l.speakers.front().getX() - l.baffle.getX();
+        return R (room - 66.0f, std::min (48.0f, l.baffle.getHeight() * 0.2f)).withCentre ({ l.baffle.getX() + room * 0.5f + 4.0f, l.baffle.getCentreY() });
+    }
+    juce::String cabArtName (int model) { return "cab_" + juce::String (model).paddedLeft ('0', 2); }
+}
+
+bool cabPictured (int model) { return art::has (cabArtName (model)); }
+
+// The photograph shows a little more than the box: the handle over it, the legs beside it, its shadow.
+R cabArtArea (R box)
+{
+    const float h = box.getHeight();
+    return box.expanded (h * 0.07f, 0.0f).withTop (box.getY() - h * 0.07f).withBottom (box.getBottom() + h * 0.09f);
+}
+
+juce::var cabDescription (int model, const CabLayout& l, juce::Image& print, float scale)
+{
+    const auto spec = cabSpec (model);
+    const auto look = cabLook (model);
+    auto rect = [] (R r)
+    {
+        juce::Array<juce::var> a;
+        a.add (r.getX()); a.add (r.getY()); a.add (r.getWidth()); a.add (r.getHeight());
+        return juce::var (a);
+    };
+    auto hex = [] (juce::uint32 c) { return juce::String::toHexString ((juce::int64) (c & 0xffffff)).paddedLeft ('0', 6); };
+    const auto area = cabArtArea (l.box);
+    auto* o = new juce::DynamicObject();
+    o->setProperty ("id", "cab-" + juce::String (model).paddedLeft ('0', 2));
+    o->setProperty ("name", cabArtName (model));
+    o->setProperty ("model", model);
+    o->setProperty ("area", rect (area));
+    o->setProperty ("box", rect (l.box));
+    o->setProperty ("baffle", rect (l.baffle));
+    juce::Array<juce::var> sp;
+    for (const auto& s : l.speakers) sp.add (rect (s));
+    o->setProperty ("speakers", sp);
+    o->setProperty ("inches", spec.speakerInches);
+    o->setProperty ("frame", hex (spec.frame));
+    o->setProperty ("tolex", model == 5 ? 1 : 0);
+    o->setProperty ("tolexColour", hex (model == 5 ? 0xffc9a66b : spec.tolex));
+    o->setProperty ("weave", (int) look.weave);
+    o->setProperty ("piping", look.piping != 0 ? hex (look.piping) : juce::String());
+    o->setProperty ("show", look.show);
+    o->setProperty ("handle", look.handle ? rect (R (std::min (200.0f, l.box.getWidth() * 0.34f), 18.0f).withCentre ({ l.box.getCentreX(), l.box.getY() - 4.0f })) : juce::var());
+    if (model == 8)
+    {
+        const auto win = cabIrWindow (l);
+        o->setProperty ("irWindow", rect (win));
+        o->setProperty ("irPlate", rect (win.expanded (22.0f, 8.0f)));
+    }
+    print = juce::Image (juce::Image::ARGB, juce::jmax (1, juce::roundToInt (area.getWidth() * scale)),
+                         juce::jmax (1, juce::roundToInt (area.getHeight() * scale)), true);
+    juce::Array<juce::var> list;
+    if (look.amp >= 0)
+    {
+        juce::Graphics g (print);
+        g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
+        std::vector<Relief> parts;
+        reliefSink = &parts;
+        const auto badge = cabBadgeArea (l);
+        ampBadge (g, ampDesign (look.amp), badge);
+        reliefSink = nullptr;
+        o->setProperty ("badge", rect (badge));
+        for (const auto& r : parts)
+        {
+            auto* p = new juce::DynamicObject();
+            p->setProperty ("path", r.path.toString());
+            p->setProperty ("colour", hex (r.colour.getARGB()));
+            p->setProperty ("depth", r.depth);
+            p->setProperty ("kind", r.kind);
+            p->setProperty ("lift", r.lift);
+            list.add (juce::var (p));
+        }
+    }
+    o->setProperty ("relief", list);
+    return juce::var (o);
+}
+
 juce::Image renderCab (int model, const CabLayout& l, R area, float scale, const juce::String& irName)
 {
     const auto spec = cabSpec (model);
@@ -2683,6 +2789,14 @@ juce::Image renderCab (int model, const CabLayout& l, R area, float scale, const
     juce::Graphics g (img);
     g.addTransform (juce::AffineTransform::translation (-area.getX(), -area.getY()).scaled (scale));
     const auto b = l.box;
+    if (cabPictured (model) && art::draw (g, cabArtName (model), cabArtArea (b)))
+    {
+        // the photograph has the cabinet; only the display's words change
+        if (model == 8)
+            letter (g, irName.isNotEmpty() ? irName : juce::String ("load an IR"), cabIrWindow (l).reduced (12.0f, 0.0f), faceFont (Face::doto, 18.0f),
+                    C (0xffff9f1c), juce::Justification::centred);
+        return img;
+    }
     {
         juce::Path p;
         p.addRoundedRectangle (b.translated (0.0f, 8.0f), 10.0f);
@@ -2842,13 +2956,11 @@ juce::Image renderCab (int model, const CabLayout& l, R area, float scale, const
             cabinetCorner (g, b, i % 2 == 1, i >= 2, std::min (32.0f, b.getWidth() * 0.075f));
     if (look.amp >= 0)
     {
-        const float hh = juce::jlimit (16.0f, 58.0f, bh * 0.125f);
-        ampBadge (g, ampDesign (look.amp), R (l.baffle.getX() + std::max (12.0f, bw * 0.045f), l.baffle.getY() + std::max (10.0f, bh * 0.05f), std::min (bw * 0.42f, hh * 6.0f), hh));
+        ampBadge (g, ampDesign (look.amp), cabBadgeArea (l));
     }
     if (model == 8)
     {
-        const float room = l.speakers.front().getX() - l.baffle.getX();
-        const auto win = R (room - 66.0f, std::min (48.0f, l.baffle.getHeight() * 0.2f)).withCentre ({ l.baffle.getX() + room * 0.5f + 4.0f, l.baffle.getCentreY() });
+        const auto win = cabIrWindow (l);
         const auto plate = win.expanded (22.0f, 8.0f);
         {
             juce::Path p;
@@ -3595,7 +3707,8 @@ GearThumb cabThumb (int model, float scale)
 {
     GearThumb t;
     t.area = R (0.0f, 0.0f, 420.0f, 340.0f);
-    const auto l = cabLayout (t.area.reduced (10.0f), model);
+    // room round the box for the handle above it and the shadow under it
+    const auto l = cabLayout (t.area.reduced (30.0f, 24.0f).withTrimmedBottom (10.0f), model);
     t.box = l.box;
     t.image = renderCab (model, l, t.area, scale, {});
     return t;
