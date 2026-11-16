@@ -1432,7 +1432,7 @@ void SettingsView::paintPage (juce::Graphics& g)
                           "tone and want it changed or removed, open an issue and it will be done. ASIO and VST are trademarks of "
                           "Steinberg Media Technologies GmbH. Riffhouse comes with absolutely no warranty. "
                           "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Modern High Gain and "
-                          "Tight Metal play amp captures by Helga Behrens, Brit 81 one by Tim Robertson, from the NAM_models collection (GPL v3). Real cabinets: Jester's Brutal "
+                          "Tight Metal play amp captures by Helga Behrens, Brit 81 one by Tim Robertson, Redline Lead one by Phillipe Priss, from the NAM_models collection (GPL v3). Real cabinets: Jester's Brutal "
                           "Pack (CC0). Fonts under the "
                           "SIL Open Font License and the Apache License 2.0. Every licence is in Licences.txt beside the app.",
                           font (13.5f), colours::textDim);
