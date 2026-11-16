@@ -3988,6 +3988,9 @@ int main (int argc, char** argv)
             rig.prepare (sr, 256);
             rig.finishPendingWork();
             if (seed > -119.0f) rig.seedGateFloor (seed);
+            // the level trim goes in where the app puts it, before the safety limiter (adding it to the
+            // file afterwards made clean tones read over 0 dBFS that the app never plays)
+            rig.setLevelTrimDb (trim + autoTrim);
             rig.setParams (v);
             r.l.resize (di.size());
             r.r.resize (di.size());
@@ -4014,8 +4017,6 @@ int main (int argc, char** argv)
                 }
             }
         }
-        const float g = dbToGain (trim + autoTrim);
-        for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
         std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));
         return 0;
