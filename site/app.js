@@ -24,7 +24,7 @@
         if (!file) continue;
         $$('[data-download]').forEach((a) => { a.href = file.browser_download_url; });
         const mb = Math.round(file.size / 1048576);
-        const day = new Date(r.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        const day = new Date(r.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
         if (note) note.textContent = `Version ${r.tag_name.replace(/^v/, '')}, ${mb} MB, released ${day}.`;
         return;
       }

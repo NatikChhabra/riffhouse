@@ -9,12 +9,16 @@ on:
       - 'site/**'
       - 'presets/**'
       - 'tools/community/**'
+      - 'tools/site/check_release.py'
       - '.github/workflows/pages.yml'
   schedule:
     # Mondays 09:05 UTC: the new tone of the week goes out.
     - cron: '5 9 * * 1'
     # Every day, so the dev log picks up changes that did not touch the site.
     - cron: '30 15 * * *'
+  # A new release: only the check below runs, and says if the site is behind it.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -27,7 +31,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Fails, with a list of what to change, when the site still talks about an older version than the newest release.
+  # It does not hold the publish back: the site and the feeds still go out. On a release it reads the site as it is on main.
+  fresh:
+    name: Site matches the newest release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event_name == 'release' && 'main' || github.sha }}
+      - name: Check the site against the newest release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/site/check_release.py
+
   deploy:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
