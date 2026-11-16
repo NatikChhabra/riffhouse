@@ -50,7 +50,8 @@ namespace
     float factoryDriveDb (const ParamValues& p) noexcept
     {
         const float g01 = juce::jlimit (0.0f, 1.0f, p[(size_t) P::ampGain] / 10.0f);
-        return 40.0f * std::log10 ((g01 + 0.02f) / 1.02f) - 40.0f * std::log10 (0.67f / 1.02f);
+        // (0 still leaves -46 dB in, as a real pot's end does: 0.02 left -61 and a cleaner capture went silent)
+        return 40.0f * std::log10 ((g01 + 0.05f) / 1.05f) - 40.0f * std::log10 (0.70f / 1.05f);
     }
 
     // master and level both set how loud it plays: the capture already has its power amp
