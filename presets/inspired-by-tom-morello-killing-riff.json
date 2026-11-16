@@ -25,7 +25,7 @@
     "cab_mic": 3,
     "cab_distance": 1.5,
     "cab_lowcut": 60,
-    "cab_highcut": 12000,
+    "cab_highcut": 7000,
     "pitch_on": true,
     "pitch_mode": "Shift",
     "pitch_semis": 12,

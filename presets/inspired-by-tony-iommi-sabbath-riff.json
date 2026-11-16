@@ -24,7 +24,7 @@
     "cab_mic": 3.5,
     "cab_distance": 2,
     "cab_lowcut": 60,
-    "cab_highcut": 12000,
+    "cab_highcut": 7000,
     "drv_on": true,
     "drv_type": "Treble Boost",
     "drv_gain": 6,
