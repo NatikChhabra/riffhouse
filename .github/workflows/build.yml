@@ -132,6 +132,22 @@ jobs:
           RIFFHOUSE_REPORT_URL: ${{ secrets.REPORT_URL }}
         run: cmake --build build --config Release --parallel --target Riffhouse_Standalone Riffhouse_VST3 riffhouse_tests
 
+      # Uploaded before the tests run, so a failing run still leaves its tool for replaying takes.
+      # The test tool of exactly this build, for before/after listening clips rendered off-line on
+      # a tester's PC from their own recordings (play <di.wav> <tone> <out.wav> [captures=0]).
+      - name: Put the test tool beside the factory tones
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force listen-tool\presets | Out-Null
+          Copy-Item build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe listen-tool\
+          Copy-Item presets\*.json listen-tool\presets\
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: riffhouse-windows-tests
+          path: listen-tool
+          if-no-files-found: warn
+          retention-days: 14
+
       # A release that can't reach the relay sends no reports and no weekly count, and nothing
       # in the app says so. 0.1.5.2 shipped that way; this stops the next one.
       - name: The app knows where reports go
@@ -200,21 +216,6 @@ jobs:
           path: build/src/Riffhouse_artefacts/Release/Standalone/*.pdb
           if-no-files-found: warn
           retention-days: 90
-
-      # The test tool of exactly this build, for before/after listening clips rendered off-line on
-      # a tester's PC from their own recordings (play <di.wav> <tone> <out.wav> [captures=0]).
-      - name: Put the test tool beside the factory tones
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force listen-tool\presets | Out-Null
-          Copy-Item build\tests\riffhouse_tests_artefacts\Release\riffhouse_tests.exe listen-tool\
-          Copy-Item presets\*.json listen-tool\presets\
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: riffhouse-windows-tests
-          path: listen-tool
-          if-no-files-found: warn
-          retention-days: 14
 
       # A player who already has 0.1.4: their own tones, favourites, recordings and songs, and the
       # settings 0.1.4 writes. The new installer goes over that copy, and later the uninstaller
