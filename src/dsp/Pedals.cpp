@@ -554,11 +554,16 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
         std::sort (sorted, sorted + kFastWindows);
         const float spread = sorted[kFastWindows * 3 / 4] - sorted[kFastWindows / 4]; // the middle half
         const float typical = median (pk, kFastWindows);
+        // hiss peaks 12 dB or more over its own level in a tenth of a second, a held note 3 to 7:
+        // with nothing played yet, only a level that peaks like hiss is taken for the floor
+        float crests[kFastWindows];
+        for (int k = 0; k < kFastWindows; ++k) crests[k] = windowPeaks[(windowAt - 1 - k + 2 * kWindows) % kWindows] - windows[(windowAt - 1 - k + 2 * kWindows) % kWindows];
+        const float crest = median (crests, kFastWindows);
         // ... and none of them above it: a note that starts in the newest tenth is not hiss
         if (spread <= 1.5f && drift <= 1.0f && sorted[kFastWindows - 1] - typical <= 3.0f
             // far under the playing, or nothing played yet (the loudest heard is the hiss itself):
             // a cold start learns the hiss before the first note instead of letting it roar
-            && (loudDb - typical >= kFastUnderPlayingDb || loudDb - typical < 6.0f) && typical < -40.0f)
+            && (loudDb - typical >= kFastUnderPlayingDb || (loudDb - typical < 6.0f && crest >= 9.0f)) && typical < -40.0f)
         {
             floorDb = std::max (-120.0f, median (lv, kFastWindows));
             floorPeakDb = std::max (-120.0f, sorted[kFastWindows - 1]);
