@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Release helper. Three jobs, all from files in the repo:
 
-  notes.py check <tag>        the tag, CMakeLists.txt and CHANGELOG.md agree on the version
+  notes.py check <tag>        the tag, CMakeLists.txt, CHANGELOG.md and README.md agree on the version
   notes.py notes <tag>        print the release notes for that version (from CHANGELOG.md)
   notes.py prerelease <tag>   print true for v1.2.3-rc1 and the like, else false
 
@@ -49,6 +49,21 @@ def section(version):
     return "\n".join(out).strip()
 
 
+def readme_check(version):
+    """What the README says that no longer matches this release: its 'New in' version and the tone count."""
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    problems = []
+    release = ".".join(version.split(".")[:3])  # a hotfix or update keeps the release's own "New in"
+    m = re.search(r"^## New in (\d+\.\d+\.\d+)", text, re.M)
+    if not m or m.group(1) != release:
+        problems.append(f"'## New in {m.group(1) if m else '?'}' should be '## New in {release}'")
+    tones = len(list((ROOT / "presets").glob("*.json")))
+    m = re.search(r"(\d+) tones", text)
+    if m and int(m.group(1)) != tones:
+        problems.append(f"it says {m.group(1)} tones, presets/ has {tones}")
+    return problems
+
+
 def main(argv):
     if len(argv) != 3 or argv[1] not in ("check", "notes", "prerelease"):
         fail("usage: notes.py check|notes|prerelease <tag>")
@@ -62,7 +77,10 @@ def main(argv):
             fail(f"the tag says {version}, CMakeLists.txt says {cmake_version()}. Change one of them.")
         if not body:
             fail(f"CHANGELOG.md has no notes under '## {version}'. Write them first.")
-        print(f"version {version}: tag, CMakeLists.txt and CHANGELOG.md agree")
+        readme_problems = readme_check(version)
+        if readme_problems:
+            fail("README.md is out of date: " + "; ".join(readme_problems))
+        print(f"version {version}: tag, CMakeLists.txt, CHANGELOG.md and README.md agree")
         return
     if not body:
         fail(f"CHANGELOG.md has no notes under '## {version}'.")

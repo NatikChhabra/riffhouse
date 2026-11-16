@@ -20,6 +20,7 @@ Every tone is checked for loudness, so one tone is never much louder than the ne
 - Every change that a player can notice gets a line under "Unreleased" in `CHANGELOG.md`, in plain words.
 - A release is a tag. Move the "Unreleased" lines under a new `## <version>` heading, set the same version in `CMakeLists.txt`, and push the tag `v<version>`. `python3 tools/release/notes.py check v<version>` tells you if the three agree.
 - The build server does the rest: it runs the checks, builds the installer, installs it on a clean Windows machine, starts the app, has it draw every screen, removes it again, and only then publishes the release with the notes from the changelog and the SHA-256 of the installer.
+- Update the "New in" section of `README.md` for a new release (hotfixes keep it). The release check fails when the README names another release or the wrong number of tones.
 - `v<version>-rc1` publishes a test release. The app's updater skips those, so nobody gets one by surprise.
 - A bad release is fixed with the next one. Mark the bad one as a pre-release on GitHub and the updater stops handing it out the same minute.
 
