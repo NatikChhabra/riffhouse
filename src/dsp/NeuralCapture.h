@@ -43,6 +43,9 @@ private:
     std::unique_ptr<Model> makeModel (const std::string& path, std::string& error);
     std::unique_ptr<Model> finishModel (std::unique_ptr<nam::DSP> dsp, const std::string& modelName);
     static bool isDamaged (const std::filesystem::path&); // a file cut short, which the library would read past
+public:
+    static long long firstUnusedWeight (const std::string& libraryMessage); // from NAM's "assigned N weights", or -1
+private:
     void setupResampling();
 
     double sr = 48000.0;
