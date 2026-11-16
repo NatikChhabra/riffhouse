@@ -23,7 +23,7 @@
     "cab_mic": 3,
     "cab_distance": 1.5,
     "cab_lowcut": 60,
-    "cab_highcut": 12000,
+    "cab_highcut": 7000,
     "gate_on": true,
     "gate_thresh": -52,
     "gate_release": 45,

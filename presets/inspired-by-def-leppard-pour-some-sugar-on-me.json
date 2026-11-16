@@ -26,7 +26,7 @@
     "cab_mic": 2.5,
     "cab_distance": 2,
     "cab_lowcut": 90,
-    "cab_highcut": 9000,
+    "cab_highcut": 7000,
     "comp_on": true,
     "comp_sustain": 6,
     "comp_attack": 4,

@@ -7,7 +7,10 @@
 #include "NAM/get_dsp.h"
 #include "FactoryCaptures.h"
 
+#include <charconv>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -66,10 +69,55 @@ void NeuralCapture::setupResampling()
     }
 }
 
+namespace
+{
+    // A model that counts its numbers (WaveNet, the usual kind) refuses a padded list, but only
+    // after reading it, so the NaN probe below cannot judge it. Padded instead with a million
+    // markers that differ from each other and from any real weight, its complaint ("assigned N
+    // weights") names the first number it did not take: past the file's own count means it
+    // wants more than the file has, and loading the file as it is would read past its end.
+    bool wantsMoreThanItHas (nlohmann::json j, size_t have)
+    {
+        auto& w = j["weights"];
+        w.erase (w.begin() + (std::ptrdiff_t) have, w.end());
+        for (std::uint32_t k = 0; k < (1u << 20); ++k)
+        {
+            const std::uint32_t bits = 0x7E000000u + k; // huge, finite and all different
+            float f;
+            std::memcpy (&f, &bits, sizeof f);
+            w.push_back (f);
+        }
+        try
+        {
+            nam::get_dsp (j);
+            return false; // took every marker: it does not count, and the NaN probe has judged it
+        }
+        catch (const std::exception& e)
+        {
+            const auto n = NeuralCapture::firstUnusedWeight (e.what());
+            return n < 0 || (unsigned long long) n > have + 1; // cannot tell: refuse rather than read past the end
+        }
+        catch (...) { return true; }
+    }
+}
+
+// "Weight mismatch: assigned 1234 weights, ...": 1234, or -1 when the message says no number.
+// Parsed without exceptions: this runs inside a catch block, where a throw would escape.
+long long NeuralCapture::firstUnusedWeight (const std::string& message)
+{
+    const auto at = message.find ("assigned ");
+    if (at == std::string::npos) return -1;
+    const char* first = message.data() + at + 9;
+    const char* last = message.data() + message.size();
+    long long n = -1;
+    const auto r = std::from_chars (first, last, n);
+    return r.ec == std::errc() && n >= 0 ? n : -1;
+}
+
 // The NAM library reads a model's numbers one after another without looking where the list
-// ends, so a cut-short file would be read past its end. Built first with a long run of NaNs
-// behind its numbers, such a file reads some of them and its sound turns NaN; a whole file
-// never reaches them.
+// ends, so a cut-short file would be read past its end: a crash, or not, depending on what
+// lies behind it in memory. Built first with a long run of NaNs behind its numbers, such a
+// file reads some of them and its sound turns NaN; a whole file never reaches them.
 bool NeuralCapture::isDamaged (const std::filesystem::path& file)
 {
     std::ifstream in (file);
@@ -77,6 +125,7 @@ bool NeuralCapture::isDamaged (const std::filesystem::path& file)
     if (j.is_discarded() || ! j.is_object() || ! j.contains ("weights") || ! j["weights"].is_array())
         return false; // not this kind of damage; the library says what is wrong with it
     auto& w = j["weights"];
+    const size_t have = w.size();
     for (int k = 0; k < (1 << 20); ++k) w.push_back (std::numeric_limits<float>::quiet_NaN());
     try
     {
@@ -91,6 +140,7 @@ bool NeuralCapture::isDamaged (const std::filesystem::path& file)
         for (auto v : y)
             if (! std::isfinite ((double) v)) return true;
     }
+    catch (const std::exception&) { return wantsMoreThanItHas (j, have); }
     catch (...) {}
     return false;
 }

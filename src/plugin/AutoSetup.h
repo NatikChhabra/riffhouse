@@ -24,7 +24,7 @@ class AutoSetup : private juce::Timer
 {
 public:
     enum class Phase { idle, listening, tuning, playing, quiet, finished, noSignal };
-    static constexpr int kSetupVersion = 2; // what a finished setup is stamped with; older ones are offered a new run
+    static constexpr int kSetupVersion = 3; // what a finished setup is stamped with; older ones are offered a new run
 
     AutoSetup (juce::AudioDeviceManager&, RiffhouseProcessor&);
     ~AutoSetup() override;
@@ -126,6 +126,7 @@ private:
     float tunePeak = 0.0f;
     float modePeak = 0.0f; // the loudest playing heard in the mode being tried, over all its buffers
     int modePeakFor = -1;
+    float sharedPeak = 0.0f; // the loudest playing heard in Windows' own modes while tuning
     double cpuMax = 0.0;
     bool lastOpenFailed = false;
     struct Best { juce::String type; int buffer = 0; double latency = 1e9; double rate = 0; } best;

@@ -25,7 +25,7 @@
     "cab_mic": 2.5,
     "cab_distance": 1.5,
     "cab_lowcut": 60,
-    "cab_highcut": 12000,
+    "cab_highcut": 7000,
     "eq_on": true,
     "eq_100": 3,
     "eq_200": 0,

@@ -752,6 +752,29 @@ namespace icons
         return p;
     }
 
+    juce::Path message()
+    {
+        // a speech bubble with its tail at the bottom left, and two lines of words in it
+        juce::Path p;
+        p.startNewSubPath (7, 17); p.lineTo (5.5f, 20.5f); p.lineTo (10.5f, 17);
+        p.lineTo (17, 17); p.quadraticTo (20, 17, 20, 14); p.lineTo (20, 7);
+        p.quadraticTo (20, 4, 17, 4); p.lineTo (7, 4); p.quadraticTo (4, 4, 4, 7);
+        p.lineTo (4, 14); p.quadraticTo (4, 17, 7, 17);
+        p.startNewSubPath (8, 8.5f); p.lineTo (16, 8.5f);
+        p.startNewSubPath (8, 12.5f); p.lineTo (13.5f, 12.5f);
+        return p;
+    }
+
+    juce::Path heart()
+    {
+        juce::Path p;
+        p.startNewSubPath (12, 19.5f);
+        p.cubicTo (4, 14, 3, 10.5f, 4.2f, 8); p.cubicTo (5.6f, 5, 10, 4.6f, 12, 8);
+        p.cubicTo (14, 4.6f, 18.4f, 5, 19.8f, 8); p.cubicTo (21, 10.5f, 20, 14, 12, 19.5f);
+        p.closeSubPath();
+        return p;
+    }
+
     juce::Path star (bool)
     {
         juce::Path p;
