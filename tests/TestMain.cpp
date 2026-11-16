@@ -1073,14 +1073,31 @@ static std::vector<float> whinePlayer (double sr, double secs, std::vector<char>
 // about -76 dBFS (measured on a Realtek USB guitar cable, 15 Nov). With the gate on (every tone
 // that has one) the pauses must come out at least 40 dB under the playing: a high-gain amp puts
 // 50 dB and more on that hiss, and with the gate off it was only 3 to 6 dB under the notes.
-void testNoiseBetweenNotes (double sr)
+void testNoiseBetweenNotes (double sr, float hissDb = -76.0f, bool bursts = false) // -70: a USB guitar input at full gain; bursts: its hiss swings 6 dB every few tens of ms (16 Nov)
 {
-    std::printf ("hiss between notes on a cheap input, every tone @ %.0f Hz\n", sr);
+    std::printf ("hiss at %.0f dBFS between notes on a cheap input, every tone @ %.0f Hz\n", hissDb, sr);
     std::vector<char> quiet;
     auto di = whinePlayer (sr, 30.0, quiet);
     Noise rnd (0x5EEDu);
-    const float hiss = juce::Decibels::decibelsToGain (-76.0f) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
-    for (auto& x : di) x += hiss * rnd.next();
+    const float hiss = juce::Decibels::decibelsToGain (hissDb) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
+    // bursts: a USB guitar input (16 Nov) hisses in swells, 0 to 7 dB every 50 ms, with clicks of a
+    // steady height on top, about 60 a second. Its level then swings 5 dB from one tenth of a second
+    // to the next while its loudest moments hold within a decibel, as measured on the real input.
+    const size_t swell = (size_t) (0.05 * sr);
+    const float click = juce::Decibels::decibelsToGain (hissDb + 18.0f);
+    float gain = 1.0f, clickLeft = 0.0f;
+    for (size_t i = 0; i < di.size(); ++i)
+    {
+        if (bursts && i % swell == 0) gain = juce::Decibels::decibelsToGain (3.5f + 3.5f * rnd.next());
+        float x = hiss * gain * rnd.next();
+        if (bursts)
+        {
+            if (std::abs (rnd.next()) < 60.0f / (float) sr) clickLeft = rnd.next() < 0.0f ? -click : click;
+            x += clickLeft;
+            clickLeft *= 0.88f; // gone in about 1 ms
+        }
+        di[i] += x;
+    }
     // judged in the pauses only once the gate has had time to hear the floor, and away from
     // each note's tail (a quarter of a second for the release)
     const size_t tail = (size_t) (0.25 * sr), from = (size_t) (3.0 * sr);
@@ -3918,7 +3935,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "play" && args.size() >= 4)
     {
-        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0]
+        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0] [seed=dB] [trace=1]
         // Plays a recorded clean guitar through a preset, for listening checks, with Auto level
         // as the app applies it (measured on this guitar) unless auto_level=0.
         juce::AudioFormatManager fm; fm.registerBasicFormats();
@@ -3944,12 +3961,18 @@ int main (int argc, char** argv)
         bool found = args[2] == "-";
         for (const auto& p : loadPresets()) if (p.name == args[2]) { v = p.values; found = true; }
         if (! found) { std::printf ("no preset %s\n", args[2].toRawUTF8()); return 1; }
-        float trim = 0.0f;
+        float trim = 0.0f, seed = -120.0f;
+        bool trace = false;
         for (int i = 4; i < args.size(); ++i)
         {
             const auto key = args[i].upToFirstOccurrenceOf ("=", false, false);
             const float value = args[i].fromFirstOccurrenceOf ("=", false, false).getFloatValue();
             if (key == "trim") { trim = value; continue; }
+            // seed=<dB>: the hiss setup measured (your-input.txt noise_floor_db), as the app gives it to the gate
+            if (key == "seed") { seed = value; continue; }
+            // trace=1: every half second, what the gate heard, where it sat and how long it was open
+            if (key == "trace") { trace = value > 0.5f; continue; }
+            if (key == "fastfloor") { NoiseGate::fastFloor = value > 0.5f; continue; } // fastfloor=0: the gate as Update 1 had it
             if (key == "captures") { Rig::circuitModelsOnly = value < 0.5f; continue; } // captures=0: the circuit models
             const int id = findParamByKey (key.toStdString());
             if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
@@ -3970,9 +3993,46 @@ int main (int argc, char** argv)
             if (loud > kSilentDb) autoTrim = std::clamp (kHouseLoudnessDb - loud, kMostCutDb, kMostBoostDb);
             std::printf ("auto level: %.1f dB\n", autoTrim);
         }
-        auto r = renderWith (v, di, sr, 256);
-        const float g = dbToGain (trim + autoTrim);
-        for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
+        Render r;
+        {
+            Rig rig;
+            rig.setOffline (true);
+            rig.setParams (v);
+            rig.prepare (sr, 256);
+            rig.setParams (v);
+            rig.finishPendingWork();
+            rig.prepare (sr, 256);
+            rig.finishPendingWork();
+            if (seed > -119.0f) rig.seedGateFloor (seed);
+            // the level trim goes in where the app puts it, before the safety limiter (adding it to the
+            // file afterwards made clean tones read over 0 dBFS that the app never plays)
+            rig.setLevelTrimDb (trim + autoTrim);
+            rig.setParams (v);
+            r.l.resize (di.size());
+            r.r.resize (di.size());
+            float inPk = 0.0f, outPk = 0.0f;
+            int blocks = 0, openBlocks = 0;
+            const size_t every = (size_t) (0.5 * sr) / 256 * 256;
+            for (size_t pos = 0; pos < di.size(); pos += 256)
+            {
+                const int n = (int) std::min<size_t> (256, di.size() - pos);
+                rig.setParams (v);
+                rig.process (di.data() + pos, r.l.data() + pos, r.r.data() + pos, n);
+                if (! trace) continue;
+                auto& m = rig.meters();
+                inPk = std::max (inPk, m.gateInPeak.load());
+                for (int i = 0; i < n; ++i) outPk = std::max (outPk, std::abs (r.l[pos + (size_t) i]));
+                ++blocks;
+                if (m.gateOpen.load()) ++openBlocks;
+                if ((pos + 256) % every == 0 || pos + 256 >= di.size())
+                {
+                    std::printf ("%6.1f s  gate hears %6.1f dB  threshold %6.1f dB  open %3d%%  out peak %6.1f dB\n", (double) (pos + 256) / sr,
+                                 gainToDb (inPk), m.gateThreshNow.load(), 100 * openBlocks / std::max (1, blocks), gainToDb (outPk));
+                    inPk = outPk = 0.0f;
+                    blocks = openBlocks = 0;
+                }
+            }
+        }
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
         std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));
         return 0;
@@ -4157,7 +4217,7 @@ int main (int argc, char** argv)
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, fileSr);
         return 0;
     }
-    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); testNoiseBetweenNotes (48000.0, -70.0f, true); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "selfnoise") { testSelfNoise (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "whine") { testWhine (48000.0); testWhine (44100.0); testWhine (192000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -4292,7 +4352,7 @@ int main (int argc, char** argv)
     testWhine (48000.0);
     testWhine (192000.0);
     testSelfNoise (48000.0);
-    testNoiseBetweenNotes (48000.0);
+    testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); testNoiseBetweenNotes (48000.0, -70.0f, true);
     testInputFix (48000.0);
     testInputGuard();
     testGate (48000.0);

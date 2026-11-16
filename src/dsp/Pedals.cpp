@@ -467,7 +467,7 @@ void NoiseGate::prepare (double sampleRate)
     windowLength = std::max (1, (int) (0.1 * sr));
     stepLength = std::max (1, (int) (0.0025 * sr));
     reopenDecay = dbToGain (-0.3f); // per step: what a stop asked for is forgotten in about 100 ms
-    floorDb = floorPeakDb = -120.0f; // as if just built: what an earlier run heard is forgotten
+    floorDb = floorPeakDb = loudDb = -120.0f; // as if just built: what an earlier run heard is forgotten
     windowPeak = 0.0f;
     windowsHeard = windowAt = windowFill = 0;
     windowPower = 0.0;
@@ -523,9 +523,54 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     windowPeaks[windowAt] = peakDb;
     windowAt = (windowAt + 1) % kWindows;
     windowsHeard = std::min (windowsHeard + 1, kWindows);
+    // the loudest the guitar has been lately, forgotten at 1 dB a second
+    loudDb = std::max (peakDb, loudDb - 0.1f);
     // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do.
     // The very first floor needs the same 1.6 s: a noisy room is gated soon after the start
     // (a quieter floor heard later is believed at once anyway).
+    // A USB guitar input hisses in bursts: its level swings 6 to 8 dB from one tenth of a second
+    // to the next, so the test above never passed and the gate went by setup's one measurement
+    // for good, 2 to 3 dB over the hiss. Any change in the input (a few dB hotter, a cold start)
+    // let the amp turn the hiss into a roar as loud as the playing (16 Nov). The loudest moment
+    // of each tenth holds far steadier on such hiss (within 1 to 1.5 dB) and a ringing note still
+    // fades through it, so 0.8 s of steady peaks, 30 dB or more under the playing of the last
+    // half minute, is believed at once as the floor, louder or quieter than the one known so far.
+    if (fastFloor && windowsHeard >= kFastWindows)
+    {
+        float pk[kFastWindows], lv[kFastWindows];
+        for (int k = 0; k < kFastWindows; ++k)
+        {
+            const int i = (windowAt - 1 - k + 2 * kWindows) % kWindows; // k = 0 is the newest
+            pk[k] = windowPeaks[i];
+            lv[k] = windows[i];
+        }
+        auto median = [] (float* v, int n) { std::sort (v, v + n); return 0.5f * (v[(n - 1) / 2] + v[n / 2]); };
+        float newer[kFastWindows / 2], older[kFastWindows / 2];
+        std::copy (pk, pk + kFastWindows / 2, newer);
+        std::copy (pk + kFastWindows / 2, pk + kFastWindows, older);
+        const float drift = std::abs (median (newer, kFastWindows / 2) - median (older, kFastWindows / 2));
+        float sorted[kFastWindows];
+        std::copy (pk, pk + kFastWindows, sorted);
+        std::sort (sorted, sorted + kFastWindows);
+        const float spread = sorted[kFastWindows * 3 / 4] - sorted[kFastWindows / 4]; // the middle half
+        const float typical = median (pk, kFastWindows);
+        // hiss peaks 12 dB or more over its own level in a tenth of a second, a held note 3 to 7:
+        // with nothing played yet, only a level that peaks like hiss is taken for the floor
+        float crests[kFastWindows];
+        for (int k = 0; k < kFastWindows; ++k) crests[k] = windowPeaks[(windowAt - 1 - k + 2 * kWindows) % kWindows] - windows[(windowAt - 1 - k + 2 * kWindows) % kWindows];
+        const float crest = median (crests, kFastWindows);
+        // ... and none of them above it: a note that starts in the newest tenth is not hiss
+        if (spread <= 1.5f && drift <= 1.0f && sorted[kFastWindows - 1] - typical <= 3.0f
+            // far under the playing, or nothing played yet (the loudest heard is the hiss itself):
+            // a cold start learns the hiss before the first note instead of letting it roar
+            && (loudDb - typical >= kFastUnderPlayingDb || (loudDb - typical < 6.0f && crest >= 9.0f)) && typical < -40.0f)
+        {
+            floorDb = std::max (-120.0f, median (lv, kFastWindows));
+            floorPeakDb = std::max (-120.0f, sorted[kFastWindows - 1]);
+            applyThreshold();
+            return;
+        }
+    }
     const int need = floorDb < -119.0f ? kFirstWindows : kWindows;
     if (windowsHeard < need) return;
     float lo = 1000.0f, hi = -1000.0f, sum = 0.0f, peak = -1000.0f;
