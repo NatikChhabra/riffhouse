@@ -143,6 +143,7 @@ def fader_cap():
 # ------------------------------------------------------------------ panel hardware
 # Each picture is a square round the middle of the part, `canvas` nominal pixels wide, and the
 # app scales it from the size it draws that part at (see HARDWARE in src/ui/Gear.cpp).
+ROCKERS = ("ec2f1b", "f4a524", "7dffa0")
 JEWELS = ("f2351f", "ffc35a", "ec2f1b", "7dffa0", "6fb7ff", "ff9f1c")
 
 
@@ -227,6 +228,36 @@ def jewel(hex_colour, on):
     return [bezel, gem]
 
 
+def rocker(hex_colour, on):
+    """A lit rocker switch: a moulded bezel round a translucent paddle that pivots on its middle, I on top and O below."""
+    k = CM
+    col = c.rgb(hex_colour)
+    shell = c.principled("rocker-shell", (0.03, 0.03, 0.032), rough=0.34, coat=0.5, coat_rough=0.12)
+    bezel = c.box("bezel", -15 * k, 15 * k, -21 * k, 21 * k, 0.0, 3.0 * k, shell, corner=4.0 * k, edge=0.5 * k)
+    c.cut(bezel, c.box("well", -12 * k, 12 * k, -18 * k, 18 * k, -1.0 * k, 4.0 * k, c.black(), corner=2.5 * k))
+    c.box("backing", -12.5 * k, 12.5 * k, -18.5 * k, 18.5 * k, 0.0, 0.3 * k, c.black(), corner=2.5 * k)
+    glass = c.principled("rocker-paddle", tuple(v * (0.85 if on else 0.22) for v in col), rough=0.28, coat=0.8, coat_rough=0.05,
+                         emission=col if on else None, strength=1.0 if on else 0.0)
+    paddle = c.box("paddle", -11.5 * k, 11.5 * k, -17.5 * k, 17.5 * k, -1.0 * k, 1.3 * k, glass, corner=1.6 * k, edge=0.45 * k)
+    c.cut(paddle, c.box("groove", -12.5 * k, 12.5 * k, -0.45 * k, 0.45 * k, 0.95 * k, 2.0 * k, c.black()))
+    mark = c.principled("rocker-mark", (0.9, 0.9, 0.9), rough=0.4, emission=(1.0, 0.95, 0.9) if on else None, strength=0.6 if on else 0.0)
+    bar = c.box("I", -0.8 * k, 0.8 * k, 6.5 * k, 12.5 * k, 1.1 * k, 1.45 * k, mark, corner=0.3 * k)
+    ring = c.lathe("O", [(0.0001, 1.45 * k), (3.2 * k, 1.45 * k), (3.2 * k, 1.1 * k)], mark, seg=48)
+    hole = c.lathe("O-hole", [(0.0001, 1.5 * k), (2.5 * k, 1.5 * k)], glass, seg=48)
+    for pl in hole.data.polygons:
+        pl.use_smooth = False
+    ring_y = -9.5 * k
+    pivot, tilt = 3.4 * k, math.radians(-7.0 if on else 7.0)   # on: the I half is pressed in
+    for ob in (paddle, bar, ring, hole):
+        ob.rotation_euler[0] = tilt
+    for ob in (paddle, bar):
+        ob.location = (0.0, 0.0, pivot)
+    # the ring sits off the pivot: swing it round the middle by hand
+    for ob in (ring, hole):
+        ob.location = (0.0, ring_y * math.cos(tilt), pivot + ring_y * math.sin(tilt))
+    return [bezel, paddle, bar, ring, hole]
+
+
 def hardware(out, px, samples, only):
     jobs = {"hw-toggle-on": (96.0, lambda: toggle(True)), "hw-toggle-off": (96.0, lambda: toggle(False)),
             "hw-jack": (64.0, jack)}
@@ -235,6 +266,9 @@ def hardware(out, px, samples, only):
     for h in JEWELS:
         for on in (True, False):
             jobs["hw-jewel-%s-%s" % (h, "on" if on else "off")] = (80.0, (lambda hh, oo: lambda: jewel(hh, oo))(h, on))
+    for h in ROCKERS:
+        for on in (True, False):
+            jobs["hw-rocker-%s-%s" % (h, "on" if on else "off")] = (72.0, (lambda hh, oo: lambda: rocker(hh, oo))(h, on))
     for name, (canvas, make) in jobs.items():
         if only and name not in only and "hw" not in only:
             continue

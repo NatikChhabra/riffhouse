@@ -32,6 +32,11 @@ namespace
     }
 
     // a pilot jewel is photographed in each colour the amps use, lit and dark
+    juce::String rockerArtName (juce::uint32 colour, bool on)
+    {
+        return "hw_rocker_" + juce::String::toHexString ((juce::int64) (colour & 0xffffff)).paddedLeft ('0', 6) + (on ? "_on" : "_off");
+    }
+
     juce::String jewelArtName (juce::uint32 colour, bool on)
     {
         return "hw_jewel_" + juce::String::toHexString ((juce::int64) (colour & 0xffffff)).paddedLeft ('0', 6) + (on ? "_on" : "_off");
@@ -1993,6 +1998,8 @@ namespace
             g.fillEllipse (lamp.expanded (0.5f));
             return;
         }
+        if (d.lamp == 2 && art::has (rockerArtName (d.jewel, true)))
+            return; // the photographed rocker brings its own bezel
         if (d.lamp == 2)
         {
             const auto bezel = R (30.0f, 42.0f).withCentre (jc);
@@ -2431,6 +2438,17 @@ void drawAmpJewel (juce::Graphics& g, const AmpLayout& l, const AmpDesign& d, bo
     {
         // a rocker: the pressed half sinks, and the whole paddle lights when on
         const auto face = R (24.0f, 36.0f).withCentre (r.getCentre()).reduced (1.0f);
+        if (art::has (rockerArtName (d.jewel, on)))
+        {
+            if (on)
+            {
+                const auto glow = face.expanded (30.0f);
+                g.setGradientFill (juce::ColourGradient (jewel.withAlpha (0.3f), face.getCentreX(), face.getCentreY(), jewel.withAlpha (0.0f), face.getCentreX() + 40.0f, face.getCentreY(), true));
+                g.fillEllipse (glow);
+            }
+            hardware (g, rockerArtName (d.jewel, on), r.getCentre(), 72.0f);
+            return;
+        }
         const C lit = on ? jewel : jewel.darker (2.6f).withMultipliedSaturation (0.6f);
         if (on)
         {
