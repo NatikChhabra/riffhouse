@@ -1586,7 +1586,10 @@ void testAliasing (double sr)
   {
     auto v = bare();
     v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = (float) amp; v[(size_t) P::ampGain] = 10;
+    // Redline Lead plays a capture now too: its circuit model, still the fallback, is what is held to the oversampled bar
+    Rig::circuitModelsOnly = amp == choices::hotRodLead;
     const auto r = renderWith (v, in, sr);
+    Rig::circuitModelsOnly = false;
     const int N = 32768;
     juce::dsp::FFT fft (15);
     std::vector<float> buf ((size_t) N * 2, 0.0f);
@@ -3859,6 +3862,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "calibrate")
     {
+        if (args.contains ("captures=0")) Rig::circuitModelsOnly = true; // the circuit models the captures replace
         const double sr = 48000.0;
         const auto di = test::guitarDi (sr, 12.0);
         for (int m = 0; m < numAmpVoicings(); ++m)

@@ -43,7 +43,7 @@ namespace
     // how much each built-in capture's output is turned so it plays as loud as the circuit model
     // it replaces did (tests: calibrate)
     constexpr int kFactoryMemory = 4608; // a standard WaveNet capture's reach, with some to spare
-    constexpr float kFactoryTrimDb[3] = { 8.8f, 2.8f, -4.4f };
+    constexpr float kFactoryTrimDb[4] = { 8.8f, 2.8f, -4.4f, 0.8f };
 
     // the gain knob drives the capture like the amp's own pot: an audio taper with 6.5 as the
     // capture was made, +7 dB at 10, and nearly nothing left at 0
@@ -159,7 +159,7 @@ void Rig::reset()
 
 int Rig::factoryFor (int ampModel) const noexcept
 {
-    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : ampModel == choices::brit800 ? 2 : -1;
+    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : ampModel == choices::brit800 ? 2 : ampModel == choices::hotRodLead ? 3 : -1;
     return i >= 0 && factoryReady[i] && ! circuitModelsOnly ? i : -1;
 }
 
