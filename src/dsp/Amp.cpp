@@ -10,18 +10,20 @@ namespace
 
     using namespace tonestacks;
 
+    // Glass Clean and Chime Top: top shelf and output bandwidth fitted to captures of a Fender Twin (normal, bright)
+    // and a Vox AC15 (top boost) on three real guitar takes; they sat 5 to 8 dB darker above 4 kHz (16 Nov).
     // name, inHP, bright, gainMin, gainMax, stages, stageGain[5], stageBias[5], stageHp[5], stageLp[5],
     // baxandall, stack, midHz, powerDrive, powerBias, sag, presenceHz, depthHz, outHp, outLp, trim
     const AmpVoicing voicings[] = {
         { "Glass Clean", 20.0f, 5.0f, -14.0f, 14.0f, 2,
           { 1, 6, 1, 1, 1 }, { 0.10f, 0.08f, 0, 0, 0 }, { 20, 30, 0, 0, 0 }, { 14000, 13750, 0, 0, 0 },
-          false, american, 600.0f, 0.9f, 0.00f, 0.10f, 4500.0f, 95.0f, 45.0f, 11000.0f, 3.3f },
+          false, american, 600.0f, 0.9f, 0.00f, 0.10f, 4500.0f, 95.0f, 45.0f, 14000.0f, 3.3f, 250.0f, 0.0f, 4500.0f, 6.0f },
         { "Tweed Edge", 20.0f, 2.0f, -12.0f, 20.0f, 2,
           { 1, 14, 1, 1, 1 }, { 0.20f, 0.15f, 0, 0, 0 }, { 20, 40, 0, 0, 0 }, { 11250, 8750, 0, 0, 0 },
           false, tweed, 800.0f, 2.2f, 0.05f, 0.45f, 3000.0f, 85.0f, 50.0f, 8000.0f, -5.5f },
         { "Chime Top", 25.0f, 3.0f, -14.0f, 20.0f, 3,
           { 1, 10, 1.5f, 1, 1 }, { 0.15f, 0.10f, 0.05f, 0, 0 }, { 25, 60, 30, 0, 0 }, { 14000, 12000, 15000, 0, 0 },
-          false, chime, 900.0f, 1.8f, 0.18f, 0.30f, 3500.0f, 110.0f, 70.0f, 10000.0f, -4.3f },
+          false, chime, 900.0f, 1.8f, 0.18f, 0.30f, 3500.0f, 110.0f, 70.0f, 10000.0f, -4.3f, 250.0f, 0.0f, 3500.0f, 5.0f },
         { "Brit 68", 30.0f, 6.0f, -14.0f, 22.0f, 3,
           { 1, 16, 1.2f, 1, 1 }, { 0.20f, 0.18f, 0.05f, 0, 0 }, { 30, 90, 40, 0, 0 }, { 12000, 11250, 14000, 0, 0 },
           false, british, 750.0f, 1.6f, 0.02f, 0.25f, 3500.0f, 100.0f, 60.0f, 10500.0f, -3.2f },
