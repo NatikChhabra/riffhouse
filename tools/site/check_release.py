@@ -140,6 +140,8 @@ def check(tag):
     for thing in ("tones", "amps", "pedals", "cabinets"):
         said = {}
         for name, html in pages.items():
+            if name == "updates.html":  # older cards say what was true then: read the newest card only
+                html = re.split(r'<li class="upd[ "]', html)[1] if '<li class="upd' in html else html
             for n in counts(html, thing):
                 said.setdefault(n, []).append(name)
         if thing == "tones":

@@ -4,9 +4,22 @@ Everything coming to Riffhouse, in the order it lands. Every release stays free 
 
 The nicer version of this page is on the website: https://riffhouse.in/roadmap.html
 
-Updated 14 November 2026.
+Updated 17 November 2026.
 
-## Out now: 0.1.5 Hotfix 3
+## Out now: 0.1.6 (Update 1)
+
+Released 17 November 2026, built from players' reports.
+
+- **Real amp captures.** The four high-gain amps now play captures of real amps, and every tone that uses them was level-matched to the new sound.
+- **Four new 4x12 cabinets.** Made from recordings of real 4x12 cabinets, with a mic knob that moves through the real mic placements. Twelve cabinets in all.
+- **A gate that sets itself.** Auto mode listens to the hiss your guitar and input make and closes just above it, from the first note. Turn Threshold yourself and it stays where you put it.
+- **The gate, saved with each tone.** A tone with the gate off no longer turns it off for every other tone.
+- **Brighter cleans.** Glass Clean and Chime Top have more top end.
+- **Setup on USB guitar cables.** Setup keeps the audio mode that hears your guitar best, the same way every time.
+- **A Feedback button.** Write what sounds or feels wrong and it goes straight to the people who fix Riffhouse.
+- **Every tone level-matched again.** All 197.
+
+## 0.1.5
 
 Released 13 November 2026 (Hotfix 1 the same day: the gate no longer cuts held notes, and the Tight Metal amp gets its low end back; Hotfix 2 on 14 November: no crackle or lost sound with a separate guitar input and headphones, the gate stops muting notes that still ring, a crash is fixed, and you can type a knob's value; Hotfix 3 the same day: bug reports and the weekly player count reach us again). The polish release: sound you can trust, tested end to end before it ships. Riffhouse updates itself, or download it from the [releases page](https://github.com/NatikChhabra/riffhouse/releases/latest).
 
