@@ -12,17 +12,20 @@
     return n;
   };
 
-  /* The download button goes straight to the newest public installer. */
+  /* The download button goes straight to the newest public installer. The page is published with that link already
+     in it (tools/site/download.py); this looks again on every load, and before a click on a page left open. */
+  let looked = 0;
   async function download() {
     const note = $('[data-release]');
     try {
-      const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { headers: { Accept: 'application/vnd.github+json' } });
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=20`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
       if (!res.ok) return;
       const releases = (await res.json()).filter((r) => !r.draft && !r.prerelease);
       for (const r of releases) {
         const file = r.assets.find((a) => /windows-setup\.exe$/i.test(a.name));
         if (!file) continue;
         $$('[data-download]').forEach((a) => { a.href = file.browser_download_url; });
+        looked = Date.now();
         const mb = Math.round(file.size / 1048576);
         const day = new Date(r.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
         if (note) note.textContent = `Version ${r.tag_name.replace(/^v/, '')}, ${mb} MB, released ${day}.`;
@@ -31,7 +34,18 @@
       if (note) note.textContent = releases.length
         ? `Version ${releases[0].tag_name.replace(/^v/, '')} is out. Its installer is still being built, try again in a few minutes.`
         : 'The first public version is in final testing.';
-    } catch { /* offline or rate limited: the link to GitHub Releases still works */ }
+    } catch { /* offline or rate limited: the link the page was published with still works */ }
+  }
+  /* A tab left open across a release must not hand out the old installer. */
+  function freshDownload() {
+    document.addEventListener('click', async (e) => {
+      const a = e.target.closest ? e.target.closest('a[data-download]') : null;
+      if (!a || Date.now() - looked < 60000 || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      await download();
+      location.href = a.href;
+    });
+    window.addEventListener('pageshow', (e) => { if (e.persisted) download(); });
   }
 
   /* Tone finder */
@@ -488,5 +502,5 @@
     });
   }
 
-  tabs(); reveals(); download(); finder(); demos(); copyId(); words(); stomp(); counts(); play(); tally(); news(); left();
+  tabs(); reveals(); download(); freshDownload(); finder(); demos(); copyId(); words(); stomp(); counts(); play(); tally(); news(); left();
 })();
