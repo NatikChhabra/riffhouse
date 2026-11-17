@@ -45,7 +45,8 @@ def count(page, thing):
 
 def build(page):
     version, day = release(page)
-    amps, pedals, cabs, tones = (count(page, t) for t in ("amps", "pedals", "cabinets", "tones"))
+    words = BLOCK.sub("", page)  # the old data block must not answer for the page
+    amps, pedals, cabs, tones = (count(words, t) for t in ("amps", "pedals", "cabinets", "tones"))
     faq = re.findall(r'<details name="faq"><summary>(.*?)</summary><p>(.*?)</p></details>', page, flags=re.S)
     if not faq:
         sys.exit("schema: index.html has no questions")
