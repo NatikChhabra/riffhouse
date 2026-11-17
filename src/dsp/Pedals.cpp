@@ -464,6 +464,7 @@ void NoiseGate::prepare (double sampleRate)
     attackCoeff = (float) std::exp (-1.0 / (0.0008 * sr));
     stopCoeff = (float) std::exp (-1.0 / (0.003 * sr)); // 40 dB down in about 14 ms
     holdSamples = (int) (0.025 * sr); // the detector already holds the last 20 ms
+    confirmSamples = std::max (1, (int) (0.0013 * sr));
     windowLength = std::max (1, (int) (0.1 * sr));
     stepLength = std::max (1, (int) (0.0025 * sr));
     reopenDecay = dbToGain (-0.3f); // per step: what a stop asked for is forgotten in about 100 ms
@@ -477,7 +478,7 @@ void NoiseGate::prepare (double sampleRate)
 
 void NoiseGate::reset()
 {
-    gain = 0.0f; open = false; stopping = false; holdCounter = 0;
+    gain = 0.0f; open = false; stopping = false; holdCounter = 0; above = 0; confirmLeft = 0;
     std::fill (std::begin (steps), std::end (steps), 0.0f);
     stepAt = stepFill = 0;
     stepPeak = heldPeak = recentPeak = earlierPeak = reopenAbove = 0.0f;
@@ -535,13 +536,15 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     // of each tenth holds far steadier on such hiss (within 1 to 1.5 dB) and a ringing note still
     // fades through it, so 0.8 s of steady peaks, 30 dB or more under the playing of the last
     // half minute, is believed at once as the floor, louder or quieter than the one known so far.
-    if (fastFloor && windowsHeard >= kFastWindows)
+    if (fastFloor && windowsHeard > kFastWindows)
     {
         float pk[kFastWindows], lv[kFastWindows];
         for (int k = 0; k < kFastWindows; ++k)
         {
             const int i = (windowAt - 1 - k + 2 * kWindows) % kWindows; // k = 0 is the newest
-            pk[k] = windowPeaks[i];
+            // the louder of each tenth and the one before it: ticks that come every fifth of a
+            // second leave every other tenth without one, and the floor never looked steady
+            pk[k] = std::max (windowPeaks[i], windowPeaks[(i - 1 + kWindows) % kWindows]);
             lv[k] = windows[i];
         }
         auto median = [] (float* v, int n) { std::sort (v, v + n); return 0.5f * (v[(n - 1) / 2] + v[n / 2]); };
@@ -643,7 +646,22 @@ void NoiseGate::process (float* x, int n, float* gainsOut)
         stepPeak = std::max (stepPeak, a);
         if (++stepFill >= stepLength) { stepFill = 0; stepDone(); }
         const float e = std::max (heldPeak, stepPeak);
-        if (a > std::max (thrOpen, reopenAbove)) { open = true; stopping = false; reopenAbove = 0.0f; holdCounter = holdSamples; }
+        // It opens at once on any sample over the threshold (a pick must not wait), and then a note has
+        // to hold near the threshold for about 1.3 ms. A tick (under half a millisecond) does not, and
+        // the gate shuts again as fast as for a hand on the strings: a USB guitar input that ticks a few
+        // times a second under its hiss held the gate open for 100 ms per tick, and the amp turned each
+        // into a burst (17 Nov take).
+        above = a > 0.5f * thrOpen ? above + 1 : std::max (0, above - 2);
+        if (a > std::max (thrOpen, reopenAbove))
+        {
+            if (! open) confirmLeft = 2 * confirmSamples;
+            open = true; stopping = false; reopenAbove = 0.0f; holdCounter = holdSamples;
+        }
+        if (confirmLeft > 0)
+        {
+            if (above >= confirmSamples) confirmLeft = 0;
+            else if (--confirmLeft == 0) { open = false; stopping = true; holdCounter = 0; }
+        }
         else if (open && e < thrClose)
         {
             if (holdCounter > 0) --holdCounter;

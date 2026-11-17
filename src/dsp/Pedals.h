@@ -265,7 +265,7 @@ private:
     float reopenAbove = 0.0f, reopenDecay = 1.0f;
     float thrOpen = 0.001f, thrClose = 0.0005f;
     float gain = 0.0f, attackCoeff = 0.0f, releaseCoeff = 0.0f, stopCoeff = 0.0f;
-    int holdSamples = 0, holdCounter = 0;
+    int holdSamples = 0, holdCounter = 0, above = 0, confirmSamples = 62, confirmLeft = 0;
     bool open = false, stopping = false;
 };
 
