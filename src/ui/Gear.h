@@ -141,6 +141,11 @@ struct CabLayout
 };
 CabLayout cabLayout (juce::Rectangle<float> area, int cabModel);
 juce::Image renderCab (int cabModel, const CabLayout&, juce::Rectangle<float> area, float scale, const juce::String& irName);
+// Cabs photographed in 3D (tools/gear3d/cabs.py): the art covers cabArtArea of the box at any size.
+bool cabPictured (int cabModel);
+juce::Rectangle<float> cabArtArea (juce::Rectangle<float> box);
+// Everything the 3D build needs to know about a cab, and the flat print of its logo.
+juce::var cabDescription (int cabModel, const CabLayout&, juce::Image& print, float scale);
 // The microphone's channel strip: the box its cable runs to, with the four controls that place
 // the mic and trim its lows and highs.
 struct MicPreLayout
