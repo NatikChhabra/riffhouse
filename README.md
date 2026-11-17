@@ -2,7 +2,7 @@
 
 # Riffhouse
 
-**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 11 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
+**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 12 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
 
@@ -12,15 +12,14 @@ More on the [website](https://riffhouse.in/), or go straight to [help and fixes]
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
-## New in 0.1.5
+## New in 0.1.6 (Update 1)
 
-- **Pedals that behave like the real circuits.** Every drive and fuzz is worked out transistor by transistor and checked against measurements of the real pedals.
-- **Cleaner high gain and quiet stops.** No digital fizz on high notes, and the gate closes the moment you mute the strings.
-- **Hum and whine taken out, not filtered.** Ground-loop buzz and charger whine are found and removed, so your notes keep their body.
-- **Real speaker cabinets.** Each cab follows its real speaker's measured response within 2 dB.
-- **No clicks.** Switching pedals, changing tones and turning knobs fast are all click-free.
-- **ASIO no longer freezes the window.** A driver is tried in a hidden test run first, and setup goes for the lowest delay by itself.
-- **Help when something breaks.** After a crash or freeze, Riffhouse offers to send a private report, with your names taken out.
+- **Real amps behind the metal tones.** Modern High Gain, Tight Metal, Brit 81 and Redline Lead now play neural captures of a real 5150, 6505+, JCM2000 and JVM. Palm mutes stop dead and the low end stays tight.
+- **A noise gate that sets itself.** Auto mode listens to your guitar's hiss and closes just above it, from the first note. Turn Threshold and it stays where you put it.
+- **Real 4x12 cabinets.** Four new cabinets from recordings of real 4x12s, with the mic knob moving through real mic placements.
+- **Brighter cleans.** Glass Clean and Chime Top now have the top end of a real Twin and AC15.
+- **Setup that just works on USB guitar cables.** It picks the mode that hears your guitar best, the same way every time.
+- **Tell us what to fix.** A Feedback button at the top sends a note straight to the people who make Riffhouse.
 
 ![Chords and tabs, read from your chair](docs/screenshots/chords.png)
 
@@ -64,7 +63,7 @@ Every amp, pedal and cabinet is its own piece of gear, with its own face and its
 | ![A cabinet with its microphone](docs/screenshots/cab.png) | ![The tone browser](docs/screenshots/browser.png) |
 
 - **11 amps**, from glassy cleans to tight metal, plus a bass amp and a direct channel.
-- **11 speaker cabinets**, three of them recordings of real 4x12s, each with a mic you can move across the cone, and a slot for your own impulse response.
+- **12 speaker cabinets**, three of them recordings of real 4x12s, each with a mic you can move across the cone, and a slot for your own impulse response.
 - **30 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
 - **197 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
 - **Neural captures:** load any `.nam` file as the amp.
