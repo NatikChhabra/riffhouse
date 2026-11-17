@@ -533,7 +533,11 @@ void AutoSetup::timerCallback()
             }
             const double elapsed = t - noiseStart;
             phaseProgress = (float) std::min (1.0, elapsed / kQuietMs);
-            if (elapsed > 300.0) noiseSamples.add (proc.meters().gateInPeak.load());
+            // the loudest the gate heard since the last look, not the last block alone: a block is
+            // 3 ms of the 40 between looks, and the ticks a USB input makes between its hiss fell
+            // between them, so setup measured the hiss 10 dB under what the gate later met (17 Nov)
+            const float heard = proc.meters().stagePeak.exchange (0.0f);
+            if (elapsed > 300.0) noiseSamples.add (heard);
             if (elapsed >= kQuietMs) finish();
             return;
         }

@@ -535,13 +535,15 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     // of each tenth holds far steadier on such hiss (within 1 to 1.5 dB) and a ringing note still
     // fades through it, so 0.8 s of steady peaks, 30 dB or more under the playing of the last
     // half minute, is believed at once as the floor, louder or quieter than the one known so far.
-    if (fastFloor && windowsHeard >= kFastWindows)
+    if (fastFloor && windowsHeard > kFastWindows)
     {
         float pk[kFastWindows], lv[kFastWindows];
         for (int k = 0; k < kFastWindows; ++k)
         {
             const int i = (windowAt - 1 - k + 2 * kWindows) % kWindows; // k = 0 is the newest
-            pk[k] = windowPeaks[i];
+            // the louder of each tenth and the one before it: ticks that come every fifth of a
+            // second leave every other tenth without one, and the floor never looked steady
+            pk[k] = std::max (windowPeaks[i], windowPeaks[(i - 1 + kWindows) % kWindows]);
             lv[k] = windows[i];
         }
         auto median = [] (float* v, int n) { std::sort (v, v + n); return 0.5f * (v[(n - 1) / 2] + v[n / 2]); };
