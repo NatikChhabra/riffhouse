@@ -17,7 +17,8 @@ It reads the files in site/ and fails with a plain list of what is stale:
   - the data block in the home page head, site/llms.txt and the sitemap dates are up to date (tools/site/schema.py)
   - the release has an installer the download button can find (only when asking GitHub)
 
-For a visitor, the home page and the press page read the newest version from GitHub when they load.
+For a visitor, the download buttons are written with the newest installer on every publish (tools/site/download.py),
+and the home page and the press page read the newest version from GitHub again when they load.
 """
 import json
 import os
@@ -58,13 +59,14 @@ def newest_release():
     if not public:
         sys.exit("site check: there is no public release yet")
     for r in public:
-        if any(a["name"].lower().endswith("windows-setup.exe") for a in r["assets"]):
+        files = [a for a in r["assets"] if a["name"].lower().endswith("windows-setup.exe")]
+        if files:
             problems = []
             if r is not public[0]:
                 problems.append(f"{public[0]['tag_name']} is published but has no windows-setup.exe, "
                                 f"so the download button still gives {r['tag_name']}")
-            return r["tag_name"], problems
-    return public[0]["tag_name"], [f"{public[0]['tag_name']} has no windows-setup.exe: the download button has nothing to give"]
+            return r["tag_name"], problems, files[0]
+    return public[0]["tag_name"], [f"{public[0]['tag_name']} has no windows-setup.exe: the download button has nothing to give"], None
 
 
 def text_of(html):
@@ -159,7 +161,7 @@ def check(tag):
 def main(argv):
     if len(argv) > 2 or (len(argv) == 2 and argv[1] in ("-h", "--help")):
         sys.exit(__doc__)
-    tag, problems = (argv[1], []) if len(argv) == 2 else newest_release()
+    tag, problems = (argv[1], []) if len(argv) == 2 else newest_release()[:2]
     full, stale = check(tag)
     stale = problems + stale
     if stale:

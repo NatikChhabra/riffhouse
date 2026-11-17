@@ -1,7 +1,7 @@
 name: Website
 
-# Publishes the site/ folder to GitHub Pages. Nothing is built: the folder is served as it is, with one version stamp added,
-# plus the RSS feeds in site/feeds/ that the Riff House Discord reads (releases, beta builds, dev log, tone of the week).
+# Publishes the site/ folder to GitHub Pages. Nothing is built: the folder is served as it is, with one version stamp
+# and the newest installer's address written into the download buttons, plus the RSS feeds in site/feeds/ that the Riff House Discord reads (releases, beta builds, dev log, tone of the week).
 on:
   push:
     branches: [main]
@@ -11,6 +11,7 @@ on:
       - 'tools/community/**'
       - 'tools/site/check_release.py'
       - 'tools/site/schema.py'
+      - 'tools/site/download.py'
       - '.github/workflows/pages.yml'
   schedule:
     # Mondays 09:05 UTC: the new tone of the week goes out.
@@ -66,6 +67,13 @@ jobs:
         run: |
           sed -i "s/href=\"styles\.css\"/href=\"styles.css?v=${GITHUB_SHA::8}\"/; s/src=\"app\.js\"/src=\"app.js?v=${GITHUB_SHA::8}\"/" site/*.html
           grep -c "?v=${GITHUB_SHA::8}" site/*.html
+      # Every download button is written with the newest installer, so nobody edits a link after a release
+      # (a release starts this publish through release-feeds.yml). If GitHub cannot be asked, the buttons keep the link
+      # to the releases page and the last step of this job goes red.
+      - name: Point the download buttons at the newest installer
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/site/download.py stamp site
       # The press page offers its files one by one and as one download.
       - name: Pack the press kit
         run: cd site/press && zip -qr riffhouse-press-kit.zip README.md logo screenshots && ls -la riffhouse-press-kit.zip
@@ -85,3 +93,9 @@ jobs:
           curl -sS -m 30 -o /dev/null -w 'IndexNow answered %{http_code}\n' -X POST https://api.indexnow.org/indexnow \
             -H 'Content-Type: application/json; charset=utf-8' \
             -d "{\"host\":\"riffhouse.in\",\"key\":\"$key\",\"keyLocation\":\"https://riffhouse.in/$key.txt\",\"urlList\":[$urls]}"
+      # Reads the published pages back from riffhouse.in, follows every download button and fails if the file it
+      # gives is not the newest release's installer.
+      - name: The live download buttons give the newest installer
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/site/download.py check "${GITHUB_SHA::8}"
