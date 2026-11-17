@@ -955,11 +955,15 @@ public:
             g.fillEllipse (lampR);
             drawCaps (g, levelText(), { lx + 13.0f, sy, 170.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
         }
+        // the right of the line starts after the auto level words, so a long warning never runs over them
         const int clips = proc.meters().clipEvents.load();
-        const auto rightLine = juce::Rectangle<float> ((float) outMeterArea.getX(), sy, 380.0f, 16.0f);
+        const float from = (float) levelSpot.getX() + 13.0f + capsWidth (levelText(), 11.0f, 0.1f) + 18.0f;
+        const auto rightLine = juce::Rectangle<float> (from, sy, (float) outMeterArea.getRight() - from, 16.0f);
+        auto fit = [&] (const juce::String& longer, const juce::String& shorter)
+        { return capsWidth (longer, 11.0f, 0.1f) <= rightLine.getWidth() ? longer : shorter; };
         if (clips > 0)
-            drawCaps (g, "Hitting the limiter: lower volume a little", rightLine, 11.0f, colours::warn, juce::Justification::centredRight, 0.1f);
-        else
+            drawCaps (g, fit ("Hitting the limiter: lower volume a little", "Limiter: turn down"), rightLine, 11.0f, colours::warn, juce::Justification::centredRight, 0.1f);
+        else if (capsWidth (latencyText(), 11.0f, 0.1f) <= rightLine.getWidth())
             drawCaps (g, latencyText(), rightLine, 11.0f, colours::textDim, juce::Justification::centredRight, 0.1f);
     }
 
