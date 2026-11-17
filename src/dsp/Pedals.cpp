@@ -478,7 +478,7 @@ void NoiseGate::prepare (double sampleRate)
 
 void NoiseGate::reset()
 {
-    gain = 0.0f; open = false; stopping = false; holdCounter = 0; above = 0;
+    gain = 0.0f; open = false; stopping = false; holdCounter = 0; above = 0; confirmLeft = 0;
     std::fill (std::begin (steps), std::end (steps), 0.0f);
     stepAt = stepFill = 0;
     stepPeak = heldPeak = recentPeak = earlierPeak = reopenAbove = 0.0f;
@@ -646,11 +646,22 @@ void NoiseGate::process (float* x, int n, float* gainsOut)
         stepPeak = std::max (stepPeak, a);
         if (++stepFill >= stepLength) { stepFill = 0; stepDone(); }
         const float e = std::max (heldPeak, stepPeak);
-        // A note opens it once it has held near the threshold for about 1.3 ms; a tick (under half a
-        // millisecond) never does. A USB guitar input that ticks a few times a second under its hiss
-        // opened the gate on every tick, and the amp turned each into a burst (17 Nov take).
+        // It opens at once on any sample over the threshold (a pick must not wait), and then a note has
+        // to hold near the threshold for about 1.3 ms. A tick (under half a millisecond) does not, and
+        // the gate shuts again as fast as for a hand on the strings: a USB guitar input that ticks a few
+        // times a second under its hiss held the gate open for 100 ms per tick, and the amp turned each
+        // into a burst (17 Nov take).
         above = a > 0.5f * thrOpen ? above + 1 : std::max (0, above - 2);
-        if (a > std::max (thrOpen, reopenAbove) && (open || above >= confirmSamples)) { open = true; stopping = false; reopenAbove = 0.0f; holdCounter = holdSamples; }
+        if (a > std::max (thrOpen, reopenAbove))
+        {
+            if (! open) confirmLeft = 2 * confirmSamples;
+            open = true; stopping = false; reopenAbove = 0.0f; holdCounter = holdSamples;
+        }
+        if (confirmLeft > 0)
+        {
+            if (above >= confirmSamples) confirmLeft = 0;
+            else if (--confirmLeft == 0) { open = false; stopping = true; holdCounter = 0; }
+        }
         else if (open && e < thrClose)
         {
             if (holdCounter > 0) --holdCounter;
