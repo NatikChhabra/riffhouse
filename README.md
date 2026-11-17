@@ -14,11 +14,10 @@ More on the [website](https://riffhouse.in/), or go straight to [help and fixes]
 
 ## New in 0.1.6 (Update 1)
 
-- **Real amps behind the metal tones.** Modern High Gain, Tight Metal, Brit 81 and Redline Lead now play neural captures of a real 5150, 6505+, JCM2000 and JVM. Palm mutes stop dead and the low end stays tight.
 - **A noise gate that sets itself.** Auto mode listens to your guitar's hiss and closes just above it, from the first note. Turn Threshold and it stays where you put it.
-- **Real 4x12 cabinets.** Four new cabinets from recordings of real 4x12s, with the mic knob moving through real mic placements.
-- **Brighter cleans.** Glass Clean and Chime Top now have the top end of a real Twin and AC15.
+- **Brighter cleans.** Glass Clean and Chime Top have the sparkle of the real amps they are modelled on.
 - **Setup that just works on USB guitar cables.** It picks the mode that hears your guitar best, the same way every time.
+- **Real amp captures for the heavier tones.** The four high-gain amps now play neural captures of real high-gain amps, through four new cabinets recorded from real 4x12s.
 - **Tell us what to fix.** A Feedback button at the top sends a note straight to the people who make Riffhouse.
 
 ![Chords and tabs, read from your chair](docs/screenshots/chords.png)
