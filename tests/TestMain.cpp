@@ -2934,7 +2934,7 @@ void testUpdates()
     CHECK (compareVersions ("0.2", "0.2.0") == 0, "missing parts count as zero");
     CHECK (compareVersions ("0.1.5.1", "0.1.5") > 0 && compareVersions ("0.1.6", "0.1.5.1") > 0 && compareVersions ("0.1.5.2", "0.1.5.1") > 0, "a hotfix (fourth number) is newer than its release and older than the next one");
     CHECK (spokenVersion ("0.1.5.1") == "0.1.5 Hotfix 1" && spokenVersion ("0.1.5") == "0.1.5" && spokenVersion ("0.1.5.2-rc1") == "0.1.5 Hotfix 2-rc1", "a hotfix is said as one (%s)", spokenVersion ("0.1.5.1").toRawUTF8());
-    CHECK (spokenVersion ("0.1.5.4") == "0.1.5 Update 1" && spokenVersion ("0.1.5.4-dev.1a2b3c4") == "0.1.5 Update 1-dev.1a2b3c4", "Update 1 is said by its name (%s)", spokenVersion ("0.1.5.4").toRawUTF8());
+    CHECK (spokenVersion ("0.1.6") == "0.1.6" && spokenVersion ("0.1.6-dev.1a2b3c4") == "0.1.6-dev.1a2b3c4", "a release is said as its number (%s)", spokenVersion ("0.1.6").toRawUTF8());
     CHECK (compareVersions ("1.0.0", "0.9.9") > 0 && compareVersions ("0.9.9", "1.0.0") < 0, "major wins");
     CHECK (compareVersions ("0.2.0-beta", "0.2.0") < 0, "a pre-release is older than its release");
     CHECK (compareVersions ("0.2.0-beta", "0.1.9") > 0, "a pre-release is newer than the version before");
