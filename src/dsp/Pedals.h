@@ -293,6 +293,7 @@ private:
     OnePole lp1[kBands - 1], lp2[kBands - 1];
     float env[kBands] {}, pwr[kBands] {}, gain[kBands] {}, subSum[kBands] {}, ring[kBands][kSubs] {};
     double ringTotal[kSubs] {}, subTotal = 0.0, latchedDb = -200.0; int latchHold = 0; // power of all bands over each 250 ms window
+    float floorOf[kBands] {}; // each band's floor, refreshed every 250 ms
     float pAtt = 0.0f, pRel = 0.0f, gAtt = 0.0f, gRel = 0.0f;
     int hopLen = 240, hopFill = 0, subHops = 50, subFill = 0, ringAt = 0, heard = 0;
 };
