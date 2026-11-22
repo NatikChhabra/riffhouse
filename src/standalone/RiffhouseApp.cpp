@@ -228,7 +228,8 @@ public:
             juce::Timer::callAfterDelay (20000, [this]
             {
                 auto& s = *properties.getUserSettings();
-                if (reports::canSend() && ! s.getBoolValue ("helloAsked", false))
+                // a test machine is never counted, so it is never asked: the question is a modal window, and a modal window ignores a close request
+                if (reports::canSend() && ! reports::onTestMachine() && ! s.getBoolValue ("helloAsked", false))
                 {
                     s.setValue ("helloAsked", true); // asked once, whatever the answer
                     s.saveIfNeeded();
