@@ -8,6 +8,9 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+- Settings has an update channel: **Stable** (tested releases only, the default) or **Beta** (test builds a few days early, rough edges possible). It replaces the old "get new versions early" switch, and anyone who had that on is on Beta. Switching to Stable never downgrades: a newer Beta stays until Stable catches up.
+- Settings has one quiet link to the Riffhouse page on GitHub, for anyone who wants to star it.
+
 ## 0.1.6 (Update 1)
 
 Update 1. The high-gain amps were rebuilt after a player told us the metal tones sounded like a fuzz pedal. They did, and the numbers showed it.

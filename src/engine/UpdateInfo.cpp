@@ -64,6 +64,16 @@ CheckAnswer readCheckAnswer (int httpStatus, const juce::String& body)
     return CheckAnswer::unreachable;
 }
 
+Channel channelFromSetting (const juce::String& saved, bool legacyEarly, const juce::String& currentVersion)
+{
+    if (saved == "beta") return Channel::beta;
+    if (saved == "stable") return Channel::stable;
+    return legacyEarly || isPreRelease (currentVersion) ? Channel::beta : Channel::stable;
+}
+
+juce::String channelKey (Channel c)  { return c == Channel::beta ? "beta" : "stable"; }
+juce::String channelName (Channel c) { return c == Channel::beta ? "Beta" : "Stable"; }
+
 bool isTrustedDownloadUrl (const juce::String& url)
 {
     return url.startsWithIgnoreCase ("https://github.com/NatikChhabra/riffhouse/releases/download/")
