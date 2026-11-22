@@ -70,6 +70,8 @@ void Rig::prepare (double sampleRate, int block)
     input.prepare (sr);
     probe.prepare (sr);
     gate.prepare (sr);
+    reducer.prepare (sr);
+    feedback.prepare (sr);
     gate.seedFloor (gateSeedDb);
     comp.prepare (sr);
     wah.prepare (sr);
@@ -146,7 +148,7 @@ void Rig::prepare (double sampleRate, int block)
 
 void Rig::reset()
 {
-    input.reset(); gate.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
+    input.reset(); gate.reset(); reducer.reset(); feedback.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
     eq.reset(); mod.reset(); modOld.reset(); modXfade = 0; lofi.reset(); doubler.reset(); limiter.reset();
     for (Delay* d : { &delayA, &delayB }) d->reset();
     for (Reverb* r : { &reverbA, &reverbB }) r->reset();
@@ -251,6 +253,7 @@ void Rig::applyParams (const ParamValues& v, bool toneChange)
     input.set (choice (p, P::humFilter), on (p, P::inputFix), get (P::inputFixAmt));
     if (changed (P::gateThresh) || changed (P::gateRelease)) gate.set (get (P::gateThresh), get (P::gateRelease));
     gate.setAuto (choice (p, P::gateAuto) == 1);
+    reducer.set (on (p, P::gateOn) ? get (P::gateReduce) : 0.0f);
     comp.set (get (P::compSustain), get (P::compAttack), get (P::compLevel), get (P::compBlend));
     wah.set (choice (p, P::wahMode), get (P::wahPos), get (P::wahSens), get (P::wahQ));
     pitch.set (choice (p, P::pitchMode), get (P::pitchSemis), get (P::pitchMix));
@@ -391,6 +394,8 @@ void Rig::processMono (float* x, int n)
                 x[i] = dry[(size_t) i] * g;
             }
     }
+    reducer.process (x, n);
+    if (on (p, P::gateOn)) feedback.process (x, n);
     if (fComp.idle()) comp.listen (x, n);
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });
     runFaded (fWah, x, n, dry, [&] (float* b, int k) { wah.process (b, k); });

@@ -269,6 +269,60 @@ private:
     bool open = false, stopping = false;
 };
 
+// Noise reducer: the gate shuts the door between notes, this one also quiets the hiss that rides along
+// while you play. The guitar is split into seven bands (250 Hz to 8 kHz, bands that add back to exactly
+// the input). Each band keeps its own idea of its hiss: the quietest level it reached in the last two
+// seconds. A band that is only hiss right now (above the note's harmonics) is turned down, a band with
+// playing in it is left alone, so a high-gain amp has no hiss to fatten. Nothing is delayed.
+class NoiseReducer
+{
+public:
+    static constexpr int kBands = 7;
+    void prepare (double sampleRate);
+    void reset();
+    void set (float amount); // 0..10 knob; 0 is off, 10 takes up to 60 dB off a band of pure hiss
+    void process (float* x, int n);
+    bool active() const noexcept { return maxCutDb > 0.01f; }
+
+private:
+    static constexpr int kSubs = 8; // 8 sub windows of 250 ms: the floor is the quietest of the last two seconds
+    double sr = 48000.0;
+    float maxCutDb = 0.0f;
+    OnePole lp1[kBands - 1], lp2[kBands - 1];
+    float env[kBands] {}, pwr[kBands] {}, gain[kBands] {}, subMin[kBands] {}, ring[kBands][kSubs] {};
+    float pAtt = 0.0f, pRel = 0.0f, gAtt = 0.0f, gRel = 0.0f;
+    int hopLen = 240, hopFill = 0, subHops = 50, subFill = 0, ringAt = 0, heard = 0;
+};
+
+// Feedback killer: a guitar near its amp can start to howl, one pure tone that only ever grows.
+// It watches every narrow peak in the sound (2048-point looks every 11 ms). A peak that
+// stands 18 dB over its surroundings and climbs at least 12 dB over about 300 ms, smoothly, with the rest of
+// the sound hardly rising is a howl: a played note starts at its loudest and fades, a swell lifts
+// every harmonic together. The howl gets a narrow notch that deepens while it keeps growing
+// (up to 30 dB), three at most, and lets go a second and a half after the tone is gone.
+class FeedbackKiller
+{
+public:
+    static constexpr int kMaxNotches = 3;
+    void prepare (double sampleRate);
+    void reset();
+    void process (float* x, int n);
+    int notching() const noexcept { int c = 0; for (auto& nt : notch) if (nt.depth > 0.05f) ++c; return c; }
+
+private:
+    static constexpr int kOrder = 11, kSize = 1 << kOrder, kBins = kSize / 2 + 1, kHop = 512, kHist = 28;
+    void look();
+    struct Notch { Biquad bq; float hz = 0.0f, depth = 0.0f, target = 0.0f, level = -200.0f; int quiet = 0; };
+    double sr = 48000.0;
+    std::unique_ptr<juce::dsp::FFT> fft;
+    std::vector<float> window, ring, frame;
+    int ringAt = 0, hopFill = 0;
+    std::vector<float> binDb;  // kHist looks of every bin's level, dB
+    float totalDb[kHist] {};   // total level of each look, dB
+    int histAt = 0, histCount = 0;
+    Notch notch[kMaxNotches];
+};
+
 class Compressor
 {
 public:
@@ -329,10 +383,21 @@ private:
     OnePole trackLp, subLp1, subLp2, upHp;
     EnvelopeFollower subEnv;
     float flip = 1.0f, lastSign = 0.0f;
-    // shifter
+    // shifter: one read head sliding through the last few periods, jumping back by whole periods
+    // of the note (found by autocorrelation) so each jump lands on the same part of the wave
     DelayLine line;
     float phase = 0.0f;
     int window = 1024;
+    void trackPeriod();
+    static constexpr int kDecHist = 1024;
+    int decFactor = 4, decCount = 0, trackCount = 0;
+    float decHist[kDecHist] {}, seg[kDecHist] {}, nsdf[kDecHist] {};
+    int decAt = 0;
+    OnePole decLp1, decLp2;
+    float period = 0.0f, periodConf = 0.0f; // samples at the host rate; 0 = no steady note (chords, noise)
+    int unvoiced = 0;
+    float headA = 0.0f, headB = 0.0f, fadeAt = 1.0f, fadeStep = 0.0f;
+    bool crossing = false, alignedJump = true;
 };
 
 class DrivePedal

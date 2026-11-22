@@ -116,6 +116,8 @@ private:
     InputConditioner input;
     TiltProbe probe;
     NoiseGate gate;
+    NoiseReducer reducer;
+    FeedbackKiller feedback;
     Compressor comp;
     Wah wah;
     PitchPedal pitch;
