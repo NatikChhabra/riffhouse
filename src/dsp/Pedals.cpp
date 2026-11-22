@@ -861,6 +861,7 @@ void NoiseReducer::reset()
     }
     hopFill = subFill = ringAt = heard = 0;
     subTotal = 0.0;
+    for (auto& f : floorOf) f = 1.0f;
     latchHold = 0;
     for (auto& v : ringTotal) v = 1.0e30; // nothing heard yet
 }
@@ -918,9 +919,7 @@ void NoiseReducer::process (float* x, int n, float gateFloorDb)
             const float pw = band[k] * band[k];
             pwr[k] = undenorm (pwr[k] + (pw - pwr[k]) * (pw > pwr[k] ? pAtt : pRel));
             env[k] = std::sqrt (pwr[k]);
-            float fl = 1.0f;
-            for (int s = 0; s < kSubs; ++s) fl = std::min (fl, ring[k][s]);
-            fl = std::max (fl, 1.0e-6f);
+            const float fl = floorOf[k];
             const float over = gainToDb (env[k] / fl);
             // the floor is the quietest 250 ms average of the last 2 s, so hiss sits a couple of dB over it:
             // 7 dB over or less is hiss alone; 15 dB or more is playing
@@ -939,6 +938,7 @@ void NoiseReducer::process (float* x, int n, float gateFloorDb)
                 subFill = 0;
                 for (int k = 0; k < kBands; ++k) { ring[k][ringAt] = subSum[k] / (float) subHops; subSum[k] = 0.0f; }
                 if (latchHold > 0) --latchHold;
+                for (int k = 0; k < kBands; ++k) { float m = 1.0f; for (int s = 0; s < kSubs; ++s) m = std::min (m, ring[k][s]); floorOf[k] = std::max (m, 1.0e-6f); }
                 ringTotal[ringAt] = subTotal / (double) subHops;
                 subTotal = 0.0;
                 ringAt = (ringAt + 1) % kSubs;
