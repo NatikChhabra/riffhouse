@@ -2914,6 +2914,11 @@ void testUpdates()
     CHECK (compareVersions ("0.1.0-rc2", "0.1.0") < 0 && compareVersions ("0.1.0-rc2", "0.1.0-rc2") == 0, "the release follows its last test build");
     CHECK (compareVersions ("0.1.0-dev.1a2b3c4", "0.1.0-rc1") < 0, "a build from source is older than a test build of that version");
     CHECK (isPreRelease ("0.1.0-rc1") && isPreRelease ("v0.2.0-dev.abc") && ! isPreRelease ("0.1.0") && ! isPreRelease ("0.1.0+build-7"), "telling a test build from a release");
+    CHECK (channelFromSetting ("", false, "0.1.6") == Channel::stable, "a fresh release copy follows Stable");
+    CHECK (channelFromSetting ("", true, "0.1.6") == Channel::beta, "the old early switch becomes Beta");
+    CHECK (channelFromSetting ("", false, "0.2.0-rc1") == Channel::beta, "a test build follows Beta until told otherwise");
+    CHECK (channelFromSetting ("stable", true, "0.2.0-rc1") == Channel::stable && channelFromSetting ("beta", false, "0.1.6") == Channel::beta, "a saved choice wins");
+    CHECK (channelKey (Channel::beta) == "beta" && channelName (Channel::stable) == "Stable", "channel names");
     {
         // someone on a test build is offered the next test build, then the release
         auto entry = [] (const char* tag, bool pre, bool draft, bool built = true)

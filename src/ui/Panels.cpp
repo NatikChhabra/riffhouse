@@ -668,6 +668,11 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     support.setTooltip ("Opens the website's support page. Everyone gets the same app; supporting is a thank-you, not a purchase.");
     support.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
     page.addAndMakeVisible (support);
+    // one quiet line, never a pop-up: a star is how other players find a free project
+    starLink.setFont (font (13.5f), false, juce::Justification::centredLeft);
+    starLink.setColour (juce::HyperlinkButton::textColourId, colours::textDim);
+    starLink.setTooltip ("Opens the Riffhouse page on GitHub. A star helps other players find a free project.");
+    page.addAndMakeVisible (starLink);
     problem.setTooltip ("Copies the report, with your user name and computer name taken out, and opens the public page where "
                         "problems are reported. Paste it there and say what went wrong. Nothing is sent by itself.");
     problem.onClick = [this]
@@ -734,14 +739,15 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
             hasUpdater = true;
             page.addAndMakeVisible (updateButton);
             page.addAndMakeVisible (autoUpdate);
-            page.addAndMakeVisible (earlyVersions);
             autoUpdate.setToggleState (up->automatic(), juce::dontSendNotification);
-            earlyVersions.setToggleState (up->early(), juce::dontSendNotification);
-            earlyVersions.onClick = [this]
+            channelRow = std::make_unique<ChipRow> (juce::StringArray { "Stable", "Beta" }, colours::accent, [this] (int i)
             {
                 if (auto* h = StandaloneHost::get())
-                    if (auto* u = h->updater()) u->setEarly (earlyVersions.getToggleState());
-            };
+                    if (auto* u = h->updater()) u->setChannel (i == 1 ? Channel::beta : Channel::stable);
+                page.repaint (earlyText);
+            });
+            channelRow->setSelected (up->channel() == Channel::beta ? 1 : 0);
+            page.addAndMakeVisible (*channelRow);
             autoUpdate.onClick = [this]
             {
                 if (auto* h = StandaloneHost::get())
@@ -1002,9 +1008,9 @@ void SettingsView::show (Section s)
     advanced.setVisible (standalone);
     updateButton.setVisible (hasUpdater);
     autoUpdate.setVisible (hasUpdater);
-    earlyVersions.setVisible (hasUpdater);
+    if (channelRow != nullptr) channelRow->setVisible (hasUpdater);
     for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get(), &teachControl, &teachJob,
-                                                             &footView, &lessMotion, &website, &problem, &report, &support })
+                                                             &footView, &lessMotion, &website, &problem, &report, &support, &starLink })
         c->setVisible (true);
     layoutPage();
     scroller.setViewPosition (0, s == sections().getFirst() ? 0 : sectionTop[(size_t) s] - 8);
@@ -1075,7 +1081,7 @@ void SettingsView::layoutPage()
     int y = 0;
     auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
     auto gap = [&] (int g) { y += g; };
-    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = earlyText = motionHead = countHead = countText = helpText = aboutHead = aboutArea = {};
+    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = channelHead = earlyText = motionHead = countHead = countText = helpText = aboutHead = aboutArea = {};
 
     // one page: every part under its own heading, one after another
     bool firstPart = true;
@@ -1144,10 +1150,13 @@ void SettingsView::layoutPage()
                 updateStatus = at (26);
                 gap (14);
                 autoUpdate.setBounds (at (30));
+                gap (22);
+                channelHead = at (22);
+                gap (6);
+                if (channelRow != nullptr) channelRow->setBounds (at (34).withWidth (std::min (col, channelRow->preferredWidth())));
                 gap (8);
-                earlyVersions.setBounds (at (30));
-                earlyText = at (22).withTrimmedLeft (44);
-                gap (16);
+                earlyText = at (58);
+                gap (18);
                 updateButton.setBounds (at (40).withWidth (250));
                 gap (40);
             }
@@ -1184,7 +1193,12 @@ void SettingsView::layoutPage()
             gap (10);
             aboutArea = at (130);
             gap (4);
-            support.setBounds (at (42).withWidth (200));
+            {
+                auto row = at (42);
+                support.setBounds (row.removeFromLeft (200));
+                row.removeFromLeft (16);
+                starLink.setBounds (row.withWidth (std::min (row.getWidth(), 220)));
+            }
             break;
         }
     }
@@ -1403,7 +1417,13 @@ void SettingsView::paintPage (juce::Graphics& g)
                 g.setColour (colours::text);
                 g.setFont (font (16.0f, Weight::medium));
                 g.drawText (lastUpdateText, updateStatus, juce::Justification::centredLeft);
-                small ("Test versions come out a few days before everyone gets them. They can have rough edges.", earlyText, 1);
+                g.setColour (colours::text);
+                g.setFont (font (14.0f, Weight::medium));
+                g.drawText ("Update channel", channelHead, juce::Justification::centredLeft);
+                const bool beta = channelRow != nullptr && channelRow->getSelected() == 1;
+                small (beta ? "Beta gets test builds a few days before Stable, so they can have rough edges. Tell us what you find in "
+                              "the Discord #beta-feedback channel. Switching back to Stable never removes a newer build; it waits for Stable to catch up."
+                            : "Stable gets tested releases only. Switch to Beta to try new versions a few days early.", earlyText, 3);
             }
             subhead ("Motion", motionHead);
             if (weeklyHello.isVisible())
