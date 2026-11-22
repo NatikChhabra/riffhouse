@@ -8,6 +8,8 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+- Tone names no longer name any artist, band or song. The 107 tones that did are now named for the sound they make (for example "Dark Singing Lead", "Fast Dry Thrash Rhythm") and sit with the other tones by genre. Nothing about how they sound changed. The "Inspired By" list is gone from the tone browser and the website. A tone you had marked as a favourite under its old name needs marking again.
+
 ## 0.1.6 (Update 1)
 
 Update 1. The high-gain amps were rebuilt after a player told us the metal tones sounded like a fuzz pedal. They did, and the numbers showed it.

@@ -211,7 +211,7 @@ bool presetFromShareCode (const juce::String& text, Preset& out, juce::String& e
 juce::String presetToShareMessage (const Preset& p)
 {
     const auto name = p.name.trim().isNotEmpty() ? p.name.trim() : juce::String ("My tone");
-    // a tone named after an artist says it is a style; the line goes above the code so nothing
+    // tones from older versions can still carry an artist's name: the line goes above the code so nothing
     // typed after the code can run into it
     const bool artist = p.artist().isNotEmpty() || name.startsWithIgnoreCase ("Inspired by ");
     return name + ", a guitar tone made in Riffhouse, the free amp app: https://riffhouse.in/\n"
@@ -265,7 +265,6 @@ std::vector<int> PresetLibrary::search (const juce::String& query, const juce::S
         if (category.isNotEmpty() && category != "All")
         {
             if (category == "Favourites") { if (! p.favourite) continue; }
-            else if (category == "Inspired By") { if (p.inspiredBy.isEmpty()) continue; }
             else if (p.category != category && ! p.genres.contains (category)) continue;
         }
         const auto text = p.searchText();

@@ -56,7 +56,7 @@
     try { tones = await (await fetch('tones.json')).json(); } catch { return; }
     const list = $('[data-list]', root), cats = $('[data-cats]', root), line = $('[data-count-line]', root);
     const search = $('[data-search]', root), chain = $('[data-chain]', root);
-    const kinds = ['All', 'Inspired By', 'Essentials', 'Clean', 'Crunch', 'Rock', 'Blues', 'Metal', 'Lead', 'Funk', 'Ambient', 'Lo-Fi', 'Bass'];
+    const kinds = ['All', 'Essentials', 'Clean', 'Crunch', 'Rock', 'Blues', 'Metal', 'Lead', 'Funk', 'Ambient', 'Lo-Fi', 'Bass'];
     let kind = 'All', current = tones.find((t) => t.n === 'First Light Clean') || tones[0];
 
     const show = (t, fresh) => {
@@ -111,7 +111,7 @@
     more.addEventListener('click', () => { all = !all; draw(); if (!all) root.scrollIntoView({ block: 'nearest' }); });
 
     cats.replaceChildren(...kinds.map((k) => {
-      const b = el('button', { type: 'button', textContent: k === 'Inspired By' ? 'Inspired by' : k });
+      const b = el('button', { type: 'button', textContent: k });
       b.setAttribute('aria-pressed', k === kind);
       b.addEventListener('click', () => {
         kind = k;

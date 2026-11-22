@@ -11,7 +11,7 @@ public:
 
     void update()
     {
-        static const char* order[] = { "All", "Favourites", "Inspired By", "Essentials", "Clean", "Crunch", "Rock", "Blues",
+        static const char* order[] = { "All", "Favourites", "Essentials", "Clean", "Crunch", "Rock", "Blues",
                                         "Metal", "Lead", "Funk", "Ambient", "Lo-Fi", "Bass" };
         items.clear();
         for (auto* o : order) items.add (o);
@@ -143,19 +143,7 @@ void PresetBrowser::show (const juce::String& group, const juce::String& words)
 void PresetBrowser::refreshList()
 {
     results = proc.presets().search (search.getText(), category);
-    if (category == "Inspired By")
-    {
-        const auto& all = proc.presets().all();
-        // by band, then by title: everything made after one band stands together
-        std::stable_sort (results.begin(), results.end(), [&] (int a, int b)
-                          {
-                              const auto& x = all[(size_t) a];
-                              const auto& y = all[(size_t) b];
-                              const int byArtist = x.artist().compareNatural (y.artist());
-                              return byArtist != 0 ? byArtist < 0 : x.title().compareNatural (y.title()) < 0;
-                          });
-    }
-    else if (search.getText().trim().isNotEmpty())
+    if (search.getText().trim().isNotEmpty())
     {
         // words typed: the tones made after a song come first, since a song is what people type
         const auto& all = proc.presets().all();
@@ -225,9 +213,7 @@ void PresetBrowser::paint (juce::Graphics& g)
     g.setFont (font (13.5f));
     g.setColour (colours::textDim);
     // the tones named after artists say plainly what they are: a style, not the artist's own
-    const juce::String hint = category == "Inspired By"
-                                  ? ". Styles only. These tones are not made with or endorsed by the artists named."
-                                  : ". Click to try it while you play, double-click to close.";
+    const juce::String hint = ". Click to try it while you play, double-click to close.";
     g.drawFittedText (juce::String ((int) results.size()) + (results.size() == 1 ? " tone" : " tones") + hint,
                       bottom.withTrimmedRight (paste.getWidth() + copy.getWidth() + folder.getWidth() + 36),
                       juce::Justification::centredLeft, 2, 0.9f);

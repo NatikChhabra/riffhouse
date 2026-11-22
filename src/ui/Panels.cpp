@@ -1427,9 +1427,8 @@ void SettingsView::paintPage (juce::Graphics& g)
             about.setLineSpacing (4.0f);
             about.setWordWrap (juce::AttributedString::byWord);
             about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
-                          "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
-                          "any artist, band or equipment maker, and all trademarks belong to their owners. If you are an artist named in a "
-                          "tone and want it changed or removed, open an issue and it will be done. ASIO and VST are trademarks of "
+                          "Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker, "
+                          "and all trademarks belong to their owners. ASIO and VST are trademarks of "
                           "Steinberg Media Technologies GmbH. Riffhouse comes with absolutely no warranty. "
                           "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Modern High Gain and "
                           "Tight Metal play amp captures by Helga Behrens, Brit 81 one by Tim Robertson, Redline Lead one by Phillipe Priss, from the NAM_models collection (GPL v3). Real cabinets: Jester's Brutal "

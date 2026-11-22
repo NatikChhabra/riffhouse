@@ -610,7 +610,7 @@ int main (int argc, char** argv)
                 riff.x.assign (b.getReadPointer (0), b.getReadPointer (0) + b.getNumSamples());
                 sr = rd->sampleRate;
             }
-            const juce::String name = juce::String (argv[2]) == "rig" ? juce::String ("Inspired by Metallica: Master of Puppets") : juce::String (argv[2]);
+            const juce::String name = juce::String (argv[2]) == "rig" ? juce::String ("Fast Dry Thrash Rhythm") : juce::String (argv[2]);
             PresetLibrary lib; lib.scanFolder (juce::File (RIFFHOUSE_PRESET_DIR), true);
             if (lib.indexOf (name) < 0) { std::printf ("no preset %s\n", name.toRawUTF8()); return 1; }
             auto v = lib.all()[(size_t) lib.indexOf (name)].values;
@@ -642,7 +642,7 @@ int main (int argc, char** argv)
         return 0;
     }
     if (argc > 1 && juce::String (argv[1]) == "--gate")
-        return gateLab (argc > 2 && ! juce::String (argv[2]).startsWith ("--") ? juce::String (argv[2]) : juce::String ("Inspired by Metallica: Master of Puppets"), wavDir);
+        return gateLab (argc > 2 && ! juce::String (argv[2]).startsWith ("--") ? juce::String (argv[2]) : juce::String ("Fast Dry Thrash Rhythm"), wavDir);
     if (argc > 1 && juce::String (argv[1]) == "--cpu")
     {
         const auto g = playedGuitar (kSr, 10.0, 0.25f, true);

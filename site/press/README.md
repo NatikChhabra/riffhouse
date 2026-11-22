@@ -33,4 +33,4 @@ Two lines: Riffhouse is a free guitar amp and pedalboard for Windows, standalone
 
 Colours: cream #efe2bf, frame #171615, cloth #86693a, lamp #f08a1c, page #0b0b0b.
 
-Please don't name Riffhouse tones after real artists or brands in titles or thumbnails; the app's tones are "inspired by" styles, not copies.
+Please don't name Riffhouse tones after real artists or brands in titles or thumbnails; tones are named for sounds, never for people.

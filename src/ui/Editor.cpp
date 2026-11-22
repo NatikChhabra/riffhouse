@@ -99,21 +99,12 @@ public:
             modified = m;
             index = idx;
             sub = {};
-            // "Inspired by <artist>: <title>" shows the title here and the artist on the line under it
             title = n;
-            if (n.startsWith ("Inspired by ") && n.contains (": "))
-            {
-                title = n.fromFirstOccurrenceOf (": ", false, false);
-                sub = n.upToFirstOccurrenceOf (": ", false, false);
-            }
             if (idx >= 0)
             {
                 const auto& pr = proc.presets().all()[(size_t) idx];
-                // under the title: who it is after, with the band when the tone is named after a player
-                if (pr.inspiredBy.isNotEmpty())
-                    sub = "Inspired by " + pr.inspiredBy + (pr.band.isNotEmpty() && pr.band != pr.inspiredBy ? " (" + pr.band + ")" : juce::String());
-                else if (sub.isEmpty())
-                    sub = pr.category;
+                // under the title: the category, then the genres
+                sub = pr.category;
                 if (! pr.genres.isEmpty()) sub << ", " << pr.genres.joinIntoString (", ").toLowerCase();
             }
             else if (sub.isEmpty())
@@ -1961,10 +1952,8 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     }
     r.toggleOverlay (r.browser);
     shoot ("browser");
-    r.browser.show ("Inspired By", {});
-    shoot ("browser-inspired");
-    r.browser.show ("All", "metallica");
-    shoot ("browser-band");
+    r.browser.show ("Metal", {});
+    shoot ("browser-metal");
     r.browser.show ("All", {});
     r.closeOverlays();
     r.toggleOverlay (r.tuner);
