@@ -25,7 +25,7 @@ void send (juce::PropertiesFile&, const juce::String& title, const juce::String&
 // "--report-check" run that proves a release build reaches the relay; not limited per day.
 juce::String sendNow (const juce::String& title, const juce::String& body);
 
-// The weekly hello: on unless the player switches it off in Settings. Once a week at most it
+// The weekly hello: off until the player says yes on the first run, and changeable in Settings. Once a week at most it
 // sends the week, a random install id and the app version, and nothing else.
 bool helloOn (juce::PropertiesFile&);
 void setHelloOn (juce::PropertiesFile&, bool);

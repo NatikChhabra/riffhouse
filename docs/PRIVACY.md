@@ -2,9 +2,9 @@
 
 Riffhouse is free and has no accounts, no ads and no tracking. Three things can leave your PC, and this page lists all of them, plus what the website collects.
 
-## The weekly player count (on unless you switch it off)
+## The weekly player count (only if you say yes)
 
-Once a week, about 20 seconds after Riffhouse opens, it sends:
+The first time Riffhouse runs it asks once: "Help count Riffhouse players?" If you say yes, once a week, about 20 seconds after Riffhouse opens, it sends:
 
 - the week, like `2026-W46`
 - a random number made on your PC the first time, like `3f9a0c...` (32 letters and digits). It comes from random numbers only, never from your name, your PC, your sound card or anything else about you
@@ -14,7 +14,7 @@ That is all. It goes to a small script on Google Apps Script that adds one row t
 
 It tells us how many people play each week and how many come back, so we know whether Riffhouse is getting better and what to fix first.
 
-**To switch it off:** Settings, Player count, untick "Count me in the weekly number of players". Nothing is sent after that.
+**To change your answer:** Settings, Player count, tick or untick "Count me in the weekly number of players". Nothing is sent while it is unticked.
 
 ## Checking for updates
 
@@ -36,6 +36,6 @@ If you leave your email address on the [updates page](https://riffhouse.in/updat
 
 If you answer it, it sends the reason you picked, the short note you typed (if any, up to 300 letters) and the app version. Nothing else, and nothing that says who you are. Please don't put personal details in the note.
 
-## Questions
+## Your data, and who to ask
 
-Open an issue: https://github.com/NatikChhabra/riffhouse/issues
+The random number is the only thing that could point back to one install. To have it deleted, an email address removed, or to ask what is held, write to Natik Chhabra, the maker, at natikchhabra22may@gmail.com or open an issue at https://github.com/NatikChhabra/riffhouse/issues. Replies come within 7 days. The full terms, cookie note and credits are on https://riffhouse.in/legal.html.

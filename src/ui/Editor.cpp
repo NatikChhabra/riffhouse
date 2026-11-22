@@ -1954,6 +1954,8 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     shoot ("browser");
     r.browser.show ("Metal", {});
     shoot ("browser-metal");
+    r.browser.show ("Blues", {});
+    shoot ("browser-blues");
     r.browser.show ("All", {});
     r.closeOverlays();
     r.toggleOverlay (r.tuner);
