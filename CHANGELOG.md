@@ -8,6 +8,8 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+- Tone names no longer name any artist, band or song. The 107 tones that did are now named for the sound they make (for example "Dark Singing Lead", "Fast Dry Thrash Rhythm") and sit with the other tones by genre. Nothing about how they sound changed. The "Inspired By" list is gone from the tone browser and the website. A tone you had marked as a favourite under its old name needs marking again.
+- The weekly player count is now off until you say yes. Riffhouse asks once on first run; Settings, Player count changes your answer any time. Terms, privacy and credits are on riffhouse.in/legal.html and the installer shows a short notice first.
 - Settings has an update channel: **Stable** (tested releases only, the default) or **Beta** (test builds a few days early, rough edges possible). It replaces the old "get new versions early" switch, and anyone who had that on is on Beta. Switching to Stable never downgrades: a newer Beta stays until Stable catches up.
 - Settings has one quiet link to the Riffhouse page on GitHub, for anyone who wants to star it.
 

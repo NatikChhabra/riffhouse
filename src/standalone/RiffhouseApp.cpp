@@ -223,18 +223,30 @@ public:
                 if (reports::canSend()) offerReport (what);
                 else if (auto* ed = editor()) ed->showToast (what + " Settings, Save a report tells us why.");
             });
-        // the weekly count, on unless switched off in Settings; said once so nobody is counted unknowingly
+        // the weekly count is off until the player says yes, asked once in plain words; Settings changes the answer any time
         if (! picturesOnly (commandLine))
             juce::Timer::callAfterDelay (20000, [this]
             {
                 auto& s = *properties.getUserSettings();
-                if (reports::canSend() && reports::helloOn (s) && ! s.getBoolValue ("helloExplained", false))
-                    if (auto* ed = editor())
-                    {
-                        ed->showToast ("Riffhouse counts players once a week: a random number, nothing about you. Settings, Player count turns it off.");
-                        s.setValue ("helloExplained", true);
-                        s.saveIfNeeded();
-                    }
+                if (reports::canSend() && ! s.getBoolValue ("helloAsked", false))
+                {
+                    s.setValue ("helloAsked", true); // asked once, whatever the answer
+                    s.saveIfNeeded();
+                    juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                                      .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                                                      .withTitle ("Help count Riffhouse players?")
+                                                      .withMessage ("Once a week it sends a random number and the app version, nothing about you. "
+                                                                    "You can change this any time in Settings, Player count.")
+                                                      .withButton ("Yes, count me")
+                                                      .withButton ("No thanks"),
+                                                  [this] (int result)
+                                                  {
+                                                      auto& st = *properties.getUserSettings();
+                                                      reports::setHelloOn (st, result == 1);
+                                                      if (result == 1) reports::sayHelloIfDue (st, versionLabel());
+                                                  });
+                    return;
+                }
                 reports::sayHelloIfDue (s, versionLabel());
             });
 

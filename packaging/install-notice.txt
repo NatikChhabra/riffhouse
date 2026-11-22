@@ -1,0 +1,25 @@
+Riffhouse is free software.
+
+You may use, copy, change and share it under the GNU Affero General Public
+License, version 3 or later. The full licence, and the licence of every part
+built into Riffhouse, is in Licences.txt in the folder it installs to. The
+source code is at https://github.com/NatikChhabra/riffhouse
+
+No warranty. Riffhouse comes as it is, with no promise that it works for you
+or fits any purpose, and its maker is not liable for damage from using it,
+as the licence says in sections 15 and 16.
+
+Not affiliated. Riffhouse has no tie to any artist, band, amp or pedal maker,
+or to Steinberg (VST and ASIO are Steinberg trademarks). Every name belongs to
+its owner.
+
+Protect your ears. A guitar through headphones can be very loud. Start with
+the volume low and turn it up slowly.
+
+Your privacy. Riffhouse has no account and no ads. Once a week it can send a
+random number and the app version so the maker can count players; you can
+switch that off in Settings. It checks GitHub for updates, and sends a problem
+report only when you press the button. Everything it sends is listed at
+https://riffhouse.in/legal.html#privacy
+
+Questions or data requests: https://riffhouse.in/legal.html#contact

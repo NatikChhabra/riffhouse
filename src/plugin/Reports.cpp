@@ -188,8 +188,8 @@ juce::String sendNow (const juce::String& title, const juce::String& body)
     return post (juce::JSON::toString (juce::var (o), true));
 }
 
-// On unless the player switched it off (Natik, 12 Nov 2026): players who never open setup are counted too.
-bool helloOn (juce::PropertiesFile& s) { return s.getBoolValue ("weeklyHello", true); }
+// Off until the player says yes on the first run (asked once, in plain words, so the consent is real).
+bool helloOn (juce::PropertiesFile& s) { return s.getBoolValue ("weeklyHello", false); }
 void setHelloOn (juce::PropertiesFile& s, bool on) { s.setValue ("weeklyHello", on); s.saveIfNeeded(); }
 
 juce::String weekOf (juce::Time t)
