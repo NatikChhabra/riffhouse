@@ -1829,17 +1829,6 @@ void testPresets (double sr)
                    "code wrapped over two lines: %s", e2.toRawUTF8());
             CHECK (presetFromShareCode (code + " sounds sick right", trailing, e3), "code with words after it: %s", e3.toRawUTF8());
             CHECK (! presetFromShareCode ("visit riffhouse: nothing here", fake, e4) && e4.isNotEmpty(), "junk after the tag must fail");
-            // a tone named after an artist carries the style line, and still pastes back
-            // (whichever tone the folder lists first, so both cases are built here)
-            auto plain = p;
-            plain.name = "My Clean Tone"; plain.band = {}; plain.inspiredBy = {};
-            auto named = plain;
-            named.name = "Inspired by Someone: A Song";
-            const auto namedMessage = presetToShareMessage (named);
-            Preset viaNamed; juce::String e5;
-            CHECK (namedMessage.contains ("Not affiliated with the artist.") && ! presetToShareMessage (plain).contains ("Not affiliated")
-                       && presetFromShareCode (namedMessage, viaNamed, e5) && viaNamed.name == named.name,
-                   "artist share message: %s", e5.toRawUTF8());
         }
     }
     if (! levels.empty())
@@ -3029,57 +3018,38 @@ int renderAll (const juce::File& dir, double sr)
     }
     return 0;
 }
-// A tone made after someone says whose sound it is: the band in front, then the title, and it is found by band and by song.
+// Factory tone names describe a sound. None of them names an artist, a band or a song.
 void testToneNames()
 {
     std::printf ("tone names\n");
     Preset p; juce::String err;
-    CHECK (presetFromJson (R"({"name":"Inspired by James Hetfield: Downpicked Thrash","category":"Inspired By","inspiredBy":"James Hetfield","band":"Metallica","description":"Tight."})", p, err), "a tone with a band is read");
-    CHECK (p.artist() == "Metallica" && p.title() == "Downpicked Thrash", "the band stands in front, the title follows: '%s' '%s'", p.artist().toRawUTF8(), p.title().toRawUTF8());
-    CHECK (p.credit() == "Inspired by James Hetfield. ", "the player is named under it: '%s'", p.credit().toRawUTF8());
-    CHECK (p.searchText().contains ("metallica") && p.searchText().contains ("hetfield"), "found by band and by player");
-    Preset back;
-    CHECK (presetFromJson (presetToJson (p), back, err) && back.band == "Metallica" && back.song.isEmpty(), "the band survives saving");
-
-    CHECK (presetFromJson (R"({"name":"Inspired by Metallica: Master of Puppets Interlude","category":"Inspired By","inspiredBy":"Metallica","band":"Metallica","song":"Master of Puppets"})", p, err), "a tone after a song is read");
-    CHECK (p.artist() == "Metallica" && p.title() == "Master of Puppets Interlude" && p.credit().isEmpty(), "a song tone needs no second credit: '%s'", p.credit().toRawUTF8());
-    CHECK (p.searchText().contains ("master of puppets"), "found by song");
-    CHECK (p.part() == "Interlude", "the part of the song it is for: '%s'", p.part().toRawUTF8());
-    CHECK (presetFromJson (presetToJson (p), back, err) && back.song == "Master of Puppets", "the song survives saving");
     // amps renamed in 0.1.5 still load from tones saved or shared before
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Hot Rod Lead"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::hotRodLead, "an old Hot Rod Lead tone loads as the Redline Lead");
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"brit plexi"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::britPlexi, "an old Brit Plexi tone loads as the Brit 68");
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Brit 800"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::brit800, "an old Brit 800 tone loads as the Brit 81");
-
-    CHECK (presetFromJson (R"({"name":"Inspired by David Gilmour: Comfortably Lead","category":"Inspired By","inspiredBy":"David Gilmour","band":"Pink Floyd","song":"Comfortably Numb"})", p, err), "a player tone after a song is read");
-    CHECK (p.credit() == juce::String (juce::CharPointer_UTF8 ("Inspired by David Gilmour on \xe2\x80\x9c" "Comfortably Numb\xe2\x80\x9d. ")), "player and song: '%s'", p.credit().toRawUTF8());
-    CHECK (p.part() == "Comfortably Lead", "a title that is not the song is left whole");
-    CHECK (presetFromJson (R"({"name":"Inspired by B.B. King: Thrill Lead","category":"Inspired By","inspiredBy":"B.B. King","song":"The Thrill Is Gone"})", p, err), "a solo artist's song tone is read");
-    CHECK (p.artist() == "B.B. King" && p.credit() == juce::String (juce::CharPointer_UTF8 ("After \xe2\x80\x9cThe Thrill Is Gone\xe2\x80\x9d. ")), "no band: the player stands in front and the song is named: '%s'", p.credit().toRawUTF8());
     CHECK (presetFromJson (R"({"name":"Warm Crunch","category":"Essentials"})", p, err) && p.artist().isEmpty() && p.title() == "Warm Crunch" && p.credit().isEmpty(), "a plain tone is only its name");
     CHECK (presetFromJson (R"({"name":"My take: louder","category":"User"})", p, err) && p.title() == "My take: louder", "a colon in your own tone's name is left alone");
 
     PresetLibrary lib;
     lib.scanFolder (presetFolder(), true);
+    // no real person, band or song in what we ship: a tone like that is a legal risk, not a feature
+    static const char* banned[] = { "inspired by", "metallica", "hendrix", "clapton", "van halen", "slash", "gilmour", "pink floyd", "nirvana", "cobain",
+                                    "hetfield", "hammett", "mayer", "iron maiden", "guns n", "def leppard", "dream theater", "led zeppelin", "zeppelin",
+                                    "black sabbath", "sabbath", "gojira", "muse", "radiohead", "slayer", "pantera", "ac/dc", "queen", "prince",
+                                    "santana", "knopfler", "stevie ray", "texas flood", "master of puppets", "teen spirit", "sweet child", "fear of the dark",
+                                    "crazy train", "paradise city", "woman tone", "brown sound" };
     for (const auto& q : lib.all())
     {
-        if (q.category != "Inspired By") continue;
-        CHECK (q.inspiredBy.isNotEmpty() && q.name.startsWith ("Inspired by " + q.inspiredBy + ": "), "%s says who it is after", q.name.toRawUTF8());
-        CHECK (q.title().isNotEmpty() && ! q.title().startsWith ("Inspired by"), "%s has a title of its own", q.name.toRawUTF8());
-        if (q.song.isNotEmpty() && q.inspiredBy == q.band)
-            CHECK (q.title().startsWith (q.song), "%s is named after its song", q.name.toRawUTF8());
+        if (! q.factory) continue;
+        const auto text = (q.name + " " + q.description + " " + q.genres.joinIntoString (" ")).toLowerCase();
+        CHECK (q.inspiredBy.isEmpty() && q.band.isEmpty() && q.song.isEmpty() && q.category != "Inspired By", "%s names no artist, band or song", q.name.toRawUTF8());
+        for (auto* word : banned)
+        {
+            const auto w = juce::String (word);
+            const bool whole = (" " + text + " ").replaceCharacters (".,'()-", "      ").contains (" " + w + " ");
+            CHECK (! whole, "%s must not say '%s'", q.name.toRawUTF8(), word);
+        }
     }
-    // what the first players asked for is found the way they would type it
-    auto found = [&] (const char* words) { return (int) lib.search (words, "All").size(); };
-    CHECK (found ("metallica") >= 5, "Metallica: %d tones", found ("metallica"));
-    CHECK (found ("master of puppets") == 2, "Master of Puppets: %d tones", found ("master of puppets"));
-    CHECK (found ("pour some sugar") == 1 && found ("def leppard") == 1, "Pour Some Sugar on Me");
-    CHECK (found ("fear of the dark") == 2 && found ("iron maiden") == 2, "Fear of the Dark");
-    CHECK (found ("wither") == 2 && found ("dream theater") == 2, "Wither");
-    CHECK (found ("sweet child") == 2 && found ("guns n' roses") >= 4, "Sweet Child O' Mine: %d, Guns N' Roses: %d", found ("sweet child"), found ("guns n' roses"));
-    CHECK (found ("nightmare") == 1 && found ("avenged sevenfold") >= 2, "Nightmare");
-    CHECK (found ("big fuzz") >= 2, "the Big Fuzz pedal: %d tones", found ("big fuzz"));
-    CHECK (found ("pink floyd comfortably numb") == 1, "a player's tone is found by band and song together");
 }
 
 void testUpdates()
@@ -3100,6 +3070,11 @@ void testUpdates()
     CHECK (compareVersions ("0.1.0-rc2", "0.1.0") < 0 && compareVersions ("0.1.0-rc2", "0.1.0-rc2") == 0, "the release follows its last test build");
     CHECK (compareVersions ("0.1.0-dev.1a2b3c4", "0.1.0-rc1") < 0, "a build from source is older than a test build of that version");
     CHECK (isPreRelease ("0.1.0-rc1") && isPreRelease ("v0.2.0-dev.abc") && ! isPreRelease ("0.1.0") && ! isPreRelease ("0.1.0+build-7"), "telling a test build from a release");
+    CHECK (channelFromSetting ("", false, "0.1.6") == Channel::stable, "a fresh release copy follows Stable");
+    CHECK (channelFromSetting ("", true, "0.1.6") == Channel::beta, "the old early switch becomes Beta");
+    CHECK (channelFromSetting ("", false, "0.2.0-rc1") == Channel::beta, "a test build follows Beta until told otherwise");
+    CHECK (channelFromSetting ("stable", true, "0.2.0-rc1") == Channel::stable && channelFromSetting ("beta", false, "0.1.6") == Channel::beta, "a saved choice wins");
+    CHECK (channelKey (Channel::beta) == "beta" && channelName (Channel::stable) == "Stable", "channel names");
     {
         // someone on a test build is offered the next test build, then the release
         auto entry = [] (const char* tag, bool pre, bool draft, bool built = true)

@@ -41,9 +41,9 @@ Yes. The installer adds a VST3 plugin of the same rig, for any DAW on Windows th
 
 Yes. Any .nam file loads as the amp and any impulse response as the cabinet. Drop the file on the window.
 
-### Are the artist tones official?
+### Do the tones copy a famous player?
 
-No. “Inspired by” names a style. Riffhouse has no tie to any artist, band or equipment maker.
+No. Tones are named for the sound they make, like “Dark Singing Lead” or “Fast Dry Thrash Rhythm”, never for a person, a band or a song. Riffhouse has no tie to any artist, band or equipment maker.
 
 ### Is there a Mac or Linux version?
 

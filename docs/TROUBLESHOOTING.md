@@ -123,6 +123,8 @@ See [Riffhouse in your recording software](DAW.md).
 
 Riffhouse checks for a new version when it starts, downloads it in the background, and installs it when you close the app. Settings shows the version you have, and **Check for updates** asks right away. Your tones and settings stay.
 
+Settings also has an **Update channel**. **Stable** is the default and only gets tested releases. **Beta** gets test builds (tagged like `0.2.0-beta1`) a few days before Stable, so they can have rough edges; report what you find in the Discord #beta-feedback channel. Switching back to Stable never removes a newer build: it stays until Stable catches up, and your tones and settings are not touched.
+
 ## Still stuck
 
 Open Settings and press **Send a report** (0.1.5 and later). It goes straight to the people who fix Riffhouse, privately, and needs no account. Your Windows user name, your computer's name, your user folder and any name inside a device name ("Asha's AirPods") are taken out before it leaves. At most three a day go from one computer.

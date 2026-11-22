@@ -64,7 +64,7 @@ Every amp, pedal and cabinet is its own piece of gear, with its own face and its
 - **11 amps**, from glassy cleans to tight metal, plus a bass amp and a direct channel.
 - **12 speaker cabinets**, three of them recordings of real 4x12s, each with a mic you can move across the cone, and a slot for your own impulse response.
 - **30 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
-- **197 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
+- **197 tones** sorted by genre and sound. Names describe the sound, never a person, a band or a song.
 - **Neural captures:** load any `.nam` file as the amp.
 - **Tuner** for any tuning, and a **metronome**.
 - **Undo and redo** for the whole tone, with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.
@@ -158,4 +158,4 @@ Riffhouse is made by [Natik Chhabra](https://github.com/NatikChhabra). It is fre
 
 It is built with [JUCE](https://juce.com) (AGPLv3), [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT) and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) (MIT), which slows the song down, and [LAME](https://lame.sourceforge.io) (LGPL 2.0), which writes the MP3 copies. The three "Real" cabinets are recordings from [Jester's Brutal Pack](https://jester-dyne-productions.com) by Jester Dyne Productions, dedicated to the public domain (CC0 1.0). Modern High Gain and Tight Metal play Neural Amp Modeler captures of real amps by Helga Behrens, Brit 81 one by Tim Robertson and Redline Lead one by Phillipe Priss, from the community [NAM_models](https://github.com/pelennor2170/NAM_models) collection (GNU GPL v3, see `tools/captures/`). Fonts: Instrument Sans, Inter, Doto, Big Shoulders, Kaushan Script and Alfa Slab One under the SIL Open Font License, and Yellowtail under the Apache License 2.0.
 
-Every amp and pedal in Riffhouse is an original design, and so is every cabinet except the three recorded "Real" ones. Tones named "Inspired by" describe a style. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.
+Every amp and pedal in Riffhouse is an original design, and so is every cabinet except the three recorded "Real" ones. Tone names describe a sound. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.

@@ -716,3 +716,14 @@ details:not([open]) > p { display: none; }
   .btn { border: 1px solid ButtonText; }
   .switch-tabs button[aria-selected="true"] { text-decoration: underline; }
 }
+
+/* Terms, privacy and credits */
+.legal-wrap { max-width: 46rem; margin-inline: auto; padding-block: clamp(48px, 8vw, 120px); }
+.legal h1 { margin-bottom: 0.4em; }
+.legal h2 { margin-top: 2.2em; margin-bottom: 0.5em; }
+.legal h3 { margin-top: 1.4em; margin-bottom: 0.3em; font-size: 1.05em; }
+.legal p, .legal li { line-height: 1.6; max-width: 40em; }
+.legal ul { padding-left: 1.2em; }
+.legal li { margin-bottom: 0.5em; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 0.5em 1.2em; margin: 1.2em 0 0; }
+.legal code { font-size: 0.92em; }
