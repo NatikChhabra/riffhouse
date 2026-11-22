@@ -8,6 +8,9 @@ Each release on GitHub carries the notes of its version from this file.
 
 ## Unreleased
 
+- New Reduce knob on the Gate: it quiets the hiss that rides along while you play, not only between notes. The guitar is split into seven bands and each learns its own hiss, the quietest it got in the last two seconds. A band holding only hiss is turned down, up to 60 dB at full, and a band with playing in it is left alone, so a high-gain amp has no hiss to fatten. Nothing is delayed. On a noisy USB input where the gate had not yet learned the hiss, the amp's hiss between notes dropped from as loud as the playing to 14 to 20 dB under it. Reduce is 5 by default and goes off with the gate.
+- The Pitch pedal's Shift mode is rebuilt. It finds the period of the note you play and only ever jumps by whole periods, so every splice lands on the same part of the wave. The old shifter smeared a note into warbling sidebands about 20 dB below the note itself; on real guitar notes the new one keeps the energy on the shifted harmonics 30 to 40 dB cleaner, and chords are 20 dB cleaner. Works at every sample rate.
+
 ## 0.1.6 (Update 1)
 
 Update 1. The high-gain amps were rebuilt after a player told us the metal tones sounded like a fuzz pedal. They did, and the numbers showed it.

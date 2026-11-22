@@ -830,6 +830,94 @@ void Wah::processClassic (float* x, int n)
 }
 
 //==============================================================================
+// NoiseReducer
+void NoiseReducer::prepare (double sampleRate)
+{
+    sr = sampleRate;
+    static constexpr double edges[kBands - 1] = { 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0 };
+    for (int k = 0; k < kBands - 1; ++k)
+    {
+        lp1[k].setCutoff (sr, edges[k]);
+        lp2[k].setCutoff (sr, edges[k]);
+    }
+    pAtt = 1.0f - (float) std::exp (-1.0 / (0.001 * 3.0 * sr));
+    pRel = 1.0f - (float) std::exp (-1.0 / (0.001 * 14.0 * sr));
+    gAtt = (float) std::exp (-1.0 / (0.001 * 1.5 * sr));
+    gRel = (float) std::exp (-1.0 / (0.001 * 45.0 * sr));
+    hopLen = std::max (1, (int) (0.005 * sr));
+    subHops = 50;
+    reset();
+}
+
+void NoiseReducer::reset()
+{
+    for (int k = 0; k < kBands - 1; ++k) { lp1[k].reset(); lp2[k].reset(); }
+    for (int k = 0; k < kBands; ++k)
+    {
+        env[k] = pwr[k] = 0.0f;
+        gain[k] = 1.0f;
+        subMin[k] = 1.0f;
+        for (int s = 0; s < kSubs; ++s) ring[k][s] = 1.0f; // nothing heard yet: no floor, nothing is turned down
+    }
+    hopFill = subFill = ringAt = heard = 0;
+}
+
+void NoiseReducer::set (float amount)
+{
+    maxCutDb = std::clamp (amount, 0.0f, 10.0f) * 6.0f;
+}
+
+void NoiseReducer::process (float* x, int n)
+{
+    if (maxCutDb <= 0.01f) return;
+    const float minGain = dbToGain (-maxCutDb);
+    for (int i = 0; i < n; ++i)
+    {
+        const float in = x[i];
+        float band[kBands];
+        float prev = 0.0f;
+        for (int k = 0; k < kBands - 1; ++k)
+        {
+            const float l = lp2[k].lowpass (lp1[k].lowpass (in));
+            band[k] = l - prev;
+            prev = l;
+        }
+        band[kBands - 1] = in - prev;
+        float out = 0.0f;
+        for (int k = 0; k < kBands; ++k)
+        {
+            // level as a smoothed power (a rectified envelope dips far under the mean of hiss, and so does its minimum)
+            const float pw = band[k] * band[k];
+            pwr[k] = undenorm (pwr[k] + (pw - pwr[k]) * (pw > pwr[k] ? pAtt : pRel));
+            env[k] = std::sqrt (pwr[k]);
+            float fl = subMin[k];
+            for (int s = 0; s < kSubs; ++s) fl = std::min (fl, ring[k][s]);
+            fl = std::max (fl, 1.0e-6f);
+            const float over = gainToDb (env[k] / fl);
+            // the floor is the quietest it dipped, so hiss itself sits a few dB over it:
+            // 10 dB over or less is hiss alone; 18 dB or more is playing
+            const float t = std::clamp ((over - 10.0f) / 8.0f, 0.0f, 1.0f);
+            const float target = heard >= 2 ? lerp (minGain, 1.0f, t) : 1.0f;
+            gain[k] = target > gain[k] ? target + (gain[k] - target) * gAtt : target + (gain[k] - target) * gRel;
+            out += band[k] * gain[k];
+        }
+        x[i] = out;
+        if (++hopFill >= hopLen)
+        {
+            hopFill = 0;
+            for (int k = 0; k < kBands; ++k) subMin[k] = std::min (subMin[k], env[k]);
+            if (++subFill >= subHops)
+            {
+                subFill = 0;
+                for (int k = 0; k < kBands; ++k) { ring[k][ringAt] = subMin[k]; subMin[k] = 1.0f; }
+                ringAt = (ringAt + 1) % kSubs;
+                ++heard;
+            }
+        }
+    }
+}
+
+//==============================================================================
 // PitchPedal
 void PitchPedal::prepare (double sampleRate)
 {
@@ -839,8 +927,10 @@ void PitchPedal::prepare (double sampleRate)
     subLp2.setCutoff (sr, 300.0);
     upHp.setCutoff (sr, 120.0);
     subEnv.prepare (sr, 3.0f, 60.0f);
-    window = (int) (0.022 * sr); // 22 ms grains: about 11 ms of shifter latency
-    line.prepare (window * 2 + 8);
+    window = (int) (0.022 * sr);
+    line.prepare (std::max (8192, (int) (0.12 * sr)));
+    decFactor = std::max (1, (int) std::lround (sr / 12000.0));
+    decLp1.setCutoff (sr, 1300.0); decLp2.setCutoff (sr, 1300.0);
     mixS.prepare (sr, 30.0f);
     reset();
 }
@@ -851,7 +941,53 @@ void PitchPedal::reset()
     flip = 1.0f; lastSign = 0.0f;
     line.reset();
     phase = 0.0f;
+    decLp1.reset(); decLp2.reset();
+    std::fill (std::begin (decHist), std::end (decHist), 0.0f);
+    decAt = decCount = trackCount = unvoiced = 0;
+    period = periodConf = 0.0f;
+    headA = (float) (0.006 * sr); headB = headA; fadeAt = 1.0f; fadeStep = 0.0f; crossing = false;
     mixS.reset (mix);
+}
+
+// Finds the period of the note being played: normalised autocorrelation of the last ~60 ms,
+// lowpassed and thinned to about 12 kHz, the first strong peak (so the octave is never picked)
+void PitchPedal::trackPeriod()
+{
+    const double rate = sr / (double) decFactor;
+    const int minLag = std::max (2, (int) (rate / 500.0)), maxLag = std::min ((int) (rate / 40.0), kDecHist / 3);
+    const int len = maxLag + std::min (maxLag, 300);
+    for (int i = 0; i < len + maxLag; ++i) seg[i] = decHist[(decAt - (len + maxLag) + i + 2 * kDecHist) % kDecHist];
+    double e = 0.0;
+    for (int i = 0; i < len; ++i) e += (double) seg[maxLag + i] * seg[maxLag + i];
+    if (e < 1.0e-8 * len) { periodConf = 0.0f; ++unvoiced; if (unvoiced > 8) period = 0.0f; return; }
+    float best = 0.0f;
+    for (int lag = minLag; lag <= maxLag; ++lag)
+    {
+        double xy = 0.0, ee = 0.0;
+        for (int i = 0; i < len; ++i)
+        {
+            const float a = seg[maxLag + i], b = seg[maxLag + i - lag];
+            xy += (double) a * b;
+            ee += (double) a * a + (double) b * b;
+        }
+        nsdf[lag] = (float) (2.0 * xy / std::max (ee, 1.0e-20));
+        best = std::max (best, nsdf[(size_t) lag]);
+    }
+    int pick = -1;
+    for (int lag = minLag + 1; lag < maxLag; ++lag)
+    {
+        const float v = nsdf[(size_t) lag];
+        if (v > 0.6f && v >= 0.9f * best && v >= nsdf[(size_t) lag - 1] && v >= nsdf[(size_t) lag + 1]) { pick = lag; break; }
+    }
+    if (pick < 0) { periodConf = best; if (++unvoiced > 8) period = 0.0f; return; }
+    unvoiced = 0;
+    const float a = nsdf[(size_t) pick - 1], b = nsdf[(size_t) pick], d = nsdf[(size_t) pick + 1];
+    const float denom = a - 2.0f * b + d;
+    const float off = std::abs (denom) > 1.0e-9f ? 0.5f * (a - d) / denom : 0.0f;
+    const float p = ((float) pick + std::clamp (off, -0.5f, 0.5f)) * (float) decFactor;
+    // a note change is taken at once; a steady note is averaged so the jumps stay put
+    period = (period > 0.0f && std::abs (p - period) < 0.06f * period) ? 0.7f * period + 0.3f * p : p;
+    periodConf = b;
 }
 
 void PitchPedal::set (int m, float semitones, float mixKnob)
@@ -894,16 +1030,45 @@ void PitchPedal::process (float* x, int n)
         }
         else
         {
-            // two crossfaded read heads sweeping through a short buffer
             line.push (in);
-            phase += (1.0f - ratio) / (float) window;
-            phase -= std::floor (phase);
-            const float p2 = phase + 0.5f - std::floor (phase + 0.5f);
-            const float d1 = 1.0f + phase * (float) window;
-            const float d2 = 1.0f + p2 * (float) window;
-            const float w1 = std::sin (phase * (float) kPi);
-            const float w2 = std::sin (p2 * (float) kPi);
-            wet = (line.read (d1) * w1 * w1 + line.read (d2) * w2 * w2);
+            const float lowIn = decLp2.lowpass (decLp1.lowpass (in));
+            if (++decCount >= decFactor)
+            {
+                decCount = 0;
+                decHist[decAt] = lowIn;
+                decAt = (decAt + 1) % kDecHist;
+                if (++trackCount >= 24) { trackCount = 0; trackPeriod(); }
+            }
+            // the read delay changes by (1 - ratio) a sample: the heard pitch is ratio times the played one.
+            // When it runs out of room it jumps by whole periods (J), under a short crossfade.
+            const float step = 1.0f - ratio;
+            headA += step;
+            if (crossing) headB += step;
+            const float lo = (float) (0.0015 * sr);
+            const float P = period > 0.0f ? period : (float) (0.0090 * sr);
+            const float minJump = (float) (0.007 * sr);
+            const float J = P * std::max (1.0f, std::ceil (minJump / P));
+            const float hi = lo + J;
+            if (! crossing && (headA < lo || headA > hi))
+            {
+                headB = headA < lo ? headA + J : headA - J;
+                alignedJump = period > 0.0f;
+                fadeAt = 0.0f;
+                fadeStep = 1.0f / std::max (48.0f, std::min (0.5f * J, (float) (0.005 * sr)));
+                crossing = true;
+            }
+            if (crossing)
+            {
+                fadeAt += fadeStep;
+                if (fadeAt >= 1.0f) { headA = headB; crossing = false; }
+            }
+            if (crossing)
+            {
+                const float ga = alignedJump ? 1.0f - fadeAt : std::cos (fadeAt * 1.5707963f), gb = alignedJump ? fadeAt : std::sin (fadeAt * 1.5707963f);
+                wet = line.read (headA) * ga + line.read (headB) * gb;
+            }
+            else
+                wet = line.read (headA);
         }
         x[i] = in * dryG + wet * wetG;
     }

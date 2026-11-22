@@ -623,6 +623,114 @@ void testElasticInput()
 
 // A clean note held on a good guitar fades slowly: 0.1.5's gate took one fading 1.7 dB a
 // second for the noise floor after 0.8 s and closed on it (a quarter of a clean take muted).
+// The pitch shifter keeps a note a note: the energy of the shifted note sits on the harmonics of the new
+// pitch (the old two-head shifter smeared it into sidebands, about -20 dB), for single notes and a chord.
+void testPitchShifter (double sr)
+{
+    std::printf ("pitch shifter @ %.0f Hz\n", sr);
+    auto harmonicDb = [&] (const std::vector<float>& y, const std::vector<double>& f0s)
+    {
+        const int a = (int) (0.2 * sr), len = (int) (1.2 * sr);
+        std::vector<double> power ((size_t) len / 2 + 1, 0.0);
+        // a plain DFT on a grid of 0.5 Hz over 60..3000 Hz is enough to compare the two
+        double inComb = 0.0, outComb = 0.0;
+        for (double f = 60.0; f < 3000.0; f += 0.5)
+        {
+            double re = 0.0, im = 0.0;
+            const double w = 6.283185307179586 * f / sr;
+            for (int i = 0; i < len; i += 2)
+            {
+                const double win = 0.5 - 0.5 * std::cos (6.283185307179586 * i / len);
+                re += win * y[(size_t) (a + i)] * std::cos (w * i);
+                im += win * y[(size_t) (a + i)] * std::sin (w * i);
+            }
+            const double p = re * re + im * im;
+            bool near = false;
+            for (double f0 : f0s)
+                for (int h = 1; h <= 10; ++h)
+                    if (std::abs (f - h * f0) <= std::max (f0 * 0.012, 2.0)) near = true;
+            (near ? inComb : outComb) += p;
+        }
+        return 10.0 * std::log10 (inComb / std::max (outComb, 1.0e-20));
+    };
+    auto note = [&] (double f0, size_t n)
+    {
+        std::vector<float> v (n);
+        for (size_t i = 0; i < n; ++i)
+        {
+            double s = 0.0;
+            for (int h = 1; h <= 6; ++h) s += std::sin (6.283185307179586 * f0 * h * (double) i / sr + 0.7 * h) / h;
+            v[i] = (float) (0.2 * s * std::exp (-(double) i / sr * 1.2));
+        }
+        return v;
+    };
+    const size_t n = (size_t) (1.6 * sr);
+    for (int semis : { 7, -5, 12, -12 })
+    {
+        for (int chord = 0; chord < 2; ++chord)
+        {
+            std::vector<double> f0s { 110.0 };
+            auto x = note (110.0, n);
+            if (chord) { auto b = note (146.83, n); for (size_t i = 0; i < n; ++i) x[i] = 0.5f * (x[i] + b[i]); f0s.push_back (146.83); }
+            for (auto& f : f0s) f *= std::pow (2.0, semis / 12.0);
+            PitchPedal pp;
+            pp.prepare (sr);
+            pp.set (2, (float) semis, 10.0f);
+            pp.reset();
+            for (size_t at = 0; at < n; at += 256) pp.process (x.data() + at, (int) std::min<size_t> (256, n - at));
+            const double db = harmonicDb (x, f0s);
+            std::printf ("  %+d semitones%s: %.1f dB on the new harmonics\n", semis, chord ? " (two notes)" : "", db);
+            CHECK (db > (chord ? -5.0 : 10.0), "the shifted %s at %+d keeps its pitch clean (the old shifter: -10 to -24 dB on chords): %.1f dB", chord ? "chord" : "note", semis, db);
+        }
+    }
+}
+
+// The noise reducer takes hiss off the bands that hold only hiss: far down between notes, nothing off a played note
+void testNoiseReducer (double sr)
+{
+    std::printf ("noise reducer @ %.0f Hz\n", sr);
+    const size_t n = (size_t) (12.0 * sr);
+    std::vector<float> clean (n, 0.0f), x;
+    for (int k = 0; k < 4; ++k)
+        for (size_t i = 0; i < (size_t) (1.2 * sr); ++i)
+        {
+            const size_t at = (size_t) (k * 3.0 * sr) + i;
+            double s = 0.0;
+            for (int h = 1; h <= 8; ++h) s += std::sin (6.283185307179586 * 110.0 * h * (double) at / sr) / h;
+            clean[at] = (float) (0.25 * s * std::exp (-(double) i / sr * 1.5));
+        }
+    x = clean;
+    uint32_t seed = 12345u;
+    for (auto& v : x)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        v += 0.0016f * ((float) (seed >> 8) / 8388608.0f - 1.0f); // about -57 dBFS of hiss
+    }
+    NoiseReducer nr;
+    nr.prepare (sr);
+    nr.set (6.0f);
+    std::vector<float> y = x;
+    for (size_t at = 0; at < n; at += 256) nr.process (y.data() + at, (int) std::min<size_t> (256, n - at));
+    auto rms = [&] (const std::vector<float>& v, double from, double to)
+    {
+        double e = 0.0; size_t c = 0;
+        for (size_t i = (size_t) (from * sr); i < (size_t) (to * sr); ++i) { e += (double) v[i] * v[i]; ++c; }
+        return 10.0 * std::log10 (e / (double) c + 1.0e-20);
+    };
+    // the third gap and the fourth note, after the reducer has heard its floor
+    const double gapCut = rms (x, 7.5, 8.9) - rms (y, 7.5, 8.9);
+    const double noteChange = rms (y, 9.0, 9.3) - rms (x, 9.0, 9.3);
+    std::printf("  hiss between notes %.1f dB down, a played note %+.2f dB\n", gapCut, noteChange);
+    CHECK (gapCut > 20.0, "hiss between notes is taken down: %.1f dB", gapCut);
+    CHECK (std::abs (noteChange) < 1.0, "a played note keeps its level: %+.2f dB", noteChange);
+    // off, it changes nothing
+    NoiseReducer off;
+    off.prepare (sr); off.set (0.0f);
+    std::vector<float> z = x;
+    for (size_t at = 0; at < n; at += 256) off.process (z.data() + at, (int) std::min<size_t> (256, n - at));
+    CHECK (z == x, "Reduce at 0 leaves the sound untouched");
+}
+
 void testGateHeldNote (double sr)
 {
     std::printf ("gate: held notes\n");
@@ -3916,6 +4024,26 @@ int main (int argc, char** argv)
         }
         return 0;
     }
+    if (args[0] == "pitchrender" && args.size() >= 6)
+    {
+        // pitchrender <in.wav> <out.wav> <mode 0..2> <semitones> <mix 0..10>: the pitch pedal alone, for measuring the shifter
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+        PitchPedal pp;
+        pp.prepare (reader->sampleRate);
+        pp.set (args[3].getIntValue(), args[4].getFloatValue(), args[5].getFloatValue());
+        pp.reset();
+        float* d = buf.getWritePointer (0);
+        for (int at = 0; at < buf.getNumSamples(); at += 256) pp.process (d + at, std::min (256, buf.getNumSamples() - at));
+        Render r;
+        r.l.assign (d, d + buf.getNumSamples());
+        r.r = r.l;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, reader->sampleRate);
+        return 0;
+    }
     if (args[0] == "levels" && args.size() >= 2)
     {
         // prints {"preset name": {rms, peak} in dBFS, ...} for tools/make_presets.py --calibrate,
@@ -4302,6 +4430,7 @@ int main (int argc, char** argv)
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "elastic") { testElasticInput(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "pitchsh") { testPitchShifter (48000.0); testPitchShifter (44100.0); testNoiseReducer (48000.0); testNoiseReducer (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); testAmpsClipLikeReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
@@ -4365,6 +4494,10 @@ int main (int argc, char** argv)
     testAmpsClipLikeReal (48000.0);
     testGateHeldNote (48000.0);
     testGateHeldNote (44100.0);
+    testPitchShifter (48000.0);
+    testPitchShifter (44100.0);
+    testNoiseReducer (48000.0);
+    testNoiseReducer (44100.0);
     testElasticInput();
     testTimeEffects (48000.0);
     testAliasing (48000.0);

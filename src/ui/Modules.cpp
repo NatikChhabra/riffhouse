@@ -7,8 +7,8 @@ namespace rh::ui
 const std::vector<ModuleInfo>& modules()
 {
     static const std::vector<ModuleInfo> m {
-        { "gate", "Gate", juce::Colour (0xff94a3b8), P::gateOn, -1, { P::gateThresh, P::gateRelease },
-          "Silences hiss and hum between notes. Auto sets the threshold from the hiss it hears; turn Threshold to set it yourself." },
+        { "gate", "Gate", juce::Colour (0xff94a3b8), P::gateOn, -1, { P::gateThresh, P::gateRelease, P::gateReduce },
+          "Silences hiss and hum between notes, and Reduce quiets the hiss while you play. Auto sets the threshold from the hiss it hears; turn Threshold to set it yourself." },
         { "comp", "Comp", juce::Colour (0xff2dd4bf), P::compOn, -1, { P::compSustain, P::compAttack, P::compLevel, P::compBlend },
           "Evens out your picking and adds sustain. Great for clean funk and country." },
         { "wah", "Wah", juce::Colour (0xffa78bfa), P::wahOn, (int) P::wahMode, { P::wahPos, P::wahSens, P::wahQ },
@@ -744,7 +744,7 @@ ModulePage::ModulePage (RiffhouseProcessor& p, int idx)
     for (auto id : info.knobs)
     {
         // on the gear itself a control is called what the maker would print, not its full name in the host
-        const auto printed = id == P::cabMic ? "Position" : id == P::gateThresh ? "Threshold" : id == P::gateRelease ? "Release" : id == P::eqLevel ? "Level" : "";
+        const auto printed = id == P::cabMic ? "Position" : id == P::gateThresh ? "Threshold" : id == P::gateRelease ? "Release" : id == P::gateReduce ? "Reduce" : id == P::eqLevel ? "Level" : "";
         addAndMakeVisible (knobs.add (new Knob (proc, id, moduleColour (index), juce::String (printed))));
     }
 
