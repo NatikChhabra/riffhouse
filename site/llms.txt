@@ -27,7 +27,7 @@ Yes. No price, no account, no ads in the app and no paid tier, now or later. The
 
 ### Do I need an audio interface?
 
-No. Plug the guitar into the computer’s mic jack with a 6.35 mm to 3.5 mm adapter or cable. A laptop with one combined headset socket needs a splitter with a separate mic socket. If you own an interface, pick it as your input. Its maker’s ASIO driver is used when it works.
+No. Plug the guitar into the computer’s mic jack with a 6.35 mm to 3.5 mm adapter or cable. A laptop with one combined headset socket needs a splitter with a separate mic socket. If you own an interface, pick it as your input. Its maker’s ASIO driver is used when it works. How to plug in.
 
 ### Will I hear myself late?
 
@@ -56,6 +56,7 @@ Start with Help and fixes. Still stuck? Settings has report buttons under Help. 
 ## Links
 
 - [Home page](https://riffhouse.in/): what it is, the tone list, how setup works
+- [Guitar into a laptop with no audio interface](https://riffhouse.in/no-audio-interface.html): what you need, four steps, and what a mic jack does to the sound
 - [Download](https://github.com/NatikChhabra/riffhouse/releases/latest): the Windows installer
 - [What's new](https://riffhouse.in/updates.html): every version so far
 - [Roadmap](https://riffhouse.in/roadmap.html): what comes next

@@ -33,7 +33,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
 REPO = "NatikChhabra/riffhouse"
 TAG = re.compile(r"^v(\d+\.\d+\.\d+)(\.\d+)?$")
-PAGES = ["index.html", "why-free.html", "updates.html", "roadmap.html", "press.html", "left.html"]
+PAGES = ["index.html", "no-audio-interface.html", "why-free.html", "updates.html", "roadmap.html", "press.html", "left.html"]
 WORDS = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "thirty": 30}
 
 
