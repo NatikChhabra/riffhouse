@@ -281,7 +281,9 @@ public:
     void prepare (double sampleRate);
     void reset();
     void set (float amount); // 0..10 knob; 0 is off, 10 takes up to 60 dB off a band of pure hiss
-    void process (float* x, int n);
+    // gateFloorDb: the hiss level the gate has heard (or setup measured), -120 when unknown; the reducer
+    // only acts while its own bands' floors add up to about that
+    void process (float* x, int n, float gateFloorDb);
     bool active() const noexcept { return maxCutDb > 0.01f; }
 
 private:
@@ -289,7 +291,8 @@ private:
     double sr = 48000.0;
     float maxCutDb = 0.0f;
     OnePole lp1[kBands - 1], lp2[kBands - 1];
-    float env[kBands] {}, pwr[kBands] {}, gain[kBands] {}, subMin[kBands] {}, ring[kBands][kSubs] {};
+    float env[kBands] {}, pwr[kBands] {}, gain[kBands] {}, subSum[kBands] {}, ring[kBands][kSubs] {};
+    double ringTotal[kSubs] {}, subTotal = 0.0, latchedDb = -200.0; int latchHold = 0; // power of all bands over each 250 ms window
     float pAtt = 0.0f, pRel = 0.0f, gAtt = 0.0f, gRel = 0.0f;
     int hopLen = 240, hopFill = 0, subHops = 50, subFill = 0, ringAt = 0, heard = 0;
 };

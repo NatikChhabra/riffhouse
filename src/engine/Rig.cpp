@@ -394,7 +394,7 @@ void Rig::processMono (float* x, int n)
                 x[i] = dry[(size_t) i] * g;
             }
     }
-    reducer.process (x, n);
+    reducer.process (x, n, gate.noiseFloorDb());
     if (on (p, P::gateOn)) feedback.process (x, n);
     if (fComp.idle()) comp.listen (x, n);
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });

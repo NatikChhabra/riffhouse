@@ -856,10 +856,13 @@ void NoiseReducer::reset()
     {
         env[k] = pwr[k] = 0.0f;
         gain[k] = 1.0f;
-        subMin[k] = 1.0f;
+        subSum[k] = 0.0f;
         for (int s = 0; s < kSubs; ++s) ring[k][s] = 1.0f; // nothing heard yet: no floor, nothing is turned down
     }
     hopFill = subFill = ringAt = heard = 0;
+    subTotal = 0.0;
+    latchHold = 0;
+    for (auto& v : ringTotal) v = 1.0e30; // nothing heard yet
 }
 
 void NoiseReducer::set (float amount)
@@ -867,9 +870,34 @@ void NoiseReducer::set (float amount)
     maxCutDb = std::clamp (amount, 0.0f, 10.0f) * 6.0f;
 }
 
-void NoiseReducer::process (float* x, int n)
+void NoiseReducer::process (float* x, int n, float gateFloorDb)
 {
     if (maxCutDb <= 0.01f) return;
+    // The bands' floors are only believed when they add up to the hiss the gate has heard (or setup measured):
+    // a take of continuous playing has no gaps, and its quietest stretch of playing is not hiss.
+    double floorPower = 0.0;
+    for (int k = 0; k < kBands; ++k)
+    {
+        float fl = 1.0f;
+        for (int s = 0; s < kSubs; ++s) fl = std::min (fl, ring[k][s]);
+        floorPower += (double) fl * fl;
+    }
+    bool trusted = heard >= 2 && gateFloorDb > -119.0f && 10.0 * std::log10 (floorPower + 1.0e-20) <= (double) gateFloorDb + 6.0;
+    if (! trusted && heard >= kSubs)
+    {
+        // The gate has not heard its floor yet (it wants a second and a half of steady quiet, and real
+        // playing rarely leaves that). A gap shows itself too: the quietest stretch of the last two
+        // seconds is 18 dB under the loudest and held steady (two windows within 1.5 dB of each other).
+        double lowest = 1.0e30, highest = 0.0;
+        for (int s = 0; s < kSubs; ++s) { lowest = std::min (lowest, ringTotal[s]); highest = std::max (highest, ringTotal[s]); }
+        int steady = 0;
+        for (int s = 0; s < kSubs; ++s) if (ringTotal[s] <= lowest * 1.42) ++steady;
+        trusted = lowest > 0.0 && highest >= lowest * 63.0 && steady >= 2;
+    }
+    // once believed, the floor stays believed for ten seconds while it does not rise by 4 dB or more
+    const double floorNow = 10.0 * std::log10 (floorPower + 1.0e-20);
+    if (trusted) { latchedDb = floorNow; latchHold = 40; }
+    else if (latchHold > 0 && floorNow <= latchedDb + 4.0) trusted = true;
     const float minGain = dbToGain (-maxCutDb);
     for (int i = 0; i < n; ++i)
     {
@@ -890,14 +918,14 @@ void NoiseReducer::process (float* x, int n)
             const float pw = band[k] * band[k];
             pwr[k] = undenorm (pwr[k] + (pw - pwr[k]) * (pw > pwr[k] ? pAtt : pRel));
             env[k] = std::sqrt (pwr[k]);
-            float fl = subMin[k];
+            float fl = 1.0f;
             for (int s = 0; s < kSubs; ++s) fl = std::min (fl, ring[k][s]);
             fl = std::max (fl, 1.0e-6f);
             const float over = gainToDb (env[k] / fl);
-            // the floor is the quietest it dipped, so hiss itself sits a few dB over it:
-            // 10 dB over or less is hiss alone; 18 dB or more is playing
-            const float t = std::clamp ((over - 10.0f) / 8.0f, 0.0f, 1.0f);
-            const float target = heard >= 2 ? lerp (minGain, 1.0f, t) : 1.0f;
+            // the floor is the quietest 250 ms average of the last 2 s, so hiss sits a couple of dB over it:
+            // 7 dB over or less is hiss alone; 15 dB or more is playing
+            const float t = std::clamp ((over - 7.0f) / 8.0f, 0.0f, 1.0f);
+            const float target = trusted ? lerp (minGain, 1.0f, t) : 1.0f;
             gain[k] = target > gain[k] ? target + (gain[k] - target) * gAtt : target + (gain[k] - target) * gRel;
             out += band[k] * gain[k];
         }
@@ -905,11 +933,14 @@ void NoiseReducer::process (float* x, int n)
         if (++hopFill >= hopLen)
         {
             hopFill = 0;
-            for (int k = 0; k < kBands; ++k) subMin[k] = std::min (subMin[k], env[k]);
+            for (int k = 0; k < kBands; ++k) { subSum[k] += env[k]; subTotal += (double) env[k] * env[k]; }
             if (++subFill >= subHops)
             {
                 subFill = 0;
-                for (int k = 0; k < kBands; ++k) { ring[k][ringAt] = subMin[k]; subMin[k] = 1.0f; }
+                for (int k = 0; k < kBands; ++k) { ring[k][ringAt] = subSum[k] / (float) subHops; subSum[k] = 0.0f; }
+                if (latchHold > 0) --latchHold;
+                ringTotal[ringAt] = subTotal / (double) subHops;
+                subTotal = 0.0;
                 ringAt = (ringAt + 1) % kSubs;
                 ++heard;
             }

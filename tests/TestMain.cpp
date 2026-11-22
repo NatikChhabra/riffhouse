@@ -710,7 +710,7 @@ void testNoiseReducer (double sr)
     nr.prepare (sr);
     nr.set (6.0f);
     std::vector<float> y = x;
-    for (size_t at = 0; at < n; at += 256) nr.process (y.data() + at, (int) std::min<size_t> (256, n - at));
+    for (size_t at = 0; at < n; at += 256) nr.process (y.data() + at, (int) std::min<size_t> (256, n - at), -60.0f);
     auto rms = [&] (const std::vector<float>& v, double from, double to)
     {
         double e = 0.0; size_t c = 0;
@@ -723,11 +723,35 @@ void testNoiseReducer (double sr)
     std::printf("  hiss between notes %.1f dB down, a played note %+.2f dB\n", gapCut, noteChange);
     CHECK (gapCut > 20.0, "hiss between notes is taken down: %.1f dB", gapCut);
     CHECK (std::abs (noteChange) < 1.0, "a played note keeps its level: %+.2f dB", noteChange);
+    // continuous playing has no gaps: its quietest stretch is playing, not hiss, so nothing may be cut
+    {
+        std::vector<float> run (n);
+        uint32_t s2 = 777u;
+        for (size_t i = 0; i < n; ++i)
+        {
+            const double t = (double) i / sr, since = std::fmod (t, 0.5);
+            double v = 0.0;
+            for (int h = 1; h <= 8; ++h) v += std::sin (6.283185307179586 * 98.0 * h * t) / h;
+            s2 = s2 * 1664525u + 1013904223u;
+            run[i] = (float) (0.06 * v * std::exp (-since * 1.4) + 0.0016 * ((float) (s2 >> 8) / 8388608.0f - 1.0f));
+        }
+        for (float gateFloor : { -120.0f, -60.0f })
+        {
+            NoiseReducer nr2;
+            nr2.prepare (sr);
+            nr2.set (10.0f);
+            auto out = run;
+            for (size_t at = 0; at < n; at += 256) nr2.process (out.data() + at, (int) std::min<size_t> (256, n - at), gateFloor);
+            const double change = rms (out, 4.0, 11.0) - rms (run, 4.0, 11.0);
+            std::printf ("  continuous playing, gate floor %.0f: %+.2f dB\n", gateFloor, change);
+            CHECK (change > -1.0, "continuous playing is not taken for hiss (gate floor %.0f): %+.2f dB", gateFloor, change);
+        }
+    }
     // off, it changes nothing
     NoiseReducer off;
     off.prepare (sr); off.set (0.0f);
     std::vector<float> z = x;
-    for (size_t at = 0; at < n; at += 256) off.process (z.data() + at, (int) std::min<size_t> (256, n - at));
+    for (size_t at = 0; at < n; at += 256) off.process (z.data() + at, (int) std::min<size_t> (256, n - at), -60.0f);
     CHECK (z == x, "Reduce at 0 leaves the sound untouched");
 }
 
@@ -4064,6 +4088,21 @@ int main (int argc, char** argv)
         Render r;
         r.l.assign (d, d + buf.getNumSamples());
         r.r = r.l;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, reader->sampleRate);
+        return 0;
+    }
+    if (args[0] == "nrscan" && args.size() >= 3)
+    {
+        // nrscan <in.wav> <out.wav> <reduce 0..10>: the noise reducer alone on a real take
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+        NoiseReducer nr; nr.prepare (reader->sampleRate); nr.set (args.size() > 3 ? args[3].getFloatValue() : 5.0f);
+        float* d = buf.getWritePointer (0);
+        for (int at = 0; at < buf.getNumSamples(); at += 256) nr.process (d + at, std::min (256, buf.getNumSamples() - at), args.size() > 4 ? args[4].getFloatValue() : -120.0f);
+        Render r; r.l.assign (d, d + buf.getNumSamples()); r.r = r.l;
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, reader->sampleRate);
         return 0;
     }
