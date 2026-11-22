@@ -294,6 +294,35 @@ private:
     int hopLen = 240, hopFill = 0, subHops = 50, subFill = 0, ringAt = 0, heard = 0;
 };
 
+// Feedback killer: a guitar near its amp can start to howl, one pure tone that only ever grows.
+// It watches every narrow peak in the sound (2048-point looks every 11 ms). A peak that
+// stands 18 dB over its surroundings and climbs at least 12 dB over about 300 ms, smoothly, with the rest of
+// the sound hardly rising is a howl: a played note starts at its loudest and fades, a swell lifts
+// every harmonic together. The howl gets a narrow notch that deepens while it keeps growing
+// (up to 30 dB), three at most, and lets go a second and a half after the tone is gone.
+class FeedbackKiller
+{
+public:
+    static constexpr int kMaxNotches = 3;
+    void prepare (double sampleRate);
+    void reset();
+    void process (float* x, int n);
+    int notching() const noexcept { int c = 0; for (auto& nt : notch) if (nt.depth > 0.05f) ++c; return c; }
+
+private:
+    static constexpr int kOrder = 11, kSize = 1 << kOrder, kBins = kSize / 2 + 1, kHop = 512, kHist = 28;
+    void look();
+    struct Notch { Biquad bq; float hz = 0.0f, depth = 0.0f, target = 0.0f, level = -200.0f; int quiet = 0; };
+    double sr = 48000.0;
+    std::unique_ptr<juce::dsp::FFT> fft;
+    std::vector<float> window, ring, frame;
+    int ringAt = 0, hopFill = 0;
+    std::vector<float> binDb;  // kHist looks of every bin's level, dB
+    float totalDb[kHist] {};   // total level of each look, dB
+    int histAt = 0, histCount = 0;
+    Notch notch[kMaxNotches];
+};
+
 class Compressor
 {
 public:

@@ -731,6 +731,54 @@ void testNoiseReducer (double sr)
     CHECK (z == x, "Reduce at 0 leaves the sound untouched");
 }
 
+// A howl (one pure tone that only grows) is notched out while the playing goes on; played notes and a
+// volume swell are never taken for one
+void testFeedbackKiller (double sr)
+{
+    std::printf ("feedback killer @ %.0f Hz\n", sr);
+    const size_t n = (size_t) (8.0 * sr);
+    auto build = [&] (bool howl, bool swell)
+    {
+        std::vector<float> v (n);
+        for (size_t i = 0; i < n; ++i)
+        {
+            const double t = (double) i / sr;
+            double s = 0.0;
+            const double pluck = std::fmod (t, 1.0);
+            for (int h = 1; h <= 7; ++h) s += std::sin (6.283185307179586 * 196.0 * h * t) / h;
+            s *= 0.15 * std::exp (-pluck * 2.5) * (swell ? std::pow (10.0, (std::min (t, 3.0) - 3.0) * 8.0 / 20.0) * 3.0 : 1.0);
+            if (howl) s += 0.001 * std::pow (10.0, std::min (std::max (t - 1.0, 0.0) * 50.0, 40.0) / 20.0) * std::sin (6.283185307179586 * 1847.0 * t);
+            v[i] = (float) std::clamp (s, -0.9, 0.9);
+        }
+        return v;
+    };
+    auto howlPower = [&] (const std::vector<float>& y, size_t from, size_t to)
+    {
+        double re = 0.0, im = 0.0;
+        for (size_t i = from; i < to; ++i) { const double w = 6.283185307179586 * 1847.0 * (double) i / sr; re += y[i] * std::cos (w); im += y[i] * std::sin (w); }
+        return 20.0 * std::log10 (std::hypot (re, im) / (double) (to - from) + 1.0e-12);
+    };
+    {
+        auto x = build (true, false), y = x;
+        FeedbackKiller fk; fk.prepare (sr);
+        for (size_t at = 0; at < n; at += 256) fk.process (y.data() + at, (int) std::min<size_t> (256, n - at));
+        const size_t a = (size_t) (6.5 * sr), b = (size_t) (7.5 * sr);
+        const double cut = howlPower (x, a, b) - howlPower (y, a, b);
+        std::printf ("  a howl growing 50 dB a second: %.1f dB off at 7 s, %d notches\n", cut, fk.notching());
+        CHECK (cut > 12.0, "the howl is cut by %.1f dB", cut);
+    }
+    for (int swell = 0; swell < 2; ++swell)
+    {
+        auto x = build (false, swell == 1), y = x;
+        FeedbackKiller fk; fk.prepare (sr);
+        for (size_t at = 0; at < n; at += 256) fk.process (y.data() + at, (int) std::min<size_t> (256, n - at));
+        double diff = 0.0, e = 0.0;
+        for (size_t i = 0; i < n; ++i) { diff += (double) (y[i] - x[i]) * (y[i] - x[i]); e += (double) x[i] * x[i]; }
+        std::printf ("  %s alone changed by %.1f dB\n", swell ? "a volume swell" : "plucked notes", 10.0 * std::log10 (diff / e + 1.0e-20));
+        CHECK (fk.notching() == 0 && diff < 1.0e-9 * e, "%s is left alone", swell ? "a swell" : "playing");
+    }
+}
+
 void testGateHeldNote (double sr)
 {
     std::printf ("gate: held notes\n");
@@ -4044,6 +4092,24 @@ int main (int argc, char** argv)
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, reader->sampleRate);
         return 0;
     }
+    if (args[0] == "fkscan" && args.size() >= 2)
+    {
+        // fkscan <in.wav>: real playing must never be taken for a howl
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+        FeedbackKiller fk; fk.prepare (reader->sampleRate);
+        std::vector<float> in (buf.getReadPointer (0), buf.getReadPointer (0) + buf.getNumSamples());
+        auto y = in;
+        int most = 0;
+        for (size_t at = 0; at < y.size(); at += 256) { fk.process (y.data() + at, (int) std::min<size_t> (256, y.size() - at)); most = std::max (most, fk.notching()); }
+        double d = 0.0, e = 0.0;
+        for (size_t i = 0; i < y.size(); ++i) { d += (double) (y[i] - in[i]) * (y[i] - in[i]); e += (double) in[i] * in[i]; }
+        std::printf ("%s: %.0f s, most notches at once %d, change %.1f dB\n", args[1].toRawUTF8(), (double) y.size() / reader->sampleRate, most, 10.0 * std::log10 (d / e + 1.0e-20));
+        return 0;
+    }
     if (args[0] == "levels" && args.size() >= 2)
     {
         // prints {"preset name": {rms, peak} in dBFS, ...} for tools/make_presets.py --calibrate,
@@ -4430,7 +4496,7 @@ int main (int argc, char** argv)
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "elastic") { testElasticInput(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
-    if (args[0] == "pitchsh") { testPitchShifter (48000.0); testPitchShifter (44100.0); testNoiseReducer (48000.0); testNoiseReducer (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "pitchsh") { testPitchShifter (48000.0); testPitchShifter (44100.0); testNoiseReducer (48000.0); testNoiseReducer (44100.0); testFeedbackKiller (48000.0); testFeedbackKiller (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); testAmpsClipLikeReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
@@ -4498,6 +4564,8 @@ int main (int argc, char** argv)
     testPitchShifter (44100.0);
     testNoiseReducer (48000.0);
     testNoiseReducer (44100.0);
+    testFeedbackKiller (48000.0);
+    testFeedbackKiller (44100.0);
     testElasticInput();
     testTimeEffects (48000.0);
     testAliasing (48000.0);

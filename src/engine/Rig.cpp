@@ -71,6 +71,7 @@ void Rig::prepare (double sampleRate, int block)
     probe.prepare (sr);
     gate.prepare (sr);
     reducer.prepare (sr);
+    feedback.prepare (sr);
     gate.seedFloor (gateSeedDb);
     comp.prepare (sr);
     wah.prepare (sr);
@@ -147,7 +148,7 @@ void Rig::prepare (double sampleRate, int block)
 
 void Rig::reset()
 {
-    input.reset(); gate.reset(); reducer.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
+    input.reset(); gate.reset(); reducer.reset(); feedback.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
     eq.reset(); mod.reset(); modOld.reset(); modXfade = 0; lofi.reset(); doubler.reset(); limiter.reset();
     for (Delay* d : { &delayA, &delayB }) d->reset();
     for (Reverb* r : { &reverbA, &reverbB }) r->reset();
@@ -394,6 +395,7 @@ void Rig::processMono (float* x, int n)
             }
     }
     reducer.process (x, n);
+    if (on (p, P::gateOn)) feedback.process (x, n);
     if (fComp.idle()) comp.listen (x, n);
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });
     runFaded (fWah, x, n, dry, [&] (float* b, int k) { wah.process (b, k); });

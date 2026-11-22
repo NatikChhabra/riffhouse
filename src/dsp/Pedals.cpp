@@ -918,6 +918,153 @@ void NoiseReducer::process (float* x, int n)
 }
 
 //==============================================================================
+// FeedbackKiller
+void FeedbackKiller::prepare (double sampleRate)
+{
+    sr = sampleRate;
+    fft = std::make_unique<juce::dsp::FFT> (kOrder);
+    window.resize (kSize);
+    for (int i = 0; i < kSize; ++i) window[(size_t) i] = 0.5f - 0.5f * std::cos (2.0f * (float) kPi * (float) i / (float) kSize);
+    ring.assign (kSize, 0.0f);
+    frame.assign (2 * kSize, 0.0f);
+    binDb.assign ((size_t) kHist * kBins, -200.0f);
+    reset();
+}
+
+void FeedbackKiller::reset()
+{
+    std::fill (ring.begin(), ring.end(), 0.0f);
+    ringAt = hopFill = histCount = 0;
+    histAt = 0;
+    std::fill (binDb.begin(), binDb.end(), -200.0f);
+    std::fill (std::begin (totalDb), std::end (totalDb), -200.0f);
+    for (auto& nt : notch) { nt.bq.reset(); nt.hz = 0.0f; nt.depth = nt.target = 0.0f; nt.quiet = 0; }
+}
+
+void FeedbackKiller::look()
+{
+    for (int i = 0; i < kSize; ++i) frame[(size_t) i] = ring[(size_t) ((ringAt + i) % kSize)] * window[(size_t) i];
+    std::fill (frame.begin() + kSize, frame.end(), 0.0f);
+    fft->performRealOnlyForwardTransform (frame.data(), true);
+    // every bin keeps its last kHist levels (dB), so any bin that climbs can be seen, not only the loudest
+    const int slot = histAt;
+    histAt = (histAt + 1) % kHist;
+    ++histCount;
+    double total = 0.0;
+    float mag[kBins];
+    for (int b = 0; b < kBins; ++b)
+    {
+        mag[b] = std::hypot (frame[(size_t) 2 * b], frame[(size_t) 2 * b + 1]);
+        total += (double) mag[b] * mag[b];
+        binDb[(size_t) slot * kBins + (size_t) b] = 20.0f * std::log10 (mag[b] + 1.0e-12f);
+    }
+    totalDb[slot] = 10.0f * std::log10 ((float) total + 1.0e-20f);
+    const float binHz = (float) (sr / kSize);
+    const int lo = std::max (8, (int) (200.0f / binHz)), hi = std::min (kBins - 22, (int) (6000.0f / binHz));
+    float hz = 0.0f, hzLevel = -200.0f;
+    bool howl = false;
+    if (histCount >= kHist)
+    {
+        const int oldest = histAt; // the slot about to be written next is the oldest
+        const float tRise = totalDb[slot] - totalDb[oldest];
+        // a swell or a new chord lifts many peaks together; a howl is one tone climbing alone
+        float topNow = -200.0f;
+        for (int b = lo; b <= hi; ++b) topNow = std::max (topNow, binDb[(size_t) slot * kBins + (size_t) b]);
+        int climbing = 0;
+        for (int b = lo; b <= hi; ++b)
+        {
+            if (mag[b] < mag[b - 1] || mag[b] < mag[b + 1]) continue;
+            const float now = binDb[(size_t) slot * kBins + (size_t) b];
+            if (now < topNow - 30.0f) continue;
+            const float before = std::max (binDb[(size_t) oldest * kBins + (size_t) b], std::max (binDb[(size_t) oldest * kBins + (size_t) b - 1], binDb[(size_t) oldest * kBins + (size_t) b + 1]));
+            if (now - before >= 4.5f) ++climbing;
+        }
+        for (int b = lo; b <= hi && ! howl && climbing <= 1; ++b)
+        {
+            if (mag[b] < mag[b - 1] || mag[b] < mag[b + 1]) continue;
+            const float now = binDb[(size_t) slot * kBins + (size_t) b];
+            if (now < -45.0f + 54.2f) continue; // a sine of amplitude 1 reads 54 dB here; a howl is louder than -45 dBFS
+            // a peak stands over what is around it: the median of bins 6 to 20 away on both sides
+            float around[30];
+            int na = 0;
+            for (int d = 6; d <= 20; ++d) { around[na++] = mag[b - d]; around[na++] = mag[b + d]; }
+            std::nth_element (around, around + na / 2, around + na);
+            const float prom = 20.0f * std::log10 ((mag[b] + 1.0e-12f) / (around[na / 2] + 1.0e-12f));
+            if (prom < 18.0f) continue;
+            const float rise = now - std::max (binDb[(size_t) oldest * kBins + (size_t) b], std::max (binDb[(size_t) oldest * kBins + (size_t) b - 1], binDb[(size_t) oldest * kBins + (size_t) b + 1]));
+            if (rise < 12.0f || tRise > 0.5f * rise) continue;
+            // a howl climbs smoothly, look after look; a pick lands in one or two looks with a jump
+            int downs = 0;
+            float biggest = 0.0f;
+            for (int i = 1; i < kHist; ++i)
+            {
+                const int s1 = (oldest + i) % kHist, s0 = (oldest + i - 1) % kHist;
+                const float step = binDb[(size_t) s1 * kBins + (size_t) b] - binDb[(size_t) s0 * kBins + (size_t) b];
+                if (step < -0.3f) ++downs;
+                biggest = std::max (biggest, step);
+            }
+            if (downs > 2 || biggest > 3.0f) continue;
+            const float la = std::log (mag[b - 1] + 1.0e-12f), lb = std::log (mag[b] + 1.0e-12f), lc = std::log (mag[b + 1] + 1.0e-12f);
+            const float off = std::clamp (0.5f * (la - lc) / std::min (la - 2.0f * lb + lc, -1.0e-6f), -0.5f, 0.5f);
+            hz = ((float) b + off) * binHz;
+            hzLevel = now;
+            howl = true;
+        }
+    }
+    // a notch already on this tone is kept alive while the tone is there, and deepens while it still grows
+    for (auto& nt : notch)
+    {
+        if (nt.hz <= 0.0f) continue;
+        const int nb = std::clamp ((int) std::lround (nt.hz / binHz), 2, kBins - 3);
+        float here = -200.0f;
+        for (int d = -2; d <= 2; ++d) here = std::max (here, binDb[(size_t) slot * kBins + (size_t) (nb + d)]);
+        if (howl && std::abs (nt.hz - hz) < 2.5f * binHz) { nt.quiet = 0; nt.target = std::min (30.0f, std::max (nt.target, nt.depth) + 6.0f); }
+        if (here < nt.level - 20.0f) ++nt.quiet; else if (! (howl && std::abs (nt.hz - hz) < 2.5f * binHz)) nt.quiet = std::max (0, nt.quiet - 1);
+        if (nt.quiet > 130) nt.target = 0.0f; // 1.5 s with the tone gone (20 dB under where it was)
+    }
+    if (howl)
+    {
+        bool have = false;
+        for (auto& nt : notch) if (nt.hz > 0.0f && std::abs (nt.hz - hz) < 2.5f * binHz) have = true;
+        if (! have)
+        {
+            Notch* s = nullptr;
+            for (auto& nt : notch) if (nt.hz <= 0.0f) { s = &nt; break; }
+            if (s == nullptr) { s = &notch[0]; for (auto& nt : notch) if (nt.depth < s->depth) s = &nt; }
+            s->hz = hz;
+            s->bq.set (Biquad::Type::notch, sr, hz, 25.0);
+            s->bq.reset();
+            s->target = 18.0f;
+            s->level = hzLevel;
+            s->quiet = 0;
+        }
+    }
+    for (auto& nt : notch)
+        if (nt.hz > 0.0f && nt.target <= 0.0f && nt.depth < 0.05f) { nt.hz = 0.0f; nt.depth = 0.0f; }
+}
+
+void FeedbackKiller::process (float* x, int n)
+{
+    for (int i = 0; i < n; ++i)
+    {
+        ring[(size_t) ringAt] = x[i];
+        ringAt = (ringAt + 1) % kSize;
+        if (++hopFill >= kHop) { hopFill = 0; look(); }
+        float v = x[i];
+        for (auto& nt : notch)
+        {
+            if (nt.hz <= 0.0f) continue;
+            // depth glides to its target: in over about 40 ms, out over about a second
+            const float tgt = nt.target / 30.0f, cur = nt.depth / 30.0f;
+            nt.depth = 30.0f * (cur + (tgt - cur) * (tgt > cur ? 0.0005f : 0.00003f) * (float) (48000.0 / sr) * 2.0f);
+            const float k = 1.0f - dbToGain (-nt.depth);
+            v = v - k * (v - nt.bq.process (v));
+        }
+        x[i] = v;
+    }
+}
+
+//==============================================================================
 // PitchPedal
 void PitchPedal::prepare (double sampleRate)
 {
