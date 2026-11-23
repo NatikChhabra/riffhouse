@@ -1,6 +1,7 @@
 // Riffhouse - free, open-source guitar rig
 // Copyright (C) 2026 Riffhouse contributors. Licensed under AGPL-3.0-or-later.
 #include "Modules.h"
+#include "GearArt.h"
 
 namespace rh::ui
 {
@@ -558,6 +559,11 @@ void MicMap::paint (juce::Graphics& g)
     const float dist = juce::jlimit (0.0f, 10.0f, proc.value (P::cabDistance)) / 10.0f;
     const float apexY = p.baffleY - 46.0f, capR = p.coneR * 0.25f;
 
+    const bool pictured = art::has ("mic_cabmap") && art::has ("mic_probe");
+    if (pictured)
+        art::draw (g, "mic_cabmap", juce::Rectangle<float> (p.area.getX(), p.area.getY() - 4.0f, 392.0f, 132.0f));
+    else
+    {
     // the cabinet's front board, cut through, with the hole the speaker sits in
     for (float side : { -1.0f, 1.0f })
     {
@@ -597,6 +603,8 @@ void MicMap::paint (juce::Graphics& g)
         g.fillRect (juce::Rectangle<float> (capR * 1.2f, 6.0f).withCentre ({ p.cx, magnet.getBottom() + 2.0f }));
     }
 
+    }
+
     // the mic
     const float mx = p.cx + p.travel * pos;
     const float nose = p.near + (p.far - p.near) * dist;
@@ -625,6 +633,17 @@ void MicMap::paint (juce::Graphics& g)
         g.strokePath (cable, juce::PathStrokeType (0.8f), juce::AffineTransform::translation (-0.8f, -0.4f));
 
         const juce::Rectangle<float> body (mx - bodyW * 0.5f, nose + headL - 1.0f, bodyW, bodyL);
+        if (pictured)
+        {
+            art::draw (g, "mic_probe", juce::Rectangle<float> (mx - 22.0f, nose - 10.0f, 44.0f, 84.0f));
+            if (dragging || isMouseOver())
+            {
+                g.setColour (colours::lamp.withAlpha (dragging ? 0.9f : 0.5f));
+                g.drawRoundedRectangle (juce::Rectangle<float> (mx - 11.0f, nose, 22.0f, headL + bodyL).expanded (4.0f), 5.0f, 1.2f);
+            }
+        }
+        else
+        {
         juce::ColourGradient tube (juce::Colour (0xff17181a), body.getX(), 0.0f, juce::Colour (0xff0b0c0d), body.getRight(), 0.0f, false);
         tube.addColour (0.3, juce::Colour (0xff8b9095));
         tube.addColour (0.55, juce::Colour (0xff3a3d40));
@@ -652,6 +671,7 @@ void MicMap::paint (juce::Graphics& g)
         {
             g.setColour (colours::lamp.withAlpha (dragging ? 0.9f : 0.5f));
             g.drawRoundedRectangle (head.getUnion (body).expanded (5.0f), 5.0f, 1.2f);
+        }
         }
     }
 

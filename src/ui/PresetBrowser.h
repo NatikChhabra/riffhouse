@@ -55,6 +55,6 @@ private:
     // each tone is shown by its amp, drawn once per amp and kept
     std::map<int, GearThumb> ampArt;
     const GearThumb& artFor (int ampModel);
-    static constexpr float kArtW = 64.0f, kArtH = 36.0f;
+    static constexpr float kArtW = 104.0f, kArtH = 42.0f;
 };
 } // namespace rh::ui
