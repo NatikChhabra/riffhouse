@@ -6,7 +6,9 @@ the middle one for new things, the first one when something you rely on changes.
 
 Each release on GitHub carries the notes of its version from this file.
 
-## Unreleased
+## 0.1.7 (Update 2)
+
+Update 2. A player told us the distortion tones were too noisy. The hiss between notes now has a knob of its own, and a feedback killer and a cleaner Pitch pedal come with it.
 
 - New Reduce knob on the Gate: it quiets the hiss that rides along between notes and under their tails, not only when the gate is shut. The guitar is split into seven bands and each learns its own hiss, the quietest 250 ms average of the last two seconds. A band holding only hiss is turned down, up to 60 dB at full, and a band with playing in it is left alone, so a high-gain amp has no hiss to fatten. It only believes a floor that matches the hiss the gate or setup has heard, or one that shows itself as a steady quiet stretch well under the playing, so continuous playing is never taken for hiss: real takes without gaps came through untouched. On a hissy input the gate had not yet learned, the amp's hiss between notes dropped from as loud as the playing to 10 to 19 dB under it. It does not take hiss out of sustained playing. Nothing is delayed. Reduce is 5 by default and goes off with the gate.
 - A feedback killer runs with the gate. A guitar near its amp can start to howl, one pure tone that only ever grows. It watches every narrow peak, and one that climbs 12 dB or more over about 300 ms, smoothly, with nothing else rising alongside it, gets a narrow notch that deepens to 30 dB while the tone keeps growing, up to three at once, and lets go 1.5 s after the tone is gone. Played notes, volume swells and chords are never taken for a howl: nothing was touched across four minutes of real guitar takes. A howl growing 50 dB a second came down about 30 dB. It goes off with the gate switch.
@@ -15,6 +17,9 @@ Each release on GitHub carries the notes of its version from this file.
 - The weekly player count is now off until you say yes. Riffhouse asks once on first run; Settings, Player count changes your answer any time. Terms, privacy and credits are on riffhouse.in/legal.html and the installer shows a short notice first.
 - Settings has an update channel: **Stable** (tested releases only, the default) or **Beta** (test builds a few days early, rough edges possible). It replaces the old "get new versions early" switch, and anyone who had that on is on Beta. Switching to Stable never downgrades: a newer Beta stays until Stable catches up.
 - Settings has one quiet link to the Riffhouse page on GitHub, for anyone who wants to star it.
+- After an update Riffhouse opens a What's new card once: what is new and what was fixed in a few lines, a link to the full release notes and one to the Discord server. Settings, Help and about has a What's new button to open it again.
+- Settings has a Community section with buttons for the Discord server, YouTube, Instagram and the website. On the fifth start Riffhouse says hello once and points there, and never again.
+- The question about the weekly player count is not asked on test machines.
 
 ## 0.1.6 (Update 1)
 
@@ -34,7 +39,6 @@ Update 1. The high-gain amps were rebuilt after a player told us the metal tones
 - The 65 metal and hard rock tones on the Real cabinets now cut the top above 7 kHz instead of 12 kHz, so less fizz rides above the tone.
 - The other cabinets roll off above 7 kHz the way real speakers do, with no flat fizz on top.
 - Every tone was level-matched again.
-- After an update Riffhouse opens a What's new card once: what is new and what was fixed in a few lines, a link to the full release notes and one to the Discord server. Settings, Help and about has a What's new button to open it again.
 - A Feedback button sits next to the name at the top: write what sounds or feels wrong and it goes straight to the people who fix Riffhouse, with your settings report if you want (your user name and computer name are taken out). The heart beside it opens the support page; supporting is a thank-you, everyone gets the same app.
 - A capture file (.nam) that was cut short, as a broken download is, could crash Riffhouse when you dropped it in: the capture library read past the end of its numbers before noticing. Riffhouse now checks first and says the file is damaged.
 - The Lo-fi pedal's Downsample knob glides when it is turned, with no click.
