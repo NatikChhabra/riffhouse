@@ -7,6 +7,8 @@
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
 #include "../plugin/Version.h"
+#include "../plugin/WhatsNew.h"
+#include <NotesData.h>
 
 namespace rh::ui
 {
@@ -130,6 +132,109 @@ void Popover::paint (juce::Graphics& g)
         g.setFont (font (17.0f, Weight::semibold));
         g.drawText (title, getLocalBounds().reduced (20, 16).removeFromTop (24), juce::Justification::centredLeft);
     }
+}
+
+//==============================================================================
+WhatsNewPanel::WhatsNewPanel()
+{
+    title = "What's new";
+    close.setTooltip ("Close");
+    close.onClick = [this] { if (onClose) onClose(); else setVisible (false); };
+    addAndMakeVisible (close);
+    for (auto* l : { &notes, &discord })
+    {
+        l->setFont (font (13.5f), false, juce::Justification::centredLeft);
+        l->setColour (juce::HyperlinkButton::textColourId, colours::textDim);
+        addAndMakeVisible (*l);
+    }
+    discord.setTooltip ("Opens the Riff House Discord server: help, ideas and beta feedback.");
+    showVersion (versionLabel());
+}
+
+void WhatsNewPanel::showVersion (const juce::String& label)
+{
+    const auto e = findWhatsNew (juce::String::fromUTF8 (RiffhouseNotes::whatsnew_txt, RiffhouseNotes::whatsnew_txtSize), label);
+    shown = e.version;
+    lines.clear();
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const auto& items = pass == 0 ? e.added : e.fixed;
+        if (items.isEmpty()) continue;
+        lines.push_back ({ pass == 0 ? "New" : "Fixed", true, nullptr });
+        for (const auto& t : items) lines.push_back ({ t, false, nullptr });
+    }
+    notes.setURL (juce::URL ("https://github.com/NatikChhabra/riffhouse/releases" + (shown.isNotEmpty() ? "/tag/v" + shown : juce::String())));
+    build();
+}
+
+void WhatsNewPanel::build()
+{
+    int y = 62;
+    const int textW = cardW - 40 - 18;
+    for (auto& l : lines)
+    {
+        if (l.head)
+        {
+            y += (y > 62 ? 10 : 0);
+            l.y = y;
+            l.h = 22;
+        }
+        else
+        {
+            juce::AttributedString a;
+            a.setWordWrap (juce::AttributedString::byWord);
+            a.setLineSpacing (3.0f);
+            a.append (l.text, font (14.0f), colours::text);
+            l.layout = std::make_unique<juce::TextLayout>();
+            l.layout->createLayout (a, (float) textW);
+            l.y = y;
+            l.h = (int) std::ceil (l.layout->getHeight()) + 7;
+        }
+        y += l.h;
+    }
+    bodyBottom = y;
+    resized();
+}
+
+int WhatsNewPanel::heightFor() const { return bodyBottom + 14 + 46; }
+
+void WhatsNewPanel::paint (juce::Graphics& g)
+{
+    Popover::paint (g);
+    g.setColour (colours::textFaint);
+    g.setFont (font (13.0f));
+    const int titleW = (int) font (17.0f, Weight::semibold).getStringWidthFloat (title);
+    g.drawText (spokenVersion (shown.isNotEmpty() ? shown : versionLabel()), 20 + titleW + 10, 16, 140, 24, juce::Justification::centredLeft);
+    if (lines.empty())
+    {
+        g.setColour (colours::textDim);
+        g.setFont (font (14.0f));
+        g.drawText ("The full list of changes is on GitHub.", 20, 62, cardW - 40, 24, juce::Justification::centredLeft);
+    }
+    for (auto& l : lines)
+    {
+        if (l.head)
+        {
+            g.setColour (colours::accent);
+            g.setFont (font (13.0f, Weight::semibold));
+            g.drawText (l.text, 20, l.y, cardW - 40, l.h, juce::Justification::centredLeft);
+            continue;
+        }
+        g.setColour (colours::textFaint);
+        g.fillEllipse (22.0f, (float) l.y + 8.0f, 4.0f, 4.0f);
+        l.layout->draw (g, juce::Rectangle<float> (38.0f, (float) l.y, (float) (cardW - 40 - 18), (float) l.h));
+    }
+    const int footY = lines.empty() ? 100 : bodyBottom + 6;
+    g.setColour (colours::line);
+    g.drawHorizontalLine (footY, 20.0f, (float) getWidth() - 20.0f);
+}
+
+void WhatsNewPanel::resized()
+{
+    close.setBounds (getWidth() - 20 - 30, 12, 30, 30);
+    const int footY = (lines.empty() ? 100 : bodyBottom + 6) + 8;
+    notes.setBounds (20, footY, 190, 28);
+    discord.setBounds (getWidth() - 20 - 70, footY, 70, 28);
 }
 
 //==============================================================================
@@ -667,7 +772,26 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     // a thank-you, never a purchase: everyone gets the same app
     support.setTooltip ("Opens the website's support page. Everyone gets the same app; supporting is a thank-you, not a purchase.");
     support.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
+    whatsNewButton.setTooltip ("What changed in this version.");
+    whatsNewButton.onClick = [this] { if (onWhatsNew) onWhatsNew(); };
+    page.addAndMakeVisible (whatsNewButton);
     page.addAndMakeVisible (support);
+    // one quiet line, never a pop-up: a star is how other players find a free project
+    starLink.setFont (font (13.5f), false, juce::Justification::centredLeft);
+    starLink.setColour (juce::HyperlinkButton::textColourId, colours::textDim);
+    starLink.setTooltip ("Opens the Riffhouse page on GitHub. A star helps other players find a free project.");
+    page.addAndMakeVisible (starLink);
+    // a standing place for the community links; the one-time hello in the editor points here
+    for (auto* b : { &discord, &youtube, &instagram, &siteLink })
+        page.addAndMakeVisible (b);
+    discord.setTooltip ("Opens the Riff House Discord server: help, ideas and beta feedback.");
+    discord.onClick = [] { juce::URL ("https://discord.gg/my4Mgg8uTq").launchInDefaultBrowser(); };
+    youtube.setTooltip ("Opens the Riff House YouTube channel.");
+    youtube.onClick = [] { juce::URL ("https://www.youtube.com/@riffhouseapp").launchInDefaultBrowser(); };
+    instagram.setTooltip ("Opens Riff House on Instagram.");
+    instagram.onClick = [] { juce::URL ("https://www.instagram.com/realriffhouse/").launchInDefaultBrowser(); };
+    siteLink.setTooltip ("Opens riffhouse.in.");
+    siteLink.onClick = [] { juce::URL ("https://riffhouse.in/").launchInDefaultBrowser(); };
     problem.setTooltip ("Copies the report, with your user name and computer name taken out, and opens the public page where "
                         "problems are reported. Paste it there and say what went wrong. Nothing is sent by itself.");
     problem.onClick = [this]
@@ -734,14 +858,15 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
             hasUpdater = true;
             page.addAndMakeVisible (updateButton);
             page.addAndMakeVisible (autoUpdate);
-            page.addAndMakeVisible (earlyVersions);
             autoUpdate.setToggleState (up->automatic(), juce::dontSendNotification);
-            earlyVersions.setToggleState (up->early(), juce::dontSendNotification);
-            earlyVersions.onClick = [this]
+            channelRow = std::make_unique<ChipRow> (juce::StringArray { "Stable", "Beta" }, colours::accent, [this] (int i)
             {
                 if (auto* h = StandaloneHost::get())
-                    if (auto* u = h->updater()) u->setEarly (earlyVersions.getToggleState());
-            };
+                    if (auto* u = h->updater()) u->setChannel (i == 1 ? Channel::beta : Channel::stable);
+                page.repaint (earlyText);
+            });
+            channelRow->setSelected (up->channel() == Channel::beta ? 1 : 0);
+            page.addAndMakeVisible (*channelRow);
             autoUpdate.onClick = [this]
             {
                 if (auto* h = StandaloneHost::get())
@@ -1002,9 +1127,10 @@ void SettingsView::show (Section s)
     advanced.setVisible (standalone);
     updateButton.setVisible (hasUpdater);
     autoUpdate.setVisible (hasUpdater);
-    earlyVersions.setVisible (hasUpdater);
+    if (channelRow != nullptr) channelRow->setVisible (hasUpdater);
     for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get(), &teachControl, &teachJob,
-                                                             &footView, &lessMotion, &website, &problem, &report, &support })
+                                                             &footView, &lessMotion, &website, &problem, &report, &support, &whatsNewButton, &starLink,
+                                                             &discord, &youtube, &instagram, &siteLink })
         c->setVisible (true);
     layoutPage();
     scroller.setViewPosition (0, s == sections().getFirst() ? 0 : sectionTop[(size_t) s] - 8);
@@ -1075,7 +1201,7 @@ void SettingsView::layoutPage()
     int y = 0;
     auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
     auto gap = [&] (int g) { y += g; };
-    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = earlyText = motionHead = countHead = countText = helpText = aboutHead = aboutArea = {};
+    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = channelHead = earlyText = motionHead = countHead = countText = helpText = communityHead = communityText = aboutHead = aboutArea = {};
 
     // one page: every part under its own heading, one after another
     bool firstPart = true;
@@ -1144,10 +1270,13 @@ void SettingsView::layoutPage()
                 updateStatus = at (26);
                 gap (14);
                 autoUpdate.setBounds (at (30));
+                gap (22);
+                channelHead = at (22);
+                gap (6);
+                if (channelRow != nullptr) channelRow->setBounds (at (34).withWidth (std::min (col, channelRow->preferredWidth())));
                 gap (8);
-                earlyVersions.setBounds (at (30));
-                earlyText = at (22).withTrimmedLeft (44);
-                gap (16);
+                earlyText = at (58);
+                gap (18);
                 updateButton.setBounds (at (40).withWidth (250));
                 gap (40);
             }
@@ -1180,11 +1309,32 @@ void SettingsView::layoutPage()
             gap (16);
             helpText = at (66);
             gap (36);
+            communityHead = at (26);
+            gap (10);
+            {
+                auto row = at (42);
+                const int cw = std::min (150, (row.getWidth() - 36) / 4);
+                for (auto* b : { &discord, &youtube, &instagram, &siteLink })
+                {
+                    b->setBounds (row.removeFromLeft (cw));
+                    row.removeFromLeft (12);
+                }
+            }
+            gap (16);
+            communityText = at (22);
+            gap (36);
             aboutHead = at (26);
             gap (10);
             aboutArea = at (130);
             gap (4);
-            support.setBounds (at (42).withWidth (200));
+            {
+                auto row = at (42);
+                support.setBounds (row.removeFromLeft (200));
+                row.removeFromLeft (12);
+                whatsNewButton.setBounds (row.removeFromLeft (130));
+                row.removeFromLeft (16);
+                starLink.setBounds (row.withWidth (std::min (row.getWidth(), 220)));
+            }
             break;
         }
     }
@@ -1403,7 +1553,13 @@ void SettingsView::paintPage (juce::Graphics& g)
                 g.setColour (colours::text);
                 g.setFont (font (16.0f, Weight::medium));
                 g.drawText (lastUpdateText, updateStatus, juce::Justification::centredLeft);
-                small ("Test versions come out a few days before everyone gets them. They can have rough edges.", earlyText, 1);
+                g.setColour (colours::text);
+                g.setFont (font (14.0f, Weight::medium));
+                g.drawText ("Update channel", channelHead, juce::Justification::centredLeft);
+                const bool beta = channelRow != nullptr && channelRow->getSelected() == 1;
+                small (beta ? "Beta gets test builds a few days before Stable, so they can have rough edges. Tell us what you find in "
+                              "the Discord #beta-feedback channel. Switching back to Stable never removes a newer build; it waits for Stable to catch up."
+                            : "Stable gets tested releases only. Switch to Beta to try new versions a few days early.", earlyText, 3);
             }
             subhead ("Motion", motionHead);
             if (weeklyHello.isVisible())
@@ -1422,17 +1578,18 @@ void SettingsView::paintPage (juce::Graphics& g)
                        : "Help and fixes opens the page of common problems. Report in public puts a report on your clipboard and opens "
                          "the page to paste it into. Save a report writes it to a text file in your recordings folder, to send to "
                          "whoever is helping you. Nothing is sent by itself.", helpText, 3);
+            subhead ("Community", communityHead);
+            small ("Players swap tones, ask for help and test early builds on Discord. Everything here is free.", communityText, 1);
             subhead ("About", aboutHead);
             juce::AttributedString about;
             about.setLineSpacing (4.0f);
             about.setWordWrap (juce::AttributedString::byWord);
             about.append ("Riffhouse " + versionLabel() + ", made by Natik Chhabra. Free and open source under the AGPL-3.0 license. "
-                          "Tone names saying \"Inspired by\" describe a style: Riffhouse has no affiliation with, and is not endorsed by, "
-                          "any artist, band or equipment maker, and all trademarks belong to their owners. If you are an artist named in a "
-                          "tone and want it changed or removed, open an issue and it will be done. ASIO and VST are trademarks of "
+                          "Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker, "
+                          "and all trademarks belong to their owners. ASIO and VST are trademarks of "
                           "Steinberg Media Technologies GmbH. Riffhouse comes with absolutely no warranty. "
                           "Built with JUCE, Neural Amp Modeler Core, Signalsmith Stretch and LAME (MP3 copies, LGPL). Modern High Gain and "
-                          "Tight Metal play amp captures by Helga Behrens, Brit 81 one by Tim Robertson, from the NAM_models collection (GPL v3). Real cabinets: Jester's Brutal "
+                          "Tight Metal play amp captures by Helga Behrens, Brit 81 one by Tim Robertson, Redline Lead one by Phillipe Priss, from the NAM_models collection (GPL v3). Real cabinets: Jester's Brutal "
                           "Pack (CC0). Fonts under the "
                           "SIL Open Font License and the Apache License 2.0. Every licence is in Licences.txt beside the app.",
                           font (13.5f), colours::textDim);

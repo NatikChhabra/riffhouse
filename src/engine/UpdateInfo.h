@@ -31,6 +31,14 @@ ReleaseInfo parseRelease (const juce::String& json, const juce::String& installe
 // test build is offered the next test build, and the full release when it arrives.
 ReleaseInfo newestRelease (const juce::String& listJson, const juce::String& installerSuffix);
 
+// Which releases a copy follows. Stable: full releases only. Beta: test releases too, a few days
+// early. Saved as "stable" or "beta". Nothing saved yet: a copy that is itself a test build follows
+// Beta, and a copy that used the old "get new versions early" switch keeps following it.
+enum class Channel { stable, beta };
+Channel channelFromSetting (const juce::String& saved, bool legacyEarly, const juce::String& currentVersion);
+juce::String channelKey (Channel);
+juce::String channelName (Channel);
+
 // What the answer from the "latest release" address means. GitHub answers 404 while nothing has
 // been published yet (test releases do not count): that is "you have the latest", not a fault.
 // Anything else that is not a 200 with a body means the check could not be made.

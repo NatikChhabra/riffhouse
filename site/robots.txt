@@ -1,4 +1,19 @@
+# Everyone may read everything here, search engines and AI assistants included.
 User-agent: *
+Allow: /
+
+# Named so there is no doubt: AI search and AI assistants are welcome.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
 Allow: /
 
 Sitemap: https://riffhouse.in/sitemap.xml

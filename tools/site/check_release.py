@@ -12,14 +12,19 @@ It reads the files in site/ and fails with a plain list of what is stale:
   - the card has its picture and a link to that version's notes
   - every page states the same number of tones, amps, pedals and cabinets, and the tone
     count is the number of tones in site/tones.json
+  - the version line written into the home and press pages names the version (it is what search engines and
+    AI assistants read: they do not run the script that fills in the live one)
+  - the data block in the home page head, site/llms.txt and the sitemap dates are up to date (tools/site/schema.py)
   - the release has an installer the download button can find (only when asking GitHub)
 
-The home page and the press page read the newest version from GitHub when they load, so they cannot go stale.
+For a visitor, the download buttons are written with the newest installer on every publish (tools/site/download.py),
+and the home page and the press page read the newest version from GitHub again when they load.
 """
 import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import time
 import urllib.request
@@ -28,7 +33,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SITE = ROOT / "site"
 REPO = "NatikChhabra/riffhouse"
 TAG = re.compile(r"^v(\d+\.\d+\.\d+)(\.\d+)?$")
-PAGES = ["index.html", "why-free.html", "updates.html", "roadmap.html", "press.html", "left.html"]
+PAGES = ["index.html", "no-audio-interface.html", "why-free.html", "updates.html", "roadmap.html", "press.html", "left.html"]
 WORDS = {"nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "thirty": 30}
 
 
@@ -54,13 +59,14 @@ def newest_release():
     if not public:
         sys.exit("site check: there is no public release yet")
     for r in public:
-        if any(a["name"].lower().endswith("windows-setup.exe") for a in r["assets"]):
+        files = [a for a in r["assets"] if a["name"].lower().endswith("windows-setup.exe")]
+        if files:
             problems = []
             if r is not public[0]:
                 problems.append(f"{public[0]['tag_name']} is published but has no windows-setup.exe, "
                                 f"so the download button still gives {r['tag_name']}")
-            return r["tag_name"], problems
-    return public[0]["tag_name"], [f"{public[0]['tag_name']} has no windows-setup.exe: the download button has nothing to give"]
+            return r["tag_name"], problems, files[0]
+    return public[0]["tag_name"], [f"{public[0]['tag_name']} has no windows-setup.exe: the download button has nothing to give"], None
 
 
 def text_of(html):
@@ -121,11 +127,23 @@ def check(tag):
     if patched and full not in text_of(road):
         stale.append(f"roadmap.html does not name {full}: say which hotfix or update is the current one")
 
+    # The version line a crawler reads, and the facts built from it.
+    for name in ("index.html", "press.html"):
+        line = re.search(r"data-release[^>]*>([^<]*)<", pages[name])
+        if not line or not re.search(rf"Version {re.escape(full)}, released \d{{1,2}} [A-Z][a-z]+ \d{{4}}\.", line.group(1)):
+            stale.append(f"{name}: the version line in the page says '{line.group(1).strip() if line else 'nothing'}', "
+                         f"write 'Version {full}, released <day month year>.'")
+    built = subprocess.run([sys.executable, str(ROOT / "tools" / "site" / "schema.py"), "--check"], capture_output=True, text=True)
+    if built.returncode:
+        stale.append((built.stderr or built.stdout).strip().replace("schema: ", ""))
+
     # The numbers agree on every page, and the tone count is the real one.
     tones = len(json.loads((SITE / "tones.json").read_text(encoding="utf-8")))
     for thing in ("tones", "amps", "pedals", "cabinets"):
         said = {}
         for name, html in pages.items():
+            if name == "updates.html":  # older cards say what was true then: read the newest card only
+                html = re.split(r'<li class="upd[ "]', html)[1] if '<li class="upd' in html else html
             for n in counts(html, thing):
                 said.setdefault(n, []).append(name)
         if thing == "tones":
@@ -143,7 +161,7 @@ def check(tag):
 def main(argv):
     if len(argv) > 2 or (len(argv) == 2 and argv[1] in ("-h", "--help")):
         sys.exit(__doc__)
-    tag, problems = (argv[1], []) if len(argv) == 2 else newest_release()
+    tag, problems = (argv[1], []) if len(argv) == 2 else newest_release()[:2]
     full, stale = check(tag)
     stale = problems + stale
     if stale:

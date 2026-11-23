@@ -44,13 +44,17 @@ void Updater::setAutomatic (bool on)
     if (on && state() == State::available) checkNow(); // fetch what was only being announced
 }
 
-bool Updater::early() const { return settings.getBoolValue ("earlyVersions", false); }
-
-void Updater::setEarly (bool on)
+Channel Updater::channel() const
 {
-    settings.setValue ("earlyVersions", on);
+    return channelFromSetting (settings.getValue ("updateChannel"), settings.getBoolValue ("earlyVersions", false), current);
+}
+
+void Updater::setChannel (Channel c)
+{
+    settings.setValue ("updateChannel", channelKey (c));
+    settings.removeValue ("earlyVersions"); // the old switch is replaced by the channel
     settings.saveIfNeeded();
-    if (on) checkNow(); // a tester wants to know straight away whether one is waiting
+    checkNow(); // say straight away what the chosen channel has
 }
 
 Updater::State Updater::state() const { const juce::ScopedLock sl (lock); return current_state; }
@@ -168,8 +172,8 @@ void Updater::run()
     const bool asked = userAsked.load();
     set (State::checking);
     int status = 0;
-    // a test build follows the test releases too; a full release only ever follows full releases
-    const bool tester = isPreRelease (current) || early();
+    // Beta follows the test releases too; Stable only ever follows full releases
+    const bool tester = channel() == Channel::beta;
     const auto json = fetch (tester ? kAllReleases : kLatestRelease, status);
     if (threadShouldExit()) return;
     const auto answer = readCheckAnswer (status, json);
@@ -256,7 +260,7 @@ juce::String Updater::statusText() const
     {
         case State::idle:        return "Version " + current;
         case State::checking:    return "Version " + current + ". Checking for a newer one";
-        case State::upToDate:    return "Version " + current + " is the latest";
+        case State::upToDate:    return "Version " + current + (channel() == Channel::beta ? " is the latest Beta" : " is the latest");
         case State::downloading: return "Downloading version " + spokenVersion (info.version) + " (" + juce::String (juce::roundToInt (downloadProgress.load() * 100.0f)) + "%)";
         case State::ready:       return "Version " + spokenVersion (info.version) + " is ready. It installs when you close Riffhouse";
         case State::available:   return "Version " + spokenVersion (info.version) + " is out. You have " + spokenVersion (current);

@@ -129,6 +129,7 @@ namespace
         s.push_back (cont (P::outLevel, "out_level", "Output", -36.0f, 12.0f, 0.0f, "dB"));
         s.push_back (tog (P::autoLevel, "auto_level", "Auto level", true));
         s.push_back (pick (P::gateAuto, "gate_auto", "Gate Mode", { "Manual", "Auto" }, 1));
+        s.push_back (knob (P::gateReduce, "gate_reduce", "Noise Reduction", 5.0f));
 
         assert ((int) s.size() == kNumParams);
         for (int i = 0; i < (int) s.size(); ++i)

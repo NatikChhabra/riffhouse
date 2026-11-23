@@ -2,7 +2,7 @@
 
 # Riffhouse
 
-**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 11 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
+**Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 12 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
 
@@ -12,15 +12,13 @@ More on the [website](https://riffhouse.in/), or go straight to [help and fixes]
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
-## New in 0.1.5
+## New in 0.1.6 (Update 1)
 
-- **Pedals that behave like the real circuits.** Every drive and fuzz is worked out transistor by transistor and checked against measurements of the real pedals.
-- **Cleaner high gain and quiet stops.** No digital fizz on high notes, and the gate closes the moment you mute the strings.
-- **Hum and whine taken out, not filtered.** Ground-loop buzz and charger whine are found and removed, so your notes keep their body.
-- **Real speaker cabinets.** Each cab follows its real speaker's measured response within 2 dB.
-- **No clicks.** Switching pedals, changing tones and turning knobs fast are all click-free.
-- **ASIO no longer freezes the window.** A driver is tried in a hidden test run first, and setup goes for the lowest delay by itself.
-- **Help when something breaks.** After a crash or freeze, Riffhouse offers to send a private report, with your names taken out.
+- **A noise gate that sets itself.** Auto mode listens to your guitar's hiss and closes just above it, from the first note. Turn Threshold and it stays where you put it.
+- **Brighter cleans.** Glass Clean and Chime Top have the sparkle of the real amps they are modelled on.
+- **Setup that just works on USB guitar cables.** It picks the mode that hears your guitar best, the same way every time.
+- **Real amp captures for the heavier tones.** The four high-gain amps now play neural captures of real high-gain amps, through four new cabinets recorded from real 4x12s.
+- **Tell us what to fix.** A Feedback button at the top sends a note straight to the people who make Riffhouse.
 
 ![Chords and tabs, read from your chair](docs/screenshots/chords.png)
 
@@ -64,9 +62,9 @@ Every amp, pedal and cabinet is its own piece of gear, with its own face and its
 | ![A cabinet with its microphone](docs/screenshots/cab.png) | ![The tone browser](docs/screenshots/browser.png) |
 
 - **11 amps**, from glassy cleans to tight metal, plus a bass amp and a direct channel.
-- **11 speaker cabinets**, three of them recordings of real 4x12s, each with a mic you can move across the cone, and a slot for your own impulse response.
+- **12 speaker cabinets**, three of them recordings of real 4x12s, each with a mic you can move across the cone, and a slot for your own impulse response.
 - **30 pedals:** gate, compressor, wah and envelope filter, octave, seven drives and fuzzes, graphic EQ, six modulations, four delays, six reverbs and a lo-fi box.
-- **197 tones** sorted by genre, with "Inspired by" tones for well-known players and songs.
+- **197 tones** sorted by genre and sound. Names describe the sound, never a person, a band or a song.
 - **Neural captures:** load any `.nam` file as the amp.
 - **Tuner** for any tuning, and a **metronome**.
 - **Undo and redo** for the whole tone, with <kbd>Ctrl</kbd>+<kbd>Z</kbd> and <kbd>Ctrl</kbd>+<kbd>Y</kbd>.
@@ -158,6 +156,6 @@ build/tests/riffhouse_tests_artefacts/Release/riffhouse_tests
 
 Riffhouse is made by [Natik Chhabra](https://github.com/NatikChhabra). It is free software under the GNU Affero General Public License, version 3 or later.
 
-It is built with [JUCE](https://juce.com) (AGPLv3), [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT) and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) (MIT), which slows the song down, and [LAME](https://lame.sourceforge.io) (LGPL 2.0), which writes the MP3 copies. The three "Real" cabinets are recordings from [Jester's Brutal Pack](https://jester-dyne-productions.com) by Jester Dyne Productions, dedicated to the public domain (CC0 1.0). Modern High Gain and Tight Metal play Neural Amp Modeler captures of real amps by Helga Behrens, and Brit 81 one by Tim Robertson, from the community [NAM_models](https://github.com/pelennor2170/NAM_models) collection (GNU GPL v3, see `tools/captures/`). Fonts: Instrument Sans, Inter, Doto, Big Shoulders, Kaushan Script and Alfa Slab One under the SIL Open Font License, and Yellowtail under the Apache License 2.0.
+It is built with [JUCE](https://juce.com) (AGPLv3), [Neural Amp Modeler Core](https://github.com/sdatkinson/NeuralAmpModelerCore) (MIT) and [Signalsmith Stretch](https://github.com/Signalsmith-Audio/signalsmith-stretch) (MIT), which slows the song down, and [LAME](https://lame.sourceforge.io) (LGPL 2.0), which writes the MP3 copies. The three "Real" cabinets are recordings from [Jester's Brutal Pack](https://jester-dyne-productions.com) by Jester Dyne Productions, dedicated to the public domain (CC0 1.0). Modern High Gain and Tight Metal play Neural Amp Modeler captures of real amps by Helga Behrens, Brit 81 one by Tim Robertson and Redline Lead one by Phillipe Priss, from the community [NAM_models](https://github.com/pelennor2170/NAM_models) collection (GNU GPL v3, see `tools/captures/`). Fonts: Instrument Sans, Inter, Doto, Big Shoulders, Kaushan Script and Alfa Slab One under the SIL Open Font License, and Yellowtail under the Apache License 2.0.
 
-Every amp and pedal in Riffhouse is an original design, and so is every cabinet except the three recorded "Real" ones. Tones named "Inspired by" describe a style. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.
+Every amp and pedal in Riffhouse is an original design, and so is every cabinet except the three recorded "Real" ones. Tone names describe a sound. Riffhouse has no affiliation with, and is not endorsed by, any artist, band or equipment maker. All trademarks belong to their owners.
