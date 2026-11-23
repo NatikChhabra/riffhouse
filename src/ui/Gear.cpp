@@ -361,7 +361,7 @@ namespace
         g.setColour (ink);
         g.drawText (text, area, j, false);
     }
-    juce::String titled (const juce::String& s) // "bass station" becomes "Bass Station"
+    juce::String titled (const juce::String& s) // "deep bass" becomes "Deep Bass"
     {
         juce::StringArray words;
         words.addTokens (s.toLowerCase(), " ", "");
@@ -378,10 +378,10 @@ const PedalDesign& drivePedalDesign (int t)
         { "clean boost", "plus 20 dB of clean", 0xffaeb3b5, 0xff16191b, 0xffd9f1ff, Finish::brushed,    KnobStyle::dome,    0xff16191b, Face::instrumentSemi, false, 0.86f, 0, 1, 3 },
         { "TREBLE BOOSTER", "range 1", 0xff5f6f78, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xffece4cf, Face::shoulders,      true,  0.92f, 0, 2, 0 },
         { "GREEN DRIVE", "mid overdrive", 0xff2e6a42, 0xfff0e8cc, 0xff7dffa0, Finish::enamel,     KnobStyle::pedal,   0xfff0e8cc, Face::shoulders,      true,  1.0f,  1, 0, 0 },
-        { "blues drive", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::script, false, 1.0f,  0, 1, 0 },
-        { "RODENT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
+        { "blues crunch", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::script, false, 1.0f,  0, 1, 0 },
+        { "GRIT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
         { "big fuzz", "sustainer", 0xffe6dbc0, 0xff3b2a1a, 0xffffb547, Finish::enamel,     KnobStyle::skirted, 0xff1e1a16, Face::shoulders,      false, 1.28f, 3, 3, 2 },
-        { "METAL BOX", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
+        { "METAL DIST", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
     };
     return d[juce::jlimit (0, (int) std::size (d) - 1, t)];
 }
@@ -444,7 +444,7 @@ const AmpDesign& ampDesign (int m)
           { "volume", "bass", "middle", "treble", "bright", "deep", "master", "output" }, { 0, 3, 2, 1, 4, 5, 6, 7 }, 0x30 },
         { "tweed",     Tolex::tweed,  0xffc9a66b, Panel::chrome,   0xff1b1a18, Weave::wheat,      0,          KnobStyle::chicken, 0xffece4cf, 0xfff2351f, Face::instrumentSemi, true,  false, false, 2, 0, 1, 0.66f,
           { "volume", "bass", "middle", "treble", "presence", "body", "loud", "output" }, { 4, 2, 1, 3, 0, 6, 5, 7 }, 0xa0 },
-        { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffcbb48a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false, false, 0, 3, 1, 0.94f,
+        { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffa8975a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false, false, 0, 3, 1, 0.94f,
           { "drive", "bass", "middle", "treble", "brilliance", "weight", "master", "output" }, { 0, 1, 2, 3, 4, 5, 6, 7 }, 0x30 },
         { "SOVEREIGN", Tolex::levant, 0xff131313, Panel::gold,     0xff17130c, Weave::none,       0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffec2f1b, Face::shoulders,      false, true,  false, 1, 0, 2, 1.0f,
           { "VOLUME I", "BASS", "MIDDLE", "TREBLE", "PRESENCE", "RESONANCE", "VOLUME II", "OUTPUT" }, { 4, 1, 2, 3, 0, 6, 5, 7 }, 0xa0 },
@@ -455,7 +455,7 @@ const AmpDesign& ampDesign (int m)
         { "MODERN",    Tolex::levant, 0xff101010, Panel::plate,    0xffe9e7e2, Weave::mesh,       0,          KnobStyle::skirted, 0xff101112, 0xff7dffa0, Face::shoulders,      true,  true,  false, 1, 2, 1, 1.0f },
         { "TIGHT",     Tolex::smooth, 0xff0d0d0e, Panel::anodised, 0xfff4a524, Weave::mesh,       0,          KnobStyle::pedal,   0xfff4a524, 0xfff4a524, Face::shoulders,      false, true,  false, 3, 3, 2, 0.84f,
           { "GAIN", "LOW", "MID", "HIGH", "PRES", "DEEP", "MASTER", "OUT" }, { 0, 1, 2, 3, 4, 5, 6, 7 }, 0x30 },
-        { "bass station", Tolex::levant, 0xff1d2530, Panel::brushed, 0xff141618, Weave::grid,     0xff8fa3b8, KnobStyle::skirted, 0xff141618, 0xff6fb7ff, Face::shoulders,      true,  true,  false, 4, 0, 0, 0.78f },
+        { "deep bass", Tolex::levant, 0xff1d2530, Panel::brushed, 0xff141618, Weave::grid,     0xff8fa3b8, KnobStyle::skirted, 0xff141618, 0xff6fb7ff, Face::shoulders,      true,  true,  false, 4, 0, 0, 0.78f },
         { "studio direct", Tolex::smooth, 0xff1a1b1d, Panel::brushed, 0xff141618, Weave::none,    0,          KnobStyle::dome,    0xff141618, 0xff7dffa0, Face::instrumentSemi, false, false, true,  5, 2, 2, 1.0f },
         { "capture",   Tolex::smooth, 0xff141518, Panel::anodised, 0xffe9e7e2, Weave::none,       0,          KnobStyle::modern,  0xffe9e7e2, 0xffff9f1c, Face::instrumentSemi, false, false, true,  5, 0, 1, 1.0f },
     };
@@ -1505,17 +1505,16 @@ namespace
                 }
                 break;
             }
-            case Weave::diamond:
+            case Weave::diamond: // the windowpane cloth: a brass lattice of upright rectangles over deep green
             {
-                g.setColour (C (0xff3a2b1f));
+                g.setColour (C (0xff10231d));
                 g.fillRect (r);
-                const float p = 22.0f;
-                for (float x = r.getX() - r.getHeight(); x < r.getRight() + r.getHeight(); x += p)
-                {
-                    g.setColour (C (0xffb08e5c).withAlpha (0.55f));
-                    g.drawLine (x, r.getY(), x + r.getHeight(), r.getBottom(), 3.0f);
-                    g.drawLine (x, r.getBottom(), x + r.getHeight(), r.getY(), 3.0f);
-                }
+                const float pu = 30.0f, pv = 20.0f;
+                g.setColour (C (0xffa8975a).withAlpha (0.6f));
+                for (float x = r.getX() + 1.0f; x < r.getRight(); x += pu)
+                    g.fillRect (x, r.getY(), 3.0f, r.getHeight());
+                for (float y = r.getY() + 1.0f; y < r.getBottom(); y += pv)
+                    g.fillRect (r.getX(), y, r.getWidth(), 3.0f);
                 for (int i = 0; i < (int) (area / 6.0f); ++i)
                 {
                     g.setColour (juce::Colours::black.withAlpha (0.08f + rnd.nextFloat() * 0.1f));
@@ -1730,7 +1729,7 @@ namespace
         if (b == "redline")      return Logo::pennant;
         if (b == "MODERN")       return Logo::milled;
         if (b == "TIGHT")        return Logo::printed;
-        if (b == "bass station") return Logo::enamel;
+        if (b == "deep bass") return Logo::enamel;
         return Logo::plate;
     }
 
@@ -2559,7 +2558,7 @@ namespace
         switch (m)
         {
             case 0:  return { Weave::black,      0,          5, 0.20f, true  };
-            case 1:  return { Weave::diamond,    0xffcbb48a, 2, 0.12f, true  };
+            case 1:  return { Weave::diamond,    0xffa8975a, 2, 0.12f, true  };
             case 2:  return { Weave::saltPepper, 0xffe9e2cf, 3, 0.16f, false };
             case 3:  return { Weave::grid,       0,          6, 0.24f, false };
             case 4:  return { Weave::silver,     0,          0, 0.15f, true  };

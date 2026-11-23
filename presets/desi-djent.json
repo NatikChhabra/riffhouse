@@ -25,7 +25,7 @@
     "cab_lowcut": 60,
     "cab_highcut": 7000,
     "drv_on": true,
-    "drv_type": "Metal Box",
+    "drv_type": "Metal Dist",
     "drv_gain": 1,
     "drv_tone": 5.5,
     "drv_level": 5,

@@ -14,7 +14,7 @@ Released 17 November 2026, built from players' reports.
 - **Four new 4x12 cabinets.** Made from recordings of real 4x12 cabinets, with a mic knob that moves through the real mic placements. Twelve cabinets in all.
 - **A gate that sets itself.** Auto mode listens to the hiss your guitar and input make and closes just above it, from the first note. Turn Threshold yourself and it stays where you put it.
 - **The gate, saved with each tone.** A tone with the gate off no longer turns it off for every other tone.
-- **Brighter cleans.** Glass Clean and Chime Top have more top end.
+- **Brighter cleans.** Glass Clean and Chime Bright have more top end.
 - **Setup on USB guitar cables.** Setup keeps the audio mode that hears your guitar best, the same way every time.
 - **A Feedback button.** Write what sounds or feels wrong and it goes straight to the people who fix Riffhouse.
 - **Every tone level-matched again.** All 197.

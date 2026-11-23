@@ -8,7 +8,7 @@
   "description": "Treble-boosted chime amp at full tilt.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 7.5,
     "amp_bass": 5,
     "amp_mid": 6,
@@ -18,7 +18,7 @@
     "amp_master": 5,
     "amp_level": 0.0,
     "cab_on": true,
-    "cab_model": "2x12 Blue",
+    "cab_model": "2x12 Chime",
     "cab_mic": 3,
     "cab_distance": 2,
     "cab_lowcut": 60,

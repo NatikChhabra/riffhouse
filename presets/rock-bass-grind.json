@@ -9,7 +9,7 @@
   "description": "Gritty, punchy rock bass.",
   "params": {
     "amp_on": true,
-    "amp_model": "Bass Station",
+    "amp_model": "Deep Bass",
     "amp_gain": 6.5,
     "amp_bass": 6,
     "amp_mid": 6,

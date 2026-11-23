@@ -3051,6 +3051,12 @@ void testToneNames()
     // amps renamed in 0.1.5 still load from tones saved or shared before
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Hot Rod Lead"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::hotRodLead, "an old Hot Rod Lead tone loads as the Redline Lead");
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"brit plexi"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::britPlexi, "an old Brit Plexi tone loads as the Brit 68");
+    CHECK (presetFromJson (R"({"name":"Old","params":{"cab_model":"2x12 Blue"}})", p, err) && (int) p.values[(size_t) P::cabModel] == 1, "an old 2x12 Blue tone loads as the 2x12 Chime");
+    CHECK (presetFromJson (R"({"name":"Old","params":{"drv_type":"Rodent Dist"}})", p, err) && (int) p.values[(size_t) P::drvType] == 4, "an old Rodent Dist tone loads as the Grit Dist");
+    CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Bass Station"}})", p, err) && (int) p.values[(size_t) P::ampModel] == 8, "an old Bass Station tone loads as the Deep Bass");
+    CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Chime Top"}})", p, err) && (int) p.values[(size_t) P::ampModel] == 2, "an old Chime Top tone loads as the Chime Bright");
+    CHECK (presetFromJson (R"({"name":"Old","params":{"drv_type":"Metal Box"}})", p, err) && (int) p.values[(size_t) P::drvType] == 6, "an old Metal Box tone loads as the Metal Dist");
+    CHECK (presetFromJson (R"({"name":"Old","params":{"drv_type":"Blues Drive"}})", p, err) && (int) p.values[(size_t) P::drvType] == 3, "an old Blues Drive tone loads as the Blues Crunch");
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Brit 800"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::brit800, "an old Brit 800 tone loads as the Brit 81");
     CHECK (presetFromJson (R"({"name":"Warm Crunch","category":"Essentials"})", p, err) && p.artist().isEmpty() && p.title() == "Warm Crunch" && p.credit().isEmpty(), "a plain tone is only its name");
     CHECK (presetFromJson (R"({"name":"My take: louder","category":"User"})", p, err) && p.title() == "My take: louder", "a colon in your own tone's name is left alone");

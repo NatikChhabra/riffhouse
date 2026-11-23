@@ -9,7 +9,7 @@
   "description": "Bright, jangly edge-of-breakup strum for band songs with big choruses.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 5.5,
     "amp_bass": 4.5,
     "amp_mid": 5.5,
@@ -19,7 +19,7 @@
     "amp_master": 5,
     "amp_level": 0.0,
     "cab_on": true,
-    "cab_model": "2x12 Blue",
+    "cab_model": "2x12 Chime",
     "cab_mic": 3,
     "cab_distance": 2,
     "cab_lowcut": 60,

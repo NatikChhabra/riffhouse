@@ -87,7 +87,7 @@ jobs:
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.found != 'true' }}
     runs-on: windows-2022
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -384,7 +384,7 @@ jobs:
     needs: reuse
     if: ${{ !cancelled() && needs.reuse.outputs.found != 'true' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The runner fetches packages from a mirror inside its own cloud first. When that mirror cannot be

@@ -2,13 +2,21 @@
 # Keep each version to 3-5 short lines per section: the full list lives in CHANGELOG.md.
 # The heading is the version; a release cannot be tagged without its entry (tools/release/notes.py check).
 
+## 0.1.7
+### New
+- A Reduce knob on the Gate quiets the hiss between notes and under their tails, so distortion tones are much quieter between notes.
+- A feedback killer runs with the gate: it notches a howl that only ever grows, and never touches played notes.
+- The Pitch pedal's Shift mode is rebuilt and sounds much cleaner on notes and chords.
+- Settings has an update channel (Stable or Beta) and a Community section with the Discord server, YouTube, Instagram and the website.
+- Tones are named for the sound they make, not for people, bands or songs. Mark a favourite again if its name changed.
+- The weekly player count is off until you say yes once.
+
 ## 0.1.6
 ### New
 - The metal amps now play captures of real amps, so palm mutes stop dead and the drive cleans up when you play softer.
 - A noise gate that sets itself: Auto is the default on every tone.
 - Three new cabinets recorded from real 4x12s, with a mic knob that moves through real mic positions.
 - A Feedback button next to the name: say what sounds wrong and it goes to the people who fix Riffhouse.
-- This panel, and Community links in Settings with the Discord server.
 ### Fixed
 - Clean tones sounded dull. Glass Clean and Chime Top are brighter on top, like the amps they are modelled on.
 - The gate no longer chatters on USB guitar cables that tick.

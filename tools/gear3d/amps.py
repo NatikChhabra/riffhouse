@@ -308,13 +308,14 @@ def cloth_maps(st, rect, weave, piping_round, speakers, work, aid):
         if weave == 1:           # darker stripes woven in a hand apart
             band = ((u - 9.0) % 18.0) < 2.4
             col = np.where(band[..., None], col * 0.72, col)
-    elif weave == 2:           # the diamond cloth: a tan lattice over brown
-        p = 22.0
-        d1 = ((u + v) % p) / p
-        d2 = ((u - v) % p) / p
-        line = np.maximum(np.exp(-((d1 - 0.5) * p / 1.6) ** 2), np.exp(-((d2 - 0.5) * p / 1.6) ** 2))
+    elif weave == 2:           # windowpane cloth: a brass lattice of upright rectangles over deep green
+        pu, pv = 30.0, 20.0
+        du = ((u % pu) / pu - 0.5) * pu
+        dv = ((v % pv) / pv - 0.5) * pv
+        line = np.maximum(np.exp(-((np.abs(du) - pu * 0.5 + 0.7) / 1.0) ** 2),
+                          np.exp(-((np.abs(dv) - pv * 0.5 + 0.7) / 1.0) ** 2))
         fine = (np.sin(u * math.pi / 1.2) * np.sin(v * math.pi / 1.2)) * 0.5 + 0.5
-        col = np.array((0.11, 0.07, 0.04)) * (1 - line[..., None]) + np.array((0.42, 0.3, 0.16)) * line[..., None]
+        col = np.array((0.012, 0.04, 0.03)) * (1 - line[..., None]) + np.array((0.4, 0.34, 0.17)) * line[..., None]
         col = col * (0.85 + 0.15 * fine[..., None])
         hgt = line * 0.8 + fine * 0.3
     elif weave == 3:           # salt and pepper basket weave

@@ -416,7 +416,7 @@ public:
 private:
     void update();
     double sr = 48000.0, osr = 192000.0;
-    std::unique_ptr<juce::dsp::Oversampling<float>> os, osHigh; // 8x, and 16x for the hard clippers (rodent, fuzz, metal)
+    std::unique_ptr<juce::dsp::Oversampling<float>> os, osHigh; // 8x, and 16x for the hard clippers (grit, fuzz, metal)
     juce::dsp::Oversampling<float>* active() const noexcept { return (type == 4 || type == 5 || type == 6) && osHigh ? osHigh.get() : os.get(); }
     int type = 2;
     float drive = 0.4f, tone = 0.5f, level = 0.5f;
@@ -428,7 +428,7 @@ private:
     Smoother levelS;
     // the pedals, each built as its circuit (see Circuits.h and the pedal lab)
     circuit::GreenDrive green;
-    circuit::RodentDist rodent;
+    circuit::GritDist grit;
     circuit::BigFuzz fuzz;
     circuit::CleanBoost boost;
     circuit::TrebleBooster trebleBoost;

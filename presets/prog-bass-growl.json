@@ -8,7 +8,7 @@
   "description": "Bright, growly, midrange-y bass.",
   "params": {
     "amp_on": true,
-    "amp_model": "Bass Station",
+    "amp_model": "Deep Bass",
     "amp_gain": 6,
     "amp_bass": 5.5,
     "amp_mid": 6.5,

@@ -12,13 +12,13 @@ More on the [website](https://riffhouse.in/), or go straight to [help and fixes]
 
 ![The amp page, with the pedalboard across the top](docs/screenshots/amp.png)
 
-## New in 0.1.6 (Update 1)
+## New in 0.1.7 (Update 2)
 
-- **A noise gate that sets itself.** Auto mode listens to your guitar's hiss and closes just above it, from the first note. Turn Threshold and it stays where you put it.
-- **Brighter cleans.** Glass Clean and Chime Top have the sparkle of the real amps they are modelled on.
-- **Setup that just works on USB guitar cables.** It picks the mode that hears your guitar best, the same way every time.
-- **Real amp captures for the heavier tones.** The four high-gain amps now play neural captures of real high-gain amps, through four new cabinets recorded from real 4x12s.
-- **Tell us what to fix.** A Feedback button at the top sends a note straight to the people who make Riffhouse.
+- **Quiet distortion.** A Reduce knob on the Gate quiets the hiss between notes and under their tails. It leaves continuous playing alone.
+- **A feedback killer.** If a guitar near its amp starts to howl, a narrow notch takes the howl down. Played notes are never touched.
+- **A cleaner Pitch pedal.** Shift mode follows the period of the note, so notes and chords stay clean.
+- **Tones named for the sound.** No tone names a person, band or song any more.
+- **A What's new card and a Community section.** Riffhouse tells you what changed after an update, and Settings links the Discord server.
 
 ![Chords and tabs, read from your chair](docs/screenshots/chords.png)
 
