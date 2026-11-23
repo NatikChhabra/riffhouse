@@ -57,6 +57,7 @@ Start with Help and fixes. Still stuck? Settings has report buttons under Help. 
 
 - [Home page](https://riffhouse.in/): what it is, the tone list, how setup works
 - [Guitar into a laptop with no audio interface](https://riffhouse.in/no-audio-interface.html): what you need, four steps, and what a mic jack does to the sound
+- [Free amp sims for Windows](https://riffhouse.in/free-amp-sim-windows.html): the three kinds of free amp sim, and free vs paid side by side
 - [Download](https://github.com/NatikChhabra/riffhouse/releases/latest): the Windows installer
 - [What's new](https://riffhouse.in/updates.html): every version so far
 - [Roadmap](https://riffhouse.in/roadmap.html): what comes next
