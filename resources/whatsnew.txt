@@ -4,7 +4,7 @@
 
 ## 0.1.7
 ### New
-- A Reduce knob on the Gate quiets the hiss between notes and under their tails, so distortion tones are no longer noisy.
+- A Reduce knob on the Gate quiets the hiss between notes and under their tails, so distortion tones are much quieter between notes.
 - A feedback killer runs with the gate: it notches a howl that only ever grows, and never touches played notes.
 - The Pitch pedal's Shift mode is rebuilt and sounds much cleaner on notes and chords.
 - Settings has an update channel (Stable or Beta) and a Community section with the Discord server, YouTube, Instagram and the website.
