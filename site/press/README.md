@@ -10,7 +10,7 @@ Everything here may be used in videos, articles and thumbnails about Riffhouse. 
 - Price: free. No paid version, no account, no ads, no trial.
 - Licence: open source, AGPLv3.
 - Made by: Natik Chhabra, India. Built alone.
-- In it: 11 amps (incl. a bass amp and a direct channel), 9 cabinets with a movable mic and an IR slot, 30 pedals, 197 tones by genre, a NAM capture loader, tuner, metronome, looper, chords and tabs sheet, play-along (slow down without pitch change, loop a part), a recorder that keeps the dry take so you can change the tone after playing, MP3 and FLAC export, MIDI foot control.
+- In it: 11 amps (incl. a bass amp and a direct channel), 12 cabinets with a movable mic and an IR slot, 30 pedals, 197 tones by genre, a NAM capture loader, tuner, metronome, looper, chords and tabs sheet, play-along (slow down without pitch change, loop a part), a recorder that keeps the dry take so you can change the tone after playing, MP3 and FLAC export, MIDI foot control.
 - Setup: automatic in the standalone app (input, buffer, level, gate, mains hum). Works through a laptop mic jack, no interface needed. ASIO, WASAPI and DirectSound if you want to pick.
 - Updates: in-app, checked against the SHA-256 GitHub publishes.
 
@@ -33,4 +33,4 @@ Two lines: Riffhouse is a free guitar amp and pedalboard for Windows, standalone
 
 Colours: cream #efe2bf, frame #171615, cloth #86693a, lamp #f08a1c, page #0b0b0b.
 
-Please don't name Riffhouse tones after real artists or brands in titles or thumbnails; the app's tones are "inspired by" styles, not copies.
+Please don't name Riffhouse tones after real artists or brands in titles or thumbnails; tones are named for sounds, never for people.

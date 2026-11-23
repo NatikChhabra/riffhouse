@@ -16,6 +16,7 @@ AppVersion={#AppVersion}
 AppVerName=Riffhouse {#AppVersion}
 AppPublisher=Natik Chhabra
 AppPublisherURL=https://github.com/NatikChhabra/riffhouse
+InfoBeforeFile=install-notice.txt
 AppSupportURL=https://github.com/NatikChhabra/riffhouse/issues
 AppUpdatesURL=https://github.com/NatikChhabra/riffhouse/releases
 DefaultDirName={localappdata}\Programs\Riffhouse

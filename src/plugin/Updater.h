@@ -35,9 +35,10 @@ public:
 
     bool automatic() const;
     void setAutomatic (bool);
-    // Testers get each test version as soon as it is out, before everyone else.
-    bool early() const;
-    void setEarly (bool);
+    // Stable follows full releases. Beta also gets each test version a few days early.
+    // Switching never downgrades: a newer Beta stays until Stable catches up.
+    Channel channel() const;
+    void setChannel (Channel);
 
     bool canInstall() const;                 // a checked installer is waiting
     bool launchInstaller (bool relaunch);    // true once the installer is running: quit now

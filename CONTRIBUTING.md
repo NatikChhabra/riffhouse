@@ -4,7 +4,7 @@ Thanks for wanting to help. Riffhouse is free software and stays that way.
 
 ## Tones
 
-The easiest way in. A tone is one JSON file in `presets/`. Make it in the app, save it, copy the file from your tone folder (**Open tone folder** in the tone browser) and open a pull request. Name tones after what they sound like. For a tone modelled on a player or a song, use "Inspired by <Artist>: <Title>".
+The easiest way in. A tone is one JSON file in `presets/`. Make it in the app, save it, copy the file from your tone folder (**Open tone folder** in the tone browser) and open a pull request. Name tones after what they sound like ("Warm Compressed Clean"), never after a person, a band or a song.
 
 Every tone is checked for loudness, so one tone is never much louder than the next. Run the checks before you send it.
 

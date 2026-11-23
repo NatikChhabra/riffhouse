@@ -116,6 +116,8 @@ private:
     InputConditioner input;
     TiltProbe probe;
     NoiseGate gate;
+    NoiseReducer reducer;
+    FeedbackKiller feedback;
     Compressor comp;
     Wah wah;
     PitchPedal pitch;
@@ -126,7 +128,7 @@ private:
     // The real amps behind Modern High Gain, Tight Metal and Brit 81, built in (FactoryCaptures.h): those
     // three play the capture itself, with the knobs around it, and fall back to the circuit
     // model only if a capture could not be built.
-    static constexpr int kFactory = 3;
+    static constexpr int kFactory = 4;
     NeuralCapture factory[kFactory];
     bool factoryReady[kFactory] {};
     Biquad facBass, facMid, facTreble, facPresence, facDepth;

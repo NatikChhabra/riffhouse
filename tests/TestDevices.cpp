@@ -575,14 +575,16 @@ void runDeviceChecks (int& checks, int& failures)
         CHECK (! reports::countsAsPlayer ("0.1.4-dev.43e3e38", false), "a build from source is not");
         CHECK (! reports::countsAsPlayer ("0.0.0-dev (built from source)", false), "nor one without a version");
         {
-            // the weekly count: on by default, a random id made once and kept, and nothing else in what is sent
+            // the weekly count: off until the player says yes, a random id made once and kept, and nothing else in what is sent
             const auto file = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-hello-test-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt()) + ".settings");
             file.deleteFile();
             juce::PropertiesFile::Options o;
             juce::PropertiesFile props (file, o);
-            CHECK (reports::helloOn (props), "the weekly count is on for a player who never touched it");
+            CHECK (! reports::helloOn (props), "the weekly count is off for a player who was never asked");
+            reports::setHelloOn (props, true);
+            CHECK (reports::helloOn (props), "and on once they say yes");
             reports::setHelloOn (props, false);
-            CHECK (! reports::helloOn (props), "and off once switched off");
+            CHECK (! reports::helloOn (props), "and off again once switched off");
             const auto id = reports::installId (props);
             CHECK (reports::isInstallId (id), "the install id is 32 hex digits: %s", id.toRawUTF8());
             CHECK (reports::installId (props) == id, "and the same the next time");
