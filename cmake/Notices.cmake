@@ -25,6 +25,15 @@ _riffhouse_notice("Signalsmith Linear (MIT)" "${signalsmith_linear_SOURCE_DIR}/L
 _riffhouse_notice("Amp captures in Modern High Gain and Tight Metal (Helga Behrens) Brit 81 (Tim Robertson) and Redline Lead (Phillipe Priss): NAM_models collection compiled by Chris Kenrick (GNU GPL v3; https://github.com/pelennor2170/NAM_models)" "${CMAKE_SOURCE_DIR}/tools/captures/COPYING-NAM_models.txt")
 _riffhouse_notice("Real cabinet impulse responses: Jester's Brutal Pack by Jester Dyne Productions (CC0 1.0)" "${CMAKE_SOURCE_DIR}/tools/cabs/LICENSE-jester.txt")
 _riffhouse_notice("LAME MP3 encoder 3.100 (LGPL 2.0 or later; source at https://lame.sourceforge.io)" "${lame_SOURCE_DIR}/COPYING")
+_riffhouse_notice("VST3 SDK (Steinberg Media Technologies GmbH, inside JUCE)" "${juce_SOURCE_DIR}/modules/juce_audio_processors/format_types/VST3_SDK/LICENSE.txt")
+if (RIFFHOUSE_ASIO_SDK_DIR)
+    # the Windows build compiles in Steinberg's ASIO SDK, which it uses under the GPL 3.0
+    _riffhouse_notice("ASIO SDK (Steinberg Media Technologies GmbH, used under the GPL 3.0)" "${CMAKE_CURRENT_LIST_DIR}/notices/GPL-3.0.txt")
+endif()
 _riffhouse_notice("Fonts: Inter (SIL Open Font License 1.1)" "${CMAKE_SOURCE_DIR}/resources/fonts/OFL-Inter.txt")
 _riffhouse_notice("Fonts: Instrument Sans, Doto, Big Shoulders, Kaushan Script, Alfa Slab One (SIL Open Font License 1.1)" "${CMAKE_SOURCE_DIR}/resources/fonts/OFL-others.txt")
 _riffhouse_notice("Fonts: Yellowtail (Apache License 2.0)" "${_eigen}/COPYING.APACHE")
+file(APPEND "${_notices}" "\n\n==============================================================================\nTrademarks\n==============================================================================\n\n"
+    "ASIO and VST are trademarks of Steinberg Media Technologies GmbH. Every amp, pedal and cabinet in Riffhouse is an original design, "
+    "and any product or artist name mentioned anywhere belongs to its owner. Riffhouse has no affiliation with, and is not endorsed by, "
+    "any artist, band or equipment maker.\n")
