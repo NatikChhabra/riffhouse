@@ -5,6 +5,7 @@
 #include "Motion.h"
 #include "../plugin/DeviceLog.h"
 #include "../plugin/StandaloneHost.h"
+#include "../plugin/Version.h"
 #include "TakesView.h"
 #include "SongSheet.h"
 
