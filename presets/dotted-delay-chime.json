@@ -8,7 +8,7 @@
   "description": "Chiming amp with dotted-eighth delay.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 5.5,
     "amp_bass": 4.5,
     "amp_mid": 5,

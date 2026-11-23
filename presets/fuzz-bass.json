@@ -9,7 +9,7 @@
   "description": "Fuzzed-out bass with clean lows underneath.",
   "params": {
     "amp_on": true,
-    "amp_model": "Bass Station",
+    "amp_model": "Deep Bass",
     "amp_gain": 5,
     "amp_bass": 6,
     "amp_mid": 5,

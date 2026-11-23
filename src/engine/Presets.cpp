@@ -78,6 +78,7 @@ bool presetFromJson (const juce::String& json, Preset& out, juce::String& error)
                     { "Brit Plexi", "Brit 68" }, { "Brit 800", "Brit 81" }, { "Hot Rod Lead", "Redline Lead" },
                     // names before 0.1.7 (Update 2)
                     { "2x12 Blue", "2x12 Chime" }, { "Rodent Dist", "Grit Dist" }, { "Blues Drive", "Blues Crunch" },
+                    { "Bass Station", "Deep Bass" }, { "Metal Box", "Metal Dist" }, { "Chime Top", "Chime Bright" },
                 };
                 juce::String name = prop.value.toString();
                 for (const auto& [was, now] : renamed)

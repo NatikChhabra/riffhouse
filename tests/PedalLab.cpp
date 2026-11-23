@@ -68,7 +68,7 @@ std::unique_ptr<Original> makeOriginal (int type)
 
 const char* pedalName (int type)
 {
-    static const char* names[] = { "Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Box" };
+    static const char* names[] = { "Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Dist" };
     return names[std::clamp (type, 0, 6)];
 }
 

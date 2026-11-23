@@ -8,7 +8,7 @@
   "description": "From quiet to huge: drive, delay and a giant hall.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 6,
     "amp_bass": 5,
     "amp_mid": 5,

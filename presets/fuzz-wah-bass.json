@@ -8,7 +8,7 @@
   "description": "Fuzzed bass with a wah, for lead bass lines.",
   "params": {
     "amp_on": true,
-    "amp_model": "Bass Station",
+    "amp_model": "Deep Bass",
     "amp_gain": 6,
     "amp_bass": 6,
     "amp_mid": 5,

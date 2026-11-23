@@ -9,7 +9,7 @@
   "description": "Dotted-eighth delay and big hall for building songs.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 3.5,
     "amp_bass": 5,
     "amp_mid": 5,

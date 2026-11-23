@@ -17,12 +17,12 @@ import json, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "presets")
 
-AMPS = ["Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline Lead",
-        "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture"]
+AMPS = ["Glass Clean", "Tweed Edge", "Chime Bright", "Brit 68", "Brit 81", "Redline Lead",
+        "Modern High Gain", "Tight Metal", "Deep Bass", "Studio Direct", "Neural Capture"]
 CABS = ["1x12 Open Back", "2x12 Chime", "4x12 Vintage", "4x12 Modern", "2x12 American",
         "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR",
         "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight", "4x12 Real Presence"]
-DRIVES = ["Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Box"]
+DRIVES = ["Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Dist"]
 
 def A(model, gain=5, bass=5, mid=5, treble=5, presence=5, depth=5, master=5, level=0.0):
     assert model in AMPS, model
@@ -102,7 +102,7 @@ P("Bedroom Lo-Fi", "Essentials", ["Lo-Fi", "Bedroom Pop"], "Wobbly, warm and dus
 P("Ambient Wash", "Essentials", ["Ambient", "Post-Rock"], "Clean notes become clouds.",
   A("Glass Clean", 3.5, 5, 5, 5.5), C("2x12 American", 4, 3), DLY("Ping Pong", 450, "1/4 dotted", 5, 5, 3.5), REV("Shimmer", 6, 40, 6, 4.5), G(-72))
 P("Bass Basics", "Essentials", ["Bass", "Rock", "Pop"], "A solid, round bass tone that sits in a mix.",
-  A("Bass Station", 4, 6, 5, 5), C("4x10 Bass", 3, 2, 30, 9000), COMP(5, 4), NOREV(), G(-70))
+  A("Deep Bass", 4, 6, 5, 5), C("4x10 Bass", 3, 2, 30, 9000), COMP(5, 4), NOREV(), G(-70))
 P("Plain DI (No Effects)", "Essentials", ["Utility"], "Your guitar with only the noise gate and hum filter. Useful for recording a clean track to re-amp later.",
   dict(amp_on=False, cab_on=False), NOREV(), G(-70))
 
@@ -122,9 +122,9 @@ P("Country Pickin'", "Clean", ["Country"], "Twangy and compressed with a slapbac
 P("Chorus Dreams", "Clean", ["80s", "New Wave", "Pop"], "Lush 80s chorus clean.",
   A("Glass Clean", 4, 5, 4.5, 6, 5.5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 3.5, 6, 7), DLY("Digital", 380, "Off", 3, 6, 2), REV("Hall", 5, 25, 5, 2.4), G(-70), double=3)
 P("Worship Swells", "Clean", ["Worship", "Ambient"], "Dotted-eighth delay and big hall for building songs.",
-  A("Chime Top", 3.5, 5, 5, 5.5, 5), C("2x12 Chime", 3, 2), COMP(3, 6), DLY("Digital", 400, "1/8 dotted", 4.5, 6, 3.5), REV("Hall", 6, 30, 5.5, 3.2), G(-70))
+  A("Chime Bright", 3.5, 5, 5, 5.5, 5), C("2x12 Chime", 3, 2), COMP(3, 6), DLY("Digital", 400, "1/8 dotted", 4.5, 6, 3.5), REV("Hall", 6, 30, 5.5, 3.2), G(-70))
 P("Chime Jangle", "Clean", ["Jangle Pop", "Indie", "Britpop"], "Shimmery, jangly chords.",
-  A("Chime Top", 4.5, 4.5, 5, 6.5, 6), C("2x12 Chime", 2.5, 2), COMP(4, 5), REV("Room", 4, 12, 6, 2), G(-68))
+  A("Chime Bright", 4.5, 4.5, 5, 6.5, 6), C("2x12 Chime", 2.5, 2), COMP(4, 5), REV("Room", 4, 12, 6, 2), G(-68))
 P("Clean Arpeggio Space", "Clean", ["Post-Rock", "Math Rock"], "Clear and detailed with stereo delay for arpeggios.",
   A("Glass Clean", 3.5, 5, 5, 6, 5.5), C("2x12 American", 3, 2), COMP(3, 6), DLY("Ping Pong", 350, "1/8", 3.5, 6, 2.5), REV("Plate", 4, 15, 5.5, 2.3), G(-72))
 P("Tremolo Noir", "Clean", ["Blues", "Cinematic", "Indie"], "Moody pulsing tremolo through a spring.",
@@ -136,7 +136,7 @@ P("Tweed Breakup", "Crunch", ["Blues", "Classic Rock", "Americana"], "Loose, hai
 P("Classic Rock Crunch", "Crunch", ["Classic Rock", "Hard Rock"], "Open chords and big riffs, 70s style.",
   A("Brit 68", 7, 5, 6.5, 6, 5.5), C("4x12 Vintage", 3, 2), REV("Room", 3, 8, 5, 1.4), G(-62))
 P("British Invasion", "Crunch", ["60s", "Britpop", "Rock"], "Chimey, raspy amp-pushed crunch.",
-  A("Chime Top", 7, 4.5, 5, 6.5, 6), C("2x12 Chime", 3, 2), REV("Room", 3, 8, 5, 1.5), G(-64))
+  A("Chime Bright", 7, 4.5, 5, 6.5, 6), C("2x12 Chime", 3, 2), REV("Room", 3, 8, 5, 1.5), G(-64))
 P("Indie Garage", "Crunch", ["Indie", "Garage Rock"], "Raw, loud, a little messy, in a good way.",
   A("Tweed Edge", 7.5, 5, 6, 6), C("2x12 Chime", 3.5, 2.5), D("Blues Crunch", 5, 5.5, 5), REV("Room", 3, 5, 5, 1.2), G(-62))
 P("Pop Punk Power", "Rock", ["Pop Punk", "Punk"], "Bright, tight and loud power chords.",
@@ -152,7 +152,7 @@ P("Stoner Doom", "Rock", ["Stoner Rock", "Doom", "Sludge"], "Huge, fuzzy and slo
 P("Shoegaze Haze", "Rock", ["Shoegaze", "Dream Pop"], "A wall of fuzz, vibrato and reverb.",
   A("Tweed Edge", 6, 5, 5, 5), C("2x12 Chime", 4.5, 3), D("Big Fuzz", 6, 5, 4.5), MOD("Vibrato", 2.5, 4, 4), REV("Cloud", 5, 40, 4.5, 4.5), G(-60), double=5)
 P("Post-Rock Crescendo", "Rock", ["Post-Rock"], "From quiet to huge: drive, delay and a giant hall.",
-  A("Chime Top", 6, 5, 5, 6), C("2x12 Chime", 3, 2), D("Blues Crunch", 5, 5, 5), DLY("Digital", 450, "1/4 dotted", 5, 5.5, 3.5), REV("Hall", 7.5, 40, 5, 3.5), G(-62))
+  A("Chime Bright", 6, 5, 5, 6), C("2x12 Chime", 3, 2), D("Blues Crunch", 5, 5, 5), DLY("Digital", 450, "1/4 dotted", 5, 5.5, 3.5), REV("Hall", 7.5, 40, 5, 3.5), G(-62))
 P("Garage Fuzz", "Rock", ["Garage Rock", "Blues Rock"], "Gnarly fuzz straight into a cranked combo.",
   A("Tweed Edge", 5, 5, 5, 5.5), C("1x12 Open Back", 3.5, 2), D("Big Fuzz", 8, 6, 4.5), G(-60), REV("Room", 2.5, 5, 5, 1))
 
@@ -174,7 +174,7 @@ P("Djent Precision", "Metal", ["Djent", "Progressive Metal"], "Ultra tight with 
 P("Metalcore Breakdown", "Metal", ["Metalcore", "Deathcore"], "Heavy, punchy and gated for breakdowns.",
   A("Tight Metal", 7, 6, 5, 6, 6.5, 7), C("4x12 Real Tight", 3, 1.5), D("Green Drive", 0.5, 6, 7), G(-48, 35), NOREV(), double=7)
 P("Death Metal Buzz", "Metal", ["Death Metal"], "Saw-toothed and brutal.",
-  A("Modern High Gain", 7, 6, 4, 6.5, 6), C("4x12 Real Heavy", 2.5, 1.5), D("Metal Box", 6, 6, 5), G(-50, 40), NOREV())
+  A("Modern High Gain", 7, 6, 4, 6.5, 6), C("4x12 Real Heavy", 2.5, 1.5), D("Metal Dist", 6, 6, 5), G(-50, 40), NOREV())
 P("Black Metal Frost", "Metal", ["Black Metal"], "Thin, cold and trebly with a dark hall.",
   A("Brit 81", 8.5, 3.5, 4.5, 7.5, 7, 3), C("4x12 Real Classic", 2, 2), G(-54), REV("Hall", 6, 30, 3.5, 2.5))
 P("Nu-Metal Bounce", "Metal", ["Nu-Metal"], "Fat, scooped and bouncy. Tune way down.",
@@ -249,23 +249,23 @@ P("VHS Sunset", "Lo-Fi", ["Synthwave", "Lo-Fi"], "Retro, chorused, tape-worn.",
 
 # ---------------------------------------------------------------- Bass
 P("Rock Bass Grind", "Bass", ["Bass", "Rock"], "Gritty, punchy rock bass.",
-  A("Bass Station", 6.5, 6, 6, 5.5), C("4x10 Bass", 3, 2, 30, 9000), COMP(5, 4), NOREV(), G(-66))
+  A("Deep Bass", 6.5, 6, 6, 5.5), C("4x10 Bass", 3, 2, 30, 9000), COMP(5, 4), NOREV(), G(-66))
 P("Funk Slap Bass", "Bass", ["Bass", "Funk"], "Scooped and snappy for slap.",
-  A("Bass Station", 4, 7, 3.5, 7), C("4x10 Bass", 2.5, 1.5, 30, 12000), COMP(7, 2), NOREV(), G(-70))
+  A("Deep Bass", 4, 7, 3.5, 7), C("4x10 Bass", 2.5, 1.5, 30, 12000), COMP(7, 2), NOREV(), G(-70))
 P("Motown Bass", "Bass", ["Bass", "Soul", "Motown"], "Deep, thumpy, old-school.",
-  A("Bass Station", 3.5, 6.5, 5, 3), C("1x15 Bass", 4, 2.5, 30, 5000), COMP(4, 5), NOREV(), G(-72))
+  A("Deep Bass", 3.5, 6.5, 5, 3), C("1x15 Bass", 4, 2.5, 30, 5000), COMP(4, 5), NOREV(), G(-72))
 P("Metal Bass", "Bass", ["Bass", "Metal"], "Clanky, driven bass that cuts through guitars.",
-  A("Bass Station", 7, 6, 6.5, 6.5), C("4x10 Bass", 2.5, 1.5, 35, 10000), D("Metal Box", 3, 6, 5), COMP(5, 4), G(-60), NOREV())
+  A("Deep Bass", 7, 6, 6.5, 6.5), C("4x10 Bass", 2.5, 1.5, 35, 10000), D("Metal Dist", 3, 6, 5), COMP(5, 4), G(-60), NOREV())
 P("Fuzz Bass", "Bass", ["Bass", "Stoner Rock"], "Fuzzed-out bass with clean lows underneath.",
-  A("Bass Station", 5, 6, 5, 5), C("4x10 Bass", 3, 2, 30, 9000), D("Big Fuzz", 6, 5, 4), G(-62), NOREV())
+  A("Deep Bass", 5, 6, 5, 5), C("4x10 Bass", 3, 2, 30, 9000), D("Big Fuzz", 6, 5, 4), G(-62), NOREV())
 P("Synth Bass Octave", "Bass", ["Bass", "Electronic"], "Sub-octave synth-like bass.",
-  A("Bass Station", 4, 6, 5, 5), C("1x15 Bass", 3.5, 2, 30, 6000), PITCH("Sub Octave", -12, 6), COMP(6, 4), G(-64), NOREV())
+  A("Deep Bass", 4, 6, 5, 5), C("1x15 Bass", 3.5, 2, 30, 6000), PITCH("Sub Octave", -12, 6), COMP(6, 4), G(-64), NOREV())
 
 # ---------------------------------------------------------------- Desi / Indian
 P("Filmi Rock Lead", "Rock", ["Bollywood", "Filmi Rock"], "Big, melodic lead for Bollywood rock songs.",
   A("Redline Lead", 6.5, 5, 6.5, 5.5), C("4x12 Real Classic", 3.5, 2), DLY("Digital", 420, "Off", 3.5, 5.5, 2.8), REV("Hall", 5, 25, 5, 2.2), G(-60))
 P("Desi Indie Strum", "Clean", ["Desi Indie", "Indie"], "Warm, open strumming tone for indie songs.",
-  A("Chime Top", 3.5, 5.5, 5, 5), C("1x12 Open Back", 4, 2.5), COMP(4, 5), REV("Room", 4, 12, 4.5, 2.2), G(-70))
+  A("Chime Bright", 3.5, 5.5, 5, 5), C("1x12 Open Back", 4, 2.5), COMP(4, 5), REV("Room", 4, 12, 4.5, 2.2), G(-70))
 P("Sufi Rock Drive", "Rock", ["Sufi Rock", "Fusion"], "Soaring overdriven tone for melodic fusion lines.",
   A("Brit 68", 6.5, 5, 6.5, 5.5), C("4x12 Vintage", 3.5, 2), D("Green Drive", 2.5, 5.5, 6.5), DLY("Analog", 450, "Off", 3, 4.5, 2.2), REV("Hall", 5, 25, 5, 2), G(-62))
 P("Raga Drone Pad", "Ambient", ["Indian Classical Fusion", "Ambient"], "Sustained, shimmering pad for drones and slides.",
@@ -277,11 +277,11 @@ P("Bangalore Thrash", "Metal", ["Indian Metal", "Thrash"], "Fast, dry thrash rhy
 P("Shillong Blues Rock", "Blues", ["Indian Blues", "Blues Rock"], "Warm, singing blues-rock crunch that cleans up when you play softly.",
   A("Tweed Edge", 6.5, 5, 6, 5.5), C("1x12 Open Back", 3.5, 2), D("Green Drive", 3, 5, 6), REV("Spring", 4, 8, 5, 1.8), G(-64))
 P("Bangla Band Jangle", "Crunch", ["Bangla Rock", "Indian Rock"], "Bright, jangly edge-of-breakup strum for band songs with big choruses.",
-  A("Chime Top", 5.5, 4.5, 5.5, 6), C("2x12 Chime", 3, 2), COMP(4, 5), MOD("Chorus", 2, 3, 2.5), REV("Room", 4, 12, 5, 2), G(-66))
+  A("Chime Bright", 5.5, 4.5, 5.5, 6), C("2x12 Chime", 3, 2), COMP(4, 5), MOD("Chorus", 2, 3, 2.5), REV("Room", 4, 12, 5, 2), G(-66))
 P("Carnatic Prog Lead", "Lead", ["Indian Prog", "Carnatic Fusion"], "Smooth, articulate lead for fast gamakas and slides, with a short echo.",
   A("Redline Lead", 6.5, 5, 6.5, 5.5, 5.5), C("4x12 Real Classic", 3.5, 2), D("Clean Boost", 3, 5, 6), DLY("Digital", 320, "Off", 2.5, 5, 1.8), REV("Plate", 4, 15, 5, 1.6), G(-60))
 P("Desi Djent", "Metal", ["Indian Prog Metal", "Djent"], "Tight, percussive low-tuned chug with a boosted front end and clear chords on top.",
-  A("Tight Metal", 7, 6, 5, 6.5, 6, 6.5), C("4x12 Real Tight", 2.5, 1.5), D("Metal Box", 1, 5.5, 5), G(-54, 45), NOREV(), double=6)
+  A("Tight Metal", 7, 6, 5, 6.5, 6, 6.5), C("4x12 Real Tight", 2.5, 1.5), D("Metal Dist", 1, 5.5, 5), G(-54, 45), NOREV(), double=6)
 P("Post-Rock Swells", "Ambient", ["Indian Post-Rock", "Post-Rock"], "Clean, wide and long for tremolo-picked builds and swelling chords.",
   A("Glass Clean", 4, 5, 5, 5.5), C("2x12 American", 3.5, 2.5), COMP(4, 6), DLY("Tape", 480, "Off", 4.5, 4.5, 3), REV("Cloud", 7, 30, 5, 4), G(-72))
 P("Bedroom Indie Clean", "Clean", ["Desi Indie", "Bedroom Pop"], "Soft, rounded clean with a slow chorus, for quiet songs recorded at home.",
@@ -314,7 +314,7 @@ P("Prog Fuzz Lead", "Lead", ["Progressive Rock", "Classic Rock"], "Sustaining fu
 P("Prog Chorus Clean", "Clean", ["Progressive Rock"], "Compressed, chorused clean with delay.",
   A("Glass Clean", 4, 5, 5, 6), C("2x12 American", 3, 2), COMP(5, 5), MOD("Chorus", 2, 4, 4), DLY("Analog", 440, "Off", 3.5, 5, 2.5), REV("Hall", 5, 25, 5, 2.2), G(-70))
 P("Treble Chime Lead", "Lead", ["Classic Rock", "Arena Rock"], "Treble-boosted chime amp at full tilt.",
-  A("Chime Top", 7.5, 5, 6, 6), C("2x12 Chime", 3, 2), D("Treble Boost", 6, 5, 5.5), DLY("Digital", 400, "Off", 3, 5, 2.4), REV("Hall", 4, 20, 5, 1.8), G(-62))
+  A("Chime Bright", 7.5, 5, 6, 6), C("2x12 Chime", 3, 2), D("Treble Boost", 6, 5, 5.5), DLY("Digital", 400, "Off", 3, 5, 2.4), REV("Hall", 4, 20, 5, 1.8), G(-62))
 P("Raw Tweed Swagger", "Crunch", ["Rock and Roll", "Classic Rock"], "Loose, raw tweed breakup.",
   A("Tweed Edge", 6, 5, 5.5, 5.5), C("1x12 Open Back", 3.5, 2.5), REV("Room", 3, 5, 5, 1.4), G(-64))
 P("Open Power Chords", "Rock", ["Classic Rock", "Mod"], "Loud, open British power chords.",
@@ -334,7 +334,7 @@ P("Doom Treble Boost", "Metal", ["Heavy Metal", "Doom"], "Treble booster into a 
 P("Neo-Classical Lead", "Metal", ["Heavy Metal", "Neo-Classical"], "Boosted British lead with a hint of chorus.",
   A("Brit 81", 7.5, 5, 6.5, 6), C("4x12 Real Classic", 3, 2), D("Green Drive", 2, 5.5, 7), MOD("Chorus", 3, 2.5, 2.5), DLY("Analog", 380, "Off", 2.5, 4.5, 1.8), G(-58))
 P("Pinch Harmonic Rhythm", "Metal", ["Heavy Metal"], "Big, mid-boosted squealing rhythm.",
-  A("Brit 81", 7.5, 6, 7, 6, 6), C("4x12 Real Classic", 3, 2), D("Metal Box", 2, 5, 7), G(-56), REV("Room", 2.5, 5, 5, 0.8))
+  A("Brit 81", 7.5, 6, 7, 6, 6), C("4x12 Real Classic", 3, 2), D("Metal Dist", 2, 5, 7), G(-56), REV("Room", 2.5, 5, 5, 0.8))
 P("Auto-Wah Metal Solo", "Metal", ["Thrash", "Heavy Metal"], "Scooped high gain with an auto-wah for solos.",
   A("Modern High Gain", 7, 6, 4, 6.5, 6.5), C("4x12 Real Heavy", 3, 2), WAH("Auto", 5, 7, 6), DLY("Digital", 380, "Off", 2.5, 5, 2), G(-56))
 P("Downpicked Thrash", "Metal", ["Thrash", "Heavy Metal"], "Scooped, tight, crushing rhythm.",
@@ -346,7 +346,7 @@ P("Octave-Up Crunch", "Metal", ["Rap Metal", "Alternative"], "Tight British crun
 P("Fast Buzzy Thrash", "Metal", ["Thrash"], "Fast, buzzy, aggressive thrash.",
   A("Modern High Gain", 8, 6, 4.5, 7, 7), C("4x12 Real Heavy", 2.5, 1.5), G(-52, 40), NOREV())
 P("Downtuned Grind Groove", "Metal", ["Groove Metal", "Thrash"], "Downtuned, fat, grinding rhythm.",
-  A("Modern High Gain", 6.5, 7, 4, 5.5, 5.5, 7), C("4x12 Real Heavy", 3, 1.5), D("Metal Box", 3, 5, 6), G(-52, 40), NOREV())
+  A("Modern High Gain", 6.5, 7, 4, 5.5, 5.5, 7), C("4x12 Real Heavy", 3, 1.5), D("Metal Dist", 3, 5, 6), G(-52, 40), NOREV())
 P("Melodic Death Lead", "Metal", ["Death Metal"], "Clear, aggressive tone for melodic death metal.",
   A("Modern High Gain", 7, 5.5, 5.5, 6.5, 6.5), C("4x12 Real Heavy", 2.5, 1.5), D("Green Drive", 1, 6, 7), G(-52, 40), REV("Room", 2, 5, 5, 0.6))
 P("Spiral Prog Riff", "Metal", ["Progressive Metal", "Alternative Metal"], "Thick, mid-heavy high gain with a phaser option.",
@@ -388,7 +388,7 @@ P("Fuzz Wall", "Rock", ["Alternative", "Grunge"], "Massive, saturated fuzz wall.
 P("Octave Down Fuzz", "Rock", ["Garage Rock", "Blues Rock"], "Gnarly fuzz plus an octave down for the riff.",
   A("Tweed Edge", 6, 5, 5.5, 5.5), C("4x12 Vintage", 3.5, 2), PITCH("Sub Octave", -12, 6), D("Big Fuzz", 7, 5, 5), G(-58), REV("Room", 2, 5, 5, 0.8))
 P("Dotted Delay Chime", "Clean", ["Rock", "Post-Punk"], "Chiming amp with dotted-eighth delay.",
-  A("Chime Top", 5.5, 4.5, 5, 6.5, 6), C("2x12 Chime", 3, 2), COMP(3, 6), DLY("Digital", 400, "1/8 dotted", 4.5, 7, 4), REV("Hall", 4.5, 20, 6, 2), G(-66))
+  A("Chime Bright", 5.5, 4.5, 5, 6.5, 6), C("2x12 Chime", 3, 2), COMP(3, 6), DLY("Digital", 400, "1/8 dotted", 4.5, 7, 4), REV("Hall", 4.5, 20, 6, 2), G(-66))
 P("Jangle Chorus", "Clean", ["Indie", "Post-Punk"], "Sparkling, chorused arpeggios.",
   A("Glass Clean", 4.5, 4.5, 5, 6.5, 6), C("2x12 American", 2.5, 2), COMP(4, 5), MOD("Chorus", 3, 5, 6), REV("Room", 3.5, 10, 5.5, 2), G(-68), double=4)
 P("Cold Flanger", "Clean", ["Post-Punk", "Goth", "New Wave"], "Icy chorus-flange clean with a hall.",
@@ -448,11 +448,11 @@ P("Chicken Scratch Funk", "Funk", ["Funk", "Soul"], "Thin, bright, percussive fu
 
 # Country / roots / jazz / surf
 P("Chicken Pickin'", "Crunch", ["Country"], "Snappy, compressed, a little hot.",
-  A("Chime Top", 5, 4.5, 5, 6.5, 6), C("2x12 Chime", 2.5, 2), COMP(6, 3), DLY("Analog", 300, "Off", 2, 5, 1.8), G(-66))
+  A("Chime Bright", 5, 4.5, 5, 6.5, 6), C("2x12 Chime", 2.5, 2), COMP(6, 3), DLY("Analog", 300, "Off", 2, 5, 1.8), G(-66))
 P("Nashville Session", "Clean", ["Country"], "Glassy, compressed, studio clean.",
   A("Glass Clean", 4.5, 4.5, 5, 6.5, 6), C("2x12 American", 2.5, 2), COMP(6, 3), REV("Room", 3, 8, 5.5, 1.4), G(-68))
 P("Country Rock Drive", "Rock", ["Country Rock"], "Bright overdrive for modern country.",
-  A("Chime Top", 6, 4.5, 5, 6.5, 6), C("2x12 Chime", 3, 2), D("Blues Crunch", 3, 5.5, 6), DLY("Digital", 380, "Off", 2.5, 6, 2), G(-64))
+  A("Chime Bright", 6, 4.5, 5, 6.5, 6), C("2x12 Chime", 3, 2), D("Blues Crunch", 3, 5.5, 6), DLY("Digital", 380, "Off", 2.5, 6, 2), G(-64))
 P("Thumb Jazz", "Blues", ["Jazz"], "Dark, warm, thumb-picked jazz.",
   A("Glass Clean", 3, 6.5, 5.5, 2.5, 3.5), C("1x12 Open Back", 6, 3, 60, 5500), REV("Room", 3, 10, 3.5, 1.2), G(-74))
 P("Lyrical Chorus", "Lead", ["Jazz Fusion"], "Warm, chorused, delayed jazz lead.",
@@ -462,7 +462,7 @@ P("Surf Tremolo Picking", "Crunch", ["Surf"], "Loud, bright, soaked in spring.",
 
 # Ambient / post-rock
 P("Crescendo Tremolo", "Ambient", ["Post-Rock"], "Shimmering tremolo picking with a huge hall.",
-  A("Chime Top", 5, 5, 5, 6), C("2x12 Chime", 3, 2), DLY("Digital", 400, "1/4 dotted", 4, 6, 3), REV("Hall", 7.5, 40, 5.5, 3.5), G(-66))
+  A("Chime Bright", 5, 5, 5, 6), C("2x12 Chime", 3, 2), DLY("Digital", 400, "1/4 dotted", 4, 6, 3), REV("Hall", 7.5, 40, 5.5, 3.5), G(-66))
 P("Glacial Wash", "Ambient", ["Post-Rock", "Ambient"], "Endless, glacial reverb wash.",
   A("Tweed Edge", 5, 5, 5, 5), C("2x12 Chime", 4, 3), D("Big Fuzz", 4, 4, 4), REV("Cloud", 8, 60, 4.5, 6), G(-62))
 
@@ -482,23 +482,23 @@ P("Fusion Groove", "Crunch", ["Indian Fusion", "Folk Rock"], "Earthy, slightly d
 P("Indian Classic Rock", "Crunch", ["Indian Rock", "Classic Rock"], "Big, melodic classic-rock crunch.",
   A("Brit 81", 6, 5, 6.5, 5.5), C("4x12 Real Classic", 3, 2), DLY("Analog", 420, "Off", 2.5, 5, 2), REV("Hall", 4, 20, 5, 1.8), G(-60))
 P("Folk Strum Energy", "Clean", ["Indian Folk", "Folk Rock"], "Bright, bouncy strumming tone.",
-  A("Chime Top", 4.5, 5, 5, 6), C("2x12 Chime", 3, 2), COMP(4, 5), REV("Room", 3.5, 10, 5, 2), G(-68))
+  A("Chime Bright", 4.5, 5, 5, 6), C("2x12 Chime", 3, 2), COMP(4, 5), REV("Room", 3.5, 10, 5, 2), G(-68))
 P("Sunny Indie Pop", "Clean", ["Desi Indie", "Indie Pop"], "Bright, happy, chorused clean.",
   A("Glass Clean", 4, 5, 5, 6, 5.5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 2.5, 3, 4), REV("Plate", 4, 15, 5.5, 2.2), G(-70))
 P("Cinematic Swell", "Ambient", ["Bollywood", "Cinematic"], "Lush, wide, cinematic clean-to-lead tone.",
-  A("Chime Top", 5, 5, 5, 5.5), C("2x12 Chime", 3.5, 2.5), COMP(4, 5), DLY("Ping Pong", 450, "Off", 4, 5, 3), REV("Hall", 6.5, 30, 5, 3.2), G(-66), double=4)
+  A("Chime Bright", 5, 5, 5, 5.5), C("2x12 Chime", 3.5, 2.5), COMP(4, 5), DLY("Ping Pong", 450, "Off", 4, 5, 3), REV("Hall", 6.5, 30, 5, 3.2), G(-66), double=4)
 
 # Bass players
 P("Slap Funk Bass", "Bass", ["Bass", "Funk Rock"], "Punchy, bright slap bass.",
-  A("Bass Station", 4.5, 6.5, 4, 7), C("4x10 Bass", 2.5, 1.5, 30, 12000), COMP(7, 2), NOREV(), G(-70))
+  A("Deep Bass", 4.5, 6.5, 4, 7), C("4x10 Bass", 2.5, 1.5, 30, 12000), COMP(7, 2), NOREV(), G(-70))
 P("Fuzz Wah Bass", "Bass", ["Bass", "Thrash"], "Fuzzed bass with a wah, for lead bass lines.",
-  A("Bass Station", 6, 6, 5, 5.5), C("4x10 Bass", 3, 2, 30, 9000), D("Big Fuzz", 6, 5, 5), WAH("Auto", 5, 6, 5), G(-60), NOREV())
+  A("Deep Bass", 6, 6, 5, 5.5), C("4x10 Bass", 3, 2, 30, 9000), D("Big Fuzz", 6, 5, 5), WAH("Auto", 5, 6, 5), G(-60), NOREV())
 P("Prog Bass Growl", "Bass", ["Bass", "Progressive Rock"], "Bright, growly, midrange-y bass.",
-  A("Bass Station", 6, 5.5, 6.5, 6.5), C("4x10 Bass", 2.5, 2, 30, 11000), COMP(5, 4), NOREV(), G(-66))
+  A("Deep Bass", 6, 5.5, 6.5, 6.5), C("4x10 Bass", 2.5, 2, 30, 11000), COMP(5, 4), NOREV(), G(-66))
 P("Earthy Fusion Bass", "Bass", ["Bass", "Indian Fusion"], "Warm, woody, round bass.",
-  A("Bass Station", 4, 6.5, 5.5, 4), C("1x15 Bass", 4, 2.5, 30, 6000), COMP(4, 5), NOREV(), G(-70))
+  A("Deep Bass", 4, 6.5, 5.5, 4), C("1x15 Bass", 4, 2.5, 30, 6000), COMP(4, 5), NOREV(), G(-70))
 P("Old-School Thump", "Bass", ["Bass", "Motown", "Soul"], "Deep, dark, thumpy old-school bass.",
-  A("Bass Station", 3.5, 7, 5, 2.5), C("1x15 Bass", 4.5, 2.5, 30, 4500), COMP(4, 5), NOREV(), G(-72))
+  A("Deep Bass", 3.5, 7, 5, 2.5), C("1x15 Bass", 4.5, 2.5, 30, 4500), COMP(4, 5), NOREV(), G(-72))
 
 
 # ---------------------------------------------------------------- Songs players asked for

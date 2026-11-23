@@ -7,7 +7,7 @@
   "description": "Shimmering tremolo picking with a huge hall.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 5,
     "amp_bass": 5,
     "amp_mid": 5,

@@ -8,7 +8,7 @@
   "description": "Treble-boosted chime amp at full tilt.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 7.5,
     "amp_bass": 5,
     "amp_mid": 6,

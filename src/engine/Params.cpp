@@ -57,15 +57,15 @@ namespace
 
         s.push_back (tog (P::drvOn, "drv_on", "Drive Pedal", false));
         s.push_back (pick (P::drvType, "drv_type", "Pedal Type",
-                           { "Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Box" }, 2));
+                           { "Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Dist" }, 2));
         s.push_back (knob (P::drvGain, "drv_gain", "Drive", 4.0f));
         s.push_back (knob (P::drvTone, "drv_tone", "Tone", 5.0f));
         s.push_back (knob (P::drvLevel, "drv_level", "Level", 5.0f));
 
         s.push_back (tog (P::ampOn, "amp_on", "Amp", true));
         s.push_back (pick (P::ampModel, "amp_model", "Amp Model",
-                           { "Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline Lead",
-                             "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture" }, 3));
+                           { "Glass Clean", "Tweed Edge", "Chime Bright", "Brit 68", "Brit 81", "Redline Lead",
+                             "Modern High Gain", "Tight Metal", "Deep Bass", "Studio Direct", "Neural Capture" }, 3));
         s.push_back (knob (P::ampGain, "amp_gain", "Gain", 5.0f));
         s.push_back (knob (P::ampBass, "amp_bass", "Bass", 5.0f));
         s.push_back (knob (P::ampMid, "amp_mid", "Mid", 5.0f));

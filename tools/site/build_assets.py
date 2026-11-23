@@ -24,7 +24,7 @@ PEDALS = [
     ("wah-0", "Funk Filter", "Wah and envelope filter"), ("wah-2", "Throat", "Classic 60s wah"), ("pitch-0", "Deep Octave", "Octave and pitch"),
     ("drive-0", "Clean Boost", "Boost"), ("drive-1", "Treble Booster", "Boost"),
     ("drive-2", "Green Drive", "Overdrive"), ("drive-3", "Blues Crunch", "Overdrive"),
-    ("drive-4", "Grit", "Distortion"), ("drive-5", "Big Fuzz", "Fuzz"), ("drive-6", "Metal Box", "Distortion"),
+    ("drive-4", "Grit", "Distortion"), ("drive-5", "Big Fuzz", "Fuzz"), ("drive-6", "Metal Dist", "Distortion"),
     ("eq-0", "Graphic EQ", "Equaliser"),
     ("mod-0", "Liquid Chorus", "Chorus"), ("mod-1", "Jet Flanger", "Flanger"), ("mod-2", "Phase Four", "Phaser"),
     ("mod-3", "Tremble", "Tremolo"), ("mod-4", "Warble", "Vibrato"), ("mod-5", "Rotary Vibe", "Vibe"),
@@ -34,8 +34,8 @@ PEDALS = [
     ("reverb-3", "Spring Tank", "Reverb"), ("reverb-4", "Shimmer", "Reverb"), ("reverb-5", "Cloud", "Reverb"),
     ("lofi-0", "Dusty Tape", "Lo-fi"),
 ]
-AMPS = ["Glass Clean", "Tweed Edge", "Chime Top", "Brit 68", "Brit 81", "Redline Lead",
-        "Modern High Gain", "Tight Metal", "Bass Station", "Studio Direct", "Neural Capture"]
+AMPS = ["Glass Clean", "Tweed Edge", "Chime Bright", "Brit 68", "Brit 81", "Redline Lead",
+        "Modern High Gain", "Tight Metal", "Deep Bass", "Studio Direct", "Neural Capture"]
 CABS = ["1x12 Open Back", "2x12 Chime", "4x12 Vintage", "4x12 Modern", "2x12 American",
         "1x8 Tiny Combo", "4x10 Bass", "1x15 Bass", "Your IR",
         "4x12 Real Classic", "4x12 Real Heavy", "4x12 Real Tight"]
@@ -43,7 +43,7 @@ CABS = ["1x12 Open Back", "2x12 Chime", "4x12 Vintage", "4x12 Modern", "2x12 Ame
 SLOTS = [  # switch, default on, type key, choices, default choice, cutout prefix
     ("gate_on", True, None, None, 0, "gate"), ("comp_on", False, None, None, 0, "comp"),
     ("wah_on", False, None, None, 0, "wah"), ("pitch_on", False, None, None, 0, "pitch"),
-    ("drv_on", False, "drv_type", ["Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Box"], 2, "drive"),
+    ("drv_on", False, "drv_type", ["Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Dist"], 2, "drive"),
     ("amp_on", True, "amp_model", AMPS, 3, "amp"), ("cab_on", True, "cab_model", CABS, 2, "cab"),
     ("eq_on", False, None, None, 0, "eq"),
     ("mod_on", False, "mod_type", ["Chorus", "Flanger", "Phaser", "Tremolo", "Vibrato", "Vibe"], 0, "mod"),

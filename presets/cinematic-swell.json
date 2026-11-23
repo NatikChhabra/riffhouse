@@ -8,7 +8,7 @@
   "description": "Lush, wide, cinematic clean-to-lead tone.",
   "params": {
     "amp_on": true,
-    "amp_model": "Chime Top",
+    "amp_model": "Chime Bright",
     "amp_gain": 5,
     "amp_bass": 5,
     "amp_mid": 5,

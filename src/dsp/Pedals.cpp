@@ -1261,7 +1261,7 @@ void DrivePedal::prepare (double sampleRate, int maxBlock)
     sr = sampleRate;
     // Every pedal is its circuit (Circuits.h). 8x below 64 kHz: the diodes and transistors make
     // harmonics far above the guitar, and at 4x they fold back as a digital grit the real pedals
-    // never had (the pedal lab measures it). The grit, the fuzz and the metal box clip hard
+    // never had (the pedal lab measures it). The grit, the fuzz and the metal dist clip hard
     // enough to need 16x: at 8x their fold-back sat 40 to 60 dB down, at 16x 61 to 75 dB.
     const int st = sampleRate < 64000.0 ? 3 : 2;
     os = std::make_unique<juce::dsp::Oversampling<float>> (1, (size_t) st, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false);
@@ -1291,7 +1291,7 @@ void DrivePedal::reset()
     boost.reset(); trebleBoost.reset(); blues.reset(); metal.reset();
     setPots (drive, tone, true); // a fresh start is already where the knobs are
     // A circuit starts with every capacitor empty and charges to where its bias holds it, and
-    // that charging comes out as a thump (-49 dB from the blues crunch and the metal box; the
+    // that charging comes out as a thump (-49 dB from the blues crunch and the metal dist; the
     // others start where they rest). Run those on silence for 10 ms first, which leaves under
     // -84 dB, as a real pedal is already powered when it is stepped on. Costs 0.3 to 0.7 ms.
     if (type == 3 || type == 6)

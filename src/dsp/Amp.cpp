@@ -10,7 +10,7 @@ namespace
 
     using namespace tonestacks;
 
-    // Glass Clean and Chime Top: top shelf and output bandwidth fitted to captures of a Fender Twin (normal, bright)
+    // Glass Clean and Chime Bright: top shelf and output bandwidth fitted to captures of a Fender Twin (normal, bright)
     // and a Vox AC15 (top boost) on three real guitar takes; they sat 5 to 8 dB darker above 4 kHz (16 Nov).
     // name, inHP, bright, gainMin, gainMax, stages, stageGain[5], stageBias[5], stageHp[5], stageLp[5],
     // baxandall, stack, midHz, powerDrive, powerBias, sag, presenceHz, depthHz, outHp, outLp, trim
@@ -21,7 +21,7 @@ namespace
         { "Tweed Edge", 20.0f, 2.0f, -12.0f, 20.0f, 2,
           { 1, 14, 1, 1, 1 }, { 0.20f, 0.15f, 0, 0, 0 }, { 20, 40, 0, 0, 0 }, { 11250, 8750, 0, 0, 0 },
           false, tweed, 800.0f, 2.2f, 0.05f, 0.45f, 3000.0f, 85.0f, 50.0f, 8000.0f, -5.5f },
-        { "Chime Top", 25.0f, 3.0f, -14.0f, 20.0f, 3,
+        { "Chime Bright", 25.0f, 3.0f, -14.0f, 20.0f, 3,
           { 1, 10, 1.5f, 1, 1 }, { 0.15f, 0.10f, 0.05f, 0, 0 }, { 25, 60, 30, 0, 0 }, { 14000, 12000, 15000, 0, 0 },
           false, chime, 900.0f, 1.8f, 0.18f, 0.30f, 3500.0f, 110.0f, 70.0f, 10000.0f, -4.3f, 250.0f, 0.0f, 2800.0f, 8.0f },
         { "Brit 68", 30.0f, 6.0f, -14.0f, 22.0f, 3,
@@ -43,7 +43,7 @@ namespace
           { 1, 8.3f, 9.6f, 44.5f, 58.3f }, { 0.20f, 0.30f, 0.20f, 0.10f, 0.05f }, { 52, 357, 326, 26, 12 }, { 2610, 6870, 8950, 2600, 16270 },
           false, modern, 650.0f, 1.3f, 0.0f, 0.15f, 3800.0f, 90.0f, 60.0f, 14000.0f, -7.6f, 240.0f, -1.3f, 4500.0f, 4.2f, 100.0f, 9.0f,
           { 40, 610, 230, 500, 490 }, { 3.3f, 3.9f, 5.1f, 4.2f, 3.3f }, 2.0f },
-        { "Bass Station", 15.0f, 0.0f, -10.0f, 18.0f, 2,
+        { "Deep Bass", 15.0f, 0.0f, -10.0f, 18.0f, 2,
           { 1, 8, 1, 1, 1 }, { 0.15f, 0.10f, 0, 0, 0 }, { 15, 20, 0, 0, 0 }, { 12000, 11250, 0, 0, 0 },
           true, american, 500.0f, 1.2f, 0.0f, 0.30f, 5000.0f, 60.0f, 28.0f, 9000.0f, 1.8f },
         { "Studio Direct", 15.0f, 0.0f, -12.0f, 12.0f, 1,

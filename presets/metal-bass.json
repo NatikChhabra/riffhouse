@@ -9,7 +9,7 @@
   "description": "Clanky, driven bass that cuts through guitars.",
   "params": {
     "amp_on": true,
-    "amp_model": "Bass Station",
+    "amp_model": "Deep Bass",
     "amp_gain": 7,
     "amp_bass": 6,
     "amp_mid": 6.5,
@@ -25,7 +25,7 @@
     "cab_lowcut": 35,
     "cab_highcut": 10000,
     "drv_on": true,
-    "drv_type": "Metal Box",
+    "drv_type": "Metal Dist",
     "drv_gain": 3,
     "drv_tone": 6,
     "drv_level": 5,

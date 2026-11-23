@@ -361,7 +361,7 @@ namespace
         g.setColour (ink);
         g.drawText (text, area, j, false);
     }
-    juce::String titled (const juce::String& s) // "bass station" becomes "Bass Station"
+    juce::String titled (const juce::String& s) // "deep bass" becomes "Deep Bass"
     {
         juce::StringArray words;
         words.addTokens (s.toLowerCase(), " ", "");
@@ -381,7 +381,7 @@ const PedalDesign& drivePedalDesign (int t)
         { "blues crunch", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::script, false, 1.0f,  0, 1, 0 },
         { "GRIT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
         { "big fuzz", "sustainer", 0xffe6dbc0, 0xff3b2a1a, 0xffffb547, Finish::enamel,     KnobStyle::skirted, 0xff1e1a16, Face::shoulders,      false, 1.28f, 3, 3, 2 },
-        { "METAL BOX", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
+        { "METAL DIST", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
     };
     return d[juce::jlimit (0, (int) std::size (d) - 1, t)];
 }
@@ -455,7 +455,7 @@ const AmpDesign& ampDesign (int m)
         { "MODERN",    Tolex::levant, 0xff101010, Panel::plate,    0xffe9e7e2, Weave::mesh,       0,          KnobStyle::skirted, 0xff101112, 0xff7dffa0, Face::shoulders,      true,  true,  false, 1, 2, 1, 1.0f },
         { "TIGHT",     Tolex::smooth, 0xff0d0d0e, Panel::anodised, 0xfff4a524, Weave::mesh,       0,          KnobStyle::pedal,   0xfff4a524, 0xfff4a524, Face::shoulders,      false, true,  false, 3, 3, 2, 0.84f,
           { "GAIN", "LOW", "MID", "HIGH", "PRES", "DEEP", "MASTER", "OUT" }, { 0, 1, 2, 3, 4, 5, 6, 7 }, 0x30 },
-        { "bass station", Tolex::levant, 0xff1d2530, Panel::brushed, 0xff141618, Weave::grid,     0xff8fa3b8, KnobStyle::skirted, 0xff141618, 0xff6fb7ff, Face::shoulders,      true,  true,  false, 4, 0, 0, 0.78f },
+        { "deep bass", Tolex::levant, 0xff1d2530, Panel::brushed, 0xff141618, Weave::grid,     0xff8fa3b8, KnobStyle::skirted, 0xff141618, 0xff6fb7ff, Face::shoulders,      true,  true,  false, 4, 0, 0, 0.78f },
         { "studio direct", Tolex::smooth, 0xff1a1b1d, Panel::brushed, 0xff141618, Weave::none,    0,          KnobStyle::dome,    0xff141618, 0xff7dffa0, Face::instrumentSemi, false, false, true,  5, 2, 2, 1.0f },
         { "capture",   Tolex::smooth, 0xff141518, Panel::anodised, 0xffe9e7e2, Weave::none,       0,          KnobStyle::modern,  0xffe9e7e2, 0xffff9f1c, Face::instrumentSemi, false, false, true,  5, 0, 1, 1.0f },
     };
@@ -1729,7 +1729,7 @@ namespace
         if (b == "redline")      return Logo::pennant;
         if (b == "MODERN")       return Logo::milled;
         if (b == "TIGHT")        return Logo::printed;
-        if (b == "bass station") return Logo::enamel;
+        if (b == "deep bass") return Logo::enamel;
         return Logo::plate;
     }
 

@@ -9,7 +9,7 @@
   "description": "Deep, dark, thumpy old-school bass.",
   "params": {
     "amp_on": true,
-    "amp_model": "Bass Station",
+    "amp_model": "Deep Bass",
     "amp_gain": 3.5,
     "amp_bass": 7,
     "amp_mid": 5,
