@@ -444,7 +444,7 @@ const AmpDesign& ampDesign (int m)
           { "volume", "bass", "middle", "treble", "bright", "deep", "master", "output" }, { 0, 3, 2, 1, 4, 5, 6, 7 }, 0x30 },
         { "tweed",     Tolex::tweed,  0xffc9a66b, Panel::chrome,   0xff1b1a18, Weave::wheat,      0,          KnobStyle::chicken, 0xffece4cf, 0xfff2351f, Face::instrumentSemi, true,  false, false, 2, 0, 1, 0.66f,
           { "volume", "bass", "middle", "treble", "presence", "body", "loud", "output" }, { 4, 2, 1, 3, 0, 6, 5, 7 }, 0xa0 },
-        { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffcbb48a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false, false, 0, 3, 1, 0.94f,
+        { "chime",     Tolex::cream,  0xffd9c9a6, Panel::brushed,  0xff2b1f14, Weave::diamond,    0xffa8975a, KnobStyle::chicken, 0xfff1ead8, 0xffffc35a, Face::shoulders,      true,  false, false, 0, 3, 1, 0.94f,
           { "drive", "bass", "middle", "treble", "brilliance", "weight", "master", "output" }, { 0, 1, 2, 3, 4, 5, 6, 7 }, 0x30 },
         { "SOVEREIGN", Tolex::levant, 0xff131313, Panel::gold,     0xff17130c, Weave::none,       0xffe9e4d6, KnobStyle::hat,     0xffd8b04a, 0xffec2f1b, Face::shoulders,      false, true,  false, 1, 0, 2, 1.0f,
           { "VOLUME I", "BASS", "MIDDLE", "TREBLE", "PRESENCE", "RESONANCE", "VOLUME II", "OUTPUT" }, { 4, 1, 2, 3, 0, 6, 5, 7 }, 0xa0 },
@@ -1505,17 +1505,16 @@ namespace
                 }
                 break;
             }
-            case Weave::diamond:
+            case Weave::diamond: // the windowpane cloth: a brass lattice of upright rectangles over deep green
             {
-                g.setColour (C (0xff3a2b1f));
+                g.setColour (C (0xff10231d));
                 g.fillRect (r);
-                const float p = 22.0f;
-                for (float x = r.getX() - r.getHeight(); x < r.getRight() + r.getHeight(); x += p)
-                {
-                    g.setColour (C (0xffb08e5c).withAlpha (0.55f));
-                    g.drawLine (x, r.getY(), x + r.getHeight(), r.getBottom(), 3.0f);
-                    g.drawLine (x, r.getBottom(), x + r.getHeight(), r.getY(), 3.0f);
-                }
+                const float pu = 30.0f, pv = 20.0f;
+                g.setColour (C (0xffa8975a).withAlpha (0.6f));
+                for (float x = r.getX() + 1.0f; x < r.getRight(); x += pu)
+                    g.fillRect (x, r.getY(), 3.0f, r.getHeight());
+                for (float y = r.getY() + 1.0f; y < r.getBottom(); y += pv)
+                    g.fillRect (r.getX(), y, r.getWidth(), 3.0f);
                 for (int i = 0; i < (int) (area / 6.0f); ++i)
                 {
                     g.setColour (juce::Colours::black.withAlpha (0.08f + rnd.nextFloat() * 0.1f));
@@ -2559,7 +2558,7 @@ namespace
         switch (m)
         {
             case 0:  return { Weave::black,      0,          5, 0.20f, true  };
-            case 1:  return { Weave::diamond,    0xffcbb48a, 2, 0.12f, true  };
+            case 1:  return { Weave::diamond,    0xffa8975a, 2, 0.12f, true  };
             case 2:  return { Weave::saltPepper, 0xffe9e2cf, 3, 0.16f, false };
             case 3:  return { Weave::grid,       0,          6, 0.24f, false };
             case 4:  return { Weave::silver,     0,          0, 0.15f, true  };
