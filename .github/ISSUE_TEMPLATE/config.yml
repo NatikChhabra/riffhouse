@@ -3,3 +3,9 @@ contact_links:
   - name: Sound problems and how to fix them
     url: https://github.com/NatikChhabra/riffhouse/blob/main/docs/TROUBLESHOOTING.md
     about: Latency, no sound, Bluetooth delay and driver trouble, with fixes.
+  - name: Ask in the Riff House Discord
+    url: https://discord.gg/my4Mgg8uTq
+    about: Questions, tones, setup help and chat with other players.
+  - name: Report a security problem privately
+    url: https://github.com/NatikChhabra/riffhouse/security/advisories/new
+    about: Please do not post security problems in a public issue.
