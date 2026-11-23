@@ -501,6 +501,25 @@ public:
         showPage ((int) proc.uiState.getProperty ("page", (int) mAmp));
         refreshTop();
         motion::attach (*this);
+        // one quiet hello, once, on the fifth start: the community links live in Settings, nothing pops up after this
+        if (auto* host = StandaloneHost::get())
+        {
+            auto& st = host->settings();
+            if (! st.getBoolValue ("communityHello", false))
+            {
+                const int starts = st.getIntValue ("startCount", 0) + 1;
+                st.setValue ("startCount", starts);
+                if (starts >= 5)
+                {
+                    st.setValue ("communityHello", true);
+                    juce::Timer::callAfterDelay (6000, [safe = juce::Component::SafePointer<RiffhouseEditor> (&editor)]
+                    {
+                        if (safe != nullptr) safe->showToast ("Come say hi on Discord. The links are in Settings, under Help and about.");
+                    });
+                }
+                st.saveIfNeeded();
+            }
+        }
     }
 
     ~Root() override

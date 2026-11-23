@@ -673,6 +673,17 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     starLink.setColour (juce::HyperlinkButton::textColourId, colours::textDim);
     starLink.setTooltip ("Opens the Riffhouse page on GitHub. A star helps other players find a free project.");
     page.addAndMakeVisible (starLink);
+    // a standing place for the community links; the one-time hello in the editor points here
+    for (auto* b : { &discord, &youtube, &instagram, &siteLink })
+        page.addAndMakeVisible (b);
+    discord.setTooltip ("Opens the Riff House Discord server: help, ideas and beta feedback.");
+    discord.onClick = [] { juce::URL ("https://discord.gg/my4Mgg8uTq").launchInDefaultBrowser(); };
+    youtube.setTooltip ("Opens the Riff House YouTube channel.");
+    youtube.onClick = [] { juce::URL ("https://www.youtube.com/@riffhouseapp").launchInDefaultBrowser(); };
+    instagram.setTooltip ("Opens Riff House on Instagram.");
+    instagram.onClick = [] { juce::URL ("https://www.instagram.com/realriffhouse/").launchInDefaultBrowser(); };
+    siteLink.setTooltip ("Opens riffhouse.in.");
+    siteLink.onClick = [] { juce::URL ("https://riffhouse.in/").launchInDefaultBrowser(); };
     problem.setTooltip ("Copies the report, with your user name and computer name taken out, and opens the public page where "
                         "problems are reported. Paste it there and say what went wrong. Nothing is sent by itself.");
     problem.onClick = [this]
@@ -1010,7 +1021,8 @@ void SettingsView::show (Section s)
     autoUpdate.setVisible (hasUpdater);
     if (channelRow != nullptr) channelRow->setVisible (hasUpdater);
     for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get(), &teachControl, &teachJob,
-                                                             &footView, &lessMotion, &website, &problem, &report, &support, &starLink })
+                                                             &footView, &lessMotion, &website, &problem, &report, &support, &starLink,
+                                                             &discord, &youtube, &instagram, &siteLink })
         c->setVisible (true);
     layoutPage();
     scroller.setViewPosition (0, s == sections().getFirst() ? 0 : sectionTop[(size_t) s] - 8);
@@ -1081,7 +1093,7 @@ void SettingsView::layoutPage()
     int y = 0;
     auto at = [&] (int height) { auto a = juce::Rectangle<int> (0, y, col, height); y += height; return a; };
     auto gap = [&] (int g) { y += g; };
-    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = channelHead = earlyText = motionHead = countHead = countText = helpText = aboutHead = aboutArea = {};
+    plateArea = soundText = meterCaption = fixText = humRow = humText = footText = updateStatus = channelHead = earlyText = motionHead = countHead = countText = helpText = communityHead = communityText = aboutHead = aboutArea = {};
 
     // one page: every part under its own heading, one after another
     bool firstPart = true;
@@ -1188,6 +1200,20 @@ void SettingsView::layoutPage()
             }
             gap (16);
             helpText = at (66);
+            gap (36);
+            communityHead = at (26);
+            gap (10);
+            {
+                auto row = at (42);
+                const int cw = std::min (150, (row.getWidth() - 36) / 4);
+                for (auto* b : { &discord, &youtube, &instagram, &siteLink })
+                {
+                    b->setBounds (row.removeFromLeft (cw));
+                    row.removeFromLeft (12);
+                }
+            }
+            gap (16);
+            communityText = at (22);
             gap (36);
             aboutHead = at (26);
             gap (10);
@@ -1442,6 +1468,8 @@ void SettingsView::paintPage (juce::Graphics& g)
                        : "Help and fixes opens the page of common problems. Report in public puts a report on your clipboard and opens "
                          "the page to paste it into. Save a report writes it to a text file in your recordings folder, to send to "
                          "whoever is helping you. Nothing is sent by itself.", helpText, 3);
+            subhead ("Community", communityHead);
+            small ("Players swap tones, ask for help and test early builds on Discord. Everything here is free.", communityText, 1);
             subhead ("About", aboutHead);
             juce::AttributedString about;
             about.setLineSpacing (4.0f);

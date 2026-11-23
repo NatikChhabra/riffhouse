@@ -159,6 +159,7 @@ private:
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
     std::unique_ptr<ChipRow> channelRow;      // Stable | Beta
+    juce::TextButton discord { "Discord" }, youtube { "YouTube" }, instagram { "Instagram" }, siteLink { "riffhouse.in" };
     juce::HyperlinkButton starLink { "Star Riffhouse on GitHub", juce::URL ("https://github.com/NatikChhabra/riffhouse") };
     juce::ToggleButton lessMotion { "Less motion: nothing slides, fades are short" };
     void refreshUpdate();
@@ -176,7 +177,7 @@ private:
     juce::Viewport footView;
     std::unique_ptr<FootList> footList;
     // the words on the page, painted where the layout put them
-    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, channelHead, earlyText, motionHead, countHead, countText, helpText, aboutHead, aboutArea;
+    juce::Rectangle<int> plateArea, soundText, meterCaption, fixText, humRow, humText, footText, updateStatus, channelHead, earlyText, motionHead, countHead, countText, helpText, communityHead, communityText, aboutHead, aboutArea;
 };
 
 // Say what is wrong (or right) in a few words, sent privately with the same report Settings sends.
