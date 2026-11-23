@@ -110,7 +110,7 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
     void mouseExit (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
-    std::function<void()> onClose, onRunSetup;
+    std::function<void()> onClose, onRunSetup, onWhatsNew;
     std::function<void (Look)> onLookChange;
     std::function<void (const juce::String&)> onMessage;
 
@@ -154,7 +154,7 @@ private:
     IconButton close { icons::close() };
     juce::TextButton runSetup { "Run automatic setup again" }, advanced { "Driver, input and output..." };
     juce::TextButton website { "Help and fixes" }, report { "Save a report" }, problem { "Report in public" }, sendReport { "Send a report" };
-    juce::TextButton support { "Support Riffhouse" };
+    juce::TextButton support { "Support Riffhouse" }, whatsNewButton { "What's new" };
     juce::ToggleButton weeklyHello { "Count me in the weekly number of players" };
     juce::TextButton updateButton { "Check for updates" };
     juce::ToggleButton autoUpdate { "Install updates by itself when I close Riffhouse" };
@@ -195,6 +195,30 @@ private:
     juce::TextEditor note;
     juce::ToggleButton withReport { "Add my settings and setup report (names taken out)" };
     juce::TextButton sendButton { "Send feedback" }, cancel { "Cancel" };
+};
+
+// What changed in this version, in a few lines a player would say: opens once after an update and
+// from Settings, Help and about. The text is resources/whatsnew.txt.
+class WhatsNewPanel : public Popover
+{
+public:
+    WhatsNewPanel();
+    void resized() override;
+    void paint (juce::Graphics&) override;
+    void showVersion (const juce::String& label); // picks the entry for that version
+    int heightFor() const; // how tall the card needs to be
+    std::function<void()> onClose;
+
+private:
+    struct Line { juce::String text; bool head; std::unique_ptr<juce::TextLayout> layout; int y = 0, h = 0; };
+    void build();
+    static constexpr int cardW = 420;
+    juce::String shown;
+    std::vector<Line> lines;
+    int bodyBottom = 0;
+    IconButton close { icons::close() };
+    juce::HyperlinkButton notes { "Release notes on GitHub", juce::URL ("https://github.com/NatikChhabra/riffhouse/releases") },
+                          discord { "Discord", juce::URL ("https://discord.gg/my4Mgg8uTq") };
 };
 
 // Ask for a name and save the current tone.

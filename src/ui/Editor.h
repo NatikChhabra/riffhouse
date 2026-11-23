@@ -43,6 +43,7 @@ public:
     // of the app only ever showed a made-up summary, and the real one crashed in 0.1.1.
     void rehearseSetup();
     void showToast (const juce::String&);
+    void showWhatsNew(); // the card of what changed in this version
     void applyLook (ui::Look, bool reopenSettings);
 
     // Renders every screen to PNG files (used for docs and visual checks).

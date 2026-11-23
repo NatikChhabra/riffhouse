@@ -30,6 +30,7 @@
 #include "plugin/Export.h"
 #include "plugin/Tuner.h"
 #include "plugin/Version.h"
+#include "plugin/WhatsNew.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <chrono>
@@ -3086,6 +3087,13 @@ void testUpdates()
     CHECK (compareVersions ("0.1.5.1", "0.1.5") > 0 && compareVersions ("0.1.6", "0.1.5.1") > 0 && compareVersions ("0.1.5.2", "0.1.5.1") > 0, "a hotfix (fourth number) is newer than its release and older than the next one");
     CHECK (spokenVersion ("0.1.5.1") == "0.1.5 Hotfix 1" && spokenVersion ("0.1.5") == "0.1.5" && spokenVersion ("0.1.5.2-rc1") == "0.1.5 Hotfix 2-rc1", "a hotfix is said as one (%s)", spokenVersion ("0.1.5.1").toRawUTF8());
     CHECK (spokenVersion ("0.1.6") == "0.1.6" && spokenVersion ("0.1.6-dev.1a2b3c4") == "0.1.6-dev.1a2b3c4", "a release is said as its number (%s)", spokenVersion ("0.1.6").toRawUTF8());
+    {
+        const juce::String notes = "# comment\n## 0.2.0 Update 2\n### New\n- a\n- b\n### Fixed\n- c\n## 0.1.6\n### New\n- old\n";
+        const auto e = findWhatsNew (notes, "0.2.0-rc1"), o = findWhatsNew (notes, "0.1.6.1"), d = findWhatsNew (notes, "0.0.0-dev");
+        CHECK (e.version == "0.2.0" && e.added.size() == 2 && e.fixed.size() == 1 && e.fixed[0] == "c", "the notes of a release are found, sections apart");
+        CHECK (o.version == "0.1.6" && o.added[0] == "old" && d.version == "0.2.0", "a hotfix finds its release, a build from source the newest");
+        CHECK (findWhatsNew ({}, "0.1.6").added.isEmpty(), "no notes, no lines");
+    }
     CHECK (compareVersions ("1.0.0", "0.9.9") > 0 && compareVersions ("0.9.9", "1.0.0") < 0, "major wins");
     CHECK (compareVersions ("0.2.0-beta", "0.2.0") < 0, "a pre-release is older than its release");
     CHECK (compareVersions ("0.2.0-beta", "0.1.9") > 0, "a pre-release is newer than the version before");

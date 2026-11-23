@@ -439,6 +439,8 @@ public:
         sheetView.onClose = [this] { closeOverlays(); };
         sheetView.onMessage = [this] (juce::String m) { editor.showToast (m); };
         settings.onClose = [this] { closeOverlays(); };
+        whatsNewPanel.onClose = [this] { closePopovers(); };
+        settings.onWhatsNew = [this] { closeOverlays(); showWhatsNew(); };
         settings.onRunSetup = [this] { closeOverlays(); editor.showSetupWizard(); };
         settings.onMessage = [this] (const juce::String& m) { editor.showToast (m); };
         settings.onLookChange = [this] (Look l)
@@ -468,7 +470,7 @@ public:
         scrim.onClick = [this] { closePopovers(); };
         for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings,
                                     (juce::Component*) &takesView, (juce::Component*) &sheetView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel, (juce::Component*) &looperPanel,
-                                    (juce::Component*) &saveDialog, (juce::Component*) &feedbackDialog })
+                                    (juce::Component*) &saveDialog, (juce::Component*) &feedbackDialog, (juce::Component*) &whatsNewPanel })
             addChildComponent (c);
         addChildComponent (dropHint);
         addChildComponent (toast);
@@ -685,10 +687,17 @@ public:
         p.toFront (true);
     }
 
+    // opens the card under the top bar, centred
+    void showWhatsNew()
+    {
+        whatsNewPanel.showVersion (versionLabel());
+        showPopover (whatsNewPanel, { getWidth() / 2 - 1, 40, 2, 30 }, 420, whatsNewPanel.heightFor());
+    }
+
     void closePopovers()
     {
         scrim.setVisible (false);
-        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog, (Popover*) &feedbackDialog })
+        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog, (Popover*) &feedbackDialog, (Popover*) &whatsNewPanel })
             p->setVisible (false);
     }
 
@@ -1017,6 +1026,7 @@ public:
     LooperPanel looperPanel;
     SaveDialog saveDialog;
     FeedbackDialog feedbackDialog;
+    WhatsNewPanel whatsNewPanel;
     Toast toast;
     DropHint dropHint;
     NoticeBar noticeBar;
@@ -1035,7 +1045,7 @@ public:
                      inScrim { scrim, motion::Enter::fade },
                      inRecord { recordPanel, motion::Enter::drop }, inMetro { metroPanel, motion::Enter::drop },
                      inLooper { looperPanel, motion::Enter::drop }, inSave { saveDialog, motion::Enter::drop },
-                     inFeedback { feedbackDialog, motion::Enter::drop };
+                     inFeedback { feedbackDialog, motion::Enter::drop }, inWhatsNew { whatsNewPanel, motion::Enter::drop };
 
     juce::String lastStatus;
     bool demoLevels = false;
@@ -1372,6 +1382,8 @@ void RiffhouseEditor::openFile (const juce::File& f)
         case Dropped::none: break;
     }
 }
+
+void RiffhouseEditor::showWhatsNew() { root->showWhatsNew(); }
 
 void RiffhouseEditor::showToast (const juce::String& m)
 {
@@ -2066,6 +2078,9 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     r.closePopovers();
     r.showPopover (r.feedbackDialog, r.feedbackButton.getBounds(), 420, 324);
     shoot ("feedback");
+    r.closePopovers();
+    r.showWhatsNew();
+    shoot ("whats-new");
     r.closePopovers();
     {
         SetupWizard w (proc);

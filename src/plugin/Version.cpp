@@ -28,10 +28,4 @@ juce::String versionForPeople()
     if (v.containsChar ('-')) return v + " (test build)";
     return v;
 }
-
-// kept to one sentence that fits a toast; change it in the release commit of each version
-juce::String whatsNew()
-{
-    return "Real amp captures for the metal amps, and a noise gate that sets itself.";
-}
 } // namespace rh

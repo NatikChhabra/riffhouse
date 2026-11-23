@@ -77,6 +77,9 @@ def main(argv):
             fail(f"the tag says {version}, CMakeLists.txt says {cmake_version()}. Change one of them.")
         if not body:
             fail(f"CHANGELOG.md has no notes under '## {version}'. Write them first.")
+        wn = (ROOT / "resources" / "whatsnew.txt").read_text(encoding="utf-8")
+        if not re.search(r"^## " + re.escape(version) + r"\b", wn, re.M):
+            fail(f"resources/whatsnew.txt has no '## {version}' entry for the in-app What's new panel. Write it first.")
         readme_problems = readme_check(version)
         if readme_problems:
             fail("README.md is out of date: " + "; ".join(readme_problems))
