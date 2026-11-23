@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://riffhouse.in/</loc></url>
-  <url><loc>https://riffhouse.in/why-free.html</loc></url>
-  <url><loc>https://riffhouse.in/updates.html</loc></url>
-  <url><loc>https://riffhouse.in/roadmap.html</loc></url>
-  <url><loc>https://riffhouse.in/press.html</loc></url>
+  <url><loc>https://riffhouse.in/</loc><lastmod>2026-11-17</lastmod></url>
+  <url><loc>https://riffhouse.in/no-audio-interface.html</loc><lastmod>2026-11-22</lastmod></url>
+  <url><loc>https://riffhouse.in/why-free.html</loc><lastmod>2026-11-17</lastmod></url>
+  <url><loc>https://riffhouse.in/updates.html</loc><lastmod>2026-11-17</lastmod></url>
+  <url><loc>https://riffhouse.in/roadmap.html</loc><lastmod>2026-11-17</lastmod></url>
+  <url><loc>https://riffhouse.in/press.html</loc><lastmod>2026-11-17</lastmod></url>
+  <url><loc>https://riffhouse.in/legal.html</loc><lastmod>2026-11-22</lastmod></url>
 </urlset>

@@ -14,7 +14,10 @@ namespace
 {
     constexpr float kHeardThreshold = 0.0032f; // -50 dBFS: something is playing
     constexpr float kSureThreshold = 0.063f;   // -24 dBFS: that is definitely a guitar
-    constexpr float kMostLevelLossDb = 16.0f;  // a mode hearing the guitar this much quieter loses Windows' boost
+    // a mode hearing the guitar this much quieter than Windows' own mode did loses Windows' boost.
+    // The loss measured on a USB guitar input was 17 to 24 dB, and two takes of strumming differ
+    // by a few dB, so 10 dB tells the two apart (16 let a harder strum through, 16 Nov).
+    constexpr float kMostLevelLossDb = 10.0f;
     constexpr double kDwellMs = 1100.0;
     constexpr double kTuneMs = 1600.0;
     constexpr double kQuietMs = 2600.0;
@@ -423,6 +426,7 @@ void AutoSetup::timerCallback()
                 if (xrunStart < 0) xrunStart = dm.getXRunCount();
                 if (modePeakFor != modeIndex) { modePeakFor = modeIndex; modePeak = 0.0f; }
                 modePeak = std::max (modePeak, raw);
+                if (AudioSwitch::isShared (modes[modeIndex])) sharedPeak = std::max (sharedPeak, raw);
                 tunePeak = std::max (tunePeak, raw);
                 strumPeak = std::max (strumPeak, raw);
                 cpuMax = std::max (cpuMax, dm.getCpuUsage());
@@ -438,7 +442,10 @@ void AutoSetup::timerCallback()
             // the level and boost Windows applies (a USB guitar input measured 20 dB down, with the
             // same hiss), and the boost that makes up for it turns the hiss into fizz. The guitar was
             // found in Windows' own mode, so a mode that hears it much quieter is not used.
-            const float quieterDb = juce::Decibels::gainToDecibels (chosenPeak, -100.0f) - juce::Decibels::gainToDecibels (modePeak, -100.0f);
+            // measured against the loudest playing Windows' own mode heard, in finding the guitar
+            // and in tuning it just before: the same player, the same minute
+            const float quieterDb = juce::Decibels::gainToDecibels (std::max (chosenPeak, sharedPeak), -100.0f)
+                                    - juce::Decibels::gainToDecibels (modePeak, -100.0f);
             // A mode is kept only once it has heard the playing at about the level Windows' own
             // mode did. Hearing nothing is not a pass: 20 dB down takes a normal strum under the
             // "something is playing" line, and that is how Exclusive Mode slipped through once
@@ -551,7 +558,10 @@ void AutoSetup::beginTuning()
         modes.add ("ASIO");
     else if (chosen.type.startsWith ("Windows Audio"))
     {
-        for (auto* m : { "Windows Audio (Exclusive Mode)", "Windows Audio (Low Latency Mode)", "Windows Audio" })
+        // Windows' own mode first: it hears the guitar at the level Windows sets, and at a small
+        // buffer it is often fast enough (6 ms on a USB guitar input). Only when it is not are the
+        // modes with less delay tried, and each is checked against the level heard here.
+        for (auto* m : { "Windows Audio", "Windows Audio (Low Latency Mode)", "Windows Audio (Exclusive Mode)" })
             if (findType (dm, m) != nullptr) modes.add (m);
     }
     else
@@ -560,7 +570,7 @@ void AutoSetup::beginTuning()
     modeIndex = 0;
     bufferIndex = 0;
     modePeakFor = -1;
-    modePeak = 0.0f;
+    modePeak = sharedPeak = 0.0f;
     while (modeIndex < modes.size() && ! (openMode (modes[modeIndex], 0) && ! buffers.isEmpty()))
         ++modeIndex;
     if (modeIndex >= modes.size()) { finishTuning(); return; }

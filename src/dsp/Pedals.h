@@ -197,7 +197,9 @@ class NoiseGate
 {
 public:
     static constexpr float kAboveFloorDb = 17.0f;   // threshold over the floor's level (hiss peaks sit about 10 dB up; it closes 4 dB lower)
-    static constexpr float kAbovePeaksDb = 6.0f;    // ... and over the floor's own loudest peaks: buzzy hum peaks far above its level
+    // ... and over the floor's own loudest peaks: buzzy hum and bursty USB hiss peak far above their level.
+    // It closes 4 dB lower, so 8 keeps the closing point clear of the hiss's own peaks (6 left it inside them).
+    static constexpr float kAbovePeaksDb = 8.0f;
     // following never asks for more than the tone's own threshold plus this, kept between -40
     // and -30 dB: notes must still ring out, and a clean tone (set low for soft playing) is let
     // hum a little before it cuts quiet notes
@@ -209,6 +211,7 @@ public:
     static constexpr float kStopDropDb = 18.0f;     // this much down inside about 30 ms is a hand on the strings
     static constexpr float kStopRangeDb = 24.0f;    // ... when it lands within this of the threshold
 
+    static inline bool fastFloor = true; // the test tool turns it off to replay how Update 1 heard a take
     void prepare (double sampleRate);
     void reset();
     void set (float thresholdDb, float releaseMs);
@@ -224,7 +227,8 @@ public:
     {
         if (peakDb <= -119.0f || floorDb > -119.0f) return;
         floorDb = peakDb - 10.0f;
-        floorPeakDb = peakDb;
+        // setup's figure is a typical hiss peak; the loudest over a second or two sit about 4 dB higher
+        floorPeakDb = peakDb + 4.0f;
         applyThreshold();
     }
     void setAuto (bool a) { if (a != autoThreshold) { autoThreshold = a; applyThreshold(); } }
@@ -246,6 +250,9 @@ private:
     static constexpr int kWindows = 16;             // 1.6 s of 0.1 s windows
     static constexpr int kFirstWindows = 16;        // the very first floor too: 0.8 s was short enough for a held note to pass
     static constexpr float kMostFloorDriftDb = 0.3f; // the later half of those windows against the earlier
+    static constexpr int kFastWindows = 8;          // 0.8 s of steady peaks is enough for a level far under the playing
+    static constexpr float kFastUnderPlayingDb = 30.0f;
+    float loudDb = -120.0f;                          // the loudest window peak lately
     float windows[kWindows] {}, windowPeaks[kWindows] {};
     float windowPeak = 0.0f;
     int windowAt = 0, windowsHeard = 0, windowLength = 4800, windowFill = 0;
@@ -258,8 +265,66 @@ private:
     float reopenAbove = 0.0f, reopenDecay = 1.0f;
     float thrOpen = 0.001f, thrClose = 0.0005f;
     float gain = 0.0f, attackCoeff = 0.0f, releaseCoeff = 0.0f, stopCoeff = 0.0f;
-    int holdSamples = 0, holdCounter = 0;
+    int holdSamples = 0, holdCounter = 0, above = 0, confirmSamples = 62, confirmLeft = 0;
     bool open = false, stopping = false;
+};
+
+// Noise reducer: the gate shuts the door between notes, this one also quiets the hiss that rides along
+// while you play. The guitar is split into seven bands (250 Hz to 8 kHz, bands that add back to exactly
+// the input). Each band keeps its own idea of its hiss: the quietest level it reached in the last two
+// seconds. A band that is only hiss right now (above the note's harmonics) is turned down, a band with
+// playing in it is left alone, so a high-gain amp has no hiss to fatten. Nothing is delayed.
+class NoiseReducer
+{
+public:
+    static constexpr int kBands = 7;
+    void prepare (double sampleRate);
+    void reset();
+    void set (float amount); // 0..10 knob; 0 is off, 10 takes up to 60 dB off a band of pure hiss
+    // gateFloorDb: the hiss level the gate has heard (or setup measured), -120 when unknown; the reducer
+    // only acts while its own bands' floors add up to about that
+    void process (float* x, int n, float gateFloorDb);
+    bool active() const noexcept { return maxCutDb > 0.01f; }
+
+private:
+    static constexpr int kSubs = 8; // 8 sub windows of 250 ms: the floor is the quietest of the last two seconds
+    double sr = 48000.0;
+    float maxCutDb = 0.0f;
+    OnePole lp1[kBands - 1], lp2[kBands - 1];
+    float env[kBands] {}, pwr[kBands] {}, gain[kBands] {}, subSum[kBands] {}, ring[kBands][kSubs] {};
+    double ringTotal[kSubs] {}, subTotal = 0.0, latchedDb = -200.0; int latchHold = 0; // power of all bands over each 250 ms window
+    float floorOf[kBands] {}; // each band's floor, refreshed every 250 ms
+    float pAtt = 0.0f, pRel = 0.0f, gAtt = 0.0f, gRel = 0.0f;
+    int hopLen = 240, hopFill = 0, subHops = 50, subFill = 0, ringAt = 0, heard = 0;
+};
+
+// Feedback killer: a guitar near its amp can start to howl, one pure tone that only ever grows.
+// It watches every narrow peak in the sound (2048-point looks every 11 ms). A peak that
+// stands 18 dB over its surroundings and climbs at least 12 dB over about 300 ms, smoothly, with the rest of
+// the sound hardly rising is a howl: a played note starts at its loudest and fades, a swell lifts
+// every harmonic together. The howl gets a narrow notch that deepens while it keeps growing
+// (up to 30 dB), three at most, and lets go a second and a half after the tone is gone.
+class FeedbackKiller
+{
+public:
+    static constexpr int kMaxNotches = 3;
+    void prepare (double sampleRate);
+    void reset();
+    void process (float* x, int n);
+    int notching() const noexcept { int c = 0; for (auto& nt : notch) if (nt.depth > 0.05f) ++c; return c; }
+
+private:
+    static constexpr int kOrder = 11, kSize = 1 << kOrder, kBins = kSize / 2 + 1, kHop = 512, kHist = 28;
+    void look();
+    struct Notch { Biquad bq; float hz = 0.0f, depth = 0.0f, target = 0.0f, level = -200.0f; int quiet = 0; };
+    double sr = 48000.0;
+    std::unique_ptr<juce::dsp::FFT> fft;
+    std::vector<float> window, ring, frame;
+    int ringAt = 0, hopFill = 0;
+    std::vector<float> binDb;  // kHist looks of every bin's level, dB
+    float totalDb[kHist] {};   // total level of each look, dB
+    int histAt = 0, histCount = 0;
+    Notch notch[kMaxNotches];
 };
 
 class Compressor
@@ -322,10 +387,21 @@ private:
     OnePole trackLp, subLp1, subLp2, upHp;
     EnvelopeFollower subEnv;
     float flip = 1.0f, lastSign = 0.0f;
-    // shifter
+    // shifter: one read head sliding through the last few periods, jumping back by whole periods
+    // of the note (found by autocorrelation) so each jump lands on the same part of the wave
     DelayLine line;
     float phase = 0.0f;
     int window = 1024;
+    void trackPeriod();
+    static constexpr int kDecHist = 1024;
+    int decFactor = 4, decCount = 0, trackCount = 0;
+    float decHist[kDecHist] {}, seg[kDecHist] {}, nsdf[kDecHist] {};
+    int decAt = 0;
+    OnePole decLp1, decLp2;
+    float period = 0.0f, periodConf = 0.0f; // samples at the host rate; 0 = no steady note (chords, noise)
+    int unvoiced = 0;
+    float headA = 0.0f, headB = 0.0f, fadeAt = 1.0f, fadeStep = 0.0f;
+    bool crossing = false, alignedJump = true;
 };
 
 class DrivePedal

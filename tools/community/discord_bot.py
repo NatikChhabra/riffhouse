@@ -211,11 +211,8 @@ def post_feeds(log: list[str]):
             }
             if it["date"]:
                 embed["timestamp"] = it["date"].isoformat()
-            preset = preset_file(it["link"]) if chan == "tone-of-the-week" else None
-            if preset:
-                msg = send_file(CH[chan], "", None, preset[0], preset[1], "application/json", [embed], ping)
-            else:
-                msg = send(CH[chan], f"<@&{ping[0]}>" if ping else "", [embed], ping)
+            # Tone of the week ships inside the app, so the post is the card only: no file to download
+            msg = send(CH[chan], f"<@&{ping[0]}>" if ping else "", [embed], ping)
             if publish and msg.get("id"):
                 try:
                     call("POST", f"/channels/{CH[chan]}/messages/{msg['id']}/crosspost")
@@ -269,19 +266,6 @@ def send_file(channel: str, content: str, path: str | None, name: str, data: byt
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.loads(r.read())
-
-
-def preset_file(link: str) -> tuple[str, bytes] | None:
-    """The preset .json behind a tone link, so people can grab the file straight from Discord."""
-    got = re.match(r"https://github\.com/([^/]+/[^/]+)/blob/([^/]+)/(presets/[\w.\-]+\.json)$", link or "")
-    if not got:
-        return None
-    raw = f"https://raw.githubusercontent.com/{got.group(1)}/{got.group(2)}/{got.group(3)}"
-    try:
-        with urllib.request.urlopen(urllib.request.Request(raw, headers={"User-Agent": UA}), timeout=30) as r:
-            return os.path.basename(got.group(3)), r.read()
-    except urllib.error.URLError:
-        return None
 
 
 def post_reels(log: list[str]):

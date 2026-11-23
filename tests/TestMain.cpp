@@ -30,6 +30,7 @@
 #include "plugin/Export.h"
 #include "plugin/Tuner.h"
 #include "plugin/Version.h"
+#include "plugin/WhatsNew.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
 #include <chrono>
@@ -623,6 +624,186 @@ void testElasticInput()
 
 // A clean note held on a good guitar fades slowly: 0.1.5's gate took one fading 1.7 dB a
 // second for the noise floor after 0.8 s and closed on it (a quarter of a clean take muted).
+// The pitch shifter keeps a note a note: the energy of the shifted note sits on the harmonics of the new
+// pitch (the old two-head shifter smeared it into sidebands, about -20 dB), for single notes and a chord.
+void testPitchShifter (double sr)
+{
+    std::printf ("pitch shifter @ %.0f Hz\n", sr);
+    auto harmonicDb = [&] (const std::vector<float>& y, const std::vector<double>& f0s)
+    {
+        const int a = (int) (0.2 * sr), len = (int) (1.2 * sr);
+        std::vector<double> power ((size_t) len / 2 + 1, 0.0);
+        // a plain DFT on a grid of 0.5 Hz over 60..3000 Hz is enough to compare the two
+        double inComb = 0.0, outComb = 0.0;
+        for (double f = 60.0; f < 3000.0; f += 0.5)
+        {
+            double re = 0.0, im = 0.0;
+            const double w = 6.283185307179586 * f / sr;
+            for (int i = 0; i < len; i += 2)
+            {
+                const double win = 0.5 - 0.5 * std::cos (6.283185307179586 * i / len);
+                re += win * y[(size_t) (a + i)] * std::cos (w * i);
+                im += win * y[(size_t) (a + i)] * std::sin (w * i);
+            }
+            const double p = re * re + im * im;
+            bool near = false;
+            for (double f0 : f0s)
+                for (int h = 1; h <= 10; ++h)
+                    if (std::abs (f - h * f0) <= std::max (f0 * 0.012, 2.0)) near = true;
+            (near ? inComb : outComb) += p;
+        }
+        return 10.0 * std::log10 (inComb / std::max (outComb, 1.0e-20));
+    };
+    auto note = [&] (double f0, size_t n)
+    {
+        std::vector<float> v (n);
+        for (size_t i = 0; i < n; ++i)
+        {
+            double s = 0.0;
+            for (int h = 1; h <= 6; ++h) s += std::sin (6.283185307179586 * f0 * h * (double) i / sr + 0.7 * h) / h;
+            v[i] = (float) (0.2 * s * std::exp (-(double) i / sr * 1.2));
+        }
+        return v;
+    };
+    const size_t n = (size_t) (1.6 * sr);
+    for (int semis : { 7, -5, 12, -12 })
+    {
+        for (int chord = 0; chord < 2; ++chord)
+        {
+            std::vector<double> f0s { 110.0 };
+            auto x = note (110.0, n);
+            if (chord) { auto b = note (146.83, n); for (size_t i = 0; i < n; ++i) x[i] = 0.5f * (x[i] + b[i]); f0s.push_back (146.83); }
+            for (auto& f : f0s) f *= std::pow (2.0, semis / 12.0);
+            PitchPedal pp;
+            pp.prepare (sr);
+            pp.set (2, (float) semis, 10.0f);
+            pp.reset();
+            for (size_t at = 0; at < n; at += 256) pp.process (x.data() + at, (int) std::min<size_t> (256, n - at));
+            const double db = harmonicDb (x, f0s);
+            std::printf ("  %+d semitones%s: %.1f dB on the new harmonics\n", semis, chord ? " (two notes)" : "", db);
+            CHECK (db > (chord ? -5.0 : 10.0), "the shifted %s at %+d keeps its pitch clean (the old shifter: -10 to -24 dB on chords): %.1f dB", chord ? "chord" : "note", semis, db);
+        }
+    }
+}
+
+// The noise reducer takes hiss off the bands that hold only hiss: far down between notes, nothing off a played note
+void testNoiseReducer (double sr)
+{
+    std::printf ("noise reducer @ %.0f Hz\n", sr);
+    const size_t n = (size_t) (12.0 * sr);
+    std::vector<float> clean (n, 0.0f), x;
+    for (int k = 0; k < 4; ++k)
+        for (size_t i = 0; i < (size_t) (1.2 * sr); ++i)
+        {
+            const size_t at = (size_t) (k * 3.0 * sr) + i;
+            double s = 0.0;
+            for (int h = 1; h <= 8; ++h) s += std::sin (6.283185307179586 * 110.0 * h * (double) at / sr) / h;
+            clean[at] = (float) (0.25 * s * std::exp (-(double) i / sr * 1.5));
+        }
+    x = clean;
+    uint32_t seed = 12345u;
+    for (auto& v : x)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        v += 0.0016f * ((float) (seed >> 8) / 8388608.0f - 1.0f); // about -57 dBFS of hiss
+    }
+    NoiseReducer nr;
+    nr.prepare (sr);
+    nr.set (6.0f);
+    std::vector<float> y = x;
+    for (size_t at = 0; at < n; at += 256) nr.process (y.data() + at, (int) std::min<size_t> (256, n - at), -60.0f);
+    auto rms = [&] (const std::vector<float>& v, double from, double to)
+    {
+        double e = 0.0; size_t c = 0;
+        for (size_t i = (size_t) (from * sr); i < (size_t) (to * sr); ++i) { e += (double) v[i] * v[i]; ++c; }
+        return 10.0 * std::log10 (e / (double) c + 1.0e-20);
+    };
+    // the third gap and the fourth note, after the reducer has heard its floor
+    const double gapCut = rms (x, 7.5, 8.9) - rms (y, 7.5, 8.9);
+    const double noteChange = rms (y, 9.0, 9.3) - rms (x, 9.0, 9.3);
+    std::printf("  hiss between notes %.1f dB down, a played note %+.2f dB\n", gapCut, noteChange);
+    CHECK (gapCut > 20.0, "hiss between notes is taken down: %.1f dB", gapCut);
+    CHECK (std::abs (noteChange) < 1.0, "a played note keeps its level: %+.2f dB", noteChange);
+    // continuous playing has no gaps: its quietest stretch is playing, not hiss, so nothing may be cut
+    {
+        std::vector<float> run (n);
+        uint32_t s2 = 777u;
+        for (size_t i = 0; i < n; ++i)
+        {
+            const double t = (double) i / sr, since = std::fmod (t, 0.5);
+            double v = 0.0;
+            for (int h = 1; h <= 8; ++h) v += std::sin (6.283185307179586 * 98.0 * h * t) / h;
+            s2 = s2 * 1664525u + 1013904223u;
+            run[i] = (float) (0.06 * v * std::exp (-since * 1.4) + 0.0016 * ((float) (s2 >> 8) / 8388608.0f - 1.0f));
+        }
+        for (float gateFloor : { -120.0f, -60.0f })
+        {
+            NoiseReducer nr2;
+            nr2.prepare (sr);
+            nr2.set (10.0f);
+            auto out = run;
+            for (size_t at = 0; at < n; at += 256) nr2.process (out.data() + at, (int) std::min<size_t> (256, n - at), gateFloor);
+            const double change = rms (out, 4.0, 11.0) - rms (run, 4.0, 11.0);
+            std::printf ("  continuous playing, gate floor %.0f: %+.2f dB\n", gateFloor, change);
+            CHECK (change > -1.0, "continuous playing is not taken for hiss (gate floor %.0f): %+.2f dB", gateFloor, change);
+        }
+    }
+    // off, it changes nothing
+    NoiseReducer off;
+    off.prepare (sr); off.set (0.0f);
+    std::vector<float> z = x;
+    for (size_t at = 0; at < n; at += 256) off.process (z.data() + at, (int) std::min<size_t> (256, n - at), -60.0f);
+    CHECK (z == x, "Reduce at 0 leaves the sound untouched");
+}
+
+// A howl (one pure tone that only grows) is notched out while the playing goes on; played notes and a
+// volume swell are never taken for one
+void testFeedbackKiller (double sr)
+{
+    std::printf ("feedback killer @ %.0f Hz\n", sr);
+    const size_t n = (size_t) (8.0 * sr);
+    auto build = [&] (bool howl, bool swell)
+    {
+        std::vector<float> v (n);
+        for (size_t i = 0; i < n; ++i)
+        {
+            const double t = (double) i / sr;
+            double s = 0.0;
+            const double pluck = std::fmod (t, 1.0);
+            for (int h = 1; h <= 7; ++h) s += std::sin (6.283185307179586 * 196.0 * h * t) / h;
+            s *= 0.15 * std::exp (-pluck * 2.5) * (swell ? std::pow (10.0, (std::min (t, 3.0) - 3.0) * 8.0 / 20.0) * 3.0 : 1.0);
+            if (howl) s += 0.001 * std::pow (10.0, std::min (std::max (t - 1.0, 0.0) * 50.0, 40.0) / 20.0) * std::sin (6.283185307179586 * 1847.0 * t);
+            v[i] = (float) std::clamp (s, -0.9, 0.9);
+        }
+        return v;
+    };
+    auto howlPower = [&] (const std::vector<float>& y, size_t from, size_t to)
+    {
+        double re = 0.0, im = 0.0;
+        for (size_t i = from; i < to; ++i) { const double w = 6.283185307179586 * 1847.0 * (double) i / sr; re += y[i] * std::cos (w); im += y[i] * std::sin (w); }
+        return 20.0 * std::log10 (std::hypot (re, im) / (double) (to - from) + 1.0e-12);
+    };
+    {
+        auto x = build (true, false), y = x;
+        FeedbackKiller fk; fk.prepare (sr);
+        for (size_t at = 0; at < n; at += 256) fk.process (y.data() + at, (int) std::min<size_t> (256, n - at));
+        const size_t a = (size_t) (6.5 * sr), b = (size_t) (7.5 * sr);
+        const double cut = howlPower (x, a, b) - howlPower (y, a, b);
+        std::printf ("  a howl growing 50 dB a second: %.1f dB off at 7 s, %d notches\n", cut, fk.notching());
+        CHECK (cut > 12.0, "the howl is cut by %.1f dB", cut);
+    }
+    for (int swell = 0; swell < 2; ++swell)
+    {
+        auto x = build (false, swell == 1), y = x;
+        FeedbackKiller fk; fk.prepare (sr);
+        for (size_t at = 0; at < n; at += 256) fk.process (y.data() + at, (int) std::min<size_t> (256, n - at));
+        double diff = 0.0, e = 0.0;
+        for (size_t i = 0; i < n; ++i) { diff += (double) (y[i] - x[i]) * (y[i] - x[i]); e += (double) x[i] * x[i]; }
+        std::printf ("  %s alone changed by %.1f dB\n", swell ? "a volume swell" : "plucked notes", 10.0 * std::log10 (diff / e + 1.0e-20));
+        CHECK (fk.notching() == 0 && diff < 1.0e-9 * e, "%s is left alone", swell ? "a swell" : "playing");
+    }
+}
+
 void testGateHeldNote (double sr)
 {
     std::printf ("gate: held notes\n");
@@ -1073,14 +1254,32 @@ static std::vector<float> whinePlayer (double sr, double secs, std::vector<char>
 // about -76 dBFS (measured on a Realtek USB guitar cable, 15 Nov). With the gate on (every tone
 // that has one) the pauses must come out at least 40 dB under the playing: a high-gain amp puts
 // 50 dB and more on that hiss, and with the gate off it was only 3 to 6 dB under the notes.
-void testNoiseBetweenNotes (double sr)
+void testNoiseBetweenNotes (double sr, float hissDb = -76.0f, bool bursts = false, bool ticks = false) // -70: a USB guitar input at full gain; bursts: its hiss swings 6 dB every few tens of ms (16 Nov)
 {
-    std::printf ("hiss between notes on a cheap input, every tone @ %.0f Hz\n", sr);
+    std::printf ("hiss at %.0f dBFS between notes on a cheap input, every tone @ %.0f Hz\n", hissDb, sr);
     std::vector<char> quiet;
     auto di = whinePlayer (sr, 30.0, quiet);
     Noise rnd (0x5EEDu);
-    const float hiss = juce::Decibels::decibelsToGain (-76.0f) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
-    for (auto& x : di) x += hiss * rnd.next();
+    const float hiss = juce::Decibels::decibelsToGain (hissDb) * std::sqrt (3.0f); // uniform noise: rms = a / sqrt 3
+    // bursts: a USB guitar input (16 Nov) hisses in swells, 0 to 7 dB every 50 ms, with clicks of a
+    // steady height on top, about 60 a second. Its level then swings 5 dB from one tenth of a second
+    // to the next while its loudest moments hold within a decibel, as measured on the real input.
+    const size_t swell = (size_t) (0.05 * sr);
+    const float click = juce::Decibels::decibelsToGain (hissDb + 18.0f);
+    float gain = 1.0f, clickLeft = 0.0f;
+    for (size_t i = 0; i < di.size(); ++i)
+    {
+        if (bursts && i % swell == 0) gain = juce::Decibels::decibelsToGain (3.5f + 3.5f * rnd.next());
+        float x = hiss * gain * rnd.next();
+        if (bursts)
+        {
+            if (std::abs (rnd.next()) < 60.0f / (float) sr) clickLeft = rnd.next() < 0.0f ? -click : click;
+            if (ticks && i % (size_t) (0.2 * sr) == 0) clickLeft = 1.4f * click; // and a tick every fifth of a second (17 Nov take)
+            x += clickLeft;
+            clickLeft *= 0.88f; // gone in about 1 ms
+        }
+        di[i] += x;
+    }
     // judged in the pauses only once the gate has had time to hear the floor, and away from
     // each note's tail (a quarter of a second for the release)
     const size_t tail = (size_t) (0.25 * sr), from = (size_t) (3.0 * sr);
@@ -1586,7 +1785,10 @@ void testAliasing (double sr)
   {
     auto v = bare();
     v[(size_t) P::ampOn] = 1; v[(size_t) P::ampModel] = (float) amp; v[(size_t) P::ampGain] = 10;
+    // Redline Lead plays a capture now too: its circuit model, still the fallback, is what is held to the oversampled bar
+    Rig::circuitModelsOnly = amp == choices::hotRodLead;
     const auto r = renderWith (v, in, sr);
+    Rig::circuitModelsOnly = false;
     const int N = 32768;
     juce::dsp::FFT fft (15);
     std::vector<float> buf ((size_t) N * 2, 0.0f);
@@ -1652,17 +1854,6 @@ void testPresets (double sr)
                    "code wrapped over two lines: %s", e2.toRawUTF8());
             CHECK (presetFromShareCode (code + " sounds sick right", trailing, e3), "code with words after it: %s", e3.toRawUTF8());
             CHECK (! presetFromShareCode ("visit riffhouse: nothing here", fake, e4) && e4.isNotEmpty(), "junk after the tag must fail");
-            // a tone named after an artist carries the style line, and still pastes back
-            // (whichever tone the folder lists first, so both cases are built here)
-            auto plain = p;
-            plain.name = "My Clean Tone"; plain.band = {}; plain.inspiredBy = {};
-            auto named = plain;
-            named.name = "Inspired by Someone: A Song";
-            const auto namedMessage = presetToShareMessage (named);
-            Preset viaNamed; juce::String e5;
-            CHECK (namedMessage.contains ("Not affiliated with the artist.") && ! presetToShareMessage (plain).contains ("Not affiliated")
-                       && presetFromShareCode (namedMessage, viaNamed, e5) && viaNamed.name == named.name,
-                   "artist share message: %s", e5.toRawUTF8());
         }
     }
     if (! levels.empty())
@@ -2206,7 +2397,7 @@ void testBadFiles (double sr)
     std::printf ("  3000 broken tones and share codes: %d read safely, %d refused with a reason\n", read, refused);
 
     // captures and IRs on disk
-    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-badfiles");
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-badfiles-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt())); // its own folder: test runs side by side wiped each other's files mid-read
     dir.deleteRecursively();
     dir.createDirectory();
     auto bytes = [&rnd] (int n) { juce::MemoryBlock m ((size_t) n); for (int k = 0; k < n; ++k) static_cast<char*> (m.getData())[k] = (char) rnd.nextInt (256); return m; };
@@ -2234,6 +2425,19 @@ void testBadFiles (double sr)
             rig.prepare (sr, 256);
             const auto err = rig.neural().load (file.getFullPathName().toStdString());
             CHECK (! err.empty(), "%s was taken as a capture", f.name);
+            // a WaveNet with too few numbers is caught before the library reads past their end
+            // (it used to be read first: a crash in one full test run of two on Windows)
+            if (juce::String (f.name) == "wrong-weights.nam")
+            {
+                CHECK (NeuralCapture::firstUnusedWeight ("Weight mismatch: assigned 12 weights, but 9 were provided.") == 12
+                       && NeuralCapture::firstUnusedWeight ("assigned many weights") == -1
+                       && NeuralCapture::firstUnusedWeight ("assigned 99999999999999999999999 weights") == -1
+                       && NeuralCapture::firstUnusedWeight ("assigned ") == -1
+                       && NeuralCapture::firstUnusedWeight ("bad_alloc") == -1,
+                       "the library's weight count is read safely from its message, or not at all");
+            }
+            if (juce::String (f.name) == "wrong-weights.nam")
+                CHECK (juce::String (err).contains ("damaged"), "a short WaveNet was read before being refused: %s", err.c_str());
             auto v = bare();
             v[(size_t) P::ampOn] = 1;
             v[(size_t) P::ampModel] = choices::neuralCapture;
@@ -2839,57 +3043,38 @@ int renderAll (const juce::File& dir, double sr)
     }
     return 0;
 }
-// A tone made after someone says whose sound it is: the band in front, then the title, and it is found by band and by song.
+// Factory tone names describe a sound. None of them names an artist, a band or a song.
 void testToneNames()
 {
     std::printf ("tone names\n");
     Preset p; juce::String err;
-    CHECK (presetFromJson (R"({"name":"Inspired by James Hetfield: Downpicked Thrash","category":"Inspired By","inspiredBy":"James Hetfield","band":"Metallica","description":"Tight."})", p, err), "a tone with a band is read");
-    CHECK (p.artist() == "Metallica" && p.title() == "Downpicked Thrash", "the band stands in front, the title follows: '%s' '%s'", p.artist().toRawUTF8(), p.title().toRawUTF8());
-    CHECK (p.credit() == "Inspired by James Hetfield. ", "the player is named under it: '%s'", p.credit().toRawUTF8());
-    CHECK (p.searchText().contains ("metallica") && p.searchText().contains ("hetfield"), "found by band and by player");
-    Preset back;
-    CHECK (presetFromJson (presetToJson (p), back, err) && back.band == "Metallica" && back.song.isEmpty(), "the band survives saving");
-
-    CHECK (presetFromJson (R"({"name":"Inspired by Metallica: Master of Puppets Interlude","category":"Inspired By","inspiredBy":"Metallica","band":"Metallica","song":"Master of Puppets"})", p, err), "a tone after a song is read");
-    CHECK (p.artist() == "Metallica" && p.title() == "Master of Puppets Interlude" && p.credit().isEmpty(), "a song tone needs no second credit: '%s'", p.credit().toRawUTF8());
-    CHECK (p.searchText().contains ("master of puppets"), "found by song");
-    CHECK (p.part() == "Interlude", "the part of the song it is for: '%s'", p.part().toRawUTF8());
-    CHECK (presetFromJson (presetToJson (p), back, err) && back.song == "Master of Puppets", "the song survives saving");
     // amps renamed in 0.1.5 still load from tones saved or shared before
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Hot Rod Lead"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::hotRodLead, "an old Hot Rod Lead tone loads as the Redline Lead");
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"brit plexi"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::britPlexi, "an old Brit Plexi tone loads as the Brit 68");
     CHECK (presetFromJson (R"({"name":"Old","params":{"amp_model":"Brit 800"}})", p, err) && (int) p.values[(size_t) P::ampModel] == choices::brit800, "an old Brit 800 tone loads as the Brit 81");
-
-    CHECK (presetFromJson (R"({"name":"Inspired by David Gilmour: Comfortably Lead","category":"Inspired By","inspiredBy":"David Gilmour","band":"Pink Floyd","song":"Comfortably Numb"})", p, err), "a player tone after a song is read");
-    CHECK (p.credit() == juce::String (juce::CharPointer_UTF8 ("Inspired by David Gilmour on \xe2\x80\x9c" "Comfortably Numb\xe2\x80\x9d. ")), "player and song: '%s'", p.credit().toRawUTF8());
-    CHECK (p.part() == "Comfortably Lead", "a title that is not the song is left whole");
-    CHECK (presetFromJson (R"({"name":"Inspired by B.B. King: Thrill Lead","category":"Inspired By","inspiredBy":"B.B. King","song":"The Thrill Is Gone"})", p, err), "a solo artist's song tone is read");
-    CHECK (p.artist() == "B.B. King" && p.credit() == juce::String (juce::CharPointer_UTF8 ("After \xe2\x80\x9cThe Thrill Is Gone\xe2\x80\x9d. ")), "no band: the player stands in front and the song is named: '%s'", p.credit().toRawUTF8());
     CHECK (presetFromJson (R"({"name":"Warm Crunch","category":"Essentials"})", p, err) && p.artist().isEmpty() && p.title() == "Warm Crunch" && p.credit().isEmpty(), "a plain tone is only its name");
     CHECK (presetFromJson (R"({"name":"My take: louder","category":"User"})", p, err) && p.title() == "My take: louder", "a colon in your own tone's name is left alone");
 
     PresetLibrary lib;
     lib.scanFolder (presetFolder(), true);
+    // no real person, band or song in what we ship: a tone like that is a legal risk, not a feature
+    static const char* banned[] = { "inspired by", "metallica", "hendrix", "clapton", "van halen", "slash", "gilmour", "pink floyd", "nirvana", "cobain",
+                                    "hetfield", "hammett", "mayer", "iron maiden", "guns n", "def leppard", "dream theater", "led zeppelin", "zeppelin",
+                                    "black sabbath", "sabbath", "gojira", "muse", "radiohead", "slayer", "pantera", "ac/dc", "queen", "prince",
+                                    "santana", "knopfler", "stevie ray", "texas flood", "master of puppets", "teen spirit", "sweet child", "fear of the dark",
+                                    "crazy train", "paradise city", "woman tone", "brown sound" };
     for (const auto& q : lib.all())
     {
-        if (q.category != "Inspired By") continue;
-        CHECK (q.inspiredBy.isNotEmpty() && q.name.startsWith ("Inspired by " + q.inspiredBy + ": "), "%s says who it is after", q.name.toRawUTF8());
-        CHECK (q.title().isNotEmpty() && ! q.title().startsWith ("Inspired by"), "%s has a title of its own", q.name.toRawUTF8());
-        if (q.song.isNotEmpty() && q.inspiredBy == q.band)
-            CHECK (q.title().startsWith (q.song), "%s is named after its song", q.name.toRawUTF8());
+        if (! q.factory) continue;
+        const auto text = (q.name + " " + q.description + " " + q.genres.joinIntoString (" ")).toLowerCase();
+        CHECK (q.inspiredBy.isEmpty() && q.band.isEmpty() && q.song.isEmpty() && q.category != "Inspired By", "%s names no artist, band or song", q.name.toRawUTF8());
+        for (auto* word : banned)
+        {
+            const auto w = juce::String (word);
+            const bool whole = (" " + text + " ").replaceCharacters (".,'()-", "      ").contains (" " + w + " ");
+            CHECK (! whole, "%s must not say '%s'", q.name.toRawUTF8(), word);
+        }
     }
-    // what the first players asked for is found the way they would type it
-    auto found = [&] (const char* words) { return (int) lib.search (words, "All").size(); };
-    CHECK (found ("metallica") >= 5, "Metallica: %d tones", found ("metallica"));
-    CHECK (found ("master of puppets") == 2, "Master of Puppets: %d tones", found ("master of puppets"));
-    CHECK (found ("pour some sugar") == 1 && found ("def leppard") == 1, "Pour Some Sugar on Me");
-    CHECK (found ("fear of the dark") == 2 && found ("iron maiden") == 2, "Fear of the Dark");
-    CHECK (found ("wither") == 2 && found ("dream theater") == 2, "Wither");
-    CHECK (found ("sweet child") == 2 && found ("guns n' roses") >= 4, "Sweet Child O' Mine: %d, Guns N' Roses: %d", found ("sweet child"), found ("guns n' roses"));
-    CHECK (found ("nightmare") == 1 && found ("avenged sevenfold") >= 2, "Nightmare");
-    CHECK (found ("big fuzz") >= 2, "the Big Fuzz pedal: %d tones", found ("big fuzz"));
-    CHECK (found ("pink floyd comfortably numb") == 1, "a player's tone is found by band and song together");
 }
 
 void testUpdates()
@@ -2901,6 +3086,14 @@ void testUpdates()
     CHECK (compareVersions ("0.2", "0.2.0") == 0, "missing parts count as zero");
     CHECK (compareVersions ("0.1.5.1", "0.1.5") > 0 && compareVersions ("0.1.6", "0.1.5.1") > 0 && compareVersions ("0.1.5.2", "0.1.5.1") > 0, "a hotfix (fourth number) is newer than its release and older than the next one");
     CHECK (spokenVersion ("0.1.5.1") == "0.1.5 Hotfix 1" && spokenVersion ("0.1.5") == "0.1.5" && spokenVersion ("0.1.5.2-rc1") == "0.1.5 Hotfix 2-rc1", "a hotfix is said as one (%s)", spokenVersion ("0.1.5.1").toRawUTF8());
+    CHECK (spokenVersion ("0.1.6") == "0.1.6" && spokenVersion ("0.1.6-dev.1a2b3c4") == "0.1.6-dev.1a2b3c4", "a release is said as its number (%s)", spokenVersion ("0.1.6").toRawUTF8());
+    {
+        const juce::String notes = "# comment\n## 0.2.0 Update 2\n### New\n- a\n- b\n### Fixed\n- c\n## 0.1.6\n### New\n- old\n";
+        const auto e = findWhatsNew (notes, "0.2.0-rc1"), o = findWhatsNew (notes, "0.1.6.1"), d = findWhatsNew (notes, "0.0.0-dev");
+        CHECK (e.version == "0.2.0" && e.added.size() == 2 && e.fixed.size() == 1 && e.fixed[0] == "c", "the notes of a release are found, sections apart");
+        CHECK (o.version == "0.1.6" && o.added[0] == "old" && d.version == "0.2.0", "a hotfix finds its release, a build from source the newest");
+        CHECK (findWhatsNew ({}, "0.1.6").added.isEmpty(), "no notes, no lines");
+    }
     CHECK (compareVersions ("1.0.0", "0.9.9") > 0 && compareVersions ("0.9.9", "1.0.0") < 0, "major wins");
     CHECK (compareVersions ("0.2.0-beta", "0.2.0") < 0, "a pre-release is older than its release");
     CHECK (compareVersions ("0.2.0-beta", "0.1.9") > 0, "a pre-release is newer than the version before");
@@ -2909,6 +3102,11 @@ void testUpdates()
     CHECK (compareVersions ("0.1.0-rc2", "0.1.0") < 0 && compareVersions ("0.1.0-rc2", "0.1.0-rc2") == 0, "the release follows its last test build");
     CHECK (compareVersions ("0.1.0-dev.1a2b3c4", "0.1.0-rc1") < 0, "a build from source is older than a test build of that version");
     CHECK (isPreRelease ("0.1.0-rc1") && isPreRelease ("v0.2.0-dev.abc") && ! isPreRelease ("0.1.0") && ! isPreRelease ("0.1.0+build-7"), "telling a test build from a release");
+    CHECK (channelFromSetting ("", false, "0.1.6") == Channel::stable, "a fresh release copy follows Stable");
+    CHECK (channelFromSetting ("", true, "0.1.6") == Channel::beta, "the old early switch becomes Beta");
+    CHECK (channelFromSetting ("", false, "0.2.0-rc1") == Channel::beta, "a test build follows Beta until told otherwise");
+    CHECK (channelFromSetting ("stable", true, "0.2.0-rc1") == Channel::stable && channelFromSetting ("beta", false, "0.1.6") == Channel::beta, "a saved choice wins");
+    CHECK (channelKey (Channel::beta) == "beta" && channelName (Channel::stable) == "Stable", "channel names");
     {
         // someone on a test build is offered the next test build, then the release
         auto entry = [] (const char* tag, bool pre, bool draft, bool built = true)
@@ -3543,7 +3741,7 @@ void testTakes()
 {
     std::printf ("takes\n");
     const double sr = 48000.0;
-    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-takes-test");
+    const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("riffhouse-takes-test-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt())); // its own folder: test runs side by side wiped each other's files mid-read
     dir.deleteRecursively();
     const auto di = test::guitarDi (sr, 3.0);
 
@@ -3813,6 +4011,8 @@ void testBufferSearch()
 
 int main (int argc, char** argv)
 {
+    // unbuffered, so a run that dies says where: one CI run stopped with its last 4 KB of output never written
+    std::setvbuf (stdout, nullptr, _IONBF, 0);
     juce::ConsoleApplication* unused = nullptr; (void) unused;
     juce::StringArray args;
     for (int i = 1; i < argc; ++i) args.add (argv[i]);
@@ -3859,6 +4059,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "calibrate")
     {
+        if (args.contains ("captures=0")) Rig::circuitModelsOnly = true; // the circuit models the captures replace
         const double sr = 48000.0;
         const auto di = test::guitarDi (sr, 12.0);
         for (int m = 0; m < numAmpVoicings(); ++m)
@@ -3876,6 +4077,59 @@ int main (int argc, char** argv)
             }
             std::printf ("\n");
         }
+        return 0;
+    }
+    if (args[0] == "pitchrender" && args.size() >= 6)
+    {
+        // pitchrender <in.wav> <out.wav> <mode 0..2> <semitones> <mix 0..10>: the pitch pedal alone, for measuring the shifter
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+        PitchPedal pp;
+        pp.prepare (reader->sampleRate);
+        pp.set (args[3].getIntValue(), args[4].getFloatValue(), args[5].getFloatValue());
+        pp.reset();
+        float* d = buf.getWritePointer (0);
+        for (int at = 0; at < buf.getNumSamples(); at += 256) pp.process (d + at, std::min (256, buf.getNumSamples() - at));
+        Render r;
+        r.l.assign (d, d + buf.getNumSamples());
+        r.r = r.l;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, reader->sampleRate);
+        return 0;
+    }
+    if (args[0] == "nrscan" && args.size() >= 3)
+    {
+        // nrscan <in.wav> <out.wav> <reduce 0..10>: the noise reducer alone on a real take
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+        NoiseReducer nr; nr.prepare (reader->sampleRate); nr.set (args.size() > 3 ? args[3].getFloatValue() : 5.0f);
+        float* d = buf.getWritePointer (0);
+        for (int at = 0; at < buf.getNumSamples(); at += 256) nr.process (d + at, std::min (256, buf.getNumSamples() - at), args.size() > 4 ? args[4].getFloatValue() : -120.0f);
+        Render r; r.l.assign (d, d + buf.getNumSamples()); r.r = r.l;
+        writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, reader->sampleRate);
+        return 0;
+    }
+    if (args[0] == "fkscan" && args.size() >= 2)
+    {
+        // fkscan <in.wav>: real playing must never be taken for a howl
+        juce::AudioFormatManager fm; fm.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader (fm.createReaderFor (juce::File::getCurrentWorkingDirectory().getChildFile (args[1])));
+        if (reader == nullptr) { std::printf ("cannot read %s\n", args[1].toRawUTF8()); return 1; }
+        juce::AudioBuffer<float> buf (1, (int) reader->lengthInSamples);
+        reader->read (&buf, 0, buf.getNumSamples(), 0, true, false);
+        FeedbackKiller fk; fk.prepare (reader->sampleRate);
+        std::vector<float> in (buf.getReadPointer (0), buf.getReadPointer (0) + buf.getNumSamples());
+        auto y = in;
+        int most = 0;
+        for (size_t at = 0; at < y.size(); at += 256) { fk.process (y.data() + at, (int) std::min<size_t> (256, y.size() - at)); most = std::max (most, fk.notching()); }
+        double d = 0.0, e = 0.0;
+        for (size_t i = 0; i < y.size(); ++i) { d += (double) (y[i] - in[i]) * (y[i] - in[i]); e += (double) in[i] * in[i]; }
+        std::printf ("%s: %.0f s, most notches at once %d, change %.1f dB\n", args[1].toRawUTF8(), (double) y.size() / reader->sampleRate, most, 10.0 * std::log10 (d / e + 1.0e-20));
         return 0;
     }
     if (args[0] == "levels" && args.size() >= 2)
@@ -3902,7 +4156,7 @@ int main (int argc, char** argv)
     }
     if (args[0] == "play" && args.size() >= 4)
     {
-        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0]
+        // play <clean guitar.wav> <preset name> <out.wav> [key=value ...] [trim=dB] [captures=0] [seed=dB] [trace=1]
         // Plays a recorded clean guitar through a preset, for listening checks, with Auto level
         // as the app applies it (measured on this guitar) unless auto_level=0.
         juce::AudioFormatManager fm; fm.registerBasicFormats();
@@ -3928,12 +4182,18 @@ int main (int argc, char** argv)
         bool found = args[2] == "-";
         for (const auto& p : loadPresets()) if (p.name == args[2]) { v = p.values; found = true; }
         if (! found) { std::printf ("no preset %s\n", args[2].toRawUTF8()); return 1; }
-        float trim = 0.0f;
+        float trim = 0.0f, seed = -120.0f;
+        bool trace = false;
         for (int i = 4; i < args.size(); ++i)
         {
             const auto key = args[i].upToFirstOccurrenceOf ("=", false, false);
             const float value = args[i].fromFirstOccurrenceOf ("=", false, false).getFloatValue();
             if (key == "trim") { trim = value; continue; }
+            // seed=<dB>: the hiss setup measured (your-input.txt noise_floor_db), as the app gives it to the gate
+            if (key == "seed") { seed = value; continue; }
+            // trace=1: every half second, what the gate heard, where it sat and how long it was open
+            if (key == "trace") { trace = value > 0.5f; continue; }
+            if (key == "fastfloor") { NoiseGate::fastFloor = value > 0.5f; continue; } // fastfloor=0: the gate as Update 1 had it
             if (key == "captures") { Rig::circuitModelsOnly = value < 0.5f; continue; } // captures=0: the circuit models
             const int id = findParamByKey (key.toStdString());
             if (id < 0) { std::printf ("no parameter %s\n", key.toRawUTF8()); return 1; }
@@ -3954,9 +4214,46 @@ int main (int argc, char** argv)
             if (loud > kSilentDb) autoTrim = std::clamp (kHouseLoudnessDb - loud, kMostCutDb, kMostBoostDb);
             std::printf ("auto level: %.1f dB\n", autoTrim);
         }
-        auto r = renderWith (v, di, sr, 256);
-        const float g = dbToGain (trim + autoTrim);
-        for (size_t i = 0; i < r.l.size(); ++i) { r.l[i] *= g; r.r[i] *= g; }
+        Render r;
+        {
+            Rig rig;
+            rig.setOffline (true);
+            rig.setParams (v);
+            rig.prepare (sr, 256);
+            rig.setParams (v);
+            rig.finishPendingWork();
+            rig.prepare (sr, 256);
+            rig.finishPendingWork();
+            if (seed > -119.0f) rig.seedGateFloor (seed);
+            // the level trim goes in where the app puts it, before the safety limiter (adding it to the
+            // file afterwards made clean tones read over 0 dBFS that the app never plays)
+            rig.setLevelTrimDb (trim + autoTrim);
+            rig.setParams (v);
+            r.l.resize (di.size());
+            r.r.resize (di.size());
+            float inPk = 0.0f, outPk = 0.0f;
+            int blocks = 0, openBlocks = 0;
+            const size_t every = (size_t) (0.5 * sr) / 256 * 256;
+            for (size_t pos = 0; pos < di.size(); pos += 256)
+            {
+                const int n = (int) std::min<size_t> (256, di.size() - pos);
+                rig.setParams (v);
+                rig.process (di.data() + pos, r.l.data() + pos, r.r.data() + pos, n);
+                if (! trace) continue;
+                auto& m = rig.meters();
+                inPk = std::max (inPk, m.gateInPeak.load());
+                for (int i = 0; i < n; ++i) outPk = std::max (outPk, std::abs (r.l[pos + (size_t) i]));
+                ++blocks;
+                if (m.gateOpen.load()) ++openBlocks;
+                if ((pos + 256) % every == 0 || pos + 256 >= di.size())
+                {
+                    std::printf ("%6.1f s  gate hears %6.1f dB  threshold %6.1f dB  open %3d%%  out peak %6.1f dB\n", (double) (pos + 256) / sr,
+                                 gainToDb (inPk), m.gateThreshNow.load(), 100 * openBlocks / std::max (1, blocks), gainToDb (outPk));
+                    inPk = outPk = 0.0f;
+                    blocks = openBlocks = 0;
+                }
+            }
+        }
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[3]), r, sr);
         std::printf ("%s: rms %.1f dB, peak %.1f dB\n", args[2].toRawUTF8(), 0.5f * (rmsDb (r.l) + rmsDb (r.r)), gainToDb (std::max (peakOf (r.l), peakOf (r.r))));
         return 0;
@@ -4141,7 +4438,7 @@ int main (int argc, char** argv)
         writeWav (juce::File::getCurrentWorkingDirectory().getChildFile (args[2]), r, fileSr);
         return 0;
     }
-    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "hissgate") { testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); testNoiseBetweenNotes (48000.0, -70.0f, true); testNoiseBetweenNotes (48000.0, -70.0f, true, true); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "selfnoise") { testSelfNoise (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "whine") { testWhine (48000.0); testWhine (44100.0); testWhine (192000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "hum") { testHum (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
@@ -4221,6 +4518,7 @@ int main (int argc, char** argv)
     if (args[0] == "dynamics") { testDynamics (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "updates") { testUpdates(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "elastic") { testElasticInput(); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
+    if (args[0] == "pitchsh") { testPitchShifter (48000.0); testPitchShifter (44100.0); testNoiseReducer (48000.0); testNoiseReducer (44100.0); testFeedbackKiller (48000.0); testFeedbackKiller (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "heldnote") { testGateHeldNote (48000.0); testGateHeldNote (44100.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampsreal") { testAmpsMatchReal (48000.0); testAmpsClipLikeReal (48000.0); std::printf ("\n%d checks, %d failures\n", checks, failures); return failures == 0 ? 0 : 1; }
     if (args[0] == "ampvsreal" && args.size() >= 2) return ampVsReal (juce::File (args[1]));
@@ -4276,7 +4574,7 @@ int main (int argc, char** argv)
     testWhine (48000.0);
     testWhine (192000.0);
     testSelfNoise (48000.0);
-    testNoiseBetweenNotes (48000.0);
+    testNoiseBetweenNotes (48000.0); testNoiseBetweenNotes (48000.0, -70.0f); testNoiseBetweenNotes (48000.0, -70.0f, true); testNoiseBetweenNotes (48000.0, -70.0f, true, true);
     testInputFix (48000.0);
     testInputGuard();
     testGate (48000.0);
@@ -4284,6 +4582,12 @@ int main (int argc, char** argv)
     testAmpsClipLikeReal (48000.0);
     testGateHeldNote (48000.0);
     testGateHeldNote (44100.0);
+    testPitchShifter (48000.0);
+    testPitchShifter (44100.0);
+    testNoiseReducer (48000.0);
+    testNoiseReducer (44100.0);
+    testFeedbackKiller (48000.0);
+    testFeedbackKiller (44100.0);
     testElasticInput();
     testTimeEffects (48000.0);
     testAliasing (48000.0);

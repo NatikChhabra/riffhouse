@@ -23,7 +23,7 @@
     "cab_mic": 3.5,
     "cab_distance": 2,
     "cab_lowcut": 60,
-    "cab_highcut": 12000,
+    "cab_highcut": 7000,
     "dly_on": true,
     "dly_type": "Analog",
     "dly_time": 420,

@@ -43,14 +43,15 @@ namespace
     // how much each built-in capture's output is turned so it plays as loud as the circuit model
     // it replaces did (tests: calibrate)
     constexpr int kFactoryMemory = 4608; // a standard WaveNet capture's reach, with some to spare
-    constexpr float kFactoryTrimDb[3] = { 8.8f, 2.8f, -4.4f };
+    constexpr float kFactoryTrimDb[4] = { 8.8f, 2.8f, -4.4f, 0.8f };
 
     // the gain knob drives the capture like the amp's own pot: an audio taper with 6.5 as the
     // capture was made, +7 dB at 10, and nearly nothing left at 0
     float factoryDriveDb (const ParamValues& p) noexcept
     {
         const float g01 = juce::jlimit (0.0f, 1.0f, p[(size_t) P::ampGain] / 10.0f);
-        return 40.0f * std::log10 ((g01 + 0.02f) / 1.02f) - 40.0f * std::log10 (0.67f / 1.02f);
+        // (0 still leaves -46 dB in, as a real pot's end does: 0.02 left -61 and a cleaner capture went silent)
+        return 40.0f * std::log10 ((g01 + 0.05f) / 1.05f) - 40.0f * std::log10 (0.70f / 1.05f);
     }
 
     // master and level both set how loud it plays: the capture already has its power amp
@@ -69,6 +70,8 @@ void Rig::prepare (double sampleRate, int block)
     input.prepare (sr);
     probe.prepare (sr);
     gate.prepare (sr);
+    reducer.prepare (sr);
+    feedback.prepare (sr);
     gate.seedFloor (gateSeedDb);
     comp.prepare (sr);
     wah.prepare (sr);
@@ -145,7 +148,7 @@ void Rig::prepare (double sampleRate, int block)
 
 void Rig::reset()
 {
-    input.reset(); gate.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
+    input.reset(); gate.reset(); reducer.reset(); feedback.reset(); comp.reset(); wah.reset(); pitch.reset(); drive.reset(); amp.reset(); cab.reset();
     eq.reset(); mod.reset(); modOld.reset(); modXfade = 0; lofi.reset(); doubler.reset(); limiter.reset();
     for (Delay* d : { &delayA, &delayB }) d->reset();
     for (Reverb* r : { &reverbA, &reverbB }) r->reset();
@@ -159,7 +162,7 @@ void Rig::reset()
 
 int Rig::factoryFor (int ampModel) const noexcept
 {
-    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : ampModel == choices::brit800 ? 2 : -1;
+    const int i = ampModel == choices::modernHigh ? 0 : ampModel == choices::tightMetal ? 1 : ampModel == choices::brit800 ? 2 : ampModel == choices::hotRodLead ? 3 : -1;
     return i >= 0 && factoryReady[i] && ! circuitModelsOnly ? i : -1;
 }
 
@@ -250,6 +253,7 @@ void Rig::applyParams (const ParamValues& v, bool toneChange)
     input.set (choice (p, P::humFilter), on (p, P::inputFix), get (P::inputFixAmt));
     if (changed (P::gateThresh) || changed (P::gateRelease)) gate.set (get (P::gateThresh), get (P::gateRelease));
     gate.setAuto (choice (p, P::gateAuto) == 1);
+    reducer.set (on (p, P::gateOn) ? get (P::gateReduce) : 0.0f);
     comp.set (get (P::compSustain), get (P::compAttack), get (P::compLevel), get (P::compBlend));
     wah.set (choice (p, P::wahMode), get (P::wahPos), get (P::wahSens), get (P::wahQ));
     pitch.set (choice (p, P::pitchMode), get (P::pitchSemis), get (P::pitchMix));
@@ -390,6 +394,8 @@ void Rig::processMono (float* x, int n)
                 x[i] = dry[(size_t) i] * g;
             }
     }
+    reducer.process (x, n, gate.noiseFloorDb());
+    if (on (p, P::gateOn)) feedback.process (x, n);
     if (fComp.idle()) comp.listen (x, n);
     runFaded (fComp, x, n, dry, [&] (float* b, int k) { comp.process (b, k); });
     runFaded (fWah, x, n, dry, [&] (float* b, int k) { wah.process (b, k); });

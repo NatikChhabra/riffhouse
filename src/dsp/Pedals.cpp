@@ -464,10 +464,11 @@ void NoiseGate::prepare (double sampleRate)
     attackCoeff = (float) std::exp (-1.0 / (0.0008 * sr));
     stopCoeff = (float) std::exp (-1.0 / (0.003 * sr)); // 40 dB down in about 14 ms
     holdSamples = (int) (0.025 * sr); // the detector already holds the last 20 ms
+    confirmSamples = std::max (1, (int) (0.0013 * sr));
     windowLength = std::max (1, (int) (0.1 * sr));
     stepLength = std::max (1, (int) (0.0025 * sr));
     reopenDecay = dbToGain (-0.3f); // per step: what a stop asked for is forgotten in about 100 ms
-    floorDb = floorPeakDb = -120.0f; // as if just built: what an earlier run heard is forgotten
+    floorDb = floorPeakDb = loudDb = -120.0f; // as if just built: what an earlier run heard is forgotten
     windowPeak = 0.0f;
     windowsHeard = windowAt = windowFill = 0;
     windowPower = 0.0;
@@ -477,7 +478,7 @@ void NoiseGate::prepare (double sampleRate)
 
 void NoiseGate::reset()
 {
-    gain = 0.0f; open = false; stopping = false; holdCounter = 0;
+    gain = 0.0f; open = false; stopping = false; holdCounter = 0; above = 0; confirmLeft = 0;
     std::fill (std::begin (steps), std::end (steps), 0.0f);
     stepAt = stepFill = 0;
     stepPeak = heldPeak = recentPeak = earlierPeak = reopenAbove = 0.0f;
@@ -523,9 +524,56 @@ void NoiseGate::windowDone (float levelDb, float peakDb)
     windowPeaks[windowAt] = peakDb;
     windowAt = (windowAt + 1) % kWindows;
     windowsHeard = std::min (windowsHeard + 1, kWindows);
+    // the loudest the guitar has been lately, forgotten at 1 dB a second
+    loudDb = std::max (peakDb, loudDb - 0.1f);
     // steady to within a decibel and a half for 1.6 s: no string does that, hiss and hum do.
     // The very first floor needs the same 1.6 s: a noisy room is gated soon after the start
     // (a quieter floor heard later is believed at once anyway).
+    // A USB guitar input hisses in bursts: its level swings 6 to 8 dB from one tenth of a second
+    // to the next, so the test above never passed and the gate went by setup's one measurement
+    // for good, 2 to 3 dB over the hiss. Any change in the input (a few dB hotter, a cold start)
+    // let the amp turn the hiss into a roar as loud as the playing (16 Nov). The loudest moment
+    // of each tenth holds far steadier on such hiss (within 1 to 1.5 dB) and a ringing note still
+    // fades through it, so 0.8 s of steady peaks, 30 dB or more under the playing of the last
+    // half minute, is believed at once as the floor, louder or quieter than the one known so far.
+    if (fastFloor && windowsHeard > kFastWindows)
+    {
+        float pk[kFastWindows], lv[kFastWindows];
+        for (int k = 0; k < kFastWindows; ++k)
+        {
+            const int i = (windowAt - 1 - k + 2 * kWindows) % kWindows; // k = 0 is the newest
+            // the louder of each tenth and the one before it: ticks that come every fifth of a
+            // second leave every other tenth without one, and the floor never looked steady
+            pk[k] = std::max (windowPeaks[i], windowPeaks[(i - 1 + kWindows) % kWindows]);
+            lv[k] = windows[i];
+        }
+        auto median = [] (float* v, int n) { std::sort (v, v + n); return 0.5f * (v[(n - 1) / 2] + v[n / 2]); };
+        float newer[kFastWindows / 2], older[kFastWindows / 2];
+        std::copy (pk, pk + kFastWindows / 2, newer);
+        std::copy (pk + kFastWindows / 2, pk + kFastWindows, older);
+        const float drift = std::abs (median (newer, kFastWindows / 2) - median (older, kFastWindows / 2));
+        float sorted[kFastWindows];
+        std::copy (pk, pk + kFastWindows, sorted);
+        std::sort (sorted, sorted + kFastWindows);
+        const float spread = sorted[kFastWindows * 3 / 4] - sorted[kFastWindows / 4]; // the middle half
+        const float typical = median (pk, kFastWindows);
+        // hiss peaks 12 dB or more over its own level in a tenth of a second, a held note 3 to 7:
+        // with nothing played yet, only a level that peaks like hiss is taken for the floor
+        float crests[kFastWindows];
+        for (int k = 0; k < kFastWindows; ++k) crests[k] = windowPeaks[(windowAt - 1 - k + 2 * kWindows) % kWindows] - windows[(windowAt - 1 - k + 2 * kWindows) % kWindows];
+        const float crest = median (crests, kFastWindows);
+        // ... and none of them above it: a note that starts in the newest tenth is not hiss
+        if (spread <= 1.5f && drift <= 1.0f && sorted[kFastWindows - 1] - typical <= 3.0f
+            // far under the playing, or nothing played yet (the loudest heard is the hiss itself):
+            // a cold start learns the hiss before the first note instead of letting it roar
+            && (loudDb - typical >= kFastUnderPlayingDb || (loudDb - typical < 6.0f && crest >= 9.0f)) && typical < -40.0f)
+        {
+            floorDb = std::max (-120.0f, median (lv, kFastWindows));
+            floorPeakDb = std::max (-120.0f, sorted[kFastWindows - 1]);
+            applyThreshold();
+            return;
+        }
+    }
     const int need = floorDb < -119.0f ? kFirstWindows : kWindows;
     if (windowsHeard < need) return;
     float lo = 1000.0f, hi = -1000.0f, sum = 0.0f, peak = -1000.0f;
@@ -598,7 +646,22 @@ void NoiseGate::process (float* x, int n, float* gainsOut)
         stepPeak = std::max (stepPeak, a);
         if (++stepFill >= stepLength) { stepFill = 0; stepDone(); }
         const float e = std::max (heldPeak, stepPeak);
-        if (a > std::max (thrOpen, reopenAbove)) { open = true; stopping = false; reopenAbove = 0.0f; holdCounter = holdSamples; }
+        // It opens at once on any sample over the threshold (a pick must not wait), and then a note has
+        // to hold near the threshold for about 1.3 ms. A tick (under half a millisecond) does not, and
+        // the gate shuts again as fast as for a hand on the strings: a USB guitar input that ticks a few
+        // times a second under its hiss held the gate open for 100 ms per tick, and the amp turned each
+        // into a burst (17 Nov take).
+        above = a > 0.5f * thrOpen ? above + 1 : std::max (0, above - 2);
+        if (a > std::max (thrOpen, reopenAbove))
+        {
+            if (! open) confirmLeft = 2 * confirmSamples;
+            open = true; stopping = false; reopenAbove = 0.0f; holdCounter = holdSamples;
+        }
+        if (confirmLeft > 0)
+        {
+            if (above >= confirmSamples) confirmLeft = 0;
+            else if (--confirmLeft == 0) { open = false; stopping = true; holdCounter = 0; }
+        }
         else if (open && e < thrClose)
         {
             if (holdCounter > 0) --holdCounter;
@@ -767,6 +830,272 @@ void Wah::processClassic (float* x, int n)
 }
 
 //==============================================================================
+// NoiseReducer
+void NoiseReducer::prepare (double sampleRate)
+{
+    sr = sampleRate;
+    static constexpr double edges[kBands - 1] = { 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0 };
+    for (int k = 0; k < kBands - 1; ++k)
+    {
+        lp1[k].setCutoff (sr, edges[k]);
+        lp2[k].setCutoff (sr, edges[k]);
+    }
+    pAtt = 1.0f - (float) std::exp (-1.0 / (0.001 * 3.0 * sr));
+    pRel = 1.0f - (float) std::exp (-1.0 / (0.001 * 14.0 * sr));
+    gAtt = (float) std::exp (-1.0 / (0.001 * 1.5 * sr));
+    gRel = (float) std::exp (-1.0 / (0.001 * 45.0 * sr));
+    hopLen = std::max (1, (int) (0.005 * sr));
+    subHops = 50;
+    reset();
+}
+
+void NoiseReducer::reset()
+{
+    for (int k = 0; k < kBands - 1; ++k) { lp1[k].reset(); lp2[k].reset(); }
+    for (int k = 0; k < kBands; ++k)
+    {
+        env[k] = pwr[k] = 0.0f;
+        gain[k] = 1.0f;
+        subSum[k] = 0.0f;
+        for (int s = 0; s < kSubs; ++s) ring[k][s] = 1.0f; // nothing heard yet: no floor, nothing is turned down
+    }
+    hopFill = subFill = ringAt = heard = 0;
+    subTotal = 0.0;
+    for (auto& f : floorOf) f = 1.0f;
+    latchHold = 0;
+    for (auto& v : ringTotal) v = 1.0e30; // nothing heard yet
+}
+
+void NoiseReducer::set (float amount)
+{
+    maxCutDb = std::clamp (amount, 0.0f, 10.0f) * 6.0f;
+}
+
+void NoiseReducer::process (float* x, int n, float gateFloorDb)
+{
+    if (maxCutDb <= 0.01f) return;
+    // The bands' floors are only believed when they add up to the hiss the gate has heard (or setup measured):
+    // a take of continuous playing has no gaps, and its quietest stretch of playing is not hiss.
+    double floorPower = 0.0;
+    for (int k = 0; k < kBands; ++k)
+    {
+        float fl = 1.0f;
+        for (int s = 0; s < kSubs; ++s) fl = std::min (fl, ring[k][s]);
+        floorPower += (double) fl * fl;
+    }
+    bool trusted = heard >= 2 && gateFloorDb > -119.0f && 10.0 * std::log10 (floorPower + 1.0e-20) <= (double) gateFloorDb + 6.0;
+    if (! trusted && heard >= kSubs)
+    {
+        // The gate has not heard its floor yet (it wants a second and a half of steady quiet, and real
+        // playing rarely leaves that). A gap shows itself too: the quietest stretch of the last two
+        // seconds is 18 dB under the loudest and held steady (two windows within 1.5 dB of each other).
+        double lowest = 1.0e30, highest = 0.0;
+        for (int s = 0; s < kSubs; ++s) { lowest = std::min (lowest, ringTotal[s]); highest = std::max (highest, ringTotal[s]); }
+        int steady = 0;
+        for (int s = 0; s < kSubs; ++s) if (ringTotal[s] <= lowest * 1.42) ++steady;
+        trusted = lowest > 0.0 && highest >= lowest * 63.0 && steady >= 2;
+    }
+    // once believed, the floor stays believed for ten seconds while it does not rise by 4 dB or more
+    const double floorNow = 10.0 * std::log10 (floorPower + 1.0e-20);
+    if (trusted) { latchedDb = floorNow; latchHold = 40; }
+    else if (latchHold > 0 && floorNow <= latchedDb + 4.0) trusted = true;
+    const float minGain = dbToGain (-maxCutDb);
+    for (int i = 0; i < n; ++i)
+    {
+        const float in = x[i];
+        float band[kBands];
+        float prev = 0.0f;
+        for (int k = 0; k < kBands - 1; ++k)
+        {
+            const float l = lp2[k].lowpass (lp1[k].lowpass (in));
+            band[k] = l - prev;
+            prev = l;
+        }
+        band[kBands - 1] = in - prev;
+        float out = 0.0f;
+        for (int k = 0; k < kBands; ++k)
+        {
+            // level as a smoothed power (a rectified envelope dips far under the mean of hiss, and so does its minimum)
+            const float pw = band[k] * band[k];
+            pwr[k] = undenorm (pwr[k] + (pw - pwr[k]) * (pw > pwr[k] ? pAtt : pRel));
+            env[k] = std::sqrt (pwr[k]);
+            const float fl = floorOf[k];
+            const float over = gainToDb (env[k] / fl);
+            // the floor is the quietest 250 ms average of the last 2 s, so hiss sits a couple of dB over it:
+            // 7 dB over or less is hiss alone; 15 dB or more is playing
+            const float t = std::clamp ((over - 7.0f) / 8.0f, 0.0f, 1.0f);
+            const float target = trusted ? lerp (minGain, 1.0f, t) : 1.0f;
+            gain[k] = target > gain[k] ? target + (gain[k] - target) * gAtt : target + (gain[k] - target) * gRel;
+            out += band[k] * gain[k];
+        }
+        x[i] = out;
+        if (++hopFill >= hopLen)
+        {
+            hopFill = 0;
+            for (int k = 0; k < kBands; ++k) { subSum[k] += env[k]; subTotal += (double) env[k] * env[k]; }
+            if (++subFill >= subHops)
+            {
+                subFill = 0;
+                for (int k = 0; k < kBands; ++k) { ring[k][ringAt] = subSum[k] / (float) subHops; subSum[k] = 0.0f; }
+                if (latchHold > 0) --latchHold;
+                for (int k = 0; k < kBands; ++k) { float m = 1.0f; for (int s = 0; s < kSubs; ++s) m = std::min (m, ring[k][s]); floorOf[k] = std::max (m, 1.0e-6f); }
+                ringTotal[ringAt] = subTotal / (double) subHops;
+                subTotal = 0.0;
+                ringAt = (ringAt + 1) % kSubs;
+                ++heard;
+            }
+        }
+    }
+}
+
+//==============================================================================
+// FeedbackKiller
+void FeedbackKiller::prepare (double sampleRate)
+{
+    sr = sampleRate;
+    fft = std::make_unique<juce::dsp::FFT> (kOrder);
+    window.resize (kSize);
+    for (int i = 0; i < kSize; ++i) window[(size_t) i] = 0.5f - 0.5f * std::cos (2.0f * (float) kPi * (float) i / (float) kSize);
+    ring.assign (kSize, 0.0f);
+    frame.assign (2 * kSize, 0.0f);
+    binDb.assign ((size_t) kHist * kBins, -200.0f);
+    reset();
+}
+
+void FeedbackKiller::reset()
+{
+    std::fill (ring.begin(), ring.end(), 0.0f);
+    ringAt = hopFill = histCount = 0;
+    histAt = 0;
+    std::fill (binDb.begin(), binDb.end(), -200.0f);
+    std::fill (std::begin (totalDb), std::end (totalDb), -200.0f);
+    for (auto& nt : notch) { nt.bq.reset(); nt.hz = 0.0f; nt.depth = nt.target = 0.0f; nt.quiet = 0; }
+}
+
+void FeedbackKiller::look()
+{
+    for (int i = 0; i < kSize; ++i) frame[(size_t) i] = ring[(size_t) ((ringAt + i) % kSize)] * window[(size_t) i];
+    std::fill (frame.begin() + kSize, frame.end(), 0.0f);
+    fft->performRealOnlyForwardTransform (frame.data(), true);
+    // every bin keeps its last kHist levels (dB), so any bin that climbs can be seen, not only the loudest
+    const int slot = histAt;
+    histAt = (histAt + 1) % kHist;
+    ++histCount;
+    double total = 0.0;
+    float mag[kBins];
+    for (int b = 0; b < kBins; ++b)
+    {
+        mag[b] = std::hypot (frame[(size_t) 2 * b], frame[(size_t) 2 * b + 1]);
+        total += (double) mag[b] * mag[b];
+        binDb[(size_t) slot * kBins + (size_t) b] = 20.0f * std::log10 (mag[b] + 1.0e-12f);
+    }
+    totalDb[slot] = 10.0f * std::log10 ((float) total + 1.0e-20f);
+    const float binHz = (float) (sr / kSize);
+    const int lo = std::max (8, (int) (200.0f / binHz)), hi = std::min (kBins - 22, (int) (6000.0f / binHz));
+    float hz = 0.0f, hzLevel = -200.0f;
+    bool howl = false;
+    if (histCount >= kHist)
+    {
+        const int oldest = histAt; // the slot about to be written next is the oldest
+        const float tRise = totalDb[slot] - totalDb[oldest];
+        // a swell or a new chord lifts many peaks together; a howl is one tone climbing alone
+        float topNow = -200.0f;
+        for (int b = lo; b <= hi; ++b) topNow = std::max (topNow, binDb[(size_t) slot * kBins + (size_t) b]);
+        int climbing = 0;
+        for (int b = lo; b <= hi; ++b)
+        {
+            if (mag[b] < mag[b - 1] || mag[b] < mag[b + 1]) continue;
+            const float now = binDb[(size_t) slot * kBins + (size_t) b];
+            if (now < topNow - 30.0f) continue;
+            const float before = std::max (binDb[(size_t) oldest * kBins + (size_t) b], std::max (binDb[(size_t) oldest * kBins + (size_t) b - 1], binDb[(size_t) oldest * kBins + (size_t) b + 1]));
+            if (now - before >= 4.5f) ++climbing;
+        }
+        for (int b = lo; b <= hi && ! howl && climbing <= 1; ++b)
+        {
+            if (mag[b] < mag[b - 1] || mag[b] < mag[b + 1]) continue;
+            const float now = binDb[(size_t) slot * kBins + (size_t) b];
+            if (now < -45.0f + 54.2f) continue; // a sine of amplitude 1 reads 54 dB here; a howl is louder than -45 dBFS
+            // a peak stands over what is around it: the median of bins 6 to 20 away on both sides
+            float around[30];
+            int na = 0;
+            for (int d = 6; d <= 20; ++d) { around[na++] = mag[b - d]; around[na++] = mag[b + d]; }
+            std::nth_element (around, around + na / 2, around + na);
+            const float prom = 20.0f * std::log10 ((mag[b] + 1.0e-12f) / (around[na / 2] + 1.0e-12f));
+            if (prom < 18.0f) continue;
+            const float rise = now - std::max (binDb[(size_t) oldest * kBins + (size_t) b], std::max (binDb[(size_t) oldest * kBins + (size_t) b - 1], binDb[(size_t) oldest * kBins + (size_t) b + 1]));
+            if (rise < 12.0f || tRise > 0.5f * rise) continue;
+            // a howl climbs smoothly, look after look; a pick lands in one or two looks with a jump
+            int downs = 0;
+            float biggest = 0.0f;
+            for (int i = 1; i < kHist; ++i)
+            {
+                const int s1 = (oldest + i) % kHist, s0 = (oldest + i - 1) % kHist;
+                const float step = binDb[(size_t) s1 * kBins + (size_t) b] - binDb[(size_t) s0 * kBins + (size_t) b];
+                if (step < -0.3f) ++downs;
+                biggest = std::max (biggest, step);
+            }
+            if (downs > 2 || biggest > 3.0f) continue;
+            const float la = std::log (mag[b - 1] + 1.0e-12f), lb = std::log (mag[b] + 1.0e-12f), lc = std::log (mag[b + 1] + 1.0e-12f);
+            const float off = std::clamp (0.5f * (la - lc) / std::min (la - 2.0f * lb + lc, -1.0e-6f), -0.5f, 0.5f);
+            hz = ((float) b + off) * binHz;
+            hzLevel = now;
+            howl = true;
+        }
+    }
+    // a notch already on this tone is kept alive while the tone is there, and deepens while it still grows
+    for (auto& nt : notch)
+    {
+        if (nt.hz <= 0.0f) continue;
+        const int nb = std::clamp ((int) std::lround (nt.hz / binHz), 2, kBins - 3);
+        float here = -200.0f;
+        for (int d = -2; d <= 2; ++d) here = std::max (here, binDb[(size_t) slot * kBins + (size_t) (nb + d)]);
+        if (howl && std::abs (nt.hz - hz) < 2.5f * binHz) { nt.quiet = 0; nt.target = std::min (30.0f, std::max (nt.target, nt.depth) + 6.0f); }
+        if (here < nt.level - 20.0f) ++nt.quiet; else if (! (howl && std::abs (nt.hz - hz) < 2.5f * binHz)) nt.quiet = std::max (0, nt.quiet - 1);
+        if (nt.quiet > 130) nt.target = 0.0f; // 1.5 s with the tone gone (20 dB under where it was)
+    }
+    if (howl)
+    {
+        bool have = false;
+        for (auto& nt : notch) if (nt.hz > 0.0f && std::abs (nt.hz - hz) < 2.5f * binHz) have = true;
+        if (! have)
+        {
+            Notch* s = nullptr;
+            for (auto& nt : notch) if (nt.hz <= 0.0f) { s = &nt; break; }
+            if (s == nullptr) { s = &notch[0]; for (auto& nt : notch) if (nt.depth < s->depth) s = &nt; }
+            s->hz = hz;
+            s->bq.set (Biquad::Type::notch, sr, hz, 25.0);
+            s->bq.reset();
+            s->target = 18.0f;
+            s->level = hzLevel;
+            s->quiet = 0;
+        }
+    }
+    for (auto& nt : notch)
+        if (nt.hz > 0.0f && nt.target <= 0.0f && nt.depth < 0.05f) { nt.hz = 0.0f; nt.depth = 0.0f; }
+}
+
+void FeedbackKiller::process (float* x, int n)
+{
+    for (int i = 0; i < n; ++i)
+    {
+        ring[(size_t) ringAt] = x[i];
+        ringAt = (ringAt + 1) % kSize;
+        if (++hopFill >= kHop) { hopFill = 0; look(); }
+        float v = x[i];
+        for (auto& nt : notch)
+        {
+            if (nt.hz <= 0.0f) continue;
+            // depth glides to its target: in over about 40 ms, out over about a second
+            const float tgt = nt.target / 30.0f, cur = nt.depth / 30.0f;
+            nt.depth = 30.0f * (cur + (tgt - cur) * (tgt > cur ? 0.0005f : 0.00003f) * (float) (48000.0 / sr) * 2.0f);
+            const float k = 1.0f - dbToGain (-nt.depth);
+            v = v - k * (v - nt.bq.process (v));
+        }
+        x[i] = v;
+    }
+}
+
+//==============================================================================
 // PitchPedal
 void PitchPedal::prepare (double sampleRate)
 {
@@ -776,8 +1105,10 @@ void PitchPedal::prepare (double sampleRate)
     subLp2.setCutoff (sr, 300.0);
     upHp.setCutoff (sr, 120.0);
     subEnv.prepare (sr, 3.0f, 60.0f);
-    window = (int) (0.022 * sr); // 22 ms grains: about 11 ms of shifter latency
-    line.prepare (window * 2 + 8);
+    window = (int) (0.022 * sr);
+    line.prepare (std::max (8192, (int) (0.12 * sr)));
+    decFactor = std::max (1, (int) std::lround (sr / 12000.0));
+    decLp1.setCutoff (sr, 1300.0); decLp2.setCutoff (sr, 1300.0);
     mixS.prepare (sr, 30.0f);
     reset();
 }
@@ -788,7 +1119,53 @@ void PitchPedal::reset()
     flip = 1.0f; lastSign = 0.0f;
     line.reset();
     phase = 0.0f;
+    decLp1.reset(); decLp2.reset();
+    std::fill (std::begin (decHist), std::end (decHist), 0.0f);
+    decAt = decCount = trackCount = unvoiced = 0;
+    period = periodConf = 0.0f;
+    headA = (float) (0.006 * sr); headB = headA; fadeAt = 1.0f; fadeStep = 0.0f; crossing = false;
     mixS.reset (mix);
+}
+
+// Finds the period of the note being played: normalised autocorrelation of the last ~60 ms,
+// lowpassed and thinned to about 12 kHz, the first strong peak (so the octave is never picked)
+void PitchPedal::trackPeriod()
+{
+    const double rate = sr / (double) decFactor;
+    const int minLag = std::max (2, (int) (rate / 500.0)), maxLag = std::min ((int) (rate / 40.0), kDecHist / 3);
+    const int len = maxLag + std::min (maxLag, 300);
+    for (int i = 0; i < len + maxLag; ++i) seg[i] = decHist[(decAt - (len + maxLag) + i + 2 * kDecHist) % kDecHist];
+    double e = 0.0;
+    for (int i = 0; i < len; ++i) e += (double) seg[maxLag + i] * seg[maxLag + i];
+    if (e < 1.0e-8 * len) { periodConf = 0.0f; ++unvoiced; if (unvoiced > 8) period = 0.0f; return; }
+    float best = 0.0f;
+    for (int lag = minLag; lag <= maxLag; ++lag)
+    {
+        double xy = 0.0, ee = 0.0;
+        for (int i = 0; i < len; ++i)
+        {
+            const float a = seg[maxLag + i], b = seg[maxLag + i - lag];
+            xy += (double) a * b;
+            ee += (double) a * a + (double) b * b;
+        }
+        nsdf[lag] = (float) (2.0 * xy / std::max (ee, 1.0e-20));
+        best = std::max (best, nsdf[(size_t) lag]);
+    }
+    int pick = -1;
+    for (int lag = minLag + 1; lag < maxLag; ++lag)
+    {
+        const float v = nsdf[(size_t) lag];
+        if (v > 0.6f && v >= 0.9f * best && v >= nsdf[(size_t) lag - 1] && v >= nsdf[(size_t) lag + 1]) { pick = lag; break; }
+    }
+    if (pick < 0) { periodConf = best; if (++unvoiced > 8) period = 0.0f; return; }
+    unvoiced = 0;
+    const float a = nsdf[(size_t) pick - 1], b = nsdf[(size_t) pick], d = nsdf[(size_t) pick + 1];
+    const float denom = a - 2.0f * b + d;
+    const float off = std::abs (denom) > 1.0e-9f ? 0.5f * (a - d) / denom : 0.0f;
+    const float p = ((float) pick + std::clamp (off, -0.5f, 0.5f)) * (float) decFactor;
+    // a note change is taken at once; a steady note is averaged so the jumps stay put
+    period = (period > 0.0f && std::abs (p - period) < 0.06f * period) ? 0.7f * period + 0.3f * p : p;
+    periodConf = b;
 }
 
 void PitchPedal::set (int m, float semitones, float mixKnob)
@@ -831,16 +1208,45 @@ void PitchPedal::process (float* x, int n)
         }
         else
         {
-            // two crossfaded read heads sweeping through a short buffer
             line.push (in);
-            phase += (1.0f - ratio) / (float) window;
-            phase -= std::floor (phase);
-            const float p2 = phase + 0.5f - std::floor (phase + 0.5f);
-            const float d1 = 1.0f + phase * (float) window;
-            const float d2 = 1.0f + p2 * (float) window;
-            const float w1 = std::sin (phase * (float) kPi);
-            const float w2 = std::sin (p2 * (float) kPi);
-            wet = (line.read (d1) * w1 * w1 + line.read (d2) * w2 * w2);
+            const float lowIn = decLp2.lowpass (decLp1.lowpass (in));
+            if (++decCount >= decFactor)
+            {
+                decCount = 0;
+                decHist[decAt] = lowIn;
+                decAt = (decAt + 1) % kDecHist;
+                if (++trackCount >= 24) { trackCount = 0; trackPeriod(); }
+            }
+            // the read delay changes by (1 - ratio) a sample: the heard pitch is ratio times the played one.
+            // When it runs out of room it jumps by whole periods (J), under a short crossfade.
+            const float step = 1.0f - ratio;
+            headA += step;
+            if (crossing) headB += step;
+            const float lo = (float) (0.0015 * sr);
+            const float P = period > 0.0f ? period : (float) (0.0090 * sr);
+            const float minJump = (float) (0.007 * sr);
+            const float J = P * std::max (1.0f, std::ceil (minJump / P));
+            const float hi = lo + J;
+            if (! crossing && (headA < lo || headA > hi))
+            {
+                headB = headA < lo ? headA + J : headA - J;
+                alignedJump = period > 0.0f;
+                fadeAt = 0.0f;
+                fadeStep = 1.0f / std::max (48.0f, std::min (0.5f * J, (float) (0.005 * sr)));
+                crossing = true;
+            }
+            if (crossing)
+            {
+                fadeAt += fadeStep;
+                if (fadeAt >= 1.0f) { headA = headB; crossing = false; }
+            }
+            if (crossing)
+            {
+                const float ga = alignedJump ? 1.0f - fadeAt : std::cos (fadeAt * 1.5707963f), gb = alignedJump ? fadeAt : std::sin (fadeAt * 1.5707963f);
+                wet = line.read (headA) * ga + line.read (headB) * gb;
+            }
+            else
+                wet = line.read (headA);
         }
         x[i] = in * dryG + wet * wetG;
     }

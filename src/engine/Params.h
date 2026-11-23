@@ -42,6 +42,8 @@ enum class P : int
     autoLevel,
     // Gate mode: Auto sets the threshold from the hiss it hears (part of the setup, not the tone)
     gateAuto,
+    // Noise reducer (0 = off, 10 = up to 60 dB off a band of pure hiss); part of the setup, not the tone
+    gateReduce,
     count
 };
 

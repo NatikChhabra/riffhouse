@@ -9,9 +9,8 @@ each preset's output level from the file already in presets/, so regenerating
 never loses the calibration; the levels are measured as if each output level
 were 0 dB, so calibrating gives the same answer however often it is run.
 
-"Inspired by" presets are fan-made approximations of a player's general
-style using Riffhouse's own models. Riffhouse is not affiliated with or
-endorsed by any artist named here.
+Preset names describe a sound (a genre, a pedal chain, a mood). They never name
+an artist, a band or a song.
 """
 import json, os, re, sys
 
@@ -74,79 +73,18 @@ def EQ(b100=0, b200=0, b400=0, b800=0, b1k6=0, b3k2=0, b6k4=0, level=0):
 def FIX(**kw):
     return dict(kw)
 
-# The band a player is known for, so a tone made after the player is also found under the band's name.
-BANDS = {
-    "Adam Jones": "Tool", "Alex Turner": "Arctic Monkeys", "Angus Young": "AC/DC", "Billie Joe Armstrong": "Green Day",
-    "Billy Corgan": "The Smashing Pumpkins", "Brian May": "Queen", "Chuck Schuldiner": "Death", "Cliff Burton": "Metallica",
-    "Dan Auerbach": "The Black Keys", "David Gilmour": "Pink Floyd", "Dimebag Darrell": "Pantera",
-    "Eddie Van Halen": "Van Halen", "Flea": "Red Hot Chili Peppers", "Geddy Lee": "Rush", "Jack White": "The White Stripes",
-    "James Hetfield": "Metallica", "Jerry Cantrell": "Alice in Chains", "Jimmy Page": "Led Zeppelin",
-    "Joe Duplantier": "Gojira", "John Frusciante": "Red Hot Chili Peppers", "Johnny Marr": "The Smiths",
-    "Johnny Ramone": "Ramones", "Jonny Greenwood": "Radiohead", "Josh Homme": "Queens of the Stone Age",
-    "Keith Richards": "The Rolling Stones", "Kerry King": "Slayer", "Kevin Parker": "Tame Impala",
-    "Kevin Shields": "My Bloody Valentine", "Kim Thayil": "Soundgarden", "Kirk Hammett": "Metallica",
-    "Kurt Cobain": "Nirvana", "Mark Knopfler": "Dire Straits", "Mark Speer": "Khruangbin", "Mark Tremonti": "Alter Bridge",
-    "Matt Bellamy": "Muse", "Max Cavalera": "Sepultura", "Mikael Akerfeldt": "Opeth", "Misha Mansoor": "Periphery",
-    "Nile Rodgers": "Chic", "Pete Townshend": "The Who", "Rahul Ram": "Indian Ocean", "Randy Rhoads": "Ozzy Osbourne",
-    "Rivers Cuomo": "Weezer", "Robert Smith": "The Cure", "Slash": "Guns N' Roses", "Steve Jones": "Sex Pistols",
-    "Synyster Gates": "Avenged Sevenfold", "The Edge": "U2", "Tim Henson": "Polyphia", "Tom DeLonge": "blink-182",
-    "Tom Morello": "Rage Against the Machine", "Tony Iommi": "Black Sabbath", "Tosin Abasi": "Animals as Leaders",
-    "Zakk Wylde": "Black Label Society",
-}
-
-# Tones made after one song say which song.
-SONGS = {
-    ("B.B. King", "Thrill Lead"): "The Thrill Is Gone",
-    ("Billie Joe Armstrong", "Basket Crunch"): "Basket Case",
-    ("David Gilmour", "Comfortably Lead"): "Comfortably Numb",
-    ("David Gilmour", "Shine On Clean"): "Shine On You Crazy Diamond",
-    ("Dimebag Darrell", "Cowboys Groove"): "Cowboys from Hell",
-    ("Jack White", "Seven Nation Fuzz"): "Seven Nation Army",
-    ("Jerry Cantrell", "Rooster Grind"): "Rooster",
-    ("Jimi Hendrix", "Little Wing Clean"): "Little Wing",
-    ("Jimi Hendrix", "Purple Fuzz Lead"): "Purple Haze",
-    ("John Mayer", "Gravity Clean"): "Gravity",
-    ("John Mayer", "Slow Dancing Clean"): "Slow Dancing in a Burning Room",
-    ("Johnny Ramone", "Blitzkrieg Buzz"): "Blitzkrieg Bop",
-    ("Kim Thayil", "Black Hole Drone"): "Black Hole Sun",
-    ("Kurt Cobain", "Come As You Are Clean"): "Come As You Are",
-    ("Kurt Cobain", "Teen Spirit Distortion"): "Smells Like Teen Spirit",
-    ("Mac DeMarco", "Salad Days Wobble"): "Salad Days",
-    ("Mark Knopfler", "Sultans Clean"): "Sultans of Swing",
-    ("Max Cavalera", "Roots Groove"): "Roots Bloody Roots",
-    ("Prince", "Purple Lead"): "Purple Rain",
-    ("Randy Rhoads", "Crazy Train Lead"): "Crazy Train",
-    ("Rivers Cuomo", "Buddy Holly Fuzz"): "Buddy Holly",
-    ("Slash", "Paradise Lead"): "Paradise City",
-    ("Stevie Ray Vaughan", "Texas Flood"): "Texas Flood",
-    ("The Edge", "Streets Delay"): "Where the Streets Have No Name",
-    ("The Local Train", "Aaoge Tum Kabhi Rock"): "Aaoge Tum Kabhi",
-    ("Tom Morello", "Killing Riff"): "Killing in the Name",
-}
-
 PRESETS = []
 
-def P(name, category, genres, desc, *parts, inspired="", band="", song="", out=0.0, double=0):
+def P(name, category, genres, desc, *parts, out=0.0, double=0):
     params = {}
     for part in parts:
         params.update(part)
     if double:
         params["doubler"] = double
     params["out_level"] = out
-    preset = dict(name=name, category=category, genres=genres, inspiredBy=inspired)
-    if band: preset["band"] = band
-    if song: preset["song"] = song
+    preset = dict(name=name, category=category, genres=genres)
     preset.update(description=desc, params=params)
     PRESETS.append(preset)
-
-def I(artist, title, category, genres, desc, *parts, band="", song="", **kw):
-    P(f"Inspired by {artist}: {title}", category, genres, desc, *parts, inspired=artist,
-      band=band or BANDS.get(artist, ""), song=song or SONGS.get((artist, title), ""), **kw)
-
-# A tone made after one song of a band. The song is the tone's title, with the part it is for when there are several.
-def S(band, song, part, genres, desc, *parts, **kw):
-    P(f"Inspired by {band}: {song}" + (f" {part}" if part else ""), "Inspired By", genres, desc, *parts,
-      inspired=band, band=band, song=song, **kw)
 
 # ---------------------------------------------------------------- Essentials
 P("First Light Clean", "Essentials", ["Pop", "Indie", "Worship"], "A clean, polished starting point. Strum and go.",
@@ -351,238 +289,238 @@ P("Bedroom Indie Clean", "Clean", ["Desi Indie", "Bedroom Pop"], "Soft, rounded 
 P("Nineties Indipop Crunch", "Crunch", ["Indipop", "Pop Rock"], "Glossy mid crunch with a chorus shimmer, made for the riff before the chorus.",
   A("Brit 68", 5.5, 5, 6, 6), C("2x12 Blue", 3, 2), MOD("Chorus", 2.5, 3.5, 2.5), DLY("Digital", 360, "Off", 2.5, 6, 1.5), REV("Room", 4, 12, 5, 1.8), G(-64))
 
-# ================================================================ Inspired by
+# ================================================================ Genre and style tones
 # Rock legends
-I("Jimi Hendrix", "Purple Fuzz Lead", "Inspired By", ["Psychedelic", "Classic Rock"], "Fuzz into a cranked British stack with a swirling vibe.",
+P("Psychedelic Fuzz Lead", "Lead", ["Psychedelic", "Classic Rock"], "Fuzz into a cranked British stack with a swirling vibe.",
   A("Brit 68", 6.5, 5, 6, 6, 5.5, 5, 7), C("4x12 Vintage", 3, 2), D("Big Fuzz", 7, 6, 4.5), MOD("Vibe", 3.5, 6, 5), REV("Room", 3, 8, 5, 1.4), G(-60))
-I("Jimi Hendrix", "Little Wing Clean", "Inspired By", ["Psychedelic", "Blues"], "Edge-of-breakup clean with a vibe.",
+P("Edge-of-Breakup Vibe", "Blues", ["Psychedelic", "Blues"], "Edge-of-breakup clean with a vibe.",
   A("Brit 68", 4, 5, 5.5, 6), C("4x12 Vintage", 3, 2), MOD("Vibe", 3, 4, 4), REV("Room", 3.5, 10, 5, 1.8), G(-66))
-I("Jimmy Page", "Zeppelin Crunch", "Inspired By", ["Classic Rock", "Hard Rock"], "Treble-boosted British crunch.",
+P("Treble Boost Crunch", "Rock", ["Classic Rock", "Hard Rock"], "Treble-boosted British crunch.",
   A("Brit 68", 6.5, 4.5, 6, 6.5, 6), C("4x12 Vintage", 3, 2.5), D("Treble Boost", 4, 5, 5.5), REV("Room", 3.5, 8, 5, 1.8), G(-62))
-I("Eric Clapton", "Woman Tone", "Inspired By", ["Blues Rock", "Classic Rock"], "Thick, dark, singing lead with the treble rolled off.",
+P("Dark Singing Lead", "Lead", ["Blues Rock", "Classic Rock"], "Thick, dark, singing lead with the treble rolled off.",
   A("Brit 68", 8, 6, 7, 2.5, 3.5), C("4x12 Vintage", 5, 2), D("Clean Boost", 4, 3, 5.5), REV("Room", 3, 8, 3.5, 1.4), G(-62))
-I("Eric Clapton", "Slowhand Clean", "Inspired By", ["Blues", "Pop Rock"], "Warm, compressed, gently chorused clean.",
+P("Warm Compressed Clean", "Clean", ["Blues", "Pop Rock"], "Warm, compressed, gently chorused clean.",
   A("Glass Clean", 4.5, 5, 5.5, 5.5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 2.5, 3, 4), REV("Plate", 3.5, 15, 5, 1.8), G(-70))
-I("Eddie Van Halen", "Brown Sound", "Inspired By", ["Hard Rock", "80s"], "Hot, saggy British stack with a phaser.",
+P("Hot Stack Phaser", "Rock", ["Hard Rock", "80s"], "Hot, saggy British stack with a phaser.",
   A("Redline Lead", 6.5, 5, 6, 6, 6, 5, 7), C("4x12 Real Classic", 3, 2.5), MOD("Phaser", 3, 5, 3), REV("Plate", 3, 15, 5, 1.6), G(-58))
-I("Slash", "Paradise Lead", "Inspired By", ["Hard Rock"], "Warm, mid-heavy hot-rod lead.",
+P("Hot-Rod Lead", "Lead", ["Hard Rock"], "Warm, mid-heavy hot-rod lead.",
   A("Redline Lead", 6.5, 5.5, 7, 5, 5), C("4x12 Real Classic", 3.5, 2), DLY("Analog", 420, "Off", 2.5, 4.5, 1.8), REV("Room", 3, 8, 5, 1.4), G(-60))
-I("Slash", "Wah Rock", "Inspired By", ["Hard Rock"], "Hot-rod crunch with a cocked wah.",
+P("Hot-Rod Wah Rock", "Crunch", ["Hard Rock"], "Hot-rod crunch with a cocked wah.",
   A("Redline Lead", 6, 5.5, 6.5, 5), C("4x12 Real Classic", 3.5, 2), WAH("Manual", 6, 5, 6), G(-60))
-I("Angus Young", "Schoolboy Crunch", "Inspired By", ["Hard Rock"], "Less gain than you think, all attitude.",
+P("Low-Gain Attitude", "Crunch", ["Hard Rock"], "Less gain than you think, all attitude.",
   A("Brit 68", 5.5, 5, 6, 6.5, 6), C("4x12 Vintage", 3, 2), REV("Room", 2.5, 5, 5, 1), G(-62))
-I("David Gilmour", "Comfortably Lead", "Inspired By", ["Progressive Rock", "Classic Rock"], "Sustaining fuzz lead, long delay and big hall.",
+P("Prog Fuzz Lead", "Lead", ["Progressive Rock", "Classic Rock"], "Sustaining fuzz lead, long delay and big hall.",
   A("Glass Clean", 6, 5, 5, 5.5, 5, 5, 7), C("2x12 American", 3.5, 2), D("Big Fuzz", 6, 4.5, 4.5), DLY("Analog", 480, "Off", 4, 4.5, 3), REV("Hall", 6, 30, 5, 2.4), G(-62))
-I("David Gilmour", "Shine On Clean", "Inspired By", ["Progressive Rock"], "Compressed, chorused clean with delay.",
+P("Prog Chorus Clean", "Clean", ["Progressive Rock"], "Compressed, chorused clean with delay.",
   A("Glass Clean", 4, 5, 5, 6), C("2x12 American", 3, 2), COMP(5, 5), MOD("Chorus", 2, 4, 4), DLY("Analog", 440, "Off", 3.5, 5, 2.5), REV("Hall", 5, 25, 5, 2.2), G(-70))
-I("Brian May", "Queen Lead", "Inspired By", ["Classic Rock", "Arena Rock"], "Treble-boosted chime amp at full tilt.",
+P("Treble Chime Lead", "Lead", ["Classic Rock", "Arena Rock"], "Treble-boosted chime amp at full tilt.",
   A("Chime Top", 7.5, 5, 6, 6), C("2x12 Blue", 3, 2), D("Treble Boost", 6, 5, 5.5), DLY("Digital", 400, "Off", 3, 5, 2.4), REV("Hall", 4, 20, 5, 1.8), G(-62))
-I("Keith Richards", "Open-G Swagger", "Inspired By", ["Rock and Roll", "Classic Rock"], "Loose, raw tweed breakup.",
+P("Raw Tweed Swagger", "Crunch", ["Rock and Roll", "Classic Rock"], "Loose, raw tweed breakup.",
   A("Tweed Edge", 6, 5, 5.5, 5.5), C("1x12 Open Back", 3.5, 2.5), REV("Room", 3, 5, 5, 1.4), G(-64))
-I("Pete Townshend", "Windmill Power Chords", "Inspired By", ["Classic Rock", "Mod"], "Loud, open British power chords.",
+P("Open Power Chords", "Rock", ["Classic Rock", "Mod"], "Loud, open British power chords.",
   A("Brit 68", 7, 5, 5.5, 6.5, 6), C("4x12 Vintage", 3, 2), REV("Room", 3, 5, 5, 1.4), G(-62))
-I("Mark Knopfler", "Sultans Clean", "Inspired By", ["Classic Rock", "Roots"], "Out-of-phase sparkle, compressed, a touch of delay.",
+P("Out-of-Phase Sparkle", "Clean", ["Classic Rock", "Roots"], "Out-of-phase sparkle, compressed, a touch of delay.",
   A("Glass Clean", 5, 4, 5.5, 6, 6), C("2x12 American", 2.5, 2), COMP(5, 4), DLY("Digital", 300, "Off", 2, 6, 1.5), REV("Room", 3.5, 10, 5, 1.8), EQ(0, -2, -2, 2, 3, 2, 0), G(-68))
-I("Stevie Ray Vaughan", "Texas Flood", "Inspired By", ["Texas Blues", "Blues"], "Big clean amp slammed by a green overdrive.",
+P("Slammed Clean Blues", "Blues", ["Texas Blues", "Blues"], "Big clean amp slammed by a green overdrive.",
   A("Glass Clean", 7, 5.5, 6, 6, 5.5, 5, 7.5), C("4x12 Vintage", 3, 2), D("Green Drive", 2, 5.5, 7), REV("Spring", 3, 0, 5, 1.5), G(-64))
-I("B.B. King", "Thrill Lead", "Inspired By", ["Blues"], "Clean, singing, sweet single notes.",
+P("Sweet Blues Lead", "Lead", ["Blues"], "Clean, singing, sweet single notes.",
   A("Glass Clean", 5.5, 4.5, 6.5, 5), C("1x12 Open Back", 4, 2), COMP(4, 5), REV("Room", 3.5, 10, 4.5, 1.8), G(-68))
-I("Chuck Berry", "Rock and Roll Twang", "Inspired By", ["Rock and Roll", "50s"], "Small, slightly dirty combo with slapback.",
+P("Rock and Roll Twang", "Crunch", ["Rock and Roll", "50s"], "Small, slightly dirty combo with slapback.",
   A("Tweed Edge", 5.5, 5, 5.5, 6), C("1x12 Open Back", 3, 2), DLY("Tape", 110, "Off", 0.5, 5, 2.5), G(-66))
-I("Carlos Santana", "Sustain Forever", "Inspired By", ["Latin Rock", "Classic Rock"], "Smooth, mid-heavy, endless sustain.",
+P("Sustain Forever", "Rock", ["Latin Rock", "Classic Rock"], "Smooth, mid-heavy, endless sustain.",
   A("Redline Lead", 7, 5, 7.5, 4.5, 4.5), C("4x12 Real Classic", 4.5, 2), REV("Hall", 4, 20, 4.5, 1.8), G(-62))
-I("Tony Iommi", "Sabbath Riff", "Inspired By", ["Heavy Metal", "Doom"], "Treble booster into a cranked British head. Tune down.",
+P("Doom Treble Boost", "Metal", ["Heavy Metal", "Doom"], "Treble booster into a cranked British head. Tune down.",
   A("Brit 81", 6.5, 5, 6.5, 5.5, 5), C("4x12 Real Classic", 3.5, 2), D("Treble Boost", 6, 5, 5.5), REV("Room", 3, 5, 4.5, 1.2), G(-60))
-I("Randy Rhoads", "Crazy Train Lead", "Inspired By", ["Heavy Metal", "Neo-Classical"], "Boosted British lead with a hint of chorus.",
+P("Neo-Classical Lead", "Metal", ["Heavy Metal", "Neo-Classical"], "Boosted British lead with a hint of chorus.",
   A("Brit 81", 7.5, 5, 6.5, 6), C("4x12 Real Classic", 3, 2), D("Green Drive", 2, 5.5, 7), MOD("Chorus", 3, 2.5, 2.5), DLY("Analog", 380, "Off", 2.5, 4.5, 1.8), G(-58))
-I("Zakk Wylde", "Pinch Harmonic Beast", "Inspired By", ["Heavy Metal"], "Big, mid-boosted squealing rhythm.",
+P("Pinch Harmonic Rhythm", "Metal", ["Heavy Metal"], "Big, mid-boosted squealing rhythm.",
   A("Brit 81", 7.5, 6, 7, 6, 6), C("4x12 Real Classic", 3, 2), D("Metal Box", 2, 5, 7), G(-56), REV("Room", 2.5, 5, 5, 0.8))
-I("Kirk Hammett", "Wah Solo", "Inspired By", ["Thrash", "Heavy Metal"], "Scooped high gain with an auto-wah for solos.",
+P("Auto-Wah Metal Solo", "Metal", ["Thrash", "Heavy Metal"], "Scooped high gain with an auto-wah for solos.",
   A("Modern High Gain", 7, 6, 4, 6.5, 6.5), C("4x12 Real Heavy", 3, 2), WAH("Auto", 5, 7, 6), DLY("Digital", 380, "Off", 2.5, 5, 2), G(-56))
-I("James Hetfield", "Downpicked Thrash", "Inspired By", ["Thrash", "Heavy Metal"], "Scooped, tight, crushing rhythm.",
+P("Downpicked Thrash", "Metal", ["Thrash", "Heavy Metal"], "Scooped, tight, crushing rhythm.",
   A("Modern High Gain", 7, 6.5, 3, 6.5, 6.5, 6.5), C("4x12 Real Heavy", 2.5, 1.5), D("Green Drive", 1, 6, 7), G(-54, 50), NOREV(), double=7)
-I("Dimebag Darrell", "Cowboys Groove", "Inspired By", ["Groove Metal"], "Razor-sharp, gated, very scooped.",
+P("Gated Groove Metal", "Metal", ["Groove Metal"], "Razor-sharp, gated, very scooped.",
   A("Tight Metal", 7.5, 7, 2.5, 7, 7, 6), C("4x12 Real Tight", 2.5, 1.5), D("Clean Boost", 3, 6, 6), G(-48, 30), NOREV())
-I("Tom Morello", "Killing Riff", "Inspired By", ["Rap Metal", "Alternative"], "Tight British crunch plus an octave-up pitch effect.",
+P("Octave-Up Crunch", "Metal", ["Rap Metal", "Alternative"], "Tight British crunch plus an octave-up pitch effect.",
   A("Brit 81", 6.5, 5, 6, 5.5, 5.5), C("4x12 Real Classic", 3, 1.5), PITCH("Shift", 12, 5), G(-58), NOREV())
-I("Kerry King", "Reign of Thrash", "Inspired By", ["Thrash"], "Fast, buzzy, aggressive thrash.",
+P("Fast Buzzy Thrash", "Metal", ["Thrash"], "Fast, buzzy, aggressive thrash.",
   A("Modern High Gain", 8, 6, 4.5, 7, 7), C("4x12 Real Heavy", 2.5, 1.5), G(-52, 40), NOREV())
-I("Max Cavalera", "Roots Groove", "Inspired By", ["Groove Metal", "Thrash"], "Downtuned, fat, grinding rhythm.",
+P("Downtuned Grind Groove", "Metal", ["Groove Metal", "Thrash"], "Downtuned, fat, grinding rhythm.",
   A("Modern High Gain", 6.5, 7, 4, 5.5, 5.5, 7), C("4x12 Real Heavy", 3, 1.5), D("Metal Box", 3, 5, 6), G(-52, 40), NOREV())
-I("Chuck Schuldiner", "Death Melody", "Inspired By", ["Death Metal"], "Clear, aggressive tone for melodic death metal.",
+P("Melodic Death Lead", "Metal", ["Death Metal"], "Clear, aggressive tone for melodic death metal.",
   A("Modern High Gain", 7, 5.5, 5.5, 6.5, 6.5), C("4x12 Real Heavy", 2.5, 1.5), D("Green Drive", 1, 6, 7), G(-52, 40), REV("Room", 2, 5, 5, 0.6))
-I("Adam Jones", "Spiral Riff", "Inspired By", ["Progressive Metal", "Alternative Metal"], "Thick, mid-heavy high gain with a phaser option.",
+P("Spiral Prog Riff", "Metal", ["Progressive Metal", "Alternative Metal"], "Thick, mid-heavy high gain with a phaser option.",
   A("Modern High Gain", 6, 6, 6.5, 5, 5, 6.5), C("4x12 Real Heavy", 3.5, 2), G(-54, 50), REV("Room", 2.5, 5, 4.5, 0.8))
-I("Misha Mansoor", "Djent Machine", "Inspired By", ["Djent", "Progressive Metal"], "Boosted, tight and articulate down to drop G.",
+P("Djent Machine", "Metal", ["Djent", "Progressive Metal"], "Boosted, tight and articulate down to drop G.",
   A("Tight Metal", 6.5, 5, 6, 6.5, 6.5, 5), C("4x12 Real Tight", 2, 1, 90, 10000), D("Green Drive", 0, 6.5, 7.5), G(-48, 35), NOREV(), double=7)
-I("Tosin Abasi", "Eight-String Clean", "Inspired By", ["Progressive Metal", "Fusion"], "Pristine, compressed clean with delay for tapping.",
+P("Eight-String Clean", "Clean", ["Progressive Metal", "Fusion"], "Pristine, compressed clean with delay for tapping.",
   A("Glass Clean", 3.5, 5, 5, 6, 6), C("2x12 American", 2.5, 2), COMP(6, 4), DLY("Ping Pong", 380, "1/8", 3, 6, 2), REV("Plate", 4, 15, 5.5, 2), G(-70))
-I("Plini", "Floating Lead", "Inspired By", ["Progressive", "Instrumental"], "Smooth boosted lead with lush ambient delay.",
+P("Floating Lead", "Lead", ["Progressive", "Instrumental"], "Smooth boosted lead with lush ambient delay.",
   A("Redline Lead", 6, 5, 6, 5.5, 5.5), C("4x12 Real Classic", 3.5, 2), D("Green Drive", 1.5, 5.5, 7), DLY("Ping Pong", 450, "1/4", 4.5, 5, 3.5), REV("Hall", 6, 30, 5, 3), G(-60))
-I("Tim Henson", "Glossy Clean", "Inspired By", ["Math Rock", "Instrumental"], "Bright, squashed, chorused clean.",
+P("Glossy Squashed Clean", "Clean", ["Math Rock", "Instrumental"], "Bright, squashed, chorused clean.",
   A("Glass Clean", 4, 4.5, 5, 6.5, 6.5), C("2x12 American", 2.5, 1.5), COMP(7, 3), MOD("Chorus", 3, 4, 5), REV("Plate", 3.5, 15, 6, 2), G(-70), double=4)
-I("Mikael Akerfeldt", "Opeth Dynamics", "Inspired By", ["Progressive Metal"], "Dark, warm high gain that still has detail.",
+P("Dark Prog Dynamics", "Metal", ["Progressive Metal"], "Dark, warm high gain that still has detail.",
   A("Redline Lead", 6.5, 6, 6, 4.5, 4.5, 6), C("4x12 Real Classic", 4, 2), G(-56), REV("Room", 3, 8, 4.5, 1.2))
-I("Joe Duplantier", "Gojira Heavy", "Inspired By", ["Progressive Metal", "Death Metal"], "Huge, tight, mid-forward heavy rhythm.",
+P("Huge Tight Heavy", "Metal", ["Progressive Metal", "Death Metal"], "Huge, tight, mid-forward heavy rhythm.",
   A("Tight Metal", 7, 6.5, 6, 5.5, 6, 7), C("4x12 Real Tight", 3, 1.5), G(-50, 40), NOREV(), double=7)
-I("Synyster Gates", "Metalcore Solo", "Inspired By", ["Metalcore", "Heavy Metal"], "Saturated, polished lead with delay.",
+P("Metalcore Solo", "Metal", ["Metalcore", "Heavy Metal"], "Saturated, polished lead with delay.",
   A("Redline Lead", 7.5, 5, 6.5, 6, 6), C("4x12 Real Classic", 3, 2), D("Green Drive", 1, 6, 7), DLY("Digital", 400, "1/4", 3, 6, 2.5), REV("Hall", 4.5, 20, 5, 1.8), G(-58))
-I("Mark Tremonti", "Rock Anthem Rhythm", "Inspired By", ["Hard Rock", "Post-Grunge"], "Thick, saturated modern rock rhythm.",
+P("Rock Anthem Rhythm", "Crunch", ["Hard Rock", "Post-Grunge"], "Thick, saturated modern rock rhythm.",
   A("Modern High Gain", 6, 6, 5.5, 5.5, 5.5, 6), C("4x12 Real Heavy", 3, 2), G(-56), NOREV(), double=6)
-I("Bloodywood", "Desi Folk Metal", "Inspired By", ["Folk Metal", "Nu-Metal"], "Heavy, bouncy and mid-forward to sit with dhol and flute.",
+P("Desi Folk Metal", "Metal", ["Folk Metal", "Nu-Metal"], "Heavy, bouncy and mid-forward to sit with dhol and flute.",
   A("Tight Metal", 6.5, 6, 6, 6, 6, 6.5), C("4x12 Real Tight", 3, 1.5), D("Green Drive", 0.5, 6, 7), G(-50, 40), NOREV(), double=7)
-I("Architects", "Modern Metalcore", "Inspired By", ["Metalcore"], "Crushing, polished modern metalcore rhythm.",
+P("Modern Metalcore", "Metal", ["Metalcore"], "Crushing, polished modern metalcore rhythm.",
   A("Tight Metal", 7, 6, 5.5, 6, 6.5, 6.5), C("4x12 Real Tight", 2.5, 1.5), D("Green Drive", 0.5, 6, 7), G(-48, 35), NOREV(), double=7)
-I("Bring Me The Horizon", "Arena Metalcore", "Inspired By", ["Metalcore", "Alternative"], "Big modern heavy rhythm with space.",
+P("Arena Metalcore", "Metal", ["Metalcore", "Alternative"], "Big modern heavy rhythm with space.",
   A("Modern High Gain", 6.5, 6, 5, 6, 6, 6.5), C("4x12 Real Heavy", 3, 1.5), G(-52, 40), REV("Room", 2, 5, 5, 0.8), double=7)
 
 # Grunge / alternative / indie
-I("Kurt Cobain", "Teen Spirit Distortion", "Inspired By", ["Grunge"], "Raw distortion pedal into a clean-ish amp.",
+P("Raw Grunge Distortion", "Rock", ["Grunge"], "Raw distortion pedal into a clean-ish amp.",
   A("Glass Clean", 5, 5.5, 5, 5.5), C("4x12 Vintage", 3.5, 2), D("Rodent Dist", 6.5, 4.5, 5), G(-60), REV("Room", 2, 5, 5, 0.8))
-I("Kurt Cobain", "Come As You Are Clean", "Inspired By", ["Grunge"], "Watery chorus clean.",
+P("Watery Chorus Clean", "Clean", ["Grunge"], "Watery chorus clean.",
   A("Glass Clean", 4, 5, 5, 5.5), C("4x12 Vintage", 3.5, 2), MOD("Chorus", 3, 7, 7), REV("Room", 2.5, 5, 5, 1), G(-66))
-I("Jerry Cantrell", "Rooster Grind", "Inspired By", ["Grunge", "Alternative Metal"], "Thick, sludgy, mid-heavy grunge.",
+P("Sludgy Grunge Grind", "Metal", ["Grunge", "Alternative Metal"], "Thick, sludgy, mid-heavy grunge.",
   A("Brit 81", 7, 6, 6.5, 5, 5, 6), C("4x12 Real Classic", 3.5, 2), MOD("Chorus", 1.5, 2, 2), G(-58), REV("Room", 2.5, 5, 4.5, 1))
-I("Kim Thayil", "Black Hole Drone", "Inspired By", ["Grunge"], "Fuzzy, droney, heavy grunge.",
+P("Droney Grunge", "Rock", ["Grunge"], "Fuzzy, droney, heavy grunge.",
   A("Brit 68", 6.5, 6, 5.5, 5, 5, 6), C("4x12 Vintage", 3.5, 2), D("Big Fuzz", 5, 5, 5), G(-58), REV("Room", 2.5, 5, 4.5, 1))
-I("Billy Corgan", "Fuzz Wall", "Inspired By", ["Alternative", "Grunge"], "Massive, saturated fuzz wall.",
+P("Fuzz Wall", "Rock", ["Alternative", "Grunge"], "Massive, saturated fuzz wall.",
   A("Brit 81", 5, 6, 5, 5.5), C("4x12 Real Heavy", 3.5, 2), D("Big Fuzz", 8, 5.5, 5), G(-56), NOREV(), double=8)
-I("Jack White", "Seven Nation Fuzz", "Inspired By", ["Garage Rock", "Blues Rock"], "Gnarly fuzz plus an octave down for the riff.",
+P("Octave Down Fuzz", "Rock", ["Garage Rock", "Blues Rock"], "Gnarly fuzz plus an octave down for the riff.",
   A("Tweed Edge", 6, 5, 5.5, 5.5), C("4x12 Vintage", 3.5, 2), PITCH("Sub Octave", -12, 6), D("Big Fuzz", 7, 5, 5), G(-58), REV("Room", 2, 5, 5, 0.8))
-I("The Edge", "Streets Delay", "Inspired By", ["Rock", "Post-Punk"], "Chiming amp with dotted-eighth delay.",
+P("Dotted Delay Chime", "Clean", ["Rock", "Post-Punk"], "Chiming amp with dotted-eighth delay.",
   A("Chime Top", 5.5, 4.5, 5, 6.5, 6), C("2x12 Blue", 3, 2), COMP(3, 6), DLY("Digital", 400, "1/8 dotted", 4.5, 7, 4), REV("Hall", 4.5, 20, 6, 2), G(-66))
-I("Johnny Marr", "Jangle Chorus", "Inspired By", ["Indie", "Post-Punk"], "Sparkling, chorused arpeggios.",
+P("Jangle Chorus", "Clean", ["Indie", "Post-Punk"], "Sparkling, chorused arpeggios.",
   A("Glass Clean", 4.5, 4.5, 5, 6.5, 6), C("2x12 American", 2.5, 2), COMP(4, 5), MOD("Chorus", 3, 5, 6), REV("Room", 3.5, 10, 5.5, 2), G(-68), double=4)
-I("Robert Smith", "Cold Flanger", "Inspired By", ["Post-Punk", "Goth", "New Wave"], "Icy chorus-flange clean with a hall.",
+P("Cold Flanger", "Clean", ["Post-Punk", "Goth", "New Wave"], "Icy chorus-flange clean with a hall.",
   A("Glass Clean", 4.5, 4.5, 5, 6, 5.5), C("2x12 American", 3, 2), MOD("Flanger", 2, 5, 3), REV("Hall", 5.5, 25, 5, 2.8), G(-68))
-I("Kevin Shields", "Glide Guitar", "Inspired By", ["Shoegaze"], "Fuzz, vibrato and a giant reverb wash.",
+P("Glide Shoegaze Wash", "Ambient", ["Shoegaze"], "Fuzz, vibrato and a giant reverb wash.",
   A("Tweed Edge", 6, 5, 5, 5), C("2x12 Blue", 4.5, 3), D("Big Fuzz", 7, 5, 4.5), MOD("Vibrato", 3, 6, 5), REV("Cloud", 5.5, 30, 4, 5), G(-58), double=6)
-I("Jonny Greenwood", "Radio Glitch", "Inspired By", ["Alternative", "Art Rock"], "Spiky, glitchy, lo-fi attack.",
+P("Glitchy Lo-Fi Attack", "Lo-Fi", ["Alternative", "Art Rock"], "Spiky, glitchy, lo-fi attack.",
   A("Brit 68", 6, 5, 6, 6.5), C("2x12 Blue", 3, 2), LOFI(4, 4, 1, 1, 4, 7), G(-60), REV("Room", 2, 5, 5, 1))
-I("Josh Homme", "Desert Riff", "Inspired By", ["Stoner Rock", "Desert Rock"], "Midrangey, fuzzy, dry desert rock.",
+P("Desert Riff", "Rock", ["Stoner Rock", "Desert Rock"], "Midrangey, fuzzy, dry desert rock.",
   A("Tweed Edge", 6.5, 5, 7, 5), C("2x12 Blue", 3.5, 2), D("Big Fuzz", 5, 6.5, 5), PITCH("Octave Up", 12, 2), G(-58), NOREV())
-I("John Frusciante", "Funky Clean", "Inspired By", ["Funk Rock", "Alternative"], "Thin, bright, dry funk clean.",
+P("Thin Funk Clean", "Clean", ["Funk Rock", "Alternative"], "Thin, bright, dry funk clean.",
   A("Brit 68", 3, 4.5, 5, 6.5, 6), C("4x12 Vintage", 2.5, 2), REV("Room", 2, 5, 5, 0.8), G(-68))
-I("John Frusciante", "Fuzz Solo", "Inspired By", ["Funk Rock", "Alternative"], "Big fuzz lead with tape echo.",
+P("Fuzz Solo Tape Echo", "Lead", ["Funk Rock", "Alternative"], "Big fuzz lead with tape echo.",
   A("Brit 68", 5, 5, 5.5, 6), C("4x12 Vintage", 3, 2), D("Big Fuzz", 6.5, 6, 4.5), DLY("Tape", 380, "Off", 3, 4, 2.2), G(-60))
-I("Tom DeLonge", "Pop Punk Bright", "Inspired By", ["Pop Punk"], "Bright, tight, doubled pop punk.",
+P("Pop Punk Bright", "Rock", ["Pop Punk"], "Bright, tight, doubled pop punk.",
   A("Brit 81", 6.5, 5, 6, 7, 6.5), C("4x12 Real Classic", 2.5, 1.5), G(-58), NOREV(), double=7)
-I("Billie Joe Armstrong", "Basket Crunch", "Inspired By", ["Pop Punk", "Punk"], "Hot, crunchy British punk rhythm.",
+P("Punk Crunch Rhythm", "Rock", ["Pop Punk", "Punk"], "Hot, crunchy British punk rhythm.",
   A("Brit 81", 7, 5.5, 6.5, 6, 6), C("4x12 Real Classic", 3, 1.5), G(-58), NOREV(), double=6)
-I("Alex Turner", "Arctic Fuzz", "Inspired By", ["Indie Rock"], "Gritty fuzz riffs, a little lo-fi.",
+P("Lo-Fi Fuzz Riff", "Rock", ["Indie Rock"], "Gritty fuzz riffs, a little lo-fi.",
   A("Tweed Edge", 6, 5, 6, 5.5), C("2x12 Blue", 3.5, 2), D("Big Fuzz", 5.5, 5.5, 5), G(-60), REV("Room", 2.5, 5, 5, 1))
-I("Matt Bellamy", "Muse Octave Fuzz", "Inspired By", ["Alternative", "Arena Rock"], "Synthy octave fuzz riff tone.",
+P("Synthy Octave Fuzz", "Rock", ["Alternative", "Arena Rock"], "Synthy octave fuzz riff tone.",
   A("Brit 81", 6, 5.5, 5.5, 6), C("4x12 Real Heavy", 3, 2), PITCH("Sub Octave", -12, 5), D("Big Fuzz", 7, 6, 5), G(-56), NOREV())
-I("Dan Auerbach", "Black Keys Grit", "Inspired By", ["Blues Rock", "Garage Rock"], "Fuzzy, dirty blues rock.",
+P("Dirty Blues Garage", "Rock", ["Blues Rock", "Garage Rock"], "Fuzzy, dirty blues rock.",
   A("Tweed Edge", 6.5, 5.5, 6, 5), C("1x12 Open Back", 3.5, 2), D("Big Fuzz", 5, 5, 5), REV("Room", 3, 5, 4.5, 1.2), G(-60))
-I("Rivers Cuomo", "Buddy Holly Fuzz", "Inspired By", ["Alternative", "Power Pop"], "Thick, saturated power-pop fuzz.",
+P("Power Pop Fuzz", "Rock", ["Alternative", "Power Pop"], "Thick, saturated power-pop fuzz.",
   A("Brit 81", 5.5, 5.5, 6, 5.5), C("4x12 Real Heavy", 3.5, 2), D("Big Fuzz", 6, 5, 5), G(-58), NOREV(), double=6)
-I("Mac DeMarco", "Salad Days Wobble", "Inspired By", ["Indie", "Lo-Fi"], "Wobbly, chorused, slightly off clean.",
+P("Wobbly Chorus Clean", "Clean", ["Indie", "Lo-Fi"], "Wobbly, chorused, slightly off clean.",
   A("Glass Clean", 4, 5, 5, 5.5), C("1x12 Open Back", 3.5, 2), MOD("Vibrato", 3, 4, 3), LOFI(0, 0, 3, 1, 1, 10), REV("Room", 3, 8, 5, 1.8), G(-70))
-I("Kevin Parker", "Tame Impala Phase", "Inspired By", ["Psychedelic", "Indie"], "Fuzzy, phased, psychedelic.",
+P("Phased Psych Fuzz", "Rock", ["Psychedelic", "Indie"], "Fuzzy, phased, psychedelic.",
   A("Tweed Edge", 5.5, 5, 5, 5.5), C("2x12 Blue", 3.5, 2), D("Big Fuzz", 5.5, 5, 4.5), MOD("Phaser", 3, 6, 5), DLY("Tape", 420, "Off", 3, 4, 2), REV("Room", 3, 8, 5, 1.6), G(-62))
-I("Mark Speer", "Khruangbin Groove", "Inspired By", ["Psychedelic Soul", "Funk"], "Warm clean with vibe and spring.",
+P("Warm Vibe Spring Clean", "Clean", ["Psychedelic Soul", "Funk"], "Warm clean with vibe and spring.",
   A("Glass Clean", 4, 5.5, 5.5, 5), C("1x12 Open Back", 4, 2.5), MOD("Vibe", 3, 4, 4), REV("Spring", 4, 0, 4.5, 2.2), G(-70))
-I("Steve Lacy", "Bedroom Funk", "Inspired By", ["Lo-Fi", "R&B"], "Compressed, slightly lo-fi funk clean.",
+P("Bedroom Funk", "Lo-Fi", ["Lo-Fi", "R&B"], "Compressed, slightly lo-fi funk clean.",
   A("Glass Clean", 4, 5, 5, 5), C("1x8 Tiny Combo", 3.5, 2), COMP(6, 3), LOFI(0.5, 0, 2, 1, 2, 10), REV("Room", 2.5, 5, 5, 1), G(-70))
-I("Mk.gee", "Hazy Chorus", "Inspired By", ["Alternative R&B", "Lo-Fi"], "Washed-out, chorus-heavy, tape-worn clean.",
+P("Hazy Chorus", "Lo-Fi", ["Alternative R&B", "Lo-Fi"], "Washed-out, chorus-heavy, tape-worn clean.",
   A("Glass Clean", 4.5, 5, 5, 5.5), C("1x12 Open Back", 4, 2.5), COMP(6, 3), MOD("Chorus", 2.5, 7, 8), LOFI(1, 0, 4, 2, 3, 10), REV("Plate", 4, 15, 4.5, 2.2), G(-70))
 
 # Funk, R&B, pop, soul
-I("Nile Rodgers", "Chic Chop", "Inspired By", ["Disco", "Funk"], "Bright, compressed, ultra-clean rhythm.",
+P("Disco Chop", "Funk", ["Disco", "Funk"], "Bright, compressed, ultra-clean rhythm.",
   A("Glass Clean", 4, 4, 5.5, 6.5, 6.5), C("2x12 American", 2, 1), COMP(7, 2, 5.5), REV("Room", 1.5, 5, 5, 0.5), G(-70))
-I("Cory Wong", "Clean Funk Comp", "Inspired By", ["Funk"], "Squeezed, sparkling single-coil funk.",
+P("Clean Funk Comp", "Funk", ["Funk"], "Squeezed, sparkling single-coil funk.",
   A("Glass Clean", 4, 4, 5, 6.5, 6.5), C("2x12 American", 2, 1), COMP(8, 2, 5.5), REV("Room", 1.5, 5, 5, 0.5), G(-70))
-I("Prince", "Purple Lead", "Inspired By", ["Funk Rock", "Pop"], "Screaming, chorused lead with big reverb.",
+P("Screaming Chorus Lead", "Lead", ["Funk Rock", "Pop"], "Screaming, chorused lead with big reverb.",
   A("Redline Lead", 7, 5, 6, 6), C("4x12 Real Classic", 3, 2), D("Green Drive", 2, 6, 6.5), MOD("Chorus", 3, 3, 3), DLY("Digital", 400, "Off", 3, 6, 2.2), REV("Hall", 5, 25, 5.5, 2.2), G(-60))
-I("John Mayer", "Gravity Clean", "Inspired By", ["Blues", "Pop"], "Big clean with a touch of green drive.",
+P("Big Clean Green Drive", "Blues", ["Blues", "Pop"], "Big clean with a touch of green drive.",
   A("Glass Clean", 5.5, 5.5, 5, 6, 5.5), C("2x12 American", 3, 2), D("Green Drive", 2, 5, 6), REV("Spring", 3.5, 0, 5, 1.8), G(-66))
-I("John Mayer", "Slow Dancing Clean", "Inspired By", ["Pop", "Soul"], "Glassy, compressed clean with plate.",
+P("Glassy Plate Clean", "Clean", ["Pop", "Soul"], "Glassy, compressed clean with plate.",
   A("Glass Clean", 4, 5, 5, 6), C("2x12 American", 3, 2), COMP(4, 5), REV("Plate", 4, 15, 5.5, 2.2), G(-70))
-I("Mateus Asato", "Neo-Soul Sparkle", "Inspired By", ["Neo-Soul", "R&B"], "Silky, compressed clean with lush reverb.",
+P("Neo-Soul Sparkle", "Clean", ["Neo-Soul", "R&B"], "Silky, compressed clean with lush reverb.",
   A("Glass Clean", 4, 5, 5, 6, 5.5), C("2x12 American", 3, 2), COMP(5, 4), MOD("Chorus", 2, 2.5, 3), REV("Plate", 5, 20, 5, 2.6), G(-70))
-I("Tom Misch", "Jazzy Groove", "Inspired By", ["Neo-Soul", "Jazz"], "Warm, round, slightly compressed.",
+P("Jazzy Groove", "Blues", ["Neo-Soul", "Jazz"], "Warm, round, slightly compressed.",
   A("Glass Clean", 3.5, 5.5, 5, 4.5, 4.5), C("1x12 Open Back", 4.5, 2.5), COMP(4, 5), REV("Room", 3.5, 10, 4.5, 1.8), G(-72))
-I("Ichika Nito", "Ethereal Harmonics", "Inspired By", ["Instrumental", "Ambient"], "Pristine clean and a deep shimmering reverb.",
+P("Ethereal Harmonics", "Ambient", ["Instrumental", "Ambient"], "Pristine clean and a deep shimmering reverb.",
   A("Glass Clean", 3.5, 5, 5, 6), C("2x12 American", 3, 2.5), COMP(4, 6), REV("Shimmer", 6, 30, 5.5, 3.5), G(-74))
-I("Jimmy Nolen", "Chicken Scratch", "Inspired By", ["Funk", "Soul"], "Thin, bright, percussive funk rhythm.",
+P("Chicken Scratch Funk", "Funk", ["Funk", "Soul"], "Thin, bright, percussive funk rhythm.",
   A("Glass Clean", 4, 3.5, 5.5, 7, 6.5), C("1x12 Open Back", 2, 1), COMP(6, 2), REV("Room", 1.5, 5, 5, 0.5), G(-70))
 
 # Country / roots / jazz / surf
-I("Brad Paisley", "Chicken Pickin'", "Inspired By", ["Country"], "Snappy, compressed, a little hot.",
+P("Chicken Pickin'", "Crunch", ["Country"], "Snappy, compressed, a little hot.",
   A("Chime Top", 5, 4.5, 5, 6.5, 6), C("2x12 Blue", 2.5, 2), COMP(6, 3), DLY("Analog", 300, "Off", 2, 5, 1.8), G(-66))
-I("Brent Mason", "Nashville Session", "Inspired By", ["Country"], "Glassy, compressed, studio clean.",
+P("Nashville Session", "Clean", ["Country"], "Glassy, compressed, studio clean.",
   A("Glass Clean", 4.5, 4.5, 5, 6.5, 6), C("2x12 American", 2.5, 2), COMP(6, 3), REV("Room", 3, 8, 5.5, 1.4), G(-68))
-I("Keith Urban", "Country Rock Drive", "Inspired By", ["Country Rock"], "Bright overdrive for modern country.",
+P("Country Rock Drive", "Rock", ["Country Rock"], "Bright overdrive for modern country.",
   A("Chime Top", 6, 4.5, 5, 6.5, 6), C("2x12 Blue", 3, 2), D("Blues Drive", 3, 5.5, 6), DLY("Digital", 380, "Off", 2.5, 6, 2), G(-64))
-I("Wes Montgomery", "Octave Jazz", "Inspired By", ["Jazz"], "Dark, warm, thumb-picked jazz.",
+P("Thumb Jazz", "Blues", ["Jazz"], "Dark, warm, thumb-picked jazz.",
   A("Glass Clean", 3, 6.5, 5.5, 2.5, 3.5), C("1x12 Open Back", 6, 3, 60, 5500), REV("Room", 3, 10, 3.5, 1.2), G(-74))
-I("Pat Metheny", "Lyrical Chorus", "Inspired By", ["Jazz Fusion"], "Warm, chorused, delayed jazz lead.",
+P("Lyrical Chorus", "Lead", ["Jazz Fusion"], "Warm, chorused, delayed jazz lead.",
   A("Glass Clean", 3.5, 5.5, 5, 4.5), C("1x12 Open Back", 4.5, 2.5), MOD("Chorus", 2, 5, 6), DLY("Ping Pong", 380, "Off", 3, 5, 2.5), REV("Hall", 5, 25, 4.5, 2.4), G(-72))
-I("Dick Dale", "Surf Tremolo Picking", "Inspired By", ["Surf"], "Loud, bright, soaked in spring.",
+P("Surf Tremolo Picking", "Crunch", ["Surf"], "Loud, bright, soaked in spring.",
   A("Glass Clean", 6, 5, 4.5, 7, 6.5), C("2x12 American", 2.5, 2), REV("Spring", 6.5, 0, 6, 4.5), G(-66))
 
 # Ambient / post-rock
-I("Explosions in the Sky", "Crescendo Tremolo", "Inspired By", ["Post-Rock"], "Shimmering tremolo picking with a huge hall.",
+P("Crescendo Tremolo", "Ambient", ["Post-Rock"], "Shimmering tremolo picking with a huge hall.",
   A("Chime Top", 5, 5, 5, 6), C("2x12 Blue", 3, 2), DLY("Digital", 400, "1/4 dotted", 4, 6, 3), REV("Hall", 7.5, 40, 5.5, 3.5), G(-66))
-I("Sigur Ros", "Glacial Bowed Wash", "Inspired By", ["Post-Rock", "Ambient"], "Endless, glacial reverb wash.",
+P("Glacial Wash", "Ambient", ["Post-Rock", "Ambient"], "Endless, glacial reverb wash.",
   A("Tweed Edge", 5, 5, 5, 5), C("2x12 Blue", 4, 3), D("Big Fuzz", 4, 4, 4), REV("Cloud", 8, 60, 4.5, 6), G(-62))
 
 # Punk / classic
-I("Johnny Ramone", "Blitzkrieg Buzz", "Inspired By", ["Punk"], "Pure downstroke buzzsaw.",
+P("Downstroke Buzzsaw", "Rock", ["Punk"], "Pure downstroke buzzsaw.",
   A("Brit 81", 7.5, 5, 6.5, 6.5, 6), C("4x12 Real Classic", 2.5, 1.5), G(-58), NOREV())
-I("Steve Jones", "Never Mind Crunch", "Inspired By", ["Punk"], "Thick, cranked British punk rhythm.",
+P("Cranked Punk Crunch", "Rock", ["Punk"], "Thick, cranked British punk rhythm.",
   A("Brit 68", 8, 5.5, 6.5, 6), C("4x12 Vintage", 3, 2), G(-58), NOREV(), double=6)
 
 # India and South Asia
-I("The Local Train", "Aaoge Tum Kabhi Rock", "Inspired By", ["Desi Indie", "Alternative"], "Warm Hindi alt-rock crunch with delay.",
+P("Hindi Alt Rock", "Crunch", ["Desi Indie", "Alternative"], "Warm Hindi alt-rock crunch with delay.",
   A("Brit 68", 5.5, 5, 6, 5.5), C("4x12 Vintage", 3, 2), DLY("Digital", 420, "Off", 3, 5.5, 2.2), REV("Hall", 4.5, 20, 5, 2), G(-62))
-I("Prateek Kuhad", "Soft Indie Clean", "Inspired By", ["Desi Indie", "Folk Pop"], "Gentle, warm clean for soft songs.",
+P("Soft Indie Clean", "Clean", ["Desi Indie", "Folk Pop"], "Gentle, warm clean for soft songs.",
   A("Glass Clean", 3, 5.5, 5, 4.5, 4.5), C("1x12 Open Back", 4.5, 2.5), COMP(4, 6), REV("Room", 4, 12, 4.5, 2.4), G(-74))
-I("Indian Ocean", "Fusion Groove", "Inspired By", ["Indian Fusion", "Folk Rock"], "Earthy, slightly driven tone for fusion grooves.",
+P("Fusion Groove", "Crunch", ["Indian Fusion", "Folk Rock"], "Earthy, slightly driven tone for fusion grooves.",
   A("Tweed Edge", 5, 5.5, 6, 5), C("1x12 Open Back", 3.5, 2.5), REV("Room", 3.5, 10, 4.5, 1.8), G(-66))
-I("Parikrama", "Indian Classic Rock", "Inspired By", ["Indian Rock", "Classic Rock"], "Big, melodic classic-rock crunch.",
+P("Indian Classic Rock", "Crunch", ["Indian Rock", "Classic Rock"], "Big, melodic classic-rock crunch.",
   A("Brit 81", 6, 5, 6.5, 5.5), C("4x12 Real Classic", 3, 2), DLY("Analog", 420, "Off", 2.5, 5, 2), REV("Hall", 4, 20, 5, 1.8), G(-60))
-I("Raghu Dixit", "Folk Strum Energy", "Inspired By", ["Indian Folk", "Folk Rock"], "Bright, bouncy strumming tone.",
+P("Folk Strum Energy", "Clean", ["Indian Folk", "Folk Rock"], "Bright, bouncy strumming tone.",
   A("Chime Top", 4.5, 5, 5, 6), C("2x12 Blue", 3, 2), COMP(4, 5), REV("Room", 3.5, 10, 5, 2), G(-68))
-I("When Chai Met Toast", "Sunny Indie Pop", "Inspired By", ["Desi Indie", "Indie Pop"], "Bright, happy, chorused clean.",
+P("Sunny Indie Pop", "Clean", ["Desi Indie", "Indie Pop"], "Bright, happy, chorused clean.",
   A("Glass Clean", 4, 5, 5, 6, 5.5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 2.5, 3, 4), REV("Plate", 4, 15, 5.5, 2.2), G(-70))
-I("A.R. Rahman", "Cinematic Swell", "Inspired By", ["Bollywood", "Cinematic"], "Lush, wide, cinematic clean-to-lead tone.",
+P("Cinematic Swell", "Ambient", ["Bollywood", "Cinematic"], "Lush, wide, cinematic clean-to-lead tone.",
   A("Chime Top", 5, 5, 5, 5.5), C("2x12 Blue", 3.5, 2.5), COMP(4, 5), DLY("Ping Pong", 450, "Off", 4, 5, 3), REV("Hall", 6.5, 30, 5, 3.2), G(-66), double=4)
 
 # Bass players
-I("Flea", "Slap Funk Bass", "Inspired By", ["Bass", "Funk Rock"], "Punchy, bright slap bass.",
+P("Slap Funk Bass", "Bass", ["Bass", "Funk Rock"], "Punchy, bright slap bass.",
   A("Bass Station", 4.5, 6.5, 4, 7), C("4x10 Bass", 2.5, 1.5, 30, 12000), COMP(7, 2), NOREV(), G(-70))
-I("Cliff Burton", "Fuzz Wah Bass", "Inspired By", ["Bass", "Thrash"], "Fuzzed bass with a wah, for lead bass lines.",
+P("Fuzz Wah Bass", "Bass", ["Bass", "Thrash"], "Fuzzed bass with a wah, for lead bass lines.",
   A("Bass Station", 6, 6, 5, 5.5), C("4x10 Bass", 3, 2, 30, 9000), D("Big Fuzz", 6, 5, 5), WAH("Auto", 5, 6, 5), G(-60), NOREV())
-I("Geddy Lee", "Prog Bass Growl", "Inspired By", ["Bass", "Progressive Rock"], "Bright, growly, midrange-y bass.",
+P("Prog Bass Growl", "Bass", ["Bass", "Progressive Rock"], "Bright, growly, midrange-y bass.",
   A("Bass Station", 6, 5.5, 6.5, 6.5), C("4x10 Bass", 2.5, 2, 30, 11000), COMP(5, 4), NOREV(), G(-66))
-I("Rahul Ram", "Earthy Fusion Bass", "Inspired By", ["Bass", "Indian Fusion"], "Warm, woody, round bass.",
+P("Earthy Fusion Bass", "Bass", ["Bass", "Indian Fusion"], "Warm, woody, round bass.",
   A("Bass Station", 4, 6.5, 5.5, 4), C("1x15 Bass", 4, 2.5, 30, 6000), COMP(4, 5), NOREV(), G(-70))
-I("James Jamerson", "Motown Thump", "Inspired By", ["Bass", "Motown", "Soul"], "Deep, dark, thumpy old-school bass.",
+P("Old-School Thump", "Bass", ["Bass", "Motown", "Soul"], "Deep, dark, thumpy old-school bass.",
   A("Bass Station", 3.5, 7, 5, 2.5), C("1x15 Bass", 4.5, 2.5, 30, 4500), COMP(4, 5), NOREV(), G(-72))
 
 
 # ---------------------------------------------------------------- Songs players asked for
-S("Metallica", "Master of Puppets", "", ["Thrash", "Heavy Metal"], "Fast, dry, scooped rhythm for downpicked eighths.",
+P("Fast Dry Thrash Rhythm", "Metal", ["Thrash", "Heavy Metal"], "Fast, dry, scooped rhythm for downpicked eighths.",
   A("Tight Metal", 7, 4.5, 4, 6.5, 6, 5.5), C("4x12 Real Tight", 2.5, 1.5), EQ(3, 0, -2, -5, -2, 2, 3), G(-54, 50), NOREV(), double=7)
-S("Metallica", "Master of Puppets", "Interlude", ["Thrash", "Heavy Metal"], "Clean arpeggios with chorus for the slow middle part.",
+P("Chorus Arpeggio Interlude", "Clean", ["Thrash", "Heavy Metal"], "Clean arpeggios with chorus for the slow middle part.",
   A("Glass Clean", 3.5, 5, 4.5, 6, 5.5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 3, 5, 5), REV("Hall", 5, 20, 5, 2.5), G(-70))
-S("Def Leppard", "Pour Some Sugar on Me", "", ["Hard Rock", "80s", "Arena Rock"], "Compressed, chorused, layered arena crunch.",
+P("Layered Arena Crunch", "Crunch", ["Hard Rock", "80s", "Arena Rock"], "Compressed, chorused, layered arena crunch.",
   A("Brit 81", 6, 4.5, 6.5, 6.5, 6), C("4x12 Real Classic", 2.5, 2, 90, 9000), COMP(6, 4), MOD("Chorus", 2.5, 4, 4), REV("Plate", 4, 20, 6, 2), G(-60), double=8)
-S("Iron Maiden", "Fear of the Dark", "", ["Heavy Metal", "NWOBHM"], "Mid-forward British gallop that also carries the twin leads.",
+P("British Gallop", "Metal", ["Heavy Metal", "NWOBHM"], "Mid-forward British gallop that also carries the twin leads.",
   A("Brit 81", 7, 5, 7, 6, 5.5), C("4x12 Real Classic", 3, 2), REV("Room", 3.5, 10, 5, 1.4), G(-60))
-S("Iron Maiden", "Fear of the Dark", "Intro", ["Heavy Metal", "NWOBHM"], "The quiet opening: clean, chorus and a long hall.",
+P("Quiet Intro Clean", "Clean", ["Heavy Metal", "NWOBHM"], "The quiet opening: clean, chorus and a long hall.",
   A("Glass Clean", 3, 5, 5, 5.5, 5), C("2x12 American", 3.5, 2.5), MOD("Chorus", 2.5, 5, 5), DLY("Digital", 400, "Off", 2, 5, 1.5), REV("Hall", 5.5, 25, 5, 2.8), G(-70))
-S("Dream Theater", "Wither", "Lead", ["Progressive Metal", "Progressive Rock"], "Smooth, sustaining solo tone with delay and a hall.",
+P("Smooth Prog Solo", "Metal", ["Progressive Metal", "Progressive Rock"], "Smooth, sustaining solo tone with delay and a hall.",
   A("Redline Lead", 7, 5, 6.5, 5.5, 5), C("4x12 Real Classic", 3.5, 2), D("Green Drive", 1, 5.5, 7), DLY("Digital", 440, "Off", 3, 5.5, 2.5), REV("Hall", 5, 25, 5, 2.2), G(-60))
-S("Dream Theater", "Wither", "Verse", ["Progressive Metal", "Progressive Rock"], "Glassy, chorused clean with a soft delay.",
+P("Glassy Prog Verse", "Clean", ["Progressive Metal", "Progressive Rock"], "Glassy, chorused clean with a soft delay.",
   A("Glass Clean", 3.5, 5, 5, 6, 5), C("2x12 American", 3, 2), COMP(4, 5), MOD("Chorus", 2, 4, 4.5), DLY("Digital", 440, "Off", 2.5, 5.5, 2), REV("Hall", 5, 25, 5.5, 2.6), G(-70))
-S("Guns N' Roses", "Sweet Child O' Mine", "", ["Hard Rock", "Classic Rock"], "Warm, round crunch for the opening riff. Use the neck pickup.",
+P("Warm Round Crunch", "Crunch", ["Hard Rock", "Classic Rock"], "Warm, round crunch for the opening riff. Use the neck pickup.",
   A("Brit 81", 5.5, 5.5, 7, 5, 4.5), C("4x12 Real Classic", 3.5, 2), DLY("Analog", 380, "Off", 2, 4.5, 1.2), REV("Room", 3.5, 10, 5, 1.6), G(-62))
-S("Guns N' Roses", "Sweet Child O' Mine", "Solo", ["Hard Rock", "Classic Rock"], "Singing neck-pickup lead. Switch the wah on for the second half of the solo.",
+P("Neck Pickup Singing Lead", "Lead", ["Hard Rock", "Classic Rock"], "Singing neck-pickup lead. Switch the wah on for the second half of the solo.",
   A("Redline Lead", 7, 5.5, 7, 5.5, 5), C("4x12 Real Classic", 3.5, 2), WAH("Classic", 5, 6.5, 5.5), FIX(wah_on=False), DLY("Analog", 400, "Off", 2.5, 4.5, 1.8), REV("Room", 3.5, 10, 5, 1.5), G(-60))
-S("Avenged Sevenfold", "Nightmare", "", ["Heavy Metal", "Metalcore"], "Thick, tight rhythm. The song is in drop D.",
+P("Drop D Rhythm", "Metal", ["Heavy Metal", "Metalcore"], "Thick, tight rhythm. The song is in drop D.",
   A("Modern High Gain", 7, 6, 4.5, 6.5, 6.5, 6.5), C("4x12 Real Heavy", 2.5, 1.5), D("Green Drive", 1, 6, 7), G(-54, 50), NOREV(), double=7)
 P("Big Fuzz Wall", "Rock", ["Alternative", "Shoegaze", "Stoner Rock"], "The Big Fuzz pedal into a loud, nearly clean stack. Thick and endless.",
   A("Brit 68", 3.5, 5.5, 5.5, 5, 4.5), C("4x12 Vintage", 3.5, 2), D("Big Fuzz", 7.5, 5, 5), REV("Room", 3, 8, 5, 1.2), G(-58))

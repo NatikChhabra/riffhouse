@@ -99,21 +99,12 @@ public:
             modified = m;
             index = idx;
             sub = {};
-            // "Inspired by <artist>: <title>" shows the title here and the artist on the line under it
             title = n;
-            if (n.startsWith ("Inspired by ") && n.contains (": "))
-            {
-                title = n.fromFirstOccurrenceOf (": ", false, false);
-                sub = n.upToFirstOccurrenceOf (": ", false, false);
-            }
             if (idx >= 0)
             {
                 const auto& pr = proc.presets().all()[(size_t) idx];
-                // under the title: who it is after, with the band when the tone is named after a player
-                if (pr.inspiredBy.isNotEmpty())
-                    sub = "Inspired by " + pr.inspiredBy + (pr.band.isNotEmpty() && pr.band != pr.inspiredBy ? " (" + pr.band + ")" : juce::String());
-                else if (sub.isEmpty())
-                    sub = pr.category;
+                // under the title: the category, then the genres
+                sub = pr.category;
                 if (! pr.genres.isEmpty()) sub << ", " << pr.genres.joinIntoString (", ").toLowerCase();
             }
             else if (sub.isEmpty())
@@ -376,6 +367,17 @@ public:
         tunerButton.onClick = [this] { toggleOverlay (tuner); };
         metroButton.setTooltip ("Metronome");
         metroButton.onClick = [this] { showPopover (metroPanel, metroButton.getBounds(), 300, 274); };
+        // beside the name, out of the way of playing: say what is wrong, and a quiet thank-you
+        feedbackButton.setTooltip ("Send feedback: tell us what to fix");
+        feedbackButton.onClick = [this] { showPopover (feedbackDialog, feedbackButton.getBounds(), 420, 324); };
+        supportButton.setTooltip ("Support Riffhouse. Everyone gets the same app; supporting is a thank-you, not a purchase.");
+        supportButton.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
+        for (auto* b : { &feedbackButton, &supportButton })
+        {
+            b->drawBackground = false;
+            addAndMakeVisible (*b);
+        }
+        feedbackDialog.onDone = [this] (juce::String m) { closeOverlays(); editor.showToast (m); };
         settingsButton.setTooltip ("Settings");
         settingsButton.onClick = [this] { toggleOverlay (settings); };
         recordOptions.setTooltip ("Recording options and play-along");
@@ -437,6 +439,8 @@ public:
         sheetView.onClose = [this] { closeOverlays(); };
         sheetView.onMessage = [this] (juce::String m) { editor.showToast (m); };
         settings.onClose = [this] { closeOverlays(); };
+        whatsNewPanel.onClose = [this] { closePopovers(); };
+        settings.onWhatsNew = [this] { closeOverlays(); showWhatsNew(); };
         settings.onRunSetup = [this] { closeOverlays(); editor.showSetupWizard(); };
         settings.onMessage = [this] (const juce::String& m) { editor.showToast (m); };
         settings.onLookChange = [this] (Look l)
@@ -466,7 +470,7 @@ public:
         scrim.onClick = [this] { closePopovers(); };
         for (juce::Component* c : { (juce::Component*) &browser, (juce::Component*) &tuner, (juce::Component*) &settings,
                                     (juce::Component*) &takesView, (juce::Component*) &sheetView, (juce::Component*) &scrim, (juce::Component*) &recordPanel, (juce::Component*) &metroPanel, (juce::Component*) &looperPanel,
-                                    (juce::Component*) &saveDialog })
+                                    (juce::Component*) &saveDialog, (juce::Component*) &feedbackDialog, (juce::Component*) &whatsNewPanel })
             addChildComponent (c);
         addChildComponent (dropHint);
         addChildComponent (toast);
@@ -499,6 +503,25 @@ public:
         showPage ((int) proc.uiState.getProperty ("page", (int) mAmp));
         refreshTop();
         motion::attach (*this);
+        // one quiet hello, once, on the fifth start: the community links live in Settings, nothing pops up after this
+        if (auto* host = StandaloneHost::get())
+        {
+            auto& st = host->settings();
+            if (! st.getBoolValue ("communityHello", false))
+            {
+                const int starts = st.getIntValue ("startCount", 0) + 1;
+                st.setValue ("startCount", starts);
+                if (starts >= 5)
+                {
+                    st.setValue ("communityHello", true);
+                    juce::Timer::callAfterDelay (6000, [safe = juce::Component::SafePointer<RiffhouseEditor> (&editor)]
+                    {
+                        if (safe != nullptr) safe->showToast ("Come say hi on Discord. The links are in Settings, under Help and about.");
+                    });
+                }
+                st.saveIfNeeded();
+            }
+        }
     }
 
     ~Root() override
@@ -664,10 +687,17 @@ public:
         p.toFront (true);
     }
 
+    // opens the card under the top bar, centred
+    void showWhatsNew()
+    {
+        whatsNewPanel.showVersion (versionLabel());
+        showPopover (whatsNewPanel, { getWidth() / 2 - 1, 40, 2, 30 }, 420, whatsNewPanel.heightFor());
+    }
+
     void closePopovers()
     {
         scrim.setVisible (false);
-        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog })
+        for (Popover* p : { (Popover*) &recordPanel, (Popover*) &metroPanel, (Popover*) &looperPanel, (Popover*) &saveDialog, (Popover*) &feedbackDialog, (Popover*) &whatsNewPanel })
             p->setVisible (false);
     }
 
@@ -817,6 +847,9 @@ public:
         // top bar: name on the left, the tone in the middle, tools on the right
         auto top = juce::Rectangle<int> (0, 0, getWidth(), topH).reduced (24, 10);
         logoArea = top.removeFromLeft (180);
+        top.removeFromLeft (4);
+        feedbackButton.setBounds (top.removeFromLeft (34));
+        supportButton.setBounds (top.removeFromLeft (34));
         settingsButton.setBounds (top.removeFromRight (36));
         top.removeFromRight (6);
         recordOptions.setBounds (top.removeFromRight (18));
@@ -941,11 +974,15 @@ public:
             g.fillEllipse (lampR);
             drawCaps (g, levelText(), { lx + 13.0f, sy, 170.0f, 16.0f }, 11.0f, colours::textDim, juce::Justification::centredLeft, 0.1f);
         }
+        // the right of the line starts after the auto level words, so a long warning never runs over them
         const int clips = proc.meters().clipEvents.load();
-        const auto rightLine = juce::Rectangle<float> ((float) outMeterArea.getX(), sy, 380.0f, 16.0f);
+        const float from = (float) levelSpot.getX() + 13.0f + capsWidth (levelText(), 11.0f, 0.1f) + 18.0f;
+        const auto rightLine = juce::Rectangle<float> (from, sy, (float) outMeterArea.getRight() - from, 16.0f);
+        auto fit = [&] (const juce::String& longer, const juce::String& shorter)
+        { return capsWidth (longer, 11.0f, 0.1f) <= rightLine.getWidth() ? longer : shorter; };
         if (clips > 0)
-            drawCaps (g, "Hitting the limiter: lower volume a little", rightLine, 11.0f, colours::warn, juce::Justification::centredRight, 0.1f);
-        else
+            drawCaps (g, fit ("Hitting the limiter: lower volume a little", "Limiter: turn down"), rightLine, 11.0f, colours::warn, juce::Justification::centredRight, 0.1f);
+        else if (capsWidth (latencyText(), 11.0f, 0.1f) <= rightLine.getWidth())
             drawCaps (g, latencyText(), rightLine, 11.0f, colours::textDim, juce::Justification::centredRight, 0.1f);
     }
 
@@ -966,6 +1003,7 @@ public:
     IconButton undoButton { icons::undo() }, redoButton { icons::redo() }, loopButton { icons::loop() };
     int historyTicks = 0;
     IconButton sheetButton { icons::chordBox() };
+    IconButton feedbackButton { icons::message() }, supportButton { icons::heart() };
     IconButton tunerButton { icons::tuningFork() }, metroButton { icons::metronome(), "100" }, settingsButton { icons::gear() };
     RecordButton record;
     IconButton recordOptions { icons::chevronDown() };
@@ -987,6 +1025,8 @@ public:
     MetronomePanel metroPanel;
     LooperPanel looperPanel;
     SaveDialog saveDialog;
+    FeedbackDialog feedbackDialog;
+    WhatsNewPanel whatsNewPanel;
     Toast toast;
     DropHint dropHint;
     NoticeBar noticeBar;
@@ -1004,7 +1044,8 @@ public:
                      inSettings { settings, motion::Enter::rise }, inTakes { takesView, motion::Enter::rise },
                      inScrim { scrim, motion::Enter::fade },
                      inRecord { recordPanel, motion::Enter::drop }, inMetro { metroPanel, motion::Enter::drop },
-                     inLooper { looperPanel, motion::Enter::drop }, inSave { saveDialog, motion::Enter::drop };
+                     inLooper { looperPanel, motion::Enter::drop }, inSave { saveDialog, motion::Enter::drop },
+                     inFeedback { feedbackDialog, motion::Enter::drop }, inWhatsNew { whatsNewPanel, motion::Enter::drop };
 
     juce::String lastStatus;
     bool demoLevels = false;
@@ -1341,6 +1382,8 @@ void RiffhouseEditor::openFile (const juce::File& f)
         case Dropped::none: break;
     }
 }
+
+void RiffhouseEditor::showWhatsNew() { root->showWhatsNew(); }
 
 void RiffhouseEditor::showToast (const juce::String& m)
 {
@@ -1940,10 +1983,10 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     }
     r.toggleOverlay (r.browser);
     shoot ("browser");
-    r.browser.show ("Inspired By", {});
-    shoot ("browser-inspired");
-    r.browser.show ("All", "metallica");
-    shoot ("browser-band");
+    r.browser.show ("Metal", {});
+    shoot ("browser-metal");
+    r.browser.show ("Blues", {});
+    shoot ("browser-blues");
     r.browser.show ("All", {});
     r.closeOverlays();
     r.toggleOverlay (r.tuner);
@@ -2032,6 +2075,12 @@ void RiffhouseEditor::saveSnapshots (const juce::File& folder, float scale, floa
     r.closePopovers();
     r.showPopover (r.saveDialog, r.saveButton.getBounds(), 360, 206);
     shoot ("save");
+    r.closePopovers();
+    r.showPopover (r.feedbackDialog, r.feedbackButton.getBounds(), 420, 324);
+    shoot ("feedback");
+    r.closePopovers();
+    r.showWhatsNew();
+    shoot ("whats-new");
     r.closePopovers();
     {
         SetupWizard w (proc);
