@@ -760,3 +760,30 @@ details:not([open]) > p { display: none; }
 @media (max-width: 699px) {
   .plugline-keys span:first-child { left: 18%; }
 }
+
+/* Free amp sims compared (free-amp-sim-windows.html). */
+.kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.kinds li { display: grid; grid-template-rows: 220px auto 1fr; gap: 16px; padding: 28px; border-radius: var(--r-m); background: var(--well); }
+.kinds img { place-self: center; width: auto; max-width: 100%; max-height: 200px; border-radius: var(--r-s); }
+.kinds h3 { font: 800 clamp(30px, 2.8vw, 40px)/.95 var(--font-display); text-transform: uppercase; }
+.kinds p { color: var(--soft); }
+.side-grid { display: grid; gap: clamp(40px, 5vw, 72px); }
+.side { width: 100%; border-collapse: collapse; font-size: var(--t-body); }
+.side th, .side td { padding: 16px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--bone-2); }
+.side thead th { font-weight: 600; border-bottom: 2px solid var(--ink); }
+.side tbody th { font-weight: 600; width: 22%; }
+.side td { color: var(--soft); }
+.side td:last-child { color: var(--ink); font-weight: 600; }
+.side-note { color: var(--soft); max-width: 36em; }
+.has-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: clamp(40px, 5vw, 72px); }
+.has-say { grid-column: 1 / 9; display: grid; gap: 28px; }
+@media (max-width: 899px) {
+  .kinds { grid-template-columns: minmax(0, 1fr); }
+  .kinds li { grid-template-rows: auto auto auto; }
+  .has-say { grid-column: 1 / -1; }
+}
+@media (max-width: 699px) {
+  .side { font-size: var(--t-small); }
+  .side th, .side td { padding: 12px 6px; }
+  .side tbody th { width: auto; }
+}
