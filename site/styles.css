@@ -556,6 +556,7 @@ details:not([open]) > p { display: none; }
 /* The update rail in the first screen of What's new, the email box, and the one question after an uninstall */
 .stops.is-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 .stops.is-six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.stops.is-seven { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .news-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: 40px; align-items: end; }
 .news-grid h2 { grid-column: 1 / 7; font-size: clamp(64px, 9vw, 152px); line-height: .85; max-width: 8ch; }
 .news { grid-column: 7 / 13; display: grid; gap: 16px; }
@@ -583,7 +584,7 @@ details:not([open]) > p { display: none; }
   .news-grid h2, .news, .left-form, .left-done { grid-column: 1 / -1; }
 }
 @media (max-width: 699px) {
-  .stops.is-five, .stops.is-six { grid-template-columns: minmax(0, 1fr); }
+  .stops.is-five, .stops.is-six, .stops.is-seven { grid-template-columns: minmax(0, 1fr); }
   /* On a phone the list of versions comes first and the button closes the screen */
   .upd-hero .road-say { display: contents; }
   .upd-hero .lead { margin-top: 24px; }

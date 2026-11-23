@@ -2,7 +2,7 @@
 
 > Riffhouse is a free, open-source guitar amp simulator and pedalboard for Windows 10 and 11. It runs on its own or as a VST3 plugin, with 11 amps, 30 pedals, 12 cabinets and 197 tones, and it works through a computer's mic jack with no audio interface.
 
-Current version: 0.1.6, released 2026-11-17. Price: free (0 USD), with no account, no ads and no paid version. Platform: Windows 10 and 11, 64-bit. Licence: AGPL-3.0, open source. Made by Natik Chhabra.
+Current version: 0.1.7, released 2026-11-23. Price: free (0 USD), with no account, no ads and no paid version. Platform: Windows 10 and 11, 64-bit. Licence: AGPL-3.0, open source. Made by Natik Chhabra.
 
 ## What it has
 
