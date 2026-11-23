@@ -10,6 +10,8 @@ if (RIFFHOUSE_GEAR_ART)
     juce_add_binary_data(riffhouse_gear NAMESPACE RiffhouseGear HEADER_NAME GearData.h SOURCES ${RIFFHOUSE_GEAR_ART})
 endif()
 
+juce_add_binary_data(riffhouse_notes NAMESPACE RiffhouseNotes HEADER_NAME NotesData.h SOURCES ${CMAKE_SOURCE_DIR}/resources/whatsnew.txt)
+
 set(RIFFHOUSE_FORMATS Standalone VST3)
 if (APPLE)
     list(APPEND RIFFHOUSE_FORMATS AU)
@@ -64,6 +66,7 @@ target_sources(Riffhouse PRIVATE
     plugin/Updater.cpp
     plugin/LevelMatcher.cpp
     plugin/Version.cpp
+    plugin/WhatsNew.cpp
     ui/Motion.cpp
     ui/Theme.cpp
     ui/Widgets.cpp
@@ -133,6 +136,7 @@ target_link_libraries(Riffhouse
         riffhouse_stretch
         riffhouse_lame
         riffhouse_assets
+        riffhouse_notes
         juce::juce_audio_utils
         juce::juce_cryptography
         juce::juce_dsp

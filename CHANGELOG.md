@@ -34,6 +34,7 @@ Update 1. The high-gain amps were rebuilt after a player told us the metal tones
 - The 65 metal and hard rock tones on the Real cabinets now cut the top above 7 kHz instead of 12 kHz, so less fizz rides above the tone.
 - The other cabinets roll off above 7 kHz the way real speakers do, with no flat fizz on top.
 - Every tone was level-matched again.
+- After an update Riffhouse opens a What's new card once: what is new and what was fixed in a few lines, a link to the full release notes and one to the Discord server. Settings, Help and about has a What's new button to open it again.
 - A Feedback button sits next to the name at the top: write what sounds or feels wrong and it goes straight to the people who fix Riffhouse, with your settings report if you want (your user name and computer name are taken out). The heart beside it opens the support page; supporting is a thank-you, everyone gets the same app.
 - A capture file (.nam) that was cut short, as a broken download is, could crash Riffhouse when you dropped it in: the capture library read past the end of its numbers before noticing. Riffhouse now checks first and says the file is damaged.
 - The Lo-fi pedal's Downsample knob glides when it is turned, with no click.

@@ -15,7 +15,4 @@ juce::String versionForPeople();
 
 // "0.1.5.1" as people say it: "0.1.5 Hotfix 1". Anything else comes back as it is.
 juce::String spokenVersion (const juce::String& label);
-
-// One line on what this version changed for the player, said once after an update.
-juce::String whatsNew();
 } // namespace rh

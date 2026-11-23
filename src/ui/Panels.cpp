@@ -7,6 +7,8 @@
 #include "../plugin/StandaloneHost.h"
 #include "../plugin/Updater.h"
 #include "../plugin/Version.h"
+#include "../plugin/WhatsNew.h"
+#include <NotesData.h>
 
 namespace rh::ui
 {
@@ -130,6 +132,109 @@ void Popover::paint (juce::Graphics& g)
         g.setFont (font (17.0f, Weight::semibold));
         g.drawText (title, getLocalBounds().reduced (20, 16).removeFromTop (24), juce::Justification::centredLeft);
     }
+}
+
+//==============================================================================
+WhatsNewPanel::WhatsNewPanel()
+{
+    title = "What's new";
+    close.setTooltip ("Close");
+    close.onClick = [this] { if (onClose) onClose(); else setVisible (false); };
+    addAndMakeVisible (close);
+    for (auto* l : { &notes, &discord })
+    {
+        l->setFont (font (13.5f), false, juce::Justification::centredLeft);
+        l->setColour (juce::HyperlinkButton::textColourId, colours::textDim);
+        addAndMakeVisible (*l);
+    }
+    discord.setTooltip ("Opens the Riff House Discord server: help, ideas and beta feedback.");
+    showVersion (versionLabel());
+}
+
+void WhatsNewPanel::showVersion (const juce::String& label)
+{
+    const auto e = findWhatsNew (juce::String::fromUTF8 (RiffhouseNotes::whatsnew_txt, RiffhouseNotes::whatsnew_txtSize), label);
+    shown = e.version;
+    lines.clear();
+    for (int pass = 0; pass < 2; ++pass)
+    {
+        const auto& items = pass == 0 ? e.added : e.fixed;
+        if (items.isEmpty()) continue;
+        lines.push_back ({ pass == 0 ? "New" : "Fixed", true, nullptr });
+        for (const auto& t : items) lines.push_back ({ t, false, nullptr });
+    }
+    notes.setURL (juce::URL ("https://github.com/NatikChhabra/riffhouse/releases" + (shown.isNotEmpty() ? "/tag/v" + shown : juce::String())));
+    build();
+}
+
+void WhatsNewPanel::build()
+{
+    int y = 62;
+    const int textW = cardW - 40 - 18;
+    for (auto& l : lines)
+    {
+        if (l.head)
+        {
+            y += (y > 62 ? 10 : 0);
+            l.y = y;
+            l.h = 22;
+        }
+        else
+        {
+            juce::AttributedString a;
+            a.setWordWrap (juce::AttributedString::byWord);
+            a.setLineSpacing (3.0f);
+            a.append (l.text, font (14.0f), colours::text);
+            l.layout = std::make_unique<juce::TextLayout>();
+            l.layout->createLayout (a, (float) textW);
+            l.y = y;
+            l.h = (int) std::ceil (l.layout->getHeight()) + 7;
+        }
+        y += l.h;
+    }
+    bodyBottom = y;
+    resized();
+}
+
+int WhatsNewPanel::heightFor() const { return bodyBottom + 14 + 46; }
+
+void WhatsNewPanel::paint (juce::Graphics& g)
+{
+    Popover::paint (g);
+    g.setColour (colours::textFaint);
+    g.setFont (font (13.0f));
+    const int titleW = (int) font (17.0f, Weight::semibold).getStringWidthFloat (title);
+    g.drawText (spokenVersion (shown.isNotEmpty() ? shown : versionLabel()), 20 + titleW + 10, 16, 140, 24, juce::Justification::centredLeft);
+    if (lines.empty())
+    {
+        g.setColour (colours::textDim);
+        g.setFont (font (14.0f));
+        g.drawText ("The full list of changes is on GitHub.", 20, 62, cardW - 40, 24, juce::Justification::centredLeft);
+    }
+    for (auto& l : lines)
+    {
+        if (l.head)
+        {
+            g.setColour (colours::accent);
+            g.setFont (font (13.0f, Weight::semibold));
+            g.drawText (l.text, 20, l.y, cardW - 40, l.h, juce::Justification::centredLeft);
+            continue;
+        }
+        g.setColour (colours::textFaint);
+        g.fillEllipse (22.0f, (float) l.y + 8.0f, 4.0f, 4.0f);
+        l.layout->draw (g, juce::Rectangle<float> (38.0f, (float) l.y, (float) (cardW - 40 - 18), (float) l.h));
+    }
+    const int footY = lines.empty() ? 100 : bodyBottom + 6;
+    g.setColour (colours::line);
+    g.drawHorizontalLine (footY, 20.0f, (float) getWidth() - 20.0f);
+}
+
+void WhatsNewPanel::resized()
+{
+    close.setBounds (getWidth() - 20 - 30, 12, 30, 30);
+    const int footY = (lines.empty() ? 100 : bodyBottom + 6) + 8;
+    notes.setBounds (20, footY, 190, 28);
+    discord.setBounds (getWidth() - 20 - 70, footY, 70, 28);
 }
 
 //==============================================================================
@@ -667,6 +772,9 @@ SettingsView::SettingsView (RiffhouseProcessor& p)
     // a thank-you, never a purchase: everyone gets the same app
     support.setTooltip ("Opens the website's support page. Everyone gets the same app; supporting is a thank-you, not a purchase.");
     support.onClick = [] { juce::URL ("https://riffhouse.in/#support").launchInDefaultBrowser(); };
+    whatsNewButton.setTooltip ("What changed in this version.");
+    whatsNewButton.onClick = [this] { if (onWhatsNew) onWhatsNew(); };
+    page.addAndMakeVisible (whatsNewButton);
     page.addAndMakeVisible (support);
     // one quiet line, never a pop-up: a star is how other players find a free project
     starLink.setFont (font (13.5f), false, juce::Justification::centredLeft);
@@ -1021,7 +1129,7 @@ void SettingsView::show (Section s)
     autoUpdate.setVisible (hasUpdater);
     if (channelRow != nullptr) channelRow->setVisible (hasUpdater);
     for (auto* c : std::initializer_list<juce::Component*> { &inGain, &gate, &inMeter, &gateOn, &inputFix, hum.get(), &teachControl, &teachJob,
-                                                             &footView, &lessMotion, &website, &problem, &report, &support, &starLink,
+                                                             &footView, &lessMotion, &website, &problem, &report, &support, &whatsNewButton, &starLink,
                                                              &discord, &youtube, &instagram, &siteLink })
         c->setVisible (true);
     layoutPage();
@@ -1222,6 +1330,8 @@ void SettingsView::layoutPage()
             {
                 auto row = at (42);
                 support.setBounds (row.removeFromLeft (200));
+                row.removeFromLeft (12);
+                whatsNewButton.setBounds (row.removeFromLeft (130));
                 row.removeFromLeft (16);
                 starLink.setBounds (row.withWidth (std::min (row.getWidth(), 220)));
             }
