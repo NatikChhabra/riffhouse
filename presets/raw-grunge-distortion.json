@@ -23,7 +23,7 @@
     "cab_lowcut": 60,
     "cab_highcut": 12000,
     "drv_on": true,
-    "drv_type": "Rodent Dist",
+    "drv_type": "Grit Dist",
     "drv_gain": 6.5,
     "drv_tone": 4.5,
     "drv_level": 5,

@@ -378,8 +378,8 @@ const PedalDesign& drivePedalDesign (int t)
         { "clean boost", "plus 20 dB of clean", 0xffaeb3b5, 0xff16191b, 0xffd9f1ff, Finish::brushed,    KnobStyle::dome,    0xff16191b, Face::instrumentSemi, false, 0.86f, 0, 1, 3 },
         { "TREBLE BOOSTER", "range 1", 0xff5f6f78, 0xfff1ead8, 0xffffb547, Finish::hammertone, KnobStyle::chicken, 0xffece4cf, Face::shoulders,      true,  0.92f, 0, 2, 0 },
         { "GREEN DRIVE", "mid overdrive", 0xff2e6a42, 0xfff0e8cc, 0xff7dffa0, Finish::enamel,     KnobStyle::pedal,   0xfff0e8cc, Face::shoulders,      true,  1.0f,  1, 0, 0 },
-        { "blues drive", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::script, false, 1.0f,  0, 1, 0 },
-        { "RODENT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
+        { "blues crunch", "low gain", 0xff1d4f9a, 0xffe9eef5, 0xff7fc4ff, Finish::sparkle,    KnobStyle::dome,    0xff1b1e24, Face::script, false, 1.0f,  0, 1, 0 },
+        { "GRIT", "distortion", 0xff1c1d1e, 0xfff2f0e8, 0xffffb547, Finish::crinkle,    KnobStyle::pedal,   0xfff2f0e8, Face::shoulders,      true,  1.0f,  0, 2, 0 },
         { "big fuzz", "sustainer", 0xffe6dbc0, 0xff3b2a1a, 0xffffb547, Finish::enamel,     KnobStyle::skirted, 0xff1e1a16, Face::shoulders,      false, 1.28f, 3, 3, 2 },
         { "METAL BOX", "high gain", 0xff34373b, 0xfff4a524, 0xfff3f3ee, Finish::crinkle,    KnobStyle::skirted, 0xff101112, Face::shoulders,      true,  1.0f,  2, 0, 0 },
     };

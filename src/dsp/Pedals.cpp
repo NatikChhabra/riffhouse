@@ -1261,7 +1261,7 @@ void DrivePedal::prepare (double sampleRate, int maxBlock)
     sr = sampleRate;
     // Every pedal is its circuit (Circuits.h). 8x below 64 kHz: the diodes and transistors make
     // harmonics far above the guitar, and at 4x they fold back as a digital grit the real pedals
-    // never had (the pedal lab measures it). The rodent, the fuzz and the metal box clip hard
+    // never had (the pedal lab measures it). The grit, the fuzz and the metal box clip hard
     // enough to need 16x: at 8x their fold-back sat 40 to 60 dB down, at 16x 61 to 75 dB.
     const int st = sampleRate < 64000.0 ? 3 : 2;
     os = std::make_unique<juce::dsp::Oversampling<float>> (1, (size_t) st, juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR, true, false);
@@ -1270,7 +1270,7 @@ void DrivePedal::prepare (double sampleRate, int maxBlock)
     osHigh->initProcessing ((size_t) maxBlock);
     osr = sr * (double) (1 << st);
     green.prepare (osr, kNewtonSteps);
-    rodent.prepare (2.0 * osr, kNewtonSteps);
+    grit.prepare (2.0 * osr, kNewtonSteps);
     fuzz.prepare (2.0 * osr, kNewtonSteps);
     boost.prepare (osr, kNewtonSteps);
     trebleBoost.prepare (osr, kNewtonSteps);
@@ -1287,11 +1287,11 @@ void DrivePedal::reset()
 {
     if (os) os->reset();
     if (osHigh) osHigh->reset();
-    green.reset(); rodent.reset(); fuzz.reset();
+    green.reset(); grit.reset(); fuzz.reset();
     boost.reset(); trebleBoost.reset(); blues.reset(); metal.reset();
     setPots (drive, tone, true); // a fresh start is already where the knobs are
     // A circuit starts with every capacitor empty and charges to where its bias holds it, and
-    // that charging comes out as a thump (-49 dB from the blues drive and the metal box; the
+    // that charging comes out as a thump (-49 dB from the blues crunch and the metal box; the
     // others start where they rest). Run those on silence for 10 ms first, which leaves under
     // -84 dB, as a real pedal is already powered when it is stepped on. Costs 0.3 to 0.7 ms.
     if (type == 3 || type == 6)
@@ -1336,7 +1336,7 @@ void DrivePedal::setPots (double d, double t, bool all)
     if (all || type == 1) trebleBoost.set (d, t);
     if (all || type == 2) green.set (d, t);
     if (all || type == 3) blues.set (d, t);
-    if (all || type == 4) rodent.set (d, t);
+    if (all || type == 4) grit.set (d, t);
     if (all || type == 5) fuzz.set (d, t);
     if (all || type == 6) metal.set (d, t);
 }
@@ -1349,7 +1349,7 @@ double DrivePedal::runCircuit (double v) noexcept
         case 1: return trebleBoost.process (v);
         case 2: return green.process (v);
         case 3: return blues.process (v);
-        case 4: return rodent.process (v);
+        case 4: return grit.process (v);
         case 5: return fuzz.process (v);
         default: return metal.process (v);
     }

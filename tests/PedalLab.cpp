@@ -60,7 +60,7 @@ std::unique_ptr<Original> makeOriginal (int type)
         case 2: return std::make_unique<Exact<c::GreenDrive>>();
         case 3: return std::make_unique<Exact<c::BluesDrive>>();
         case 6: return std::make_unique<Exact<c::MetalBox>>();
-        case 4: return std::make_unique<Exact<c::RodentDist>>();
+        case 4: return std::make_unique<Exact<c::GritDist>>();
         case 5: return std::make_unique<Exact<c::BigFuzz>>();
         default: return {};
     }
@@ -68,7 +68,7 @@ std::unique_ptr<Original> makeOriginal (int type)
 
 const char* pedalName (int type)
 {
-    static const char* names[] = { "Clean Boost", "Treble Boost", "Green Drive", "Blues Drive", "Rodent Dist", "Big Fuzz", "Metal Box" };
+    static const char* names[] = { "Clean Boost", "Treble Boost", "Green Drive", "Blues Crunch", "Grit Dist", "Big Fuzz", "Metal Box" };
     return names[std::clamp (type, 0, 6)];
 }
 

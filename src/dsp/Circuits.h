@@ -140,7 +140,7 @@ struct DiodeFeedback
 };
 
 // Two diodes back to back from a node to ground, fed through a resistor: the hard ceiling of
-// the rodent and metal pedals. Static, so it is solved fresh each sample from the last answer.
+// the grit and metal pedals. Static, so it is solved fresh each sample from the last answer.
 struct DiodeShunt
 {
     double r = 1000.0;
@@ -174,7 +174,7 @@ struct DiodeShunt
 // and a capacitor in parallel, from the minus input to ground up to two resistor-capacitor legs.
 // The op-amp itself has a gain that falls with frequency (its gain-bandwidth), a top speed for
 // its output (slew rate) and supply rails. Turned up, it runs out of bandwidth before anything
-// clips: that is a big part of the rodent pedal's sound. Backward Euler, solved exactly each
+// clips: that is a big part of the grit pedal's sound. Backward Euler, solved exactly each
 // sample, since all of it is linear except the speed limit and the rails.
 struct OpAmpNonInverting
 {
@@ -294,11 +294,11 @@ struct GreenDrive
     }
 };
 
-// The rodent distortion: an old op-amp at up to 2000x gain, its gain network 47 Ohm and
+// The grit distortion: an old op-amp at up to 2000x gain, its gain network 47 Ohm and
 // 2.2 uF plus 560 Ohm and 4.7 uF to ground, 100 kOhm pot and 100 pF across. It runs out of
 // bandwidth and speed before anything clips. Then two silicon diodes to ground behind 1 kOhm,
 // and a filter: 1.5 kOhm plus the 100 kOhm filter pot into 3.3 nF.
-struct RodentDist
+struct GritDist
 {
     OpAmpNonInverting amp;
     OnePoleD coupling, filter;

@@ -15,7 +15,7 @@ namespace
     // The speaker's own response is its row in CabCurves.h, in the same order.
     const CabDescription cabs[] = {
         { "1x12 Open Back", 95.0f, 0.75f, 0.0f, 3.0f, 0.0f, 11u },
-        { "2x12 Blue", 88.0f, 0.85f, 0.3f, 3.0f, 0.0f, 23u },
+        { "2x12 Chime", 88.0f, 0.85f, 0.3f, 3.0f, 0.0f, 23u },
         { "4x12 Vintage", 92.0f, 1.2f, 1.0f, 3.0f, 0.0f, 37u },
         { "4x12 Modern", 85.0f, 1.35f, 1.0f, 3.0f, 0.0f, 41u },
         { "2x12 American", 80.0f, 0.9f, 0.2f, 3.0f, 0.0f, 53u },
