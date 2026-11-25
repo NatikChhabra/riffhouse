@@ -2,6 +2,8 @@
 
 # Riffhouse
 
+> **Riffhouse is no longer actively maintained. Version 0.1.7 is the last release, and there are no plans for more updates. The app stays free, the download and the source stay online, and the Discord server stays open.**
+
 **Music should be free.** Riffhouse is a guitar amp and pedalboard for your computer: 11 amps, 30 pedals, 12 speaker cabinets and 197 tones. All of it is free, with no account, no ads and no paid version.
 
 Plug your guitar into whatever you have, an audio interface or the mic jack on a laptop. Pick your input, play for under a minute while it sets itself up, and you have an amp.
@@ -104,11 +106,9 @@ Every change runs more than 6,900 automatic checks on the sound engine before it
 
 ## What comes next
 
-The next big update, 0.2.0, brings a real pedalboard (any pedal, in any order, two of the same), scenes you switch while you play, a Mic button that sends guitar and voice into any call, Share clip for the last 30 seconds you played, a second amp, drums and a daily practice goal. Smaller updates before it fix what players report and lay its groundwork.
+Nothing is planned. Riffhouse is no longer actively maintained, so the 0.2.0 plan in the [roadmap](ROADMAP.md) will not ship from here. The code is open under the AGPL, so you are free to fork it and carry on.
 
-The whole plan is in the [roadmap](ROADMAP.md) and on the [roadmap page](https://riffhouse.in/roadmap.html). Things only get added to it, never pushed to a later version.
-
-Missing something? [Say so](https://github.com/NatikChhabra/riffhouse/issues/new). If something is broken, **Send a report** in Settings sends the details privately, or **Report in public** fills in a public report for you.
+Found a bug? You can [say so](https://github.com/NatikChhabra/riffhouse/issues/new), but fixes are not promised. If something is broken, **Send a report** in Settings sends the details privately, or **Report in public** fills in a public report for you.
 
 ## Support Riffhouse
 
